@@ -4,55 +4,51 @@ Prioritised roadmap for hardening and extending the A2A commerce platform. Organ
 
 ---
 
-## Tier 0 — Critical Correctness (fix before any production traffic)
+## Tier 0 — Critical Correctness ~~(fix before any production traffic)~~ DONE
 
-### 1. Atomic wallet balance operations
-**Products:** billing, payments, paywall
+> All Tier 0 items have been fixed and tested.
 
-`Wallet.withdraw()` and `Wallet.charge()` use a read-check-write pattern that is not atomic. Two concurrent calls can both read the same balance, both pass the `>= amount` check, and both deduct — producing a negative balance. Fix with `BEGIN IMMEDIATE` transactions or `UPDATE wallets SET balance = balance - ? WHERE balance >= ? AND agent_id = ?` (single atomic statement, check row count).
+### ~~1. Atomic wallet balance operations~~ DONE
+Uses atomic `UPDATE ... SET balance = balance - ? WHERE balance >= ?` — concurrent withdrawals can never produce negative balances. 4 new tests including concurrent withdrawal/charge/deposit.
 
-**Files:** `products/billing/src/wallet.py:95-119`
+### ~~2. Silent charge failure in paywall middleware~~ DONE
+Charge failures now log a warning and write an audit record with `reason=charge_failed:...`. 2 new tests.
 
-### 2. Silent charge failure in paywall middleware
-After a tool executes successfully, the billing charge is wrapped in a bare `except Exception: pass`. If the charge fails (concurrent balance depletion, DB error), the agent gets the service for free with no record. Replace with: logged warning + audit event + compensating transaction or pre-authorisation pattern.
+### ~~3. Assert statements used as runtime guards~~ DONE
+All `assert raw is not None` replaced with explicit `if raw is None: raise RuntimeError(...)`.
 
-**File:** `products/paywall/src/middleware.py:289-295`
+### ~~4. Dynamic SQL column names from caller-controlled dicts~~ DONE
+`update_subscription` in payments now validates keys against `_SUBSCRIPTION_COLUMNS` allowlist. 3 new tests. (Marketplace and reputation already use explicit named parameters, not dict keys.)
 
-### 3. Assert statements used as runtime guards
-`assert raw is not None` in marketplace is stripped by `python -O`. Replace all `assert` guards with explicit `if ... raise` patterns.
-
-**File:** `products/marketplace/src/marketplace.py:88,138,151`
-
-### 4. Dynamic SQL column names from caller-controlled dicts
-`update_service`, `update_target`, and `update_intent` build SQL `SET` clauses from dict keys without validating against an allowlist. If any external input reaches these dicts, it's a SQL injection vector.
-
-**Files:** `products/marketplace/src/storage.py:202`, `products/reputation/src/storage.py:198`, `products/payments/src/storage.py:346`
+### ~~5. Audit log sanitization~~ DONE
+Switched from exact key match to substring matching. Catches `ApiKey`, `stripe_secret_key`, `DB_PASSWORD`, `api_token_v2`, etc. 8 new tests.
 
 ---
 
 ## Tier 1 — Production Readiness
 
-### 5. Database migration tooling
+### ~~6. Marketplace ownership enforcement~~ DONE
+`update_service` and `deactivate_service` accept optional `requester_id`. When provided, verifies caller matches `provider_id`. Backwards-compatible (no `requester_id` = no check). 6 new tests.
+
+### ~~7. Marketplace max_cost SQL filter~~ DONE
+Moved `max_cost` filter from post-SQL Python filtering into the SQL `WHERE` clause using `json_extract`. No more truncated results at page boundaries. 2 new tests.
+
+### 8. Database migration tooling
 All products use `CREATE TABLE IF NOT EXISTS` on every connect. There is no schema versioning, no migration history, and no path for `ALTER TABLE`. Add a lightweight migration framework (version table + ordered SQL scripts per product) or adopt Alembic.
 
-### 6. Health check endpoints for MCP servers
+### 9. Health check endpoints for MCP servers
 None of the three connectors expose a health endpoint. Container orchestrators (k8s, ECS) cannot determine liveness. Add a `/health` or `ping` tool to each MCP server.
 
-### 7. Graceful shutdown handling
+### 10. Graceful shutdown handling
 The payments scheduler, reputation pipeline, and MCP servers have no `SIGTERM`/`SIGINT` handlers. SQLite connections are not closed on container termination, risking WAL corruption. Wire `asyncio` signal handlers to each service's `stop()`/`close()` methods.
 
-### 8. Docker and CI/CD
+### 11. Docker and CI/CD
 No Dockerfiles for any product. No `docker-compose.yml` for local multi-service development. No GitHub Actions workflow for automated testing. Add:
 - Per-product `Dockerfile` (or a single multi-stage build)
 - `docker-compose.yml` with all services + persistent volumes
-- `.github/workflows/ci.yml` running the full 962-test suite
+- `.github/workflows/ci.yml` running the full 987-test suite
 
-### 9. Marketplace ownership enforcement
-`update_service` and `deactivate_service` accept only `service_id` with no caller verification. Any agent who knows a service ID can modify another provider's listing. Add a `requester_id` parameter and ownership check.
-
-**File:** `products/marketplace/src/marketplace.py:104-151`
-
-### 10. Configuration externalisation
+### 12. Configuration externalisation
 Move hardcoded values to environment variables or config files:
 
 | Value | Current location | Suggested config |
@@ -97,10 +93,8 @@ The paywall accesses billing internals directly via `self.tracker._storage.recor
 - `reputation/src/storage.py:list_targets()` — same issue
 - `billing/src/tracker.py:get_usage()` — no `function` filter (must fetch all records to query "calls to tool X in the last hour")
 
-### 17. Fix marketplace `max_cost` filtering
-`search_services` applies the `max_cost` filter in Python after the SQL `LIMIT`. If many services exceed the budget, pages are short or empty even though qualifying services exist. Move the cost filter into the SQL `WHERE` clause.
-
-**File:** `products/marketplace/src/storage.py:274-278`
+### ~~17. Fix marketplace `max_cost` filtering~~ DONE
+Moved into SQL WHERE clause. See Tier 1 item 7.
 
 ### 18. Missing CRUD operations
 - **Trust:** no `delete_server` or `update_server` — stale servers accumulate indefinitely
