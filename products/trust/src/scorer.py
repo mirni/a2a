@@ -262,8 +262,6 @@ class ScoreEngine:
         now: float | None = None,
     ) -> TrustScore:
         """Compute trust score from stored data and persist the result."""
-        from .storage import StorageBackend  # avoid circular at module level
-
         if now is None:
             now = time.time()
 
