@@ -1,0 +1,46 @@
+# Stage 1: Base - Shared environment
+FROM python:3.13.11-slim-trixie AS base
+
+ENV LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONFAULTHANDLER=1 \
+    # Add both Python --user and NPM global bins to PATH
+    PATH="/root/.local/bin:/usr/local/bin:${PATH}" \
+    FT_APP_ENV="docker"
+
+# Install Node.js (Required to RUN Claude) and common tools
+RUN apt-get update && apt-get -y install \
+    sudo libatlas3-base curl sqlite3 libgomp1 git less ripgrep \
+    nodejs npm \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workdir
+
+# Stage 2: Builder - Compile and Install
+FROM base AS builder
+RUN apt-get update && apt-get -y install \
+    build-essential libssl-dev libffi-dev libgfortran5 pkg-config cmake gcc \
+    && pip install --upgrade pip wheel
+
+# 1. Install Claude Code globally in this stage
+RUN npm install -g @anthropic-ai/claude-code
+
+# 2. Install Python dependencies to /root/.local
+COPY requirements.txt /workdir/
+RUN pip install --user --no-cache-dir "numpy<2.0" \
+    && pip install --user --no-cache-dir -r requirements.txt
+
+# Stage 3: Runtime - Clean and Small
+FROM base AS runtime-image
+
+# A. Copy Python packages installed with --user
+COPY --from=builder /root/.local /root/.local
+
+# B. Copy Claude binary AND its node_modules (required!)
+COPY --from=builder /usr/local/lib/node_modules /usr/local/lib/node_modules
+COPY --from=builder /usr/local/bin/claude /usr/local/bin/claude
+
+WORKDIR /workdir
+# Claude is now in /usr/local/bin, which is in our PATH
+ENTRYPOINT [ "claude", "--dangerously-skip-permissions" ]
