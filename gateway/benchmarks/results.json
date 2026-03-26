@@ -1,0 +1,195 @@
+{
+  "system_info": {
+    "python_version": "3.13.11 (main, Feb  3 2026, 03:08:54) [GCC 14.2.0]",
+    "platform": "Linux-6.14.0-37-generic-x86_64-with-glibc2.41",
+    "processor": "unknown"
+  },
+  "timestamp": "2026-03-26T06:18:59+0000",
+  "results": [
+    {
+      "scenario_name": "health_throughput (c=1)",
+      "concurrency": 1,
+      "total_requests": 200,
+      "duration_sec": 0.0367,
+      "rps": 5453.77,
+      "p50_ms": 0.156,
+      "p95_ms": 0.192,
+      "p99_ms": 0.822,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "run_id": "55bb6ff622277263",
+      "extra": {}
+    },
+    {
+      "scenario_name": "health_throughput (c=10)",
+      "concurrency": 10,
+      "total_requests": 200,
+      "duration_sec": 0.0331,
+      "rps": 6044.06,
+      "p50_ms": 0.155,
+      "p95_ms": 0.175,
+      "p99_ms": 0.377,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "run_id": "8e30577dc1b459d9",
+      "extra": {}
+    },
+    {
+      "scenario_name": "health_throughput (c=50)",
+      "concurrency": 50,
+      "total_requests": 200,
+      "duration_sec": 0.0333,
+      "rps": 6000.84,
+      "p50_ms": 0.156,
+      "p95_ms": 0.172,
+      "p99_ms": 0.392,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "run_id": "583a29572f1b65b9",
+      "extra": {}
+    },
+    {
+      "scenario_name": "pricing_throughput (c=1)",
+      "concurrency": 1,
+      "total_requests": 200,
+      "duration_sec": 0.0492,
+      "rps": 4065.19,
+      "p50_ms": 0.228,
+      "p95_ms": 0.264,
+      "p99_ms": 0.548,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "run_id": "8332b245e42d5abd",
+      "extra": {}
+    },
+    {
+      "scenario_name": "pricing_throughput (c=10)",
+      "concurrency": 10,
+      "total_requests": 200,
+      "duration_sec": 0.0492,
+      "rps": 4062.54,
+      "p50_ms": 0.234,
+      "p95_ms": 0.269,
+      "p99_ms": 0.502,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "run_id": "1dff63ea5fa4604d",
+      "extra": {}
+    },
+    {
+      "scenario_name": "pricing_throughput (c=50)",
+      "concurrency": 50,
+      "total_requests": 200,
+      "duration_sec": 0.0533,
+      "rps": 3751.57,
+      "p50_ms": 0.244,
+      "p95_ms": 0.374,
+      "p99_ms": 0.543,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "run_id": "5e010912109ee186",
+      "extra": {}
+    },
+    {
+      "scenario_name": "execute_pipeline_get_balance (c=1)",
+      "concurrency": 1,
+      "total_requests": 100,
+      "duration_sec": 0.392,
+      "rps": 255.1,
+      "p50_ms": 4.019,
+      "p95_ms": 4.982,
+      "p99_ms": 6.597,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "run_id": "8e781993773ccf96",
+      "extra": {}
+    },
+    {
+      "scenario_name": "execute_pipeline_get_balance (c=10)",
+      "concurrency": 10,
+      "total_requests": 100,
+      "duration_sec": 0.118,
+      "rps": 847.8,
+      "p50_ms": 10.431,
+      "p95_ms": 17.07,
+      "p99_ms": 17.975,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "run_id": "dacde30a96d26232",
+      "extra": {}
+    },
+    {
+      "scenario_name": "execute_pipeline_get_balance (c=50)",
+      "concurrency": 50,
+      "total_requests": 100,
+      "duration_sec": 0.082,
+      "rps": 1219.21,
+      "p50_ms": 32.603,
+      "p95_ms": 46.984,
+      "p99_ms": 47.313,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "run_id": "40262bb446b7a2ed",
+      "extra": {}
+    },
+    {
+      "scenario_name": "execute_paid_tools_create_intent",
+      "concurrency": 10,
+      "total_requests": 50,
+      "duration_sec": 0.0939,
+      "rps": 532.32,
+      "p50_ms": 18.822,
+      "p95_ms": 22.443,
+      "p99_ms": 22.674,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "run_id": "29695e4955746381",
+      "extra": {}
+    },
+    {
+      "scenario_name": "wallet_stress_concurrent_ops",
+      "concurrency": 20,
+      "total_requests": 100,
+      "duration_sec": 0.1324,
+      "rps": 755.46,
+      "p50_ms": 20.888,
+      "p95_ms": 36.868,
+      "p99_ms": 39.673,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "run_id": "5be50a425c336dd0",
+      "extra": {
+        "final_balance": 10500.0,
+        "expected_balance": 10500.0,
+        "balance_consistent": true
+      }
+    },
+    {
+      "scenario_name": "rate_limiter_burst",
+      "concurrency": 1,
+      "total_requests": 200,
+      "duration_sec": 0.3226,
+      "rps": 619.93,
+      "p50_ms": 2.673,
+      "p95_ms": 3.081,
+      "p99_ms": 3.502,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "run_id": "3350da2700ab2681",
+      "extra": {
+        "success_count": 100,
+        "rate_limited_count": 100,
+        "status_distribution": {
+          "200": 100,
+          "429": 100
+        },
+        "cutoff_accurate": true
+      }
+    }
+  ],
+  "summary": {
+    "total_scenarios": 12,
+    "total_errors": 0,
+    "scenarios_passed": 12
+  }
+}
