@@ -1,0 +1,316 @@
+"""SQLite storage layer for billing data.
+
+All database access is async via aiosqlite. Schema is auto-created on first connect.
+"""
+
+from __future__ import annotations
+
+import json
+import time
+from dataclasses import dataclass, field
+from typing import Any
+
+import aiosqlite
+
+# ---------------------------------------------------------------------------
+# Schema
+# ---------------------------------------------------------------------------
+
+_SCHEMA = """
+CREATE TABLE IF NOT EXISTS wallets (
+    agent_id   TEXT PRIMARY KEY,
+    balance    REAL NOT NULL DEFAULT 0.0,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS usage_records (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_id   TEXT NOT NULL,
+    function   TEXT NOT NULL,
+    cost       REAL NOT NULL,
+    tokens     INTEGER NOT NULL DEFAULT 0,
+    metadata   TEXT,
+    created_at REAL NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_usage_agent   ON usage_records(agent_id);
+CREATE INDEX IF NOT EXISTS idx_usage_created ON usage_records(created_at);
+
+CREATE TABLE IF NOT EXISTS transactions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_id    TEXT NOT NULL,
+    amount      REAL NOT NULL,
+    tx_type     TEXT NOT NULL,
+    description TEXT,
+    created_at  REAL NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_tx_agent ON transactions(agent_id);
+
+CREATE TABLE IF NOT EXISTS rate_policies (
+    agent_id        TEXT PRIMARY KEY,
+    max_calls_per_min  INTEGER,
+    max_spend_per_day  REAL,
+    updated_at      REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS billing_events (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type TEXT NOT NULL,
+    agent_id   TEXT NOT NULL,
+    payload    TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    delivered  INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_undelivered ON billing_events(delivered, created_at);
+"""
+
+
+@dataclass
+class StorageBackend:
+    """Async SQLite storage backend for all billing data."""
+
+    dsn: str
+    _db: aiosqlite.Connection | None = field(default=None, init=False, repr=False)
+
+    async def connect(self) -> None:
+        """Open the database connection and ensure schema exists."""
+        db_path = self.dsn.replace("sqlite:///", "")
+        self._db = await aiosqlite.connect(db_path)
+        self._db.row_factory = aiosqlite.Row
+        await self._db.executescript(_SCHEMA)
+        await self._db.commit()
+
+    async def close(self) -> None:
+        """Close the database connection."""
+        if self._db:
+            await self._db.close()
+            self._db = None
+
+    @property
+    def db(self) -> aiosqlite.Connection:
+        if self._db is None:
+            raise RuntimeError("StorageBackend not connected. Call connect() first.")
+        return self._db
+
+    # -----------------------------------------------------------------------
+    # Wallet operations
+    # -----------------------------------------------------------------------
+
+    async def get_wallet(self, agent_id: str) -> dict[str, Any] | None:
+        cursor = await self.db.execute(
+            "SELECT agent_id, balance, created_at, updated_at FROM wallets WHERE agent_id = ?",
+            (agent_id,),
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        return dict(row)
+
+    async def create_wallet(self, agent_id: str, initial_balance: float = 0.0) -> dict[str, Any]:
+        now = time.time()
+        await self.db.execute(
+            "INSERT INTO wallets (agent_id, balance, created_at, updated_at) VALUES (?, ?, ?, ?)",
+            (agent_id, initial_balance, now, now),
+        )
+        await self.db.commit()
+        return {"agent_id": agent_id, "balance": initial_balance, "created_at": now, "updated_at": now}
+
+    async def update_balance(self, agent_id: str, new_balance: float) -> None:
+        now = time.time()
+        await self.db.execute(
+            "UPDATE wallets SET balance = ?, updated_at = ? WHERE agent_id = ?",
+            (new_balance, now, agent_id),
+        )
+        await self.db.commit()
+
+    # -----------------------------------------------------------------------
+    # Transaction log
+    # -----------------------------------------------------------------------
+
+    async def record_transaction(
+        self, agent_id: str, amount: float, tx_type: str, description: str = ""
+    ) -> int:
+        now = time.time()
+        cursor = await self.db.execute(
+            "INSERT INTO transactions (agent_id, amount, tx_type, description, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (agent_id, amount, tx_type, description, now),
+        )
+        await self.db.commit()
+        return cursor.lastrowid  # type: ignore[return-value]
+
+    async def get_transactions(
+        self, agent_id: str, limit: int = 100, offset: int = 0
+    ) -> list[dict[str, Any]]:
+        cursor = await self.db.execute(
+            "SELECT * FROM transactions WHERE agent_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (agent_id, limit, offset),
+        )
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+    # -----------------------------------------------------------------------
+    # Usage records
+    # -----------------------------------------------------------------------
+
+    async def record_usage(
+        self,
+        agent_id: str,
+        function: str,
+        cost: float,
+        tokens: int = 0,
+        metadata: dict[str, Any] | None = None,
+    ) -> int:
+        now = time.time()
+        cursor = await self.db.execute(
+            "INSERT INTO usage_records (agent_id, function, cost, tokens, metadata, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (agent_id, function, cost, tokens, json.dumps(metadata) if metadata else None, now),
+        )
+        await self.db.commit()
+        return cursor.lastrowid  # type: ignore[return-value]
+
+    async def get_usage(
+        self,
+        agent_id: str,
+        since: float | None = None,
+        until: float | None = None,
+        limit: int = 1000,
+    ) -> list[dict[str, Any]]:
+        query = "SELECT * FROM usage_records WHERE agent_id = ?"
+        params: list[Any] = [agent_id]
+        if since is not None:
+            query += " AND created_at >= ?"
+            params.append(since)
+        if until is not None:
+            query += " AND created_at <= ?"
+            params.append(until)
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+        cursor = await self.db.execute(query, params)
+        rows = await cursor.fetchall()
+        results = []
+        for r in rows:
+            d = dict(r)
+            if d.get("metadata"):
+                d["metadata"] = json.loads(d["metadata"])
+            results.append(d)
+        return results
+
+    async def get_usage_summary(
+        self, agent_id: str, since: float | None = None
+    ) -> dict[str, Any]:
+        query = "SELECT COUNT(*) as total_calls, COALESCE(SUM(cost), 0) as total_cost, COALESCE(SUM(tokens), 0) as total_tokens FROM usage_records WHERE agent_id = ?"
+        params: list[Any] = [agent_id]
+        if since is not None:
+            query += " AND created_at >= ?"
+            params.append(since)
+        cursor = await self.db.execute(query, params)
+        row = await cursor.fetchone()
+        return dict(row) if row else {"total_calls": 0, "total_cost": 0.0, "total_tokens": 0}
+
+    # -----------------------------------------------------------------------
+    # Rate policies
+    # -----------------------------------------------------------------------
+
+    async def get_rate_policy(self, agent_id: str) -> dict[str, Any] | None:
+        cursor = await self.db.execute(
+            "SELECT * FROM rate_policies WHERE agent_id = ?", (agent_id,)
+        )
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+    async def set_rate_policy(
+        self,
+        agent_id: str,
+        max_calls_per_min: int | None = None,
+        max_spend_per_day: float | None = None,
+    ) -> None:
+        now = time.time()
+        await self.db.execute(
+            "INSERT INTO rate_policies (agent_id, max_calls_per_min, max_spend_per_day, updated_at) "
+            "VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(agent_id) DO UPDATE SET "
+            "max_calls_per_min = excluded.max_calls_per_min, "
+            "max_spend_per_day = excluded.max_spend_per_day, "
+            "updated_at = excluded.updated_at",
+            (agent_id, max_calls_per_min, max_spend_per_day, now),
+        )
+        await self.db.commit()
+
+    async def delete_rate_policy(self, agent_id: str) -> None:
+        await self.db.execute("DELETE FROM rate_policies WHERE agent_id = ?", (agent_id,))
+        await self.db.commit()
+
+    # -----------------------------------------------------------------------
+    # Rate-limit check helpers
+    # -----------------------------------------------------------------------
+
+    async def count_calls_since(self, agent_id: str, since: float) -> int:
+        cursor = await self.db.execute(
+            "SELECT COUNT(*) FROM usage_records WHERE agent_id = ? AND created_at >= ?",
+            (agent_id, since),
+        )
+        row = await cursor.fetchone()
+        return row[0] if row else 0
+
+    async def sum_cost_since(self, agent_id: str, since: float) -> float:
+        cursor = await self.db.execute(
+            "SELECT COALESCE(SUM(cost), 0) FROM usage_records WHERE agent_id = ? AND created_at >= ?",
+            (agent_id, since),
+        )
+        row = await cursor.fetchone()
+        return float(row[0]) if row else 0.0
+
+    # -----------------------------------------------------------------------
+    # Billing events
+    # -----------------------------------------------------------------------
+
+    async def emit_event(
+        self, event_type: str, agent_id: str, payload: dict[str, Any]
+    ) -> int:
+        now = time.time()
+        cursor = await self.db.execute(
+            "INSERT INTO billing_events (event_type, agent_id, payload, created_at) "
+            "VALUES (?, ?, ?, ?)",
+            (event_type, agent_id, json.dumps(payload), now),
+        )
+        await self.db.commit()
+        return cursor.lastrowid  # type: ignore[return-value]
+
+    async def get_pending_events(self, limit: int = 100) -> list[dict[str, Any]]:
+        cursor = await self.db.execute(
+            "SELECT * FROM billing_events WHERE delivered = 0 ORDER BY created_at ASC LIMIT ?",
+            (limit,),
+        )
+        rows = await cursor.fetchall()
+        results = []
+        for r in rows:
+            d = dict(r)
+            d["payload"] = json.loads(d["payload"])
+            results.append(d)
+        return results
+
+    async def mark_event_delivered(self, event_id: int) -> None:
+        await self.db.execute(
+            "UPDATE billing_events SET delivered = 1 WHERE id = ?", (event_id,)
+        )
+        await self.db.commit()
+
+    async def get_events(
+        self, agent_id: str, limit: int = 100
+    ) -> list[dict[str, Any]]:
+        cursor = await self.db.execute(
+            "SELECT * FROM billing_events WHERE agent_id = ? ORDER BY created_at DESC LIMIT ?",
+            (agent_id, limit),
+        )
+        rows = await cursor.fetchall()
+        results = []
+        for r in rows:
+            d = dict(r)
+            d["payload"] = json.loads(d["payload"])
+            results.append(d)
+        return results
