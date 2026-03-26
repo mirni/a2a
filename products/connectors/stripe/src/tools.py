@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from src.client import StripeClient
-from errors import ConnectorError, ValidationError
+from src.errors import ConnectorError, ValidationError
 from src.models import (
     CreateCustomerInput,
     CreatePaymentIntentInput,

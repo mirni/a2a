@@ -6,13 +6,13 @@ import httpx
 import pytest
 
 from src.client import StripeClient, _flatten_dict, _translate_error, _get_api_key
-from errors import (
+from src.errors import (
     AuthenticationError,
     ConnectorError,
     RateLimitError,
     UpstreamError,
 )
-from retry import RetryConfig, RetryExhausted
+from src.retry import RetryConfig, RetryExhausted
 
 from .conftest import MockTransport, make_error_response, make_stripe_response
 

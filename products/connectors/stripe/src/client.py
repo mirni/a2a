@@ -11,15 +11,15 @@ from typing import Any
 
 import httpx
 
-from audit_log import log_operation
-from errors import (
+from src.audit_log import log_operation
+from src.errors import (
     AuthenticationError,
     ConnectorError,
     RateLimitError,
     UpstreamError,
 )
-from rate_limiter import RateLimiter
-from retry import RetryConfig, RetryExhausted, retry_async
+from src.rate_limiter import RateLimiter
+from src.retry import RetryConfig, RetryExhausted, retry_async
 
 STRIPE_API_BASE = "https://api.stripe.com/v1"
 STRIPE_API_VERSION = "2024-12-18.acacia"
@@ -204,7 +204,7 @@ def _translate_error(exc: Exception) -> ConnectorError:
         return UpstreamError(message, status_code=status, retryable=False)
 
     if isinstance(exc, (httpx.ConnectTimeout, httpx.ReadTimeout)):
-        from errors import TimeoutError as ConnTimeoutError
+        from src.errors import TimeoutError as ConnTimeoutError
         return ConnTimeoutError(str(exc))
 
     return UpstreamError(str(exc), retryable=False)

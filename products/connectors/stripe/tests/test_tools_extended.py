@@ -3,7 +3,7 @@
 import pytest
 
 from src.client import StripeClient
-from errors import ValidationError
+from src.errors import ValidationError
 from src.models import (
     CreateCustomerInput,
     CreatePaymentIntentInput,

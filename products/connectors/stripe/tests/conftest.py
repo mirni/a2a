@@ -11,8 +11,8 @@ import httpx
 import pytest
 
 from src.client import StripeClient
-from rate_limiter import RateLimiter
-from retry import RetryConfig
+from src.rate_limiter import RateLimiter
+from src.retry import RetryConfig
 
 
 def make_stripe_response(

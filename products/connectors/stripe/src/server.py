@@ -10,7 +10,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import ValidationError as PydanticValidationError
 
 from src.client import StripeClient
-from errors import ValidationError
+from src.errors import ValidationError
 from src.models import (
     CreateCustomerInput,
     CreatePaymentIntentInput,
