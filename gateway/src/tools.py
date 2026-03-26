@@ -231,6 +231,29 @@ async def _search_servers(ctx: AppContext, params: dict[str, Any]) -> dict[str, 
 
 
 # ---------------------------------------------------------------------------
+# Event Bus tools
+# ---------------------------------------------------------------------------
+
+
+async def _publish_event(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    event_id = await ctx.event_bus.publish(
+        event_type=params["event_type"],
+        source=params["source"],
+        payload=params.get("payload", {}),
+    )
+    return {"event_id": event_id}
+
+
+async def _get_events(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    events = await ctx.event_bus.get_events(
+        event_type=params.get("event_type"),
+        since_id=params.get("since_id", 0),
+        limit=params.get("limit", 100),
+    )
+    return {"events": events}
+
+
+# ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 
@@ -252,4 +275,7 @@ TOOL_REGISTRY: dict[str, ToolFunc] = {
     # Trust
     "get_trust_score": _get_trust_score,
     "search_servers": _search_servers,
+    # Event Bus
+    "publish_event": _publish_event,
+    "get_events": _get_events,
 }

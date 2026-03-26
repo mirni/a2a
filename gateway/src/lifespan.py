@@ -32,6 +32,12 @@ from trust_src.api import TrustAPI
 from trust_src.scorer import ScoreEngine
 from trust_src.storage import StorageBackend as TrustStorage
 
+# Shared — Event Bus
+from shared_src.event_bus import EventBus
+
+# Cross-product event handlers
+from gateway.src.event_handlers import register_all_handlers
+
 
 @dataclass
 class AppContext:
@@ -43,6 +49,7 @@ class AppContext:
     payment_engine: PaymentEngine
     marketplace: Marketplace
     trust_api: TrustAPI
+    event_bus: EventBus
 
 
 @asynccontextmanager
@@ -59,6 +66,9 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
         "MARKETPLACE_DSN", f"sqlite:///{data_dir}/marketplace.db"
     )
     trust_dsn = os.environ.get("TRUST_DSN", f"sqlite:///{data_dir}/trust.db")
+    event_bus_dsn = os.environ.get(
+        "EVENT_BUS_DSN", f"sqlite:///{data_dir}/event_bus.db"
+    )
 
     # --- Billing ---
     tracker = UsageTracker(billing_dsn)
@@ -85,6 +95,11 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     scorer = ScoreEngine(storage=trust_storage)
     trust_api = TrustAPI(storage=trust_storage, scorer=scorer)
 
+    # --- Event Bus ---
+    event_bus = EventBus(dsn=event_bus_dsn)
+    await event_bus.connect()
+    await register_all_handlers(event_bus, marketplace)
+
     # Store on app.state
     app.state.ctx = AppContext(
         tracker=tracker,
@@ -93,11 +108,13 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
         payment_engine=payment_engine,
         marketplace=marketplace,
         trust_api=trust_api,
+        event_bus=event_bus,
     )
 
     yield
 
     # --- Shutdown ---
+    await event_bus.close()
     await trust_storage.close()
     await marketplace_storage.close()
     await payment_storage.close()

@@ -40,6 +40,7 @@ async def app(tmp_data_dir, monkeypatch):
     monkeypatch.setenv("PAYMENTS_DSN", f"sqlite:///{tmp_data_dir}/payments.db")
     monkeypatch.setenv("MARKETPLACE_DSN", f"sqlite:///{tmp_data_dir}/marketplace.db")
     monkeypatch.setenv("TRUST_DSN", f"sqlite:///{tmp_data_dir}/trust.db")
+    monkeypatch.setenv("EVENT_BUS_DSN", f"sqlite:///{tmp_data_dir}/event_bus.db")
 
     application = create_app()
 

@@ -339,5 +339,63 @@
     "pricing": {"per_call": 0.0},
     "sla": {"max_latency_ms": 500},
     "tier_required": "free"
+  },
+  {
+    "name": "publish_event",
+    "service": "events",
+    "description": "Publish an event to the cross-product event bus.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "event_type": {"type": "string", "description": "Dot-separated event type (e.g. trust.score_drop)"},
+        "source": {"type": "string", "description": "Product that originated the event"},
+        "payload": {"type": "object", "description": "Arbitrary event payload"}
+      },
+      "required": ["event_type", "source"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "event_id": {"type": "integer"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 200},
+    "tier_required": "free"
+  },
+  {
+    "name": "get_events",
+    "service": "events",
+    "description": "Query events from the event bus with optional type filter and offset.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "event_type": {"type": "string", "description": "Filter by event type (optional)"},
+        "since_id": {"type": "integer", "description": "Return events after this ID (default 0)", "default": 0},
+        "limit": {"type": "integer", "description": "Maximum events to return", "default": 100}
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {"type": "integer"},
+              "event_type": {"type": "string"},
+              "source": {"type": "string"},
+              "payload": {"type": "object"},
+              "integrity_hash": {"type": "string"},
+              "created_at": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 200},
+    "tier_required": "free"
   }
 ]

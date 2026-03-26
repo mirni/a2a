@@ -10,6 +10,7 @@ After calling bootstrap(), modules are available as:
   payments_src.engine, payments_src.storage, payments_src.models, ...
   marketplace_src.marketplace, marketplace_src.models, marketplace_src.storage
   trust_src.api, trust_src.scorer, trust_src.storage, trust_src.models
+  shared_src.event_bus, shared_src.errors, shared_src.audit_log, ...
 """
 
 from __future__ import annotations
@@ -126,6 +127,7 @@ def bootstrap() -> None:
     if _bootstrapped:
         return
 
+    _load_product_simple("shared", "shared")
     _load_billing()
     _load_product_simple("paywall", "paywall")
     _load_payments()
