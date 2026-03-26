@@ -231,6 +231,45 @@ async def _search_servers(ctx: AppContext, params: dict[str, Any]) -> dict[str, 
 
 
 # ---------------------------------------------------------------------------
+# Paywall tools
+# ---------------------------------------------------------------------------
+
+
+async def _get_global_audit_log(
+    ctx: AppContext, params: dict[str, Any]
+) -> dict[str, Any]:
+    entries = await ctx.paywall_storage.get_global_audit_log(
+        since=params.get("since"),
+        limit=params.get("limit", 100),
+    )
+    return {"entries": entries}
+
+
+# ---------------------------------------------------------------------------
+# Additional Trust tools
+# ---------------------------------------------------------------------------
+
+
+async def _delete_server(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    await ctx.trust_api.delete_server(params["server_id"])
+    return {"deleted": True}
+
+
+async def _update_server(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    server = await ctx.trust_api.update_server(
+        params["server_id"],
+        name=params.get("name"),
+        url=params.get("url"),
+    )
+    return {
+        "id": server.id,
+        "name": server.name,
+        "url": server.url,
+        "transport_type": server.transport_type.value,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 
@@ -252,4 +291,8 @@ TOOL_REGISTRY: dict[str, ToolFunc] = {
     # Trust
     "get_trust_score": _get_trust_score,
     "search_servers": _search_servers,
+    "delete_server": _delete_server,
+    "update_server": _update_server,
+    # Paywall
+    "get_global_audit_log": _get_global_audit_log,
 }

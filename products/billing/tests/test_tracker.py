@@ -171,6 +171,43 @@ class TestUsageAPI:
         assert projection["projected_24h_cost"] == 240.0
 
 
+class TestUsageFunctionFilter:
+    async def test_get_usage_with_function_filter(self, tracker: UsageTracker):
+        @tracker.metered(cost=1.0)
+        async def tool_a(agent_id):
+            return "a"
+
+        @tracker.metered(cost=2.0)
+        async def tool_b(agent_id):
+            return "b"
+
+        await tool_a("agent-1")
+        await tool_a("agent-1")
+        await tool_b("agent-1")
+
+        # Filter by tool_a's qualified name
+        usage_a = await tracker.get_usage("agent-1", function="tool_a")
+        assert len(usage_a) == 2
+        for u in usage_a:
+            assert "tool_a" in u["function"]
+
+    async def test_get_usage_without_function_filter(self, tracker: UsageTracker):
+        @tracker.metered(cost=1.0)
+        async def tool_a(agent_id):
+            return "a"
+
+        @tracker.metered(cost=2.0)
+        async def tool_b(agent_id):
+            return "b"
+
+        await tool_a("agent-1")
+        await tool_b("agent-1")
+
+        # Without filter, should return all
+        usage = await tracker.get_usage("agent-1")
+        assert len(usage) == 2
+
+
 class TestRequireCreditsDecorator:
     async def test_require_credits_decorator(self, tracker: UsageTracker):
         await tracker.wallet.create("agent-1", 50.0)

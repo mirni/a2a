@@ -214,3 +214,86 @@ class TestSearchServers:
 
         servers = await api.list_servers()
         assert len(servers) == 2
+
+
+class TestDeleteServer:
+    async def test_delete_server_removes_server(self, api, storage):
+        server = await api.register_server(
+            name="Doomed", url="https://doomed.com", server_id="doom-001",
+        )
+        await api.delete_server("doom-001")
+        fetched = await storage.get_server("doom-001")
+        assert fetched is None
+
+    async def test_delete_server_removes_scores(self, api, storage):
+        await api.register_server(
+            name="Doomed", url="https://doomed.com", server_id="doom-002",
+        )
+        now = time.time()
+        await storage.store_trust_score(TrustScore(
+            server_id="doom-002",
+            timestamp=now,
+            window=Window.H24,
+            composite_score=80.0,
+            confidence=1.0,
+        ))
+        await storage.store_probe_result(ProbeResult(
+            server_id="doom-002",
+            timestamp=now,
+            latency_ms=50,
+            status_code=200,
+            tools_count=3,
+            tools_documented=3,
+        ))
+        await storage.store_security_scan(SecurityScan(
+            server_id="doom-002",
+            timestamp=now,
+            tls_enabled=True,
+            auth_required=True,
+            input_validation_score=100.0,
+            cve_count=0,
+        ))
+
+        await api.delete_server("doom-002")
+
+        # All associated data should be gone
+        scores = await storage.get_score_history("doom-002")
+        assert scores == []
+        probes = await storage.get_probe_results("doom-002")
+        assert probes == []
+        scans = await storage.get_security_scans("doom-002")
+        assert scans == []
+
+    async def test_delete_server_not_found(self, api):
+        with pytest.raises(ServerNotFoundError):
+            await api.delete_server("nonexistent")
+
+
+class TestUpdateServer:
+    async def test_update_server_name(self, api, storage):
+        await api.register_server(
+            name="Old Name", url="https://old.com", server_id="upd-001",
+        )
+        updated = await api.update_server("upd-001", name="New Name")
+        assert updated.name == "New Name"
+        assert updated.url == "https://old.com"
+
+    async def test_update_server_url(self, api, storage):
+        await api.register_server(
+            name="My Server", url="https://old.com", server_id="upd-002",
+        )
+        updated = await api.update_server("upd-002", url="https://new.com")
+        assert updated.url == "https://new.com"
+        assert updated.name == "My Server"
+
+    async def test_update_server_name_and_url(self, api, storage):
+        await api.register_server(
+            name="Old", url="https://old.com", server_id="upd-003",
+        )
+        updated = await api.update_server("upd-003", name="New", url="https://new.com")
+        assert updated.name == "New"
+        assert updated.url == "https://new.com"
+
+    async def test_update_server_not_found(self, api):
+        with pytest.raises(ServerNotFoundError):
+            await api.update_server("nonexistent", name="X")

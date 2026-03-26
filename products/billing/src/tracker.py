@@ -182,9 +182,10 @@ class UsageTracker:
         since: float | None = None,
         until: float | None = None,
         limit: int = 1000,
+        function: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Query usage history for an agent."""
-        return await self._storage.get_usage(agent_id, since, until, limit)
+        """Query usage history for an agent, optionally filtered by function name."""
+        return await self._storage.get_usage(agent_id, since, until, limit, function=function)
 
     async def get_usage_summary(
         self, agent_id: str, since: float | None = None

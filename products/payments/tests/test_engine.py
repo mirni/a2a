@@ -690,3 +690,39 @@ class TestPaymentHistory:
         history_b = await engine.get_payment_history("agent-b")
         assert len(history_a) >= 1
         assert len(history_b) >= 1
+
+    async def test_payment_history_includes_subscriptions(self, engine, funded_wallets):
+        """Payment history should include subscription records."""
+        sub = await engine.create_subscription(
+            payer="agent-a", payee="agent-b", amount=10.0,
+            interval="monthly",
+        )
+        history = await engine.get_payment_history("agent-a")
+        types = {h["type"] for h in history}
+        assert "subscription" in types
+
+    async def test_payment_history_all_types(self, engine, funded_wallets):
+        """Payment history should include intents, escrows, subscriptions, and settlements."""
+        # Create an intent and capture it (creates intent + settlement)
+        intent = await engine.create_intent(
+            payer="agent-a", payee="agent-b", amount=10.0,
+        )
+        await engine.capture(intent.id)
+
+        # Create an escrow
+        await engine.create_escrow(
+            payer="agent-a", payee="agent-b", amount=20.0,
+        )
+
+        # Create a subscription
+        await engine.create_subscription(
+            payer="agent-a", payee="agent-b", amount=5.0,
+            interval="monthly",
+        )
+
+        history = await engine.get_payment_history("agent-a")
+        types = {h["type"] for h in history}
+        assert "intent" in types
+        assert "escrow" in types
+        assert "subscription" in types
+        assert "settlement" in types

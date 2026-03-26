@@ -492,6 +492,20 @@ class PaymentStorage:
                 "created_at": escrow["created_at"],
             })
 
+        # Subscriptions
+        subscriptions = await self.list_subscriptions(agent_id=agent_id, limit=fetch_limit)
+        for sub in subscriptions:
+            history.append({
+                "type": "subscription",
+                "id": sub["id"],
+                "payer": sub["payer"],
+                "payee": sub["payee"],
+                "amount": sub["amount"],
+                "status": sub["status"],
+                "description": sub["description"],
+                "created_at": sub["created_at"],
+            })
+
         # Settlements
         settlements = await self.list_settlements(agent_id=agent_id, limit=fetch_limit)
         for settlement in settlements:

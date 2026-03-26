@@ -171,6 +171,43 @@ class TestAuditLog:
         assert len(logs) == 3
 
 
+class TestGlobalAuditLog:
+    async def test_get_global_audit_log_returns_all(self, paywall_storage: PaywallStorage):
+        await paywall_storage.record_audit(agent_id="agent-1", function="fn1")
+        await paywall_storage.record_audit(agent_id="agent-2", function="fn2")
+        await paywall_storage.record_audit(agent_id="agent-3", function="fn3")
+
+        logs = await paywall_storage.get_global_audit_log()
+        assert len(logs) == 3
+        agents = {l["agent_id"] for l in logs}
+        assert agents == {"agent-1", "agent-2", "agent-3"}
+
+    async def test_get_global_audit_log_with_since(self, paywall_storage: PaywallStorage):
+        await paywall_storage.record_audit(agent_id="agent-1", function="old_fn")
+        now = time.time()
+        await paywall_storage.record_audit(agent_id="agent-2", function="new_fn")
+
+        logs = await paywall_storage.get_global_audit_log(since=now - 0.01)
+        assert len(logs) >= 1
+        functions = [l["function"] for l in logs]
+        assert "new_fn" in functions
+
+    async def test_get_global_audit_log_with_limit(self, paywall_storage: PaywallStorage):
+        for i in range(5):
+            await paywall_storage.record_audit(agent_id=f"agent-{i}", function=f"fn{i}")
+
+        logs = await paywall_storage.get_global_audit_log(limit=3)
+        assert len(logs) == 3
+
+    async def test_get_audit_log_with_agent_id_still_filters(self, paywall_storage: PaywallStorage):
+        await paywall_storage.record_audit(agent_id="agent-1", function="fn1")
+        await paywall_storage.record_audit(agent_id="agent-2", function="fn2")
+
+        logs = await paywall_storage.get_audit_log("agent-1")
+        assert len(logs) == 1
+        assert logs[0]["agent_id"] == "agent-1"
+
+
 class TestStorageLifecycle:
     async def test_not_connected_raises(self):
         storage = PaywallStorage(dsn="sqlite:///unused.db")

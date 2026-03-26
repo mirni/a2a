@@ -290,6 +290,53 @@ class MarketplaceStorage:
         rows = await cursor.fetchall()
         return [{"category": r["category"], "count": r["count"]} for r in rows]
 
+    async def count_search_results(
+        self,
+        *,
+        query: str | None = None,
+        category: str | None = None,
+        tags: list[str] | None = None,
+        max_cost: float | None = None,
+        pricing_model: str | None = None,
+        status: str = "active",
+    ) -> int:
+        """Count total matching services (ignoring LIMIT/OFFSET) for pagination."""
+        conditions: list[str] = ["s.status = ?"]
+        params: list[Any] = [status]
+
+        if query:
+            conditions.append("(s.name LIKE ? OR s.description LIKE ?)")
+            like = f"%{query}%"
+            params.extend([like, like])
+
+        if category:
+            conditions.append("s.category = ?")
+            params.append(category)
+
+        if tags:
+            placeholders = ", ".join("?" for _ in tags)
+            conditions.append(
+                f"s.id IN (SELECT service_id FROM service_tags WHERE tag IN ({placeholders}))"
+            )
+            params.extend(tags)
+
+        if pricing_model:
+            conditions.append("json_extract(s.pricing_json, '$.model') = ?")
+            params.append(pricing_model)
+
+        if max_cost is not None:
+            conditions.append(
+                "CAST(json_extract(s.pricing_json, '$.cost') AS REAL) <= ?"
+            )
+            params.append(max_cost)
+
+        where = " AND ".join(conditions)
+        sql = f"SELECT COUNT(DISTINCT s.id) as cnt FROM services s WHERE {where}"
+
+        cursor = await self.db.execute(sql, params)
+        row = await cursor.fetchone()
+        return row["cnt"] if row else 0
+
     async def count_services(self, status: str = "active") -> int:
         """Count services with given status."""
         cursor = await self.db.execute(
