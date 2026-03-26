@@ -1,0 +1,108 @@
+"""Tests for API key management."""
+
+from __future__ import annotations
+
+import pytest
+
+from src.keys import InvalidKeyError, KeyManager, _hash_key
+
+
+class TestKeyGeneration:
+    async def test_create_key_format(self, key_manager: KeyManager):
+        result = await key_manager.create_key(agent_id="agent-1", tier="free")
+        key = result["key"]
+        assert key.startswith("a2a_free_")
+        assert len(key) == len("a2a_free_") + 24  # 12 bytes = 24 hex chars
+
+    async def test_create_pro_key(self, key_manager: KeyManager):
+        result = await key_manager.create_key(agent_id="agent-1", tier="pro")
+        assert result["key"].startswith("a2a_pro_")
+        assert result["tier"] == "pro"
+        assert result["agent_id"] == "agent-1"
+
+    async def test_create_enterprise_key(self, key_manager: KeyManager):
+        result = await key_manager.create_key(agent_id="agent-1", tier="enterprise")
+        assert result["key"].startswith("a2a_enterprise_")
+        assert result["tier"] == "enterprise"
+
+    async def test_create_key_with_connector(self, key_manager: KeyManager):
+        result = await key_manager.create_key(
+            agent_id="agent-1", tier="pro", connector="stripe"
+        )
+        assert result["connector"] == "stripe"
+
+    async def test_invalid_tier_rejected(self, key_manager: KeyManager):
+        with pytest.raises(ValueError, match="Unknown tier"):
+            await key_manager.create_key(agent_id="agent-1", tier="platinum")
+
+    async def test_key_hash_stored(self, key_manager: KeyManager):
+        result = await key_manager.create_key(agent_id="agent-1", tier="free")
+        assert result["key_hash"] == _hash_key(result["key"])
+
+
+class TestKeyValidation:
+    async def test_validate_valid_key(self, key_manager: KeyManager):
+        created = await key_manager.create_key(agent_id="agent-1", tier="pro")
+        record = await key_manager.validate_key(created["key"])
+        assert record["agent_id"] == "agent-1"
+        assert record["tier"] == "pro"
+
+    async def test_validate_invalid_format(self, key_manager: KeyManager):
+        with pytest.raises(InvalidKeyError, match="Invalid key format"):
+            await key_manager.validate_key("not_a_valid_key")
+
+    async def test_validate_empty_key(self, key_manager: KeyManager):
+        with pytest.raises(InvalidKeyError, match="Invalid key format"):
+            await key_manager.validate_key("")
+
+    async def test_validate_nonexistent_key(self, key_manager: KeyManager):
+        with pytest.raises(InvalidKeyError, match="not found"):
+            await key_manager.validate_key("a2a_pro_0000000000000000000000ff")
+
+    async def test_validate_revoked_key(self, key_manager: KeyManager):
+        created = await key_manager.create_key(agent_id="agent-1", tier="pro")
+        await key_manager.revoke_key(created["key"])
+
+        with pytest.raises(InvalidKeyError, match="revoked"):
+            await key_manager.validate_key(created["key"])
+
+
+class TestKeyRevocation:
+    async def test_revoke_existing_key(self, key_manager: KeyManager):
+        created = await key_manager.create_key(agent_id="agent-1", tier="pro")
+        result = await key_manager.revoke_key(created["key"])
+        assert result is True
+
+    async def test_revoke_nonexistent_key(self, key_manager: KeyManager):
+        result = await key_manager.revoke_key("a2a_pro_0000000000000000000000ff")
+        assert result is False
+
+
+class TestKeyLookup:
+    async def test_lookup_agent(self, key_manager: KeyManager):
+        created = await key_manager.create_key(agent_id="agent-42", tier="enterprise")
+        agent_id, tier = await key_manager.lookup_agent(created["key"])
+        assert agent_id == "agent-42"
+        assert tier == "enterprise"
+
+    async def test_get_agent_keys(self, key_manager: KeyManager):
+        await key_manager.create_key(agent_id="agent-1", tier="free")
+        await key_manager.create_key(agent_id="agent-1", tier="pro")
+
+        keys = await key_manager.get_agent_keys("agent-1")
+        assert len(keys) == 2
+
+    async def test_get_agent_keys_empty(self, key_manager: KeyManager):
+        keys = await key_manager.get_agent_keys("unknown-agent")
+        assert keys == []
+
+    async def test_multiple_agents_isolated(self, key_manager: KeyManager):
+        await key_manager.create_key(agent_id="agent-1", tier="free")
+        await key_manager.create_key(agent_id="agent-2", tier="pro")
+
+        keys1 = await key_manager.get_agent_keys("agent-1")
+        keys2 = await key_manager.get_agent_keys("agent-2")
+        assert len(keys1) == 1
+        assert len(keys2) == 1
+        assert keys1[0]["tier"] == "free"
+        assert keys2[0]["tier"] == "pro"
