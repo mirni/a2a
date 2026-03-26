@@ -1,0 +1,54 @@
+"""Error mapping from product exceptions to HTTP JSON responses."""
+
+from __future__ import annotations
+
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+
+
+async def error_response(status: int, message: str, code: str = "error") -> JSONResponse:
+    """Build a standard error JSON response."""
+    return JSONResponse(
+        {"success": False, "error": {"code": code, "message": message}},
+        status_code=status,
+    )
+
+
+async def handle_product_exception(request: Request, exc: Exception) -> JSONResponse:
+    """Map known product exceptions to HTTP status codes."""
+    exc_type = type(exc).__name__
+    msg = str(exc)
+
+    mapping: dict[str, tuple[int, str]] = {
+        # Paywall / Auth
+        "InvalidKeyError": (401, "invalid_key"),
+        "AuthenticationError": (401, "authentication_error"),
+        # Tier
+        "TierInsufficientError": (403, "insufficient_tier"),
+        # Rate limits
+        "RateLimitError": (429, "rate_limit_exceeded"),
+        "RateLimitExceededError": (429, "rate_limit_exceeded"),
+        "SpendCapExceededError": (429, "spend_cap_exceeded"),
+        # Balance
+        "InsufficientCreditsError": (402, "insufficient_balance"),
+        "InsufficientBalanceError": (402, "insufficient_balance"),
+        # Not found
+        "ServiceNotFoundError": (404, "service_not_found"),
+        "ServerNotFoundError": (404, "server_not_found"),
+        "IntentNotFoundError": (404, "intent_not_found"),
+        "EscrowNotFoundError": (404, "escrow_not_found"),
+        "WalletNotFoundError": (404, "wallet_not_found"),
+        # Conflict / invalid state
+        "InvalidStateError": (409, "invalid_state"),
+        "DuplicateIntentError": (409, "duplicate_intent"),
+        "DuplicateServiceError": (409, "duplicate_service"),
+        # Validation
+        "ValidationError": (400, "validation_error"),
+    }
+
+    if exc_type in mapping:
+        status, code = mapping[exc_type]
+        return await error_response(status, msg, code)
+
+    # Unknown → 500
+    return await error_response(500, f"Internal error: {exc_type}", "internal_error")

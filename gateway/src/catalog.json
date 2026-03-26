@@ -1,0 +1,343 @@
+[
+  {
+    "name": "get_balance",
+    "service": "billing",
+    "description": "Get the current wallet balance for an agent.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string", "description": "The agent identifier"}
+      },
+      "required": ["agent_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "balance": {"type": "number"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 200},
+    "tier_required": "free"
+  },
+  {
+    "name": "get_usage_summary",
+    "service": "billing",
+    "description": "Get usage summary (total cost, calls, tokens) for an agent.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string", "description": "The agent identifier"},
+        "since": {"type": "number", "description": "Unix timestamp to query from (optional)"}
+      },
+      "required": ["agent_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "total_cost": {"type": "number"},
+        "total_calls": {"type": "integer"},
+        "total_tokens": {"type": "integer"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 500},
+    "tier_required": "free"
+  },
+  {
+    "name": "deposit",
+    "service": "billing",
+    "description": "Deposit credits into an agent's wallet.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string"},
+        "amount": {"type": "number", "description": "Amount to deposit"},
+        "description": {"type": "string", "description": "Optional description"}
+      },
+      "required": ["agent_id", "amount"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "new_balance": {"type": "number"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 300},
+    "tier_required": "free"
+  },
+  {
+    "name": "create_intent",
+    "service": "payments",
+    "description": "Create a payment intent between two agents.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "payer": {"type": "string"},
+        "payee": {"type": "string"},
+        "amount": {"type": "number"},
+        "description": {"type": "string"},
+        "idempotency_key": {"type": "string"}
+      },
+      "required": ["payer", "payee", "amount"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"type": "string"},
+        "amount": {"type": "number"}
+      }
+    },
+    "pricing": {"per_call": 0.5},
+    "sla": {"max_latency_ms": 500},
+    "tier_required": "free"
+  },
+  {
+    "name": "capture_intent",
+    "service": "payments",
+    "description": "Capture (settle) a pending payment intent.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "intent_id": {"type": "string"}
+      },
+      "required": ["intent_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"type": "string"},
+        "amount": {"type": "number"}
+      }
+    },
+    "pricing": {"per_call": 0.5},
+    "sla": {"max_latency_ms": 500},
+    "tier_required": "free"
+  },
+  {
+    "name": "create_escrow",
+    "service": "payments",
+    "description": "Create an escrow between two agents. Funds are held from payer immediately.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "payer": {"type": "string"},
+        "payee": {"type": "string"},
+        "amount": {"type": "number"},
+        "description": {"type": "string"},
+        "timeout_hours": {"type": "number"}
+      },
+      "required": ["payer", "payee", "amount"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"type": "string"},
+        "amount": {"type": "number"}
+      }
+    },
+    "pricing": {"per_call": 1.0},
+    "sla": {"max_latency_ms": 500},
+    "tier_required": "pro"
+  },
+  {
+    "name": "release_escrow",
+    "service": "payments",
+    "description": "Release escrowed funds to the payee.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "escrow_id": {"type": "string"}
+      },
+      "required": ["escrow_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"type": "string"},
+        "amount": {"type": "number"}
+      }
+    },
+    "pricing": {"per_call": 0.5},
+    "sla": {"max_latency_ms": 500},
+    "tier_required": "pro"
+  },
+  {
+    "name": "search_services",
+    "service": "marketplace",
+    "description": "Search the marketplace for available services.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "query": {"type": "string", "description": "Search query"},
+        "category": {"type": "string"},
+        "tags": {"type": "array", "items": {"type": "string"}},
+        "max_cost": {"type": "number"},
+        "limit": {"type": "integer", "default": 20}
+      }
+    },
+    "output_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "name": {"type": "string"},
+          "description": {"type": "string"},
+          "pricing": {"type": "object"}
+        }
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 300},
+    "tier_required": "free"
+  },
+  {
+    "name": "best_match",
+    "service": "marketplace",
+    "description": "Find the best matching services for a query with ranking.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "query": {"type": "string"},
+        "budget": {"type": "number"},
+        "min_trust_score": {"type": "number"},
+        "prefer": {"type": "string", "enum": ["cost", "trust", "latency"]},
+        "limit": {"type": "integer", "default": 5}
+      },
+      "required": ["query"]
+    },
+    "output_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "service": {"type": "object"},
+          "rank_score": {"type": "number"},
+          "match_reasons": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "pricing": {"per_call": 0.1},
+    "sla": {"max_latency_ms": 500},
+    "tier_required": "free"
+  },
+  {
+    "name": "register_service",
+    "service": "marketplace",
+    "description": "Register a new service in the marketplace.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "provider_id": {"type": "string"},
+        "name": {"type": "string"},
+        "description": {"type": "string"},
+        "category": {"type": "string"},
+        "tools": {"type": "array", "items": {"type": "string"}},
+        "tags": {"type": "array", "items": {"type": "string"}},
+        "endpoint": {"type": "string"},
+        "pricing": {
+          "type": "object",
+          "properties": {
+            "model": {"type": "string"},
+            "cost": {"type": "number"}
+          }
+        }
+      },
+      "required": ["provider_id", "name", "description", "category"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "name": {"type": "string"},
+        "status": {"type": "string"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 500},
+    "tier_required": "pro"
+  },
+  {
+    "name": "get_trust_score",
+    "service": "trust",
+    "description": "Get the trust score for a server.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "server_id": {"type": "string"},
+        "window": {"type": "string", "enum": ["24h", "7d", "30d"], "default": "24h"},
+        "recompute": {"type": "boolean", "default": false}
+      },
+      "required": ["server_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "server_id": {"type": "string"},
+        "composite_score": {"type": "number"},
+        "reliability_score": {"type": "number"},
+        "security_score": {"type": "number"},
+        "confidence": {"type": "number"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 300},
+    "tier_required": "free"
+  },
+  {
+    "name": "search_servers",
+    "service": "trust",
+    "description": "Search for servers by name or minimum trust score.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "name_contains": {"type": "string"},
+        "min_score": {"type": "number"},
+        "limit": {"type": "integer", "default": 100}
+      }
+    },
+    "output_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "name": {"type": "string"},
+          "url": {"type": "string"}
+        }
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 300},
+    "tier_required": "free"
+  },
+  {
+    "name": "get_payment_history",
+    "service": "payments",
+    "description": "Get payment history for an agent.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string"},
+        "limit": {"type": "integer", "default": 100},
+        "offset": {"type": "integer", "default": 0}
+      },
+      "required": ["agent_id"]
+    },
+    "output_schema": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 500},
+    "tier_required": "free"
+  }
+]
