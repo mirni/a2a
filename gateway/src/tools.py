@@ -295,6 +295,51 @@ async def _get_events(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]
 
 
 # ---------------------------------------------------------------------------
+# Webhook tools
+# ---------------------------------------------------------------------------
+
+
+async def _register_webhook(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    result = await ctx.webhook_manager.register(
+        agent_id=params["agent_id"],
+        url=params["url"],
+        event_types=params["event_types"],
+        secret=params.get("secret", ""),
+    )
+    return result
+
+
+async def _list_webhooks(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    webhooks = await ctx.webhook_manager.list_webhooks(params["agent_id"])
+    return {"webhooks": webhooks}
+
+
+async def _delete_webhook(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    deleted = await ctx.webhook_manager.delete_webhook(params["webhook_id"])
+    return {"deleted": deleted}
+
+
+# ---------------------------------------------------------------------------
+# Subscription Scheduler tools
+# ---------------------------------------------------------------------------
+
+
+async def _process_due_subscriptions(
+    ctx: AppContext, params: dict[str, Any]
+) -> dict[str, Any]:
+    if ctx.scheduler is None:
+        return {"error": "Scheduler not available"}
+    result = await ctx.scheduler.process_due()
+    return {
+        "processed": result.processed,
+        "succeeded": result.succeeded,
+        "failed": result.failed,
+        "suspended": result.suspended,
+        "expired_escrows": result.expired_escrows,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 
@@ -323,4 +368,10 @@ TOOL_REGISTRY: dict[str, ToolFunc] = {
     # Event Bus
     "publish_event": _publish_event,
     "get_events": _get_events,
+    # Webhooks
+    "register_webhook": _register_webhook,
+    "list_webhooks": _list_webhooks,
+    "delete_webhook": _delete_webhook,
+    # Scheduler
+    "process_due_subscriptions": _process_due_subscriptions,
 }

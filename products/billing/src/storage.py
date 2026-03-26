@@ -20,6 +20,7 @@ _SCHEMA = """
 CREATE TABLE IF NOT EXISTS wallets (
     agent_id   TEXT PRIMARY KEY,
     balance    REAL NOT NULL DEFAULT 0.0,
+    org_id     TEXT NOT NULL DEFAULT 'default',
     created_at REAL NOT NULL,
     updated_at REAL NOT NULL
 );

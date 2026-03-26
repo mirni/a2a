@@ -27,6 +27,6 @@ async def pricing_detail(request: Request) -> JSONResponse:
 
 
 routes = [
-    Route("/pricing", pricing_list, methods=["GET"]),
-    Route("/pricing/{tool}", pricing_detail, methods=["GET"]),
+    Route("/v1/pricing", pricing_list, methods=["GET"]),
+    Route("/v1/pricing/{tool}", pricing_detail, methods=["GET"]),
 ]

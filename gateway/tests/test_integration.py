@@ -24,7 +24,7 @@ def _auth(key: str) -> dict[str, str]:
 async def _exec(client, tool: str, params: dict, key: str):
     """Execute a tool via the gateway and return the full response."""
     return await client.post(
-        "/execute",
+        "/v1/execute",
         json={"tool": tool, "params": params},
         headers=_auth(key),
     )

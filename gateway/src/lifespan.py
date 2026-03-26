@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import AsyncGenerator
 
 from starlette.applications import Starlette
@@ -38,6 +40,20 @@ from shared_src.event_bus import EventBus
 # Cross-product event handlers
 from gateway.src.event_handlers import register_all_handlers
 
+# Webhook delivery
+from gateway.src.webhooks import WebhookManager
+
+# Health monitoring
+from gateway.src.health_monitor import HealthMonitor
+
+# Signing
+from gateway.src.signing import SigningManager
+
+# Observability
+from gateway.src.middleware import setup_structured_logging
+
+logger = logging.getLogger("a2a.lifespan")
+
 
 @dataclass
 class AppContext:
@@ -50,11 +66,18 @@ class AppContext:
     marketplace: Marketplace
     trust_api: TrustAPI
     event_bus: EventBus
+    webhook_manager: WebhookManager
+    scheduler: object | None = None
+    health_monitor: HealthMonitor | None = None
+    signing_manager: SigningManager | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     """Initialize all backends on startup, tear down on shutdown."""
+
+    # Setup structured logging
+    setup_structured_logging()
 
     data_dir = os.environ.get("A2A_DATA_DIR", "/tmp/a2a_gateway")
     os.makedirs(data_dir, exist_ok=True)
@@ -68,6 +91,9 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     trust_dsn = os.environ.get("TRUST_DSN", f"sqlite:///{data_dir}/trust.db")
     event_bus_dsn = os.environ.get(
         "EVENT_BUS_DSN", f"sqlite:///{data_dir}/event_bus.db"
+    )
+    webhook_dsn = os.environ.get(
+        "WEBHOOK_DSN", f"sqlite:///{data_dir}/webhooks.db"
     )
 
     # --- Billing ---
@@ -103,8 +129,34 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     await event_bus.connect()
     await register_all_handlers(event_bus, marketplace)
 
+    # --- Webhook Manager ---
+    webhook_manager = WebhookManager(webhook_dsn)
+    await webhook_manager.connect()
+
+    # --- Subscription Scheduler ---
+    scheduler = None
+    scheduler_task = None
+    try:
+        from payments_src.scheduler import SubscriptionScheduler
+
+        scheduler = SubscriptionScheduler(engine=payment_engine)
+        scheduler_task = asyncio.create_task(scheduler.run(interval=300))
+        logger.info("Subscription scheduler started (interval=300s)")
+    except Exception:
+        logger.warning("Failed to start subscription scheduler", exc_info=True)
+
+    # --- Health Monitor ---
+    health_monitor = HealthMonitor(
+        marketplace=marketplace, event_bus=event_bus, interval=300, timeout=10.0
+    )
+    health_monitor_task = asyncio.create_task(health_monitor.run())
+    logger.info("Health monitor started (interval=300s)")
+
+    # --- Signing Manager ---
+    signing_manager = SigningManager()
+
     # Store on app.state
-    app.state.ctx = AppContext(
+    ctx = AppContext(
         tracker=tracker,
         key_manager=key_manager,
         paywall_storage=paywall_storage,
@@ -112,11 +164,32 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
         marketplace=marketplace,
         trust_api=trust_api,
         event_bus=event_bus,
+        webhook_manager=webhook_manager,
+        scheduler=scheduler,
+        health_monitor=health_monitor,
+        signing_manager=signing_manager,
     )
+    app.state.ctx = ctx
+    app.state.signing_manager = signing_manager
 
     yield
 
     # --- Shutdown ---
+    # Cancel background tasks
+    health_monitor_task.cancel()
+    try:
+        await health_monitor_task
+    except asyncio.CancelledError:
+        pass
+
+    if scheduler_task is not None:
+        scheduler_task.cancel()
+        try:
+            await scheduler_task
+        except asyncio.CancelledError:
+            pass
+
+    await webhook_manager.close()
     await event_bus.close()
     await trust_storage.close()
     await marketplace_storage.close()

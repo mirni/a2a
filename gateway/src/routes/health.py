@@ -17,4 +17,4 @@ async def health(request: Request) -> JSONResponse:
     })
 
 
-routes = [Route("/health", health, methods=["GET"])]
+routes = [Route("/v1/health", health, methods=["GET"])]

@@ -465,5 +465,98 @@
     "pricing": {"per_call": 0.0},
     "sla": {"max_latency_ms": 200},
     "tier_required": "free"
+  },
+  {
+    "name": "register_webhook",
+    "service": "webhooks",
+    "description": "Register a webhook endpoint to receive event notifications.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string", "description": "The agent registering the webhook"},
+        "url": {"type": "string", "description": "The URL to receive webhook POST requests"},
+        "event_types": {"type": "array", "items": {"type": "string"}, "description": "Event types to subscribe to (e.g. billing.deposit)"},
+        "secret": {"type": "string", "description": "Shared secret for HMAC-SHA3 signature verification"}
+      },
+      "required": ["agent_id", "url", "event_types"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "agent_id": {"type": "string"},
+        "url": {"type": "string"},
+        "event_types": {"type": "array", "items": {"type": "string"}},
+        "created_at": {"type": "number"},
+        "active": {"type": "boolean"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 300},
+    "tier_required": "pro"
+  },
+  {
+    "name": "list_webhooks",
+    "service": "webhooks",
+    "description": "List all registered webhooks for an agent.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string", "description": "The agent whose webhooks to list"}
+      },
+      "required": ["agent_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "webhooks": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 200},
+    "tier_required": "pro"
+  },
+  {
+    "name": "delete_webhook",
+    "service": "webhooks",
+    "description": "Delete (deactivate) a webhook by its ID.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "webhook_id": {"type": "string", "description": "The webhook ID to delete"}
+      },
+      "required": ["webhook_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "deleted": {"type": "boolean"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 200},
+    "tier_required": "pro"
+  },
+  {
+    "name": "process_due_subscriptions",
+    "service": "payments",
+    "description": "Trigger processing of all due subscriptions and expired escrows.",
+    "input_schema": {
+      "type": "object",
+      "properties": {}
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "processed": {"type": "integer"},
+        "succeeded": {"type": "integer"},
+        "failed": {"type": "integer"},
+        "suspended": {"type": "integer"},
+        "expired_escrows": {"type": "integer"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 5000},
+    "tier_required": "pro"
   }
 ]

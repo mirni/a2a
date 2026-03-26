@@ -8,7 +8,7 @@ import pytest
 @pytest.mark.asyncio
 async def test_execute_missing_tool(client, api_key):
     resp = await client.post(
-        "/execute",
+        "/v1/execute",
         json={"params": {}},
         headers={"Authorization": f"Bearer {api_key}"},
     )
@@ -19,7 +19,7 @@ async def test_execute_missing_tool(client, api_key):
 @pytest.mark.asyncio
 async def test_execute_unknown_tool(client, api_key):
     resp = await client.post(
-        "/execute",
+        "/v1/execute",
         json={"tool": "nonexistent", "params": {}},
         headers={"Authorization": f"Bearer {api_key}"},
     )
@@ -30,7 +30,7 @@ async def test_execute_unknown_tool(client, api_key):
 @pytest.mark.asyncio
 async def test_execute_missing_key(client):
     resp = await client.post(
-        "/execute",
+        "/v1/execute",
         json={"tool": "get_balance", "params": {"agent_id": "test"}},
     )
     assert resp.status_code == 401
@@ -40,7 +40,7 @@ async def test_execute_missing_key(client):
 @pytest.mark.asyncio
 async def test_execute_invalid_key(client):
     resp = await client.post(
-        "/execute",
+        "/v1/execute",
         json={"tool": "get_balance", "params": {"agent_id": "test"}},
         headers={"Authorization": "Bearer invalid_key_12345"},
     )
@@ -50,7 +50,7 @@ async def test_execute_invalid_key(client):
 @pytest.mark.asyncio
 async def test_execute_get_balance(client, api_key, app):
     resp = await client.post(
-        "/execute",
+        "/v1/execute",
         json={"tool": "get_balance", "params": {"agent_id": "test-agent"}},
         headers={"Authorization": f"Bearer {api_key}"},
     )
@@ -65,7 +65,7 @@ async def test_execute_get_balance(client, api_key, app):
 @pytest.mark.asyncio
 async def test_execute_get_usage_summary(client, api_key):
     resp = await client.post(
-        "/execute",
+        "/v1/execute",
         json={"tool": "get_usage_summary", "params": {"agent_id": "test-agent"}},
         headers={"Authorization": f"Bearer {api_key}"},
     )
@@ -79,7 +79,7 @@ async def test_execute_get_usage_summary(client, api_key):
 @pytest.mark.asyncio
 async def test_execute_deposit(client, api_key):
     resp = await client.post(
-        "/execute",
+        "/v1/execute",
         json={"tool": "deposit", "params": {"agent_id": "test-agent", "amount": 50.0}},
         headers={"Authorization": f"Bearer {api_key}"},
     )
@@ -93,7 +93,7 @@ async def test_execute_deposit(client, api_key):
 async def test_execute_x_api_key_header(client, api_key):
     """API key via X-API-Key header should also work."""
     resp = await client.post(
-        "/execute",
+        "/v1/execute",
         json={"tool": "get_balance", "params": {"agent_id": "test-agent"}},
         headers={"X-API-Key": api_key},
     )
@@ -105,7 +105,7 @@ async def test_execute_x_api_key_header(client, api_key):
 async def test_execute_api_key_query_param(client, api_key):
     """API key via query parameter should also work."""
     resp = await client.post(
-        f"/execute?api_key={api_key}",
+        f"/v1/execute?api_key={api_key}",
         json={"tool": "get_balance", "params": {"agent_id": "test-agent"}},
     )
     assert resp.status_code == 200
@@ -116,7 +116,7 @@ async def test_execute_api_key_query_param(client, api_key):
 async def test_execute_insufficient_tier(client, api_key):
     """Free tier should not access pro-tier tools like create_escrow."""
     resp = await client.post(
-        "/execute",
+        "/v1/execute",
         json={
             "tool": "create_escrow",
             "params": {"payer": "a", "payee": "b", "amount": 10},
@@ -134,7 +134,7 @@ async def test_execute_pro_tier_access(client, pro_api_key, app):
     ctx = app.state.ctx
 
     resp = await client.post(
-        "/execute",
+        "/v1/execute",
         json={
             "tool": "create_escrow",
             "params": {
@@ -163,7 +163,7 @@ async def test_execute_insufficient_balance(client, app):
     key_info = await ctx.key_manager.create_key("broke-agent", tier="free")
 
     resp = await client.post(
-        "/execute",
+        "/v1/execute",
         json={
             "tool": "create_intent",
             "params": {"payer": "broke-agent", "payee": "someone", "amount": 5},
@@ -178,7 +178,7 @@ async def test_execute_insufficient_balance(client, app):
 async def test_execute_search_services(client, api_key):
     """Search services should work with empty marketplace."""
     resp = await client.post(
-        "/execute",
+        "/v1/execute",
         json={"tool": "search_services", "params": {"query": "test"}},
         headers={"Authorization": f"Bearer {api_key}"},
     )
@@ -191,7 +191,7 @@ async def test_execute_search_services(client, api_key):
 @pytest.mark.asyncio
 async def test_execute_invalid_json(client, api_key):
     resp = await client.post(
-        "/execute",
+        "/v1/execute",
         content=b"not json",
         headers={
             "Authorization": f"Bearer {api_key}",
@@ -213,7 +213,7 @@ async def test_execute_delete_server(client, pro_api_key, app):
     )
 
     resp = await client.post(
-        "/execute",
+        "/v1/execute",
         json={"tool": "delete_server", "params": {"server_id": "del-001"}},
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
@@ -231,7 +231,7 @@ async def test_execute_delete_server(client, pro_api_key, app):
 async def test_execute_delete_server_not_found(client, pro_api_key, app):
     """Deleting a non-existent server should return an error."""
     resp = await client.post(
-        "/execute",
+        "/v1/execute",
         json={"tool": "delete_server", "params": {"server_id": "nonexistent"}},
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
@@ -243,7 +243,7 @@ async def test_execute_delete_server_not_found(client, pro_api_key, app):
 async def test_execute_delete_server_requires_pro(client, api_key):
     """Free tier should not be able to delete a server."""
     resp = await client.post(
-        "/execute",
+        "/v1/execute",
         json={"tool": "delete_server", "params": {"server_id": "any"}},
         headers={"Authorization": f"Bearer {api_key}"},
     )
@@ -262,7 +262,7 @@ async def test_execute_update_server(client, pro_api_key, app):
     )
 
     resp = await client.post(
-        "/execute",
+        "/v1/execute",
         json={
             "tool": "update_server",
             "params": {"server_id": "upd-001", "name": "New Name", "url": "https://new.com"},
@@ -280,7 +280,7 @@ async def test_execute_update_server(client, pro_api_key, app):
 async def test_execute_update_server_not_found(client, pro_api_key):
     """Updating a non-existent server should return an error."""
     resp = await client.post(
-        "/execute",
+        "/v1/execute",
         json={
             "tool": "update_server",
             "params": {"server_id": "nonexistent", "name": "X"},
@@ -304,7 +304,7 @@ async def test_execute_global_audit_log(client, pro_api_key, app):
     )
 
     resp = await client.post(
-        "/execute",
+        "/v1/execute",
         json={"tool": "get_global_audit_log", "params": {"limit": 50}},
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
@@ -323,7 +323,7 @@ async def test_execute_global_audit_log(client, pro_api_key, app):
 async def test_execute_global_audit_log_requires_pro(client, api_key):
     """Free tier should not access the global audit log."""
     resp = await client.post(
-        "/execute",
+        "/v1/execute",
         json={"tool": "get_global_audit_log", "params": {}},
         headers={"Authorization": f"Bearer {api_key}"},
     )
@@ -341,7 +341,7 @@ async def test_execute_create_and_capture_intent(client, api_key, app):
 
     # Create intent
     resp = await client.post(
-        "/execute",
+        "/v1/execute",
         json={
             "tool": "create_intent",
             "params": {
@@ -360,7 +360,7 @@ async def test_execute_create_and_capture_intent(client, api_key, app):
 
     # Capture intent
     resp = await client.post(
-        "/execute",
+        "/v1/execute",
         json={
             "tool": "capture_intent",
             "params": {"intent_id": intent_id},

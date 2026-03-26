@@ -58,7 +58,7 @@ async def _register_marketplace_service(
     Uses the provided api_key which must be pro-tier (register_service requires pro).
     """
     resp = await client.post(
-        "/execute",
+        "/v1/execute",
         json={
             "tool": "register_service",
             "params": {
@@ -97,7 +97,7 @@ class TestGatewayTrustMarketplace:
 
         # Search (free tier) and verify trust_score is present
         resp = await client.post(
-            "/execute",
+            "/v1/execute",
             json={"tool": "search_services", "params": {"query": "Trusted"}},
             headers={"Authorization": f"Bearer {api_key}"},
         )
@@ -122,7 +122,7 @@ class TestGatewayTrustMarketplace:
         )
 
         resp = await client.post(
-            "/execute",
+            "/v1/execute",
             json={"tool": "search_services", "params": {"query": "Unscored"}},
             headers={"Authorization": f"Bearer {api_key}"},
         )
@@ -163,7 +163,7 @@ class TestGatewayTrustMarketplace:
 
         # best_match (free tier) with prefer=trust
         resp = await client.post(
-            "/execute",
+            "/v1/execute",
             json={
                 "tool": "best_match",
                 "params": {

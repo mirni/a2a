@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
     agent_id   TEXT NOT NULL,
     tier       TEXT NOT NULL,
     connector  TEXT NOT NULL DEFAULT '',
+    org_id     TEXT NOT NULL DEFAULT 'default',
     created_at REAL NOT NULL,
     revoked    INTEGER NOT NULL DEFAULT 0
 );
@@ -50,6 +51,17 @@ CREATE TABLE IF NOT EXISTS rate_windows (
     window_start REAL NOT NULL,
     PRIMARY KEY (agent_id, window_key)
 );
+
+CREATE TABLE IF NOT EXISTS rate_events (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_id   TEXT NOT NULL,
+    window_key TEXT NOT NULL,
+    tool_name  TEXT NOT NULL DEFAULT '',
+    timestamp  REAL NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_rate_events_agent ON rate_events(agent_id, window_key, timestamp);
+CREATE INDEX IF NOT EXISTS idx_rate_events_tool ON rate_events(agent_id, tool_name, timestamp);
 """
 
 
@@ -85,14 +97,15 @@ class PaywallStorage:
     # -----------------------------------------------------------------------
 
     async def store_key(
-        self, key_hash: str, agent_id: str, tier: str, connector: str = ""
+        self, key_hash: str, agent_id: str, tier: str, connector: str = "",
+        org_id: str = "default",
     ) -> dict[str, Any]:
         """Store a hashed API key."""
         now = time.time()
         await self.db.execute(
-            "INSERT INTO api_keys (key_hash, agent_id, tier, connector, created_at) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (key_hash, agent_id, tier, connector, now),
+            "INSERT INTO api_keys (key_hash, agent_id, tier, connector, org_id, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (key_hash, agent_id, tier, connector, org_id, now),
         )
         await self.db.commit()
         return {
@@ -100,6 +113,7 @@ class PaywallStorage:
             "agent_id": agent_id,
             "tier": tier,
             "connector": connector,
+            "org_id": org_id,
             "created_at": now,
             "revoked": 0,
         }
@@ -107,7 +121,7 @@ class PaywallStorage:
     async def lookup_key(self, key_hash: str) -> dict[str, Any] | None:
         """Look up an API key by its hash. Returns None if not found."""
         cursor = await self.db.execute(
-            "SELECT key_hash, agent_id, tier, connector, created_at, revoked "
+            "SELECT key_hash, agent_id, tier, connector, org_id, created_at, revoked "
             "FROM api_keys WHERE key_hash = ?",
             (key_hash,),
         )
@@ -126,7 +140,7 @@ class PaywallStorage:
     async def get_keys_for_agent(self, agent_id: str) -> list[dict[str, Any]]:
         """Get all API keys for an agent."""
         cursor = await self.db.execute(
-            "SELECT key_hash, agent_id, tier, connector, created_at, revoked "
+            "SELECT key_hash, agent_id, tier, connector, org_id, created_at, revoked "
             "FROM api_keys WHERE agent_id = ? ORDER BY created_at DESC",
             (agent_id,),
         )
@@ -183,6 +197,70 @@ class PaywallStorage:
             )
             await self.db.commit()
             return new_count
+
+    # -----------------------------------------------------------------------
+    # Sliding window rate limiting
+    # -----------------------------------------------------------------------
+
+    async def record_rate_event(
+        self, agent_id: str, window_key: str, tool_name: str = ""
+    ) -> None:
+        """Record a rate event for sliding window tracking."""
+        now = time.time()
+        await self.db.execute(
+            "INSERT INTO rate_events (agent_id, window_key, tool_name, timestamp) "
+            "VALUES (?, ?, ?, ?)",
+            (agent_id, window_key, tool_name, now),
+        )
+        await self.db.commit()
+
+    async def get_sliding_window_count(
+        self, agent_id: str, window_key: str, window_seconds: float = 3600.0
+    ) -> int:
+        """Count events within a sliding window (default: 1 hour)."""
+        cutoff = time.time() - window_seconds
+        cursor = await self.db.execute(
+            "SELECT COUNT(*) FROM rate_events "
+            "WHERE agent_id = ? AND window_key = ? AND timestamp >= ?",
+            (agent_id, window_key, cutoff),
+        )
+        row = await cursor.fetchone()
+        return row[0] if row else 0
+
+    async def get_tool_rate_count(
+        self, agent_id: str, tool_name: str, window_seconds: float = 3600.0
+    ) -> int:
+        """Count events for a specific tool within a sliding window."""
+        cutoff = time.time() - window_seconds
+        cursor = await self.db.execute(
+            "SELECT COUNT(*) FROM rate_events "
+            "WHERE agent_id = ? AND tool_name = ? AND timestamp >= ?",
+            (agent_id, tool_name, cutoff),
+        )
+        row = await cursor.fetchone()
+        return row[0] if row else 0
+
+    async def get_burst_count(
+        self, agent_id: str, window_key: str, burst_window_seconds: float = 60.0
+    ) -> int:
+        """Count events within a burst window (default: 1 minute)."""
+        cutoff = time.time() - burst_window_seconds
+        cursor = await self.db.execute(
+            "SELECT COUNT(*) FROM rate_events "
+            "WHERE agent_id = ? AND window_key = ? AND timestamp >= ?",
+            (agent_id, window_key, cutoff),
+        )
+        row = await cursor.fetchone()
+        return row[0] if row else 0
+
+    async def cleanup_old_rate_events(self, max_age_seconds: float = 7200.0) -> int:
+        """Remove rate events older than max_age_seconds. Returns count deleted."""
+        cutoff = time.time() - max_age_seconds
+        cursor = await self.db.execute(
+            "DELETE FROM rate_events WHERE timestamp < ?", (cutoff,)
+        )
+        await self.db.commit()
+        return cursor.rowcount
 
     # -----------------------------------------------------------------------
     # Audit log operations

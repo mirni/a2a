@@ -114,11 +114,15 @@ def make_payment_settlement_handler(event_bus: EventBus):
 # Handler: billing.* -> log for webhook dispatch
 # ---------------------------------------------------------------------------
 
-def make_billing_webhook_handler():
-    """Create a handler that logs billing events for future webhook dispatch.
+def make_billing_webhook_handler(webhook_manager: Any = None):
+    """Create a handler that dispatches billing events via WebhookManager.
 
-    Subscribes to ``billing.*`` events and logs them so they can be
-    forwarded to external webhook endpoints later.
+    Subscribes to ``billing.*`` events and forwards them to registered
+    webhook endpoints.
+
+    Args:
+        webhook_manager: Optional WebhookManager instance. If provided,
+                        events are dispatched to registered webhooks.
     """
 
     async def billing_webhook_handler(event: dict[str, Any]) -> None:
@@ -128,6 +132,11 @@ def make_billing_webhook_handler():
             event["source"],
             event["payload"],
         )
+        if webhook_manager is not None:
+            try:
+                await webhook_manager.deliver(event)
+            except Exception:
+                logger.exception("Failed to deliver webhook for event %s", event.get("id"))
 
     return billing_webhook_handler
 
@@ -140,6 +149,7 @@ async def register_all_handlers(
     event_bus: EventBus,
     marketplace: Any,
     trust_threshold: float = 50.0,
+    webhook_manager: Any = None,
 ) -> list[str]:
     """Register all cross-product event handlers and return subscription IDs.
 
@@ -147,6 +157,7 @@ async def register_all_handlers(
         event_bus: The shared EventBus instance.
         marketplace: The Marketplace instance.
         trust_threshold: Score below which services get suspended.
+        webhook_manager: Optional WebhookManager for webhook dispatch.
 
     Returns:
         List of subscription IDs for cleanup.
@@ -177,19 +188,19 @@ async def register_all_handlers(
         )
     )
 
-    # billing.usage_recorded -> webhook log
+    # billing.usage_recorded -> webhook dispatch
     sub_ids.append(
         await event_bus.subscribe(
             "billing.usage_recorded",
-            make_billing_webhook_handler(),
+            make_billing_webhook_handler(webhook_manager),
         )
     )
 
-    # billing.deposit -> webhook log
+    # billing.deposit -> webhook dispatch
     sub_ids.append(
         await event_bus.subscribe(
             "billing.deposit",
-            make_billing_webhook_handler(),
+            make_billing_webhook_handler(webhook_manager),
         )
     )
 

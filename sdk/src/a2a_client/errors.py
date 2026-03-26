@@ -43,6 +43,11 @@ class ServerError(A2AError):
     pass
 
 
+class RetryableError(A2AError):
+    """Error that can be retried (429, 5xx)."""
+    pass
+
+
 # Map HTTP status codes to exception classes
 STATUS_MAP: dict[int, type[A2AError]] = {
     400: ToolNotFoundError,
@@ -52,6 +57,9 @@ STATUS_MAP: dict[int, type[A2AError]] = {
     404: ToolNotFoundError,
     429: RateLimitError,
 }
+
+# Status codes that are safe to retry
+RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
 
 
 def raise_for_status(status: int, body: dict) -> None:

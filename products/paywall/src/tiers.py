@@ -23,6 +23,7 @@ class TierConfig:
     cost_per_call: float
     audit_log_retention_days: int | None  # None = no retention
     support_level: str
+    burst_allowance: int = 10
 
     @property
     def rate_limit_per_minute(self) -> int:
@@ -41,6 +42,7 @@ TIER_CONFIGS: dict[TierName, TierConfig] = {
         cost_per_call=0,
         audit_log_retention_days=None,
         support_level="none",
+        burst_allowance=10,
     ),
     TierName.PRO: TierConfig(
         name=TierName.PRO,
@@ -48,6 +50,7 @@ TIER_CONFIGS: dict[TierName, TierConfig] = {
         cost_per_call=1,
         audit_log_retention_days=30,
         support_level="email",
+        burst_allowance=100,
     ),
     TierName.ENTERPRISE: TierConfig(
         name=TierName.ENTERPRISE,
@@ -55,6 +58,7 @@ TIER_CONFIGS: dict[TierName, TierConfig] = {
         cost_per_call=1,
         audit_log_retention_days=90,
         support_level="priority",
+        burst_allowance=1000,
     ),
 }
 

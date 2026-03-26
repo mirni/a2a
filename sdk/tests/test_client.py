@@ -39,6 +39,8 @@ async def gateway_app(tmp_path, monkeypatch):
     monkeypatch.setenv("PAYMENTS_DSN", f"sqlite:///{data_dir}/payments.db")
     monkeypatch.setenv("MARKETPLACE_DSN", f"sqlite:///{data_dir}/marketplace.db")
     monkeypatch.setenv("TRUST_DSN", f"sqlite:///{data_dir}/trust.db")
+    monkeypatch.setenv("EVENT_BUS_DSN", f"sqlite:///{data_dir}/event_bus.db")
+    monkeypatch.setenv("WEBHOOK_DSN", f"sqlite:///{data_dir}/webhooks.db")
 
     app = create_app()
     ctx_manager = lifespan(app)
@@ -54,6 +56,11 @@ async def sdk_client(gateway_app):
     client = A2AClient.__new__(A2AClient)
     client.base_url = "http://test"
     client.api_key = None
+    client.max_retries = 0  # No retries in tests for speed
+    client.retry_base_delay = 0.0
+    client.pricing_cache_ttl = 300.0
+    client._pricing_cache = None
+    client._pricing_cache_time = 0.0
     client._client = httpx.AsyncClient(
         transport=transport, base_url="http://test", timeout=30.0
     )

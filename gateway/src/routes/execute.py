@@ -12,11 +12,14 @@ from starlette.routing import Route
 from gateway.src.auth import extract_api_key
 from gateway.src.catalog import get_tool
 from gateway.src.errors import error_response, handle_product_exception
+from gateway.src.middleware import Metrics
 from gateway.src.tools import TOOL_REGISTRY
 
 
 async def execute(request: Request) -> JSONResponse:
     """Execute a tool with authentication, tier checks, rate limiting, and billing."""
+    _start_time = time.time()
+
     # --- Parse body ---
     try:
         body: dict[str, Any] = await request.json()
@@ -68,22 +71,41 @@ async def execute(request: Request) -> JSONResponse:
             "insufficient_tier",
         )
 
-    # --- 4. Check rate limit ---
+    # --- 4. Check rate limit (sliding window) ---
     from paywall_src.tiers import get_tier_config
 
     tier_config = get_tier_config(agent_tier)
-    window_start = time.time() // 3600 * 3600  # current hour boundary
     window_key = "gateway"
     try:
-        rate_count = await ctx.paywall_storage.get_rate_count(
-            agent_id, window_key, window_start
+        # Global sliding window check (1 hour)
+        rate_count = await ctx.paywall_storage.get_sliding_window_count(
+            agent_id, window_key, window_seconds=3600.0
         )
         if rate_count >= tier_config.rate_limit_per_hour:
-            return await error_response(
-                429,
-                f"Rate limit exceeded: {rate_count}/{tier_config.rate_limit_per_hour} per hour",
-                "rate_limit_exceeded",
+            # Check burst allowance (1-minute window)
+            burst_count = await ctx.paywall_storage.get_burst_count(
+                agent_id, window_key, burst_window_seconds=60.0
             )
+            burst_limit = tier_config.rate_limit_per_hour // 60 + tier_config.burst_allowance
+            if burst_count >= burst_limit:
+                return await error_response(
+                    429,
+                    f"Rate limit exceeded: {rate_count}/{tier_config.rate_limit_per_hour} per hour",
+                    "rate_limit_exceeded",
+                )
+
+        # Per-tool rate limit check (if defined in catalog)
+        tool_rate_limit = tool_def.get("rate_limit_per_hour")
+        if tool_rate_limit is not None:
+            tool_rate_count = await ctx.paywall_storage.get_tool_rate_count(
+                agent_id, tool_name, window_seconds=3600.0
+            )
+            if tool_rate_count >= tool_rate_limit:
+                return await error_response(
+                    429,
+                    f"Per-tool rate limit exceeded for '{tool_name}': {tool_rate_count}/{tool_rate_limit} per hour",
+                    "rate_limit_exceeded",
+                )
     except Exception:
         pass  # If rate counting fails, allow the request
 
@@ -107,6 +129,7 @@ async def execute(request: Request) -> JSONResponse:
     try:
         result = await tool_func(ctx, params)
     except Exception as exc:
+        Metrics.record_error()
         return await handle_product_exception(request, exc)
 
     # --- 7. Record usage + charge ---
@@ -118,19 +141,35 @@ async def execute(request: Request) -> JSONResponse:
         )
         if per_call > 0:
             await ctx.tracker.wallet.charge(agent_id, per_call, description=f"gateway:{tool_name}")
-        # Increment rate counter
-        await ctx.paywall_storage.increment_rate_count(
-            agent_id, window_key, window_start
-        )
+        # Record rate event for sliding window tracking
+        await ctx.paywall_storage.record_rate_event(agent_id, window_key, tool_name)
     except Exception:
         pass  # Usage recording failure should not fail the request
 
-    # --- 8. Return result ---
-    return JSONResponse({
-        "success": True,
-        "result": result,
-        "charged": per_call,
-    })
+    # --- 8. Record metrics ---
+    Metrics.record_request(tool_name)
+    elapsed_ms = (time.time() - _start_time) * 1000
+    Metrics.record_latency(elapsed_ms)
+
+    # --- 9. Return result ---
+    headers: dict[str, str] = {}
+    correlation_id = getattr(request.state, "correlation_id", None)
+    if correlation_id:
+        headers["X-Request-ID"] = correlation_id
+
+    # Sign response if signing manager available
+    signing_manager = getattr(request.app.state, "signing_manager", None)
+    if signing_manager:
+        from gateway.src.signing import sign_response
+        import json as _json
+
+        body_bytes = _json.dumps({"success": True, "result": result, "charged": per_call}).encode()
+        headers.update(sign_response(signing_manager, body_bytes))
+
+    return JSONResponse(
+        {"success": True, "result": result, "charged": per_call},
+        headers=headers,
+    )
 
 
-routes = [Route("/execute", execute, methods=["POST"])]
+routes = [Route("/v1/execute", execute, methods=["POST"])]

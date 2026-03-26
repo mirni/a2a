@@ -53,6 +53,7 @@ class MarketplaceStorage:
                 endpoint TEXT NOT NULL DEFAULT '',
                 status TEXT NOT NULL DEFAULT 'active',
                 metadata_json TEXT NOT NULL DEFAULT '{}',
+                org_id TEXT NOT NULL DEFAULT 'default',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );

@@ -1,4 +1,4 @@
-"""Edge case tests for gateway /execute route.
+"""Edge case tests for gateway /v1/execute route.
 
 Covers: rate limit reset at hour boundary, multiple API keys for same agent
 sharing rate limit, and invalid JSON variants.
@@ -22,7 +22,7 @@ class TestInvalidJsonVariants:
     async def test_empty_body(self, client, api_key):
         """Empty request body should return 400."""
         resp = await client.post(
-            "/execute",
+            "/v1/execute",
             content=b"",
             headers={
                 "Authorization": f"Bearer {api_key}",
@@ -35,7 +35,7 @@ class TestInvalidJsonVariants:
     async def test_json_array_body(self, client, api_key):
         """JSON array (not object) should return 400 because body.get('tool') fails."""
         resp = await client.post(
-            "/execute",
+            "/v1/execute",
             content=b'["hello"]',
             headers={
                 "Authorization": f"Bearer {api_key}",
@@ -48,7 +48,7 @@ class TestInvalidJsonVariants:
     async def test_json_string_body(self, client, api_key):
         """JSON string value (not object) should return 400."""
         resp = await client.post(
-            "/execute",
+            "/v1/execute",
             content=b'"just a string"',
             headers={
                 "Authorization": f"Bearer {api_key}",
@@ -61,7 +61,7 @@ class TestInvalidJsonVariants:
         """Missing Content-Type header with JSON body should still parse
         (Starlette reads body regardless of Content-Type)."""
         resp = await client.post(
-            "/execute",
+            "/v1/execute",
             content=b'{"tool": "get_balance", "params": {"agent_id": "test-agent"}}',
             headers={
                 "Authorization": f"Bearer {api_key}",
@@ -91,14 +91,14 @@ class TestMultipleApiKeysSameAgent:
 
         # Both keys should be able to call
         resp1 = await client.post(
-            "/execute",
+            "/v1/execute",
             json={"tool": "get_balance", "params": {"agent_id": "multi-key-agent"}},
             headers={"Authorization": f"Bearer {key_info_1['key']}"},
         )
         assert resp1.status_code == 200
 
         resp2 = await client.post(
-            "/execute",
+            "/v1/execute",
             json={"tool": "get_balance", "params": {"agent_id": "multi-key-agent"}},
             headers={"Authorization": f"Bearer {key_info_2['key']}"},
         )
@@ -106,36 +106,34 @@ class TestMultipleApiKeysSameAgent:
 
 
 # ---------------------------------------------------------------------------
-# Rate limit at hour boundary
+# Rate limit sliding window
 # ---------------------------------------------------------------------------
 
 
-class TestRateLimitHourBoundary:
-    """The gateway uses floor-division to compute window_start:
-    window_start = time.time() // 3600 * 3600
+class TestRateLimitSlidingWindow:
+    """The gateway uses a sliding window for rate limiting.
+    Events older than 1 hour are not counted."""
 
-    This means the window resets at the top of each hour. We can verify
-    this by pre-filling the rate counter with an old window_start and
-    confirming it does not count toward the current window."""
-
-    async def test_old_window_does_not_count(self, app, client):
-        """Seed rate counts with a window_start from the previous hour.
-        Requests in the current hour should not be affected."""
+    async def test_old_events_do_not_count(self, app, client):
+        """Seed rate events older than 1 hour. They should not affect the current window."""
         ctx = app.state.ctx
 
         await ctx.tracker.wallet.create("rate-agent", initial_balance=1000.0)
         key_info = await ctx.key_manager.create_key("rate-agent", tier="free")
 
-        # Seed 200 counts in the PREVIOUS hour window
-        old_window_start = (time.time() // 3600 * 3600) - 3600
+        # Insert old rate events (>1 hour ago) directly into DB
+        old_time = time.time() - 7200  # 2 hours ago
         for _ in range(200):
-            await ctx.paywall_storage.increment_rate_count(
-                "rate-agent", "gateway", old_window_start
+            await ctx.paywall_storage.db.execute(
+                "INSERT INTO rate_events (agent_id, window_key, tool_name, timestamp) "
+                "VALUES (?, ?, ?, ?)",
+                ("rate-agent", "gateway", "", old_time),
             )
+        await ctx.paywall_storage.db.commit()
 
-        # Current request should still succeed because it's a new window
+        # Current request should still succeed
         resp = await client.post(
-            "/execute",
+            "/v1/execute",
             json={"tool": "get_balance", "params": {"agent_id": "rate-agent"}},
             headers={"Authorization": f"Bearer {key_info['key']}"},
         )
@@ -143,8 +141,7 @@ class TestRateLimitHourBoundary:
 
 
 class TestRateLimitExceeded:
-    """When rate counter for the current hour hits the limit, requests
-    should be rejected with 429."""
+    """When sliding window count hits the limit, requests should be rejected with 429."""
 
     async def test_rate_limit_exceeded(self, app, client):
         ctx = app.state.ctx
@@ -152,16 +149,19 @@ class TestRateLimitExceeded:
         await ctx.tracker.wallet.create("rate-blocked", initial_balance=1000.0)
         key_info = await ctx.key_manager.create_key("rate-blocked", tier="free")
 
-        # Free tier has 100 calls/hour limit
-        # Seed to exactly 100 in the current window
-        current_window = time.time() // 3600 * 3600
-        for _ in range(100):
-            await ctx.paywall_storage.increment_rate_count(
-                "rate-blocked", "gateway", current_window
+        # Free tier has 100 calls/hour limit + 10 burst allowance
+        # Seed 111 recent rate events (exceeds both hourly and burst)
+        now = time.time()
+        for _ in range(111):
+            await ctx.paywall_storage.db.execute(
+                "INSERT INTO rate_events (agent_id, window_key, tool_name, timestamp) "
+                "VALUES (?, ?, ?, ?)",
+                ("rate-blocked", "gateway", "", now),
             )
+        await ctx.paywall_storage.db.commit()
 
         resp = await client.post(
-            "/execute",
+            "/v1/execute",
             json={"tool": "get_balance", "params": {"agent_id": "rate-blocked"}},
             headers={"Authorization": f"Bearer {key_info['key']}"},
         )

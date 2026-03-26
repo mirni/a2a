@@ -24,8 +24,8 @@ class InvalidKeyError(Exception):
 
 
 def _hash_key(raw_key: str) -> str:
-    """SHA-256 hash of a raw API key."""
-    return hashlib.sha256(raw_key.encode()).hexdigest()
+    """SHA-3-256 hash of a raw API key."""
+    return hashlib.sha3_256(raw_key.encode()).hexdigest()
 
 
 def _generate_key(tier: str) -> str:

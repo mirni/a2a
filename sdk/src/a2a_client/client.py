@@ -2,16 +2,29 @@
 
 from __future__ import annotations
 
+import asyncio
+import time
 from typing import Any
 
 import httpx
 
-from .errors import A2AError, raise_for_status
+from .errors import (
+    A2AError,
+    RETRYABLE_STATUS_CODES,
+    RateLimitError,
+    raise_for_status,
+)
 from .models import ExecuteResponse, HealthResponse, ToolPricing
 
 
 class A2AClient:
     """Async client for the A2A Commerce gateway.
+
+    Features:
+    - Automatic retry with exponential backoff for 429/5xx responses
+    - Connection pooling via httpx limits
+    - Pricing cache with configurable TTL
+    - All endpoints use /v1/ prefix
 
     Usage::
 
@@ -25,12 +38,26 @@ class A2AClient:
         base_url: str = "http://localhost:8000",
         api_key: str | None = None,
         timeout: float = 30.0,
+        max_retries: int = 3,
+        retry_base_delay: float = 1.0,
+        max_connections: int = 100,
+        max_keepalive: int = 20,
+        pricing_cache_ttl: float = 300.0,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
+        self.max_retries = max_retries
+        self.retry_base_delay = retry_base_delay
+        self.pricing_cache_ttl = pricing_cache_ttl
+        self._pricing_cache: list[ToolPricing] | None = None
+        self._pricing_cache_time: float = 0.0
         self._client = httpx.AsyncClient(
             base_url=self.base_url,
             timeout=timeout,
+            limits=httpx.Limits(
+                max_connections=max_connections,
+                max_keepalive_connections=max_keepalive,
+            ),
         )
 
     async def __aenter__(self) -> A2AClient:
@@ -48,23 +75,76 @@ class A2AClient:
             headers["Authorization"] = f"Bearer {self.api_key}"
         return headers
 
+    async def _request_with_retry(
+        self,
+        method: str,
+        url: str,
+        **kwargs: Any,
+    ) -> httpx.Response:
+        """Execute an HTTP request with retry logic for transient failures."""
+        last_error: Exception | None = None
+
+        for attempt in range(self.max_retries + 1):
+            try:
+                resp = await self._client.request(method, url, **kwargs)
+                if resp.status_code not in RETRYABLE_STATUS_CODES:
+                    return resp
+                # Retryable HTTP status — treat as error for retry
+                if attempt == self.max_retries:
+                    return resp  # Return the response on last attempt
+            except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.ConnectError) as e:
+                last_error = e
+                if attempt == self.max_retries:
+                    raise
+            else:
+                last_error = None
+
+            # Compute delay
+            delay = self.retry_base_delay * (2 ** attempt)
+
+            # Respect Retry-After header for 429
+            if resp.status_code == 429:
+                retry_after = resp.headers.get("retry-after")
+                if retry_after:
+                    try:
+                        delay = max(delay, float(retry_after))
+                    except ValueError:
+                        pass
+
+            await asyncio.sleep(delay)
+
+        # Should not reach here, but return last response if we do
+        return resp  # type: ignore[possibly-undefined]
+
     # ----- Core methods -----
 
     async def health(self) -> HealthResponse:
-        """GET /health"""
-        resp = await self._client.get("/health")
+        """GET /v1/health"""
+        resp = await self._request_with_retry("GET", "/v1/health")
         resp.raise_for_status()
         return HealthResponse.from_dict(resp.json())
 
-    async def pricing(self) -> list[ToolPricing]:
-        """GET /pricing — full catalog."""
-        resp = await self._client.get("/pricing")
+    async def pricing(self, use_cache: bool = True) -> list[ToolPricing]:
+        """GET /v1/pricing — full catalog with optional caching."""
+        now = time.time()
+        if (
+            use_cache
+            and self._pricing_cache is not None
+            and (now - self._pricing_cache_time) < self.pricing_cache_ttl
+        ):
+            return self._pricing_cache
+
+        resp = await self._request_with_retry("GET", "/v1/pricing")
         resp.raise_for_status()
-        return [ToolPricing.from_dict(t) for t in resp.json()["tools"]]
+        result = [ToolPricing.from_dict(t) for t in resp.json()["tools"]]
+
+        self._pricing_cache = result
+        self._pricing_cache_time = now
+        return result
 
     async def pricing_tool(self, tool_name: str) -> ToolPricing:
-        """GET /pricing/{tool} — single tool."""
-        resp = await self._client.get(f"/pricing/{tool_name}")
+        """GET /v1/pricing/{tool} — single tool."""
+        resp = await self._request_with_retry("GET", f"/v1/pricing/{tool_name}")
         if resp.status_code != 200:
             raise_for_status(resp.status_code, resp.json())
         return ToolPricing.from_dict(resp.json()["tool"])
@@ -72,9 +152,10 @@ class A2AClient:
     async def execute(
         self, tool: str, params: dict[str, Any] | None = None
     ) -> ExecuteResponse:
-        """POST /execute — run a tool."""
-        resp = await self._client.post(
-            "/execute",
+        """POST /v1/execute — run a tool."""
+        resp = await self._request_with_retry(
+            "POST",
+            "/v1/execute",
             json={"tool": tool, "params": params or {}},
             headers=self._headers(),
         )
@@ -82,6 +163,11 @@ class A2AClient:
         if resp.status_code != 200:
             raise_for_status(resp.status_code, body)
         return ExecuteResponse.from_dict(body)
+
+    def invalidate_pricing_cache(self) -> None:
+        """Clear the cached pricing data."""
+        self._pricing_cache = None
+        self._pricing_cache_time = 0.0
 
     # ----- Convenience methods -----
 

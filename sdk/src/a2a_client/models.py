@@ -65,3 +65,100 @@ class HealthResponse:
             version=data["version"],
             tools=data["tools"],
         )
+
+
+# ---------------------------------------------------------------------------
+# Typed response models for specific tool results
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class BalanceResponse:
+    """Response from get_balance tool."""
+
+    balance: float
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> BalanceResponse:
+        return cls(balance=data["balance"])
+
+
+@dataclass
+class DepositResponse:
+    """Response from deposit tool."""
+
+    new_balance: float
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> DepositResponse:
+        return cls(new_balance=data["new_balance"])
+
+
+@dataclass
+class PaymentIntentResponse:
+    """Response from create_intent tool."""
+
+    id: str
+    status: str
+    amount: float
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> PaymentIntentResponse:
+        return cls(id=data["id"], status=data["status"], amount=data["amount"])
+
+
+@dataclass
+class EscrowResponse:
+    """Response from create_escrow / release_escrow tools."""
+
+    id: str
+    status: str
+    amount: float
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> EscrowResponse:
+        return cls(id=data["id"], status=data["status"], amount=data["amount"])
+
+
+@dataclass
+class TrustScoreResponse:
+    """Response from get_trust_score tool."""
+
+    server_id: str
+    composite_score: float
+    reliability_score: float
+    security_score: float
+    documentation_score: float
+    responsiveness_score: float
+    confidence: float
+    window: str
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> TrustScoreResponse:
+        return cls(
+            server_id=data["server_id"],
+            composite_score=data["composite_score"],
+            reliability_score=data["reliability_score"],
+            security_score=data["security_score"],
+            documentation_score=data.get("documentation_score", 0.0),
+            responsiveness_score=data.get("responsiveness_score", 0.0),
+            confidence=data["confidence"],
+            window=data["window"],
+        )
+
+
+@dataclass
+class ServiceMatch:
+    """A single service match result."""
+
+    service: dict[str, Any]
+    rank_score: float
+    match_reasons: list[str]
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> ServiceMatch:
+        return cls(
+            service=data["service"],
+            rank_score=data["rank_score"],
+            match_reasons=data.get("match_reasons", []),
+        )
