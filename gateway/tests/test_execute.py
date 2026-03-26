@@ -203,6 +203,135 @@ async def test_execute_invalid_json(client, api_key):
 
 
 @pytest.mark.asyncio
+async def test_execute_delete_server(client, pro_api_key, app):
+    """Pro tier should be able to delete a server via gateway."""
+    ctx = app.state.ctx
+
+    # Register a server first
+    await ctx.trust_api.register_server(
+        name="To Delete", url="https://delete.com", server_id="del-001",
+    )
+
+    resp = await client.post(
+        "/execute",
+        json={"tool": "delete_server", "params": {"server_id": "del-001"}},
+        headers={"Authorization": f"Bearer {pro_api_key}"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is True
+    assert data["result"]["deleted"] is True
+
+    # Verify it's gone
+    server = await ctx.trust_api.storage.get_server("del-001")
+    assert server is None
+
+
+@pytest.mark.asyncio
+async def test_execute_delete_server_not_found(client, pro_api_key, app):
+    """Deleting a non-existent server should return an error."""
+    resp = await client.post(
+        "/execute",
+        json={"tool": "delete_server", "params": {"server_id": "nonexistent"}},
+        headers={"Authorization": f"Bearer {pro_api_key}"},
+    )
+    # Should get an error response (not 200)
+    assert resp.status_code != 200
+
+
+@pytest.mark.asyncio
+async def test_execute_delete_server_requires_pro(client, api_key):
+    """Free tier should not be able to delete a server."""
+    resp = await client.post(
+        "/execute",
+        json={"tool": "delete_server", "params": {"server_id": "any"}},
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 403
+    assert resp.json()["error"]["code"] == "insufficient_tier"
+
+
+@pytest.mark.asyncio
+async def test_execute_update_server(client, pro_api_key, app):
+    """Pro tier should be able to update a server via gateway."""
+    ctx = app.state.ctx
+
+    # Register a server first
+    await ctx.trust_api.register_server(
+        name="Old Name", url="https://old.com", server_id="upd-001",
+    )
+
+    resp = await client.post(
+        "/execute",
+        json={
+            "tool": "update_server",
+            "params": {"server_id": "upd-001", "name": "New Name", "url": "https://new.com"},
+        },
+        headers={"Authorization": f"Bearer {pro_api_key}"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is True
+    assert data["result"]["name"] == "New Name"
+    assert data["result"]["url"] == "https://new.com"
+
+
+@pytest.mark.asyncio
+async def test_execute_update_server_not_found(client, pro_api_key):
+    """Updating a non-existent server should return an error."""
+    resp = await client.post(
+        "/execute",
+        json={
+            "tool": "update_server",
+            "params": {"server_id": "nonexistent", "name": "X"},
+        },
+        headers={"Authorization": f"Bearer {pro_api_key}"},
+    )
+    assert resp.status_code != 200
+
+
+@pytest.mark.asyncio
+async def test_execute_global_audit_log(client, pro_api_key, app):
+    """Pro tier should be able to query the global audit log."""
+    ctx = app.state.ctx
+
+    # Record some audit entries
+    await ctx.paywall_storage.record_audit(
+        agent_id="agent-x", function="test_fn", tier="pro",
+    )
+    await ctx.paywall_storage.record_audit(
+        agent_id="agent-y", function="other_fn", tier="free",
+    )
+
+    resp = await client.post(
+        "/execute",
+        json={"tool": "get_global_audit_log", "params": {"limit": 50}},
+        headers={"Authorization": f"Bearer {pro_api_key}"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is True
+    entries = data["result"]["entries"]
+    # Should have at least the 2 entries we just created (plus any from gateway usage)
+    assert len(entries) >= 2
+    agents = {e["agent_id"] for e in entries}
+    assert "agent-x" in agents
+    assert "agent-y" in agents
+
+
+@pytest.mark.asyncio
+async def test_execute_global_audit_log_requires_pro(client, api_key):
+    """Free tier should not access the global audit log."""
+    resp = await client.post(
+        "/execute",
+        json={"tool": "get_global_audit_log", "params": {}},
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 403
+    assert resp.json()["error"]["code"] == "insufficient_tier"
+
+
+@pytest.mark.asyncio
 async def test_execute_create_and_capture_intent(client, api_key, app):
     """End-to-end: create an intent and then capture it."""
     ctx = app.state.ctx

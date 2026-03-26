@@ -339,5 +339,73 @@
     "pricing": {"per_call": 0.0},
     "sla": {"max_latency_ms": 500},
     "tier_required": "free"
+  },
+  {
+    "name": "delete_server",
+    "service": "trust",
+    "description": "Delete a server and all its associated trust data (probes, scans, scores).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "server_id": {"type": "string", "description": "The server identifier to delete"}
+      },
+      "required": ["server_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "deleted": {"type": "boolean"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 300},
+    "tier_required": "pro"
+  },
+  {
+    "name": "update_server",
+    "service": "trust",
+    "description": "Update a server's name and/or URL.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "server_id": {"type": "string", "description": "The server identifier to update"},
+        "name": {"type": "string", "description": "New server name (optional)"},
+        "url": {"type": "string", "description": "New server URL (optional)"}
+      },
+      "required": ["server_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "name": {"type": "string"},
+        "url": {"type": "string"},
+        "transport_type": {"type": "string"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 300},
+    "tier_required": "pro"
+  },
+  {
+    "name": "get_global_audit_log",
+    "service": "paywall",
+    "description": "Get the global audit log across all agents (admin operation).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "since": {"type": "number", "description": "Unix timestamp to query from (optional)"},
+        "limit": {"type": "integer", "default": 100, "description": "Maximum number of entries"}
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "entries": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 500},
+    "tier_required": "pro"
   }
 ]

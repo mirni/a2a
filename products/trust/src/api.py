@@ -145,6 +145,41 @@ class TrustAPI:
         """
         return await self.storage.search_servers(name_contains, min_score, limit)
 
+    async def delete_server(self, server_id: str) -> None:
+        """Delete a server and all its associated data.
+
+        Args:
+            server_id: Server identifier to delete.
+
+        Raises:
+            ServerNotFoundError: If the server does not exist.
+        """
+        deleted = await self.storage.delete_server(server_id)
+        if not deleted:
+            raise ServerNotFoundError(f"Server not found: {server_id}")
+
+    async def update_server(self, server_id: str, **kwargs) -> Server:
+        """Update a server's name and/or url.
+
+        Args:
+            server_id: Server identifier to update.
+            **kwargs: Fields to update (name, url).
+
+        Returns:
+            The updated Server object.
+
+        Raises:
+            ServerNotFoundError: If the server does not exist.
+        """
+        updated = await self.storage.update_server(
+            server_id,
+            name=kwargs.get("name"),
+            url=kwargs.get("url"),
+        )
+        if updated is None:
+            raise ServerNotFoundError(f"Server not found: {server_id}")
+        return updated
+
     async def list_servers(self) -> list[Server]:
         """List all registered servers."""
         return await self.storage.list_servers()

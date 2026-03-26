@@ -173,6 +173,55 @@ class StorageBackend:
         rows = await cursor.fetchall()
         return [self._row_to_server(r) for r in rows]
 
+    async def delete_server(self, server_id: str) -> bool:
+        """Delete a server and all associated data (probes, scans, scores).
+
+        Returns True if the server existed and was deleted.
+        """
+        cursor = await self.db.execute(
+            "DELETE FROM servers WHERE id = ?", (server_id,)
+        )
+        if cursor.rowcount == 0:
+            return False
+        await self.db.execute(
+            "DELETE FROM probe_results WHERE server_id = ?", (server_id,)
+        )
+        await self.db.execute(
+            "DELETE FROM security_scans WHERE server_id = ?", (server_id,)
+        )
+        await self.db.execute(
+            "DELETE FROM trust_scores WHERE server_id = ?", (server_id,)
+        )
+        await self.db.commit()
+        return True
+
+    async def update_server(
+        self, server_id: str, name: str | None = None, url: str | None = None
+    ) -> Server | None:
+        """Update a server's name and/or url. Returns updated Server or None if not found."""
+        existing = await self.get_server(server_id)
+        if existing is None:
+            return None
+
+        updates: list[str] = []
+        values: list[Any] = []
+        if name is not None:
+            updates.append("name = ?")
+            values.append(name)
+        if url is not None:
+            updates.append("url = ?")
+            values.append(url)
+
+        if updates:
+            values.append(server_id)
+            await self.db.execute(
+                f"UPDATE servers SET {', '.join(updates)} WHERE id = ?",
+                values,
+            )
+            await self.db.commit()
+
+        return await self.get_server(server_id)
+
     # -----------------------------------------------------------------------
     # Probe results
     # -----------------------------------------------------------------------

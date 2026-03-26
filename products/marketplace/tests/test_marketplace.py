@@ -431,6 +431,41 @@ class TestOwnershipEnforcement:
         assert result.status == ServiceStatus.INACTIVE
 
 
+class TestSearchPagination:
+    async def _seed_many(self, marketplace):
+        for i in range(10):
+            await marketplace.register_service(make_service(
+                provider_id=f"prov-{i}", name=f"Service {i}",
+                category="testing", cost=float(i),
+            ))
+
+    async def test_search_with_offset_and_limit(self, marketplace):
+        await self._seed_many(marketplace)
+        params = ServiceSearchParams(limit=3, offset=0)
+        page1 = await marketplace.search(params)
+        assert len(page1) == 3
+
+        params2 = ServiceSearchParams(limit=3, offset=3)
+        page2 = await marketplace.search(params2)
+        assert len(page2) == 3
+
+        # Pages should not overlap
+        ids1 = {s.id for s in page1}
+        ids2 = {s.id for s in page2}
+        assert ids1.isdisjoint(ids2)
+
+    async def test_search_offset_beyond_results(self, marketplace):
+        await self._seed_many(marketplace)
+        params = ServiceSearchParams(limit=10, offset=100)
+        results = await marketplace.search(params)
+        assert results == []
+
+    async def test_total_count_in_search(self, marketplace, storage):
+        await self._seed_many(marketplace)
+        total = await storage.count_search_results(status="active")
+        assert total == 10
+
+
 class TestMaxCostSQLFilter:
     """Tests that max_cost filtering works correctly at page boundaries."""
 

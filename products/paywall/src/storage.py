@@ -226,6 +226,23 @@ class PaywallStorage:
         rows = await cursor.fetchall()
         return [dict(r) for r in rows]
 
+    async def get_global_audit_log(
+        self,
+        since: float | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Get audit log entries across all agents (admin global view)."""
+        query = "SELECT * FROM audit_log WHERE 1=1"
+        params: list[Any] = []
+        if since is not None:
+            query += " AND created_at >= ?"
+            params.append(since)
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+        cursor = await self.db.execute(query, params)
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
     async def purge_audit_log(self, before: float) -> int:
         """Delete audit log entries older than the given timestamp. Returns count deleted."""
         cursor = await self.db.execute(

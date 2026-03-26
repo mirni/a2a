@@ -251,6 +251,7 @@ class StorageBackend:
         since: float | None = None,
         until: float | None = None,
         limit: int = 1000,
+        function: str | None = None,
     ) -> list[dict[str, Any]]:
         query = "SELECT * FROM usage_records WHERE agent_id = ?"
         params: list[Any] = [agent_id]
@@ -260,6 +261,9 @@ class StorageBackend:
         if until is not None:
             query += " AND created_at <= ?"
             params.append(until)
+        if function is not None:
+            query += " AND function LIKE ?"
+            params.append(f"%{function}%")
         query += " ORDER BY created_at DESC LIMIT ?"
         params.append(limit)
         cursor = await self.db.execute(query, params)
