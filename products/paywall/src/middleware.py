@@ -16,10 +16,13 @@ Usage::
 from __future__ import annotations
 
 import functools
+import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, ParamSpec, TypeVar
+
+logger = logging.getLogger("a2a.paywall")
 
 from .keys import InvalidKeyError, KeyManager
 from .storage import PaywallStorage
@@ -291,8 +294,21 @@ class PaywallMiddleware:
                             agent_id, effective_cost,
                             description=f"paywall:{self.connector}:{fn.__qualname__}",
                         )
-                    except Exception:
-                        pass  # Charge failure should not block after successful execution
+                    except Exception as charge_err:
+                        # Charge failure should not block response, but must be logged
+                        logger.warning(
+                            "Charge failed for agent %s on %s:%s — %s",
+                            agent_id, self.connector, fn.__qualname__, charge_err,
+                        )
+                        await self.paywall_storage.record_audit(
+                            agent_id=agent_id,
+                            connector=self.connector,
+                            function=fn.__qualname__,
+                            tier=agent_tier,
+                            cost=effective_cost,
+                            allowed=True,
+                            reason=f"charge_failed: {charge_err}",
+                        )
 
                 # Step 6: Record audit log
                 await self.paywall_storage.record_audit(

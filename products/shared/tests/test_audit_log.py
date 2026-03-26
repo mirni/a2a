@@ -78,3 +78,51 @@ class TestLogOperation:
         )
         assert entry.params["api_key"] == "[REDACTED]"
         assert entry.params["email"] == "test@test.com"
+
+
+class TestSanitizeParamsEdgeCases:
+    """Tests for improved sanitization: substring matching, mixed case, deep nesting."""
+
+    def test_redacts_camelcase_apikey(self):
+        result = _sanitize_params({"ApiKey": "sk-1234"})
+        assert result["ApiKey"] == "[REDACTED]"
+
+    def test_redacts_prefixed_key(self):
+        result = _sanitize_params({"stripe_secret_key": "sk-1234"})
+        assert result["stripe_secret_key"] == "[REDACTED]"
+
+    def test_redacts_suffixed_key(self):
+        result = _sanitize_params({"api_token_v2": "tok-xyz"})
+        assert result["api_token_v2"] == "[REDACTED]"
+
+    def test_redacts_deeply_nested(self):
+        params = {
+            "config": {
+                "auth": {
+                    "api_key": "sk-deep",
+                    "host": "localhost",
+                }
+            }
+        }
+        result = _sanitize_params(params)
+        assert result["config"]["auth"]["api_key"] == "[REDACTED]"
+        assert result["config"]["auth"]["host"] == "localhost"
+
+    def test_redacts_mixed_case_password(self):
+        result = _sanitize_params({"DB_PASSWORD": "hunter2"})
+        assert result["DB_PASSWORD"] == "[REDACTED]"
+
+    def test_preserves_keys_without_sensitive_substring(self):
+        result = _sanitize_params({"customer_id": "cus_123", "amount": 100})
+        assert result["customer_id"] == "cus_123"
+        assert result["amount"] == 100
+
+    def test_redacts_authorization_header(self):
+        result = _sanitize_params({"Authorization": "Bearer tok123"})
+        assert result["Authorization"] == "[REDACTED]"
+
+    def test_handles_list_values(self):
+        """Lists should pass through without error."""
+        result = _sanitize_params({"tags": ["a", "b"], "secret": "x"})
+        assert result["tags"] == ["a", "b"]
+        assert result["secret"] == "[REDACTED]"

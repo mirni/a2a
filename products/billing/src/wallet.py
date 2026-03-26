@@ -69,11 +69,9 @@ class Wallet:
         """Add credits to an agent's wallet. Returns new balance."""
         if amount <= 0:
             raise ValueError("Deposit amount must be positive")
-        wallet = await self.storage.get_wallet(agent_id)
-        if wallet is None:
+        success, new_balance = await self.storage.atomic_credit(agent_id, amount)
+        if not success:
             raise WalletNotFoundError(agent_id)
-        new_balance = wallet["balance"] + amount
-        await self.storage.update_balance(agent_id, new_balance)
         await self.storage.record_transaction(agent_id, amount, "deposit", description)
         await self.storage.emit_event(
             "wallet.deposit",
@@ -86,16 +84,19 @@ class Wallet:
         """Remove credits from an agent's wallet. Returns new balance.
 
         Raises InsufficientCreditsError if balance is too low.
+        Uses atomic UPDATE WHERE balance >= ? to prevent race conditions.
         """
         if amount <= 0:
             raise ValueError("Withdrawal amount must be positive")
         wallet = await self.storage.get_wallet(agent_id)
         if wallet is None:
             raise WalletNotFoundError(agent_id)
-        if wallet["balance"] < amount:
-            raise InsufficientCreditsError(agent_id, amount, wallet["balance"])
-        new_balance = wallet["balance"] - amount
-        await self.storage.update_balance(agent_id, new_balance)
+        success, new_balance = await self.storage.atomic_debit_strict(agent_id, amount)
+        if not success:
+            # Re-fetch current balance for the error message
+            current = await self.storage.get_wallet(agent_id)
+            available = current["balance"] if current else 0.0
+            raise InsufficientCreditsError(agent_id, amount, available)
         await self.storage.record_transaction(agent_id, -amount, "withdrawal", description)
         await self.storage.emit_event(
             "wallet.withdrawal",
@@ -108,16 +109,18 @@ class Wallet:
         """Deduct credits for usage (metered call). Returns new balance.
 
         Raises InsufficientCreditsError if balance is too low.
+        Uses atomic UPDATE WHERE balance >= ? to prevent race conditions.
         """
         if amount <= 0:
             raise ValueError("Charge amount must be positive")
         wallet = await self.storage.get_wallet(agent_id)
         if wallet is None:
             raise WalletNotFoundError(agent_id)
-        if wallet["balance"] < amount:
-            raise InsufficientCreditsError(agent_id, amount, wallet["balance"])
-        new_balance = wallet["balance"] - amount
-        await self.storage.update_balance(agent_id, new_balance)
+        success, new_balance = await self.storage.atomic_debit_strict(agent_id, amount)
+        if not success:
+            current = await self.storage.get_wallet(agent_id)
+            available = current["balance"] if current else 0.0
+            raise InsufficientCreditsError(agent_id, amount, available)
         await self.storage.record_transaction(agent_id, -amount, "charge", description)
         return new_balance
 

@@ -384,3 +384,90 @@ class TestCountServices:
         await marketplace.deactivate_service(svc.id)
         assert await marketplace.count_services("active") == 0
         assert await marketplace.count_services("inactive") == 1
+
+
+class TestOwnershipEnforcement:
+    """Tests that update/deactivate require matching provider_id."""
+
+    async def test_update_own_service_succeeds(self, marketplace):
+        spec = make_service(provider_id="agent-1", name="My Service")
+        svc = await marketplace.register_service(spec)
+        updated = await marketplace.update_service(
+            svc.id, requester_id="agent-1", name="Updated"
+        )
+        assert updated.name == "Updated"
+
+    async def test_update_other_service_raises(self, marketplace):
+        spec = make_service(provider_id="agent-1", name="My Service")
+        svc = await marketplace.register_service(spec)
+        with pytest.raises(PermissionError, match="not the owner"):
+            await marketplace.update_service(
+                svc.id, requester_id="agent-2", name="Hijacked"
+            )
+
+    async def test_deactivate_own_service_succeeds(self, marketplace):
+        spec = make_service(provider_id="agent-1", name="My Service")
+        svc = await marketplace.register_service(spec)
+        result = await marketplace.deactivate_service(svc.id, requester_id="agent-1")
+        assert result.status == ServiceStatus.INACTIVE
+
+    async def test_deactivate_other_service_raises(self, marketplace):
+        spec = make_service(provider_id="agent-1", name="My Service")
+        svc = await marketplace.register_service(spec)
+        with pytest.raises(PermissionError, match="not the owner"):
+            await marketplace.deactivate_service(svc.id, requester_id="agent-2")
+
+    async def test_update_without_requester_still_works(self, marketplace):
+        """Backwards compat: if no requester_id passed, ownership is not checked."""
+        spec = make_service(provider_id="agent-1", name="My Service")
+        svc = await marketplace.register_service(spec)
+        updated = await marketplace.update_service(svc.id, name="Updated")
+        assert updated.name == "Updated"
+
+    async def test_deactivate_without_requester_still_works(self, marketplace):
+        spec = make_service(provider_id="agent-1", name="My Service")
+        svc = await marketplace.register_service(spec)
+        result = await marketplace.deactivate_service(svc.id)
+        assert result.status == ServiceStatus.INACTIVE
+
+
+class TestMaxCostSQLFilter:
+    """Tests that max_cost filtering works correctly at page boundaries."""
+
+    async def test_max_cost_returns_all_qualifying_within_limit(self, marketplace):
+        """Register 5 cheap then 15 expensive services.
+
+        With max_cost=1.0 and limit=10: the SQL query orders by created_at DESC
+        with LIMIT 10, which returns only the 10 most recent (all expensive).
+        Post-SQL filtering removes them all, returning 0 instead of 5.
+        The fix must push max_cost into the SQL WHERE clause.
+        """
+        # Cheap services created first (older)
+        for i in range(5):
+            await marketplace.register_service(make_service(
+                provider_id=f"cheap-{i}", name=f"Cheap {i}", cost=0.5,
+            ))
+        # Expensive services created after (newer — will appear first in DESC order)
+        for i in range(15):
+            await marketplace.register_service(make_service(
+                provider_id=f"exp-{i}", name=f"Expensive {i}", cost=10.0,
+            ))
+
+        params = ServiceSearchParams(max_cost=1.0, limit=10)
+        results = await marketplace.search(params)
+        assert len(results) == 5
+        for svc in results:
+            assert svc.pricing.cost <= 1.0
+
+    async def test_max_cost_zero_returns_only_free(self, marketplace):
+        await marketplace.register_service(make_service(
+            provider_id="a1", name="Paid", cost=1.0,
+        ))
+        await marketplace.register_service(make_service(
+            provider_id="a2", name="Free", cost=0.0,
+            pricing_model=PricingModelType.FREE,
+        ))
+        params = ServiceSearchParams(max_cost=0.0)
+        results = await marketplace.search(params)
+        assert len(results) == 1
+        assert results[0].name == "Free"

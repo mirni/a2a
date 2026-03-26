@@ -700,3 +700,72 @@ class TestPaymentHistory:
         assert len(history_c) == 1
         history_x = await payment_storage.get_payment_history("x")
         assert len(history_x) == 0
+
+
+# ---------------------------------------------------------------------------
+# SQL Column Injection Prevention
+# ---------------------------------------------------------------------------
+
+class TestSubscriptionUpdateAllowlist:
+    """Tests that update_subscription rejects invalid column names."""
+
+    async def test_valid_columns_accepted(self, payment_storage):
+        now = time.time()
+        data = {
+            "id": "sub-allow-1",
+            "payer": "a",
+            "payee": "b",
+            "amount": 10.0,
+            "interval": "daily",
+            "status": "active",
+            "next_charge_at": now + 86400,
+            "created_at": now,
+            "updated_at": now,
+        }
+        await payment_storage.insert_subscription(data)
+        # These are all valid columns
+        await payment_storage.update_subscription("sub-allow-1", {
+            "status": "cancelled",
+            "cancelled_by": "a",
+        })
+        result = await payment_storage.get_subscription("sub-allow-1")
+        assert result["status"] == "cancelled"
+
+    async def test_invalid_column_rejected(self, payment_storage):
+        now = time.time()
+        data = {
+            "id": "sub-allow-2",
+            "payer": "a",
+            "payee": "b",
+            "amount": 10.0,
+            "interval": "daily",
+            "status": "active",
+            "next_charge_at": now + 86400,
+            "created_at": now,
+            "updated_at": now,
+        }
+        await payment_storage.insert_subscription(data)
+        with pytest.raises(ValueError, match="Invalid column"):
+            await payment_storage.update_subscription("sub-allow-2", {
+                "status = 'active'; DROP TABLE subscriptions; --": "hacked",
+            })
+
+    async def test_sql_injection_in_key_rejected(self, payment_storage):
+        now = time.time()
+        data = {
+            "id": "sub-allow-3",
+            "payer": "a",
+            "payee": "b",
+            "amount": 10.0,
+            "interval": "daily",
+            "status": "active",
+            "next_charge_at": now + 86400,
+            "created_at": now,
+            "updated_at": now,
+        }
+        await payment_storage.insert_subscription(data)
+        with pytest.raises(ValueError, match="Invalid column"):
+            await payment_storage.update_subscription("sub-allow-3", {
+                "amount": 0,
+                "nonexistent_column": "value",
+            })

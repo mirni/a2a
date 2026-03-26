@@ -439,3 +439,57 @@ class TestEdgeCases:
         # Should work because agent has a pro key
         result = await pro_tool(agent_id="agent-1")
         assert result == {"ok": True}
+
+
+class TestChargeFailureHandling:
+    """Tests that charge failures after tool execution are logged, not silenced."""
+
+    async def test_charge_failure_logs_audit_event(
+        self, middleware: PaywallMiddleware, key_manager: KeyManager,
+        tracker, paywall_storage,
+    ):
+        """When wallet charge fails post-execution, an audit record should
+        be written with reason 'charge_failed', not silently swallowed."""
+        await key_manager.create_key(agent_id="agent-1", tier="pro")
+        # Create wallet with just enough to pass the balance check but
+        # then drain it before the charge can happen
+        await tracker.wallet.create("agent-1", initial_balance=5.0)
+
+        call_count = 0
+
+        @middleware.gated(tier="free", cost=5)
+        async def paid_tool(agent_id: str):
+            nonlocal call_count
+            call_count += 1
+            # Drain the wallet during execution so the post-call charge fails
+            if call_count == 1:
+                await tracker.wallet.withdraw("agent-1", 5.0, "drain")
+            return {"ok": True}
+
+        # The tool should still return successfully (charge is post-execution)
+        result = await paid_tool(agent_id="agent-1")
+        assert result == {"ok": True}
+
+        # But the charge failure should be recorded in audit log
+        logs = await paywall_storage.get_audit_log("agent-1")
+        # Should have: 1 success audit + 1 charge_failed audit
+        charge_failed_logs = [l for l in logs if l.get("reason") and "charge_failed" in l["reason"]]
+        assert len(charge_failed_logs) >= 1
+
+    async def test_charge_failure_does_not_block_response(
+        self, middleware: PaywallMiddleware, key_manager: KeyManager,
+        tracker, paywall_storage,
+    ):
+        """Tool result is returned even when charge fails."""
+        await key_manager.create_key(agent_id="agent-1", tier="pro")
+        # Balance passes the pre-check (10 >= 5) but is drained during execution
+        await tracker.wallet.create("agent-1", initial_balance=10.0)
+
+        @middleware.gated(tier="free", cost=5)
+        async def paid_tool(agent_id: str):
+            # Drain wallet during execution so the post-call charge fails
+            await tracker.wallet.withdraw("agent-1", 10.0, "drain")
+            return {"data": [1, 2, 3]}
+
+        result = await paid_tool(agent_id="agent-1")
+        assert result == {"data": [1, 2, 3]}

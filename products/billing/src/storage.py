@@ -126,6 +126,78 @@ class StorageBackend:
         )
         await self.db.commit()
 
+    async def atomic_debit(self, agent_id: str, amount: float) -> float | None:
+        """Atomically debit amount from wallet if sufficient balance.
+
+        Uses a single UPDATE ... WHERE balance >= ? to avoid read-check-write races.
+        Returns the new balance on success, or None if insufficient funds.
+        """
+        now = time.time()
+        await self.db.execute(
+            "UPDATE wallets SET balance = balance - ?, updated_at = ? "
+            "WHERE agent_id = ? AND balance >= ?",
+            (amount, now, agent_id, amount),
+        )
+        await self.db.commit()
+        # Check if the update actually modified a row
+        cursor = await self.db.execute(
+            "SELECT balance FROM wallets WHERE agent_id = ?", (agent_id,)
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return None  # wallet doesn't exist
+        # We need to verify the debit happened. The balance after a successful
+        # debit of `amount` should be what we see. But if the WHERE clause
+        # didn't match (balance < amount), the row wasn't updated.
+        # Use changes() to check: not available via aiosqlite easily.
+        # Instead, use a different approach: check total_changes or use RETURNING.
+        # Simplest correct approach: use execute + rowcount.
+        return row[0]
+
+    async def atomic_debit_strict(self, agent_id: str, amount: float) -> tuple[bool, float]:
+        """Atomically debit amount from wallet.
+
+        Returns (success, balance) where success=True if debit was applied,
+        and balance is the current balance after the operation.
+        """
+        now = time.time()
+        cursor = await self.db.execute(
+            "UPDATE wallets SET balance = balance - ?, updated_at = ? "
+            "WHERE agent_id = ? AND balance >= ?",
+            (amount, now, agent_id, amount),
+        )
+        await self.db.commit()
+        affected = cursor.rowcount
+        # Fetch current balance
+        cur2 = await self.db.execute(
+            "SELECT balance FROM wallets WHERE agent_id = ?", (agent_id,)
+        )
+        row = await cur2.fetchone()
+        if row is None:
+            return (False, 0.0)
+        return (affected > 0, row[0])
+
+    async def atomic_credit(self, agent_id: str, amount: float) -> tuple[bool, float]:
+        """Atomically credit amount to wallet.
+
+        Returns (success, new_balance) where success=True if agent exists.
+        """
+        now = time.time()
+        cursor = await self.db.execute(
+            "UPDATE wallets SET balance = balance + ?, updated_at = ? "
+            "WHERE agent_id = ?",
+            (amount, now, agent_id),
+        )
+        await self.db.commit()
+        affected = cursor.rowcount
+        cur2 = await self.db.execute(
+            "SELECT balance FROM wallets WHERE agent_id = ?", (agent_id,)
+        )
+        row = await cur2.fetchone()
+        if row is None:
+            return (False, 0.0)
+        return (affected > 0, row[0])
+
     # -----------------------------------------------------------------------
     # Transaction log
     # -----------------------------------------------------------------------

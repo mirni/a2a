@@ -257,6 +257,12 @@ class MarketplaceStorage:
             conditions.append("json_extract(s.pricing_json, '$.model') = ?")
             params.append(pricing_model)
 
+        if max_cost is not None:
+            conditions.append(
+                "CAST(json_extract(s.pricing_json, '$.cost') AS REAL) <= ?"
+            )
+            params.append(max_cost)
+
         where = " AND ".join(conditions)
         sql = f"""
             SELECT DISTINCT s.* FROM services s
@@ -271,10 +277,6 @@ class MarketplaceStorage:
         results = []
         for row in rows:
             svc = await self._enrich_service(dict(row))
-            if max_cost is not None:
-                p = json.loads(svc["pricing_json"])
-                if p.get("cost", 0) > max_cost:
-                    continue
             results.append(svc)
         return results
 

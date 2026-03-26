@@ -85,7 +85,8 @@ class Marketplace:
             metadata=spec.metadata,
         )
         raw = await self._storage.get_service(service_id)
-        assert raw is not None
+        if raw is None:
+            raise RuntimeError(f"Failed to retrieve newly created service {service_id}")
         return self._to_service(raw)
 
     async def get_service(self, service_id: str) -> Service:
@@ -105,6 +106,7 @@ class Marketplace:
         self,
         service_id: str,
         *,
+        requester_id: str | None = None,
         name: str | None = None,
         description: str | None = None,
         category: str | None = None,
@@ -117,9 +119,17 @@ class Marketplace:
     ) -> Service:
         """Update an existing service.
 
+        Args:
+            service_id: The service to update.
+            requester_id: If provided, verifies caller owns the service.
+
         Raises:
             ServiceNotFoundError: If service not found.
+            PermissionError: If requester_id does not match provider_id.
         """
+        if requester_id is not None:
+            await self._check_ownership(service_id, requester_id)
+
         updated = await self._storage.update_service(
             service_id,
             name=name,
@@ -135,21 +145,43 @@ class Marketplace:
         if not updated:
             raise ServiceNotFoundError(service_id)
         raw = await self._storage.get_service(service_id)
-        assert raw is not None
+        if raw is None:
+            raise RuntimeError(f"Failed to retrieve updated service {service_id}")
         return self._to_service(raw)
 
-    async def deactivate_service(self, service_id: str) -> Service:
+    async def deactivate_service(
+        self, service_id: str, *, requester_id: str | None = None
+    ) -> Service:
         """Deactivate a service listing.
+
+        Args:
+            service_id: The service to deactivate.
+            requester_id: If provided, verifies caller owns the service.
 
         Raises:
             ServiceNotFoundError: If service not found.
+            PermissionError: If requester_id does not match provider_id.
         """
+        if requester_id is not None:
+            await self._check_ownership(service_id, requester_id)
+
         updated = await self._storage.update_service(service_id, status="inactive")
         if not updated:
             raise ServiceNotFoundError(service_id)
         raw = await self._storage.get_service(service_id)
-        assert raw is not None
+        if raw is None:
+            raise RuntimeError(f"Failed to retrieve deactivated service {service_id}")
         return self._to_service(raw)
+
+    async def _check_ownership(self, service_id: str, requester_id: str) -> None:
+        """Verify that requester_id matches the service's provider_id."""
+        raw = await self._storage.get_service(service_id)
+        if raw is None:
+            raise ServiceNotFoundError(service_id)
+        if raw["provider_id"] != requester_id:
+            raise PermissionError(
+                f"Agent '{requester_id}' is not the owner of service '{service_id}'"
+            )
 
     async def search(self, params: ServiceSearchParams | None = None, **kwargs: Any) -> list[Service]:
         """Search for services with filters.

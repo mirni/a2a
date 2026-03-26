@@ -115,3 +115,80 @@ class TestWalletTransactions:
     async def test_transactions_missing_wallet_raises(self, wallet: Wallet):
         with pytest.raises(WalletNotFoundError):
             await wallet.get_transactions("nonexistent")
+
+
+class TestAtomicWalletOperations:
+    """Tests that wallet balance operations are atomic.
+
+    The core invariant: no matter how many concurrent operations run,
+    the final balance must be consistent (never negative when it shouldn't be).
+    """
+
+    async def test_concurrent_withdrawals_never_go_negative(self, wallet: Wallet):
+        """Fire N concurrent withdrawals that collectively exceed balance.
+
+        With 100 balance and 20 withdrawals of 10 each (200 total),
+        exactly 10 should succeed and 10 should raise InsufficientCreditsError.
+        Final balance must be 0.
+        """
+        import asyncio
+
+        await wallet.create("agent-1", initial_balance=100.0)
+
+        async def try_withdraw():
+            try:
+                await wallet.withdraw("agent-1", 10.0, "concurrent")
+                return "ok"
+            except InsufficientCreditsError:
+                return "insufficient"
+
+        results = await asyncio.gather(*[try_withdraw() for _ in range(20)])
+        successes = results.count("ok")
+        failures = results.count("insufficient")
+
+        assert successes == 10
+        assert failures == 10
+        balance = await wallet.get_balance("agent-1")
+        assert balance == 0.0
+
+    async def test_concurrent_charges_never_go_negative(self, wallet: Wallet):
+        """Same test for charge() — used by paywall."""
+        import asyncio
+
+        await wallet.create("agent-1", initial_balance=50.0)
+
+        async def try_charge():
+            try:
+                await wallet.charge("agent-1", 10.0, "metered")
+                return "ok"
+            except InsufficientCreditsError:
+                return "insufficient"
+
+        results = await asyncio.gather(*[try_charge() for _ in range(10)])
+        successes = results.count("ok")
+        failures = results.count("insufficient")
+
+        assert successes == 5
+        assert failures == 5
+        balance = await wallet.get_balance("agent-1")
+        assert balance == 0.0
+
+    async def test_concurrent_deposits_are_consistent(self, wallet: Wallet):
+        """Concurrent deposits should all succeed and sum correctly."""
+        import asyncio
+
+        await wallet.create("agent-1", initial_balance=0.0)
+
+        async def do_deposit():
+            await wallet.deposit("agent-1", 10.0, "concurrent")
+
+        await asyncio.gather(*[do_deposit() for _ in range(10)])
+        balance = await wallet.get_balance("agent-1")
+        assert balance == 100.0
+
+    async def test_withdraw_exact_balance_succeeds(self, wallet: Wallet):
+        """Withdrawing exactly the full balance should succeed atomically."""
+        await wallet.create("agent-1", initial_balance=50.0)
+        result = await wallet.withdraw("agent-1", 50.0)
+        assert result == 0.0
+        assert await wallet.get_balance("agent-1") == 0.0

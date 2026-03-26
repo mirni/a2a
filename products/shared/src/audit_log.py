@@ -62,19 +62,26 @@ class AuditEntry:
         return entry
 
 
-# Keys that must never appear in audit logs
-_SENSITIVE_KEYS = frozenset({
-    "api_key", "secret", "password", "token", "authorization",
-    "secret_key", "private_key", "access_token", "refresh_token",
-    "credit_card", "card_number", "cvv", "ssn",
-})
+# Substrings that indicate a key is sensitive (case-insensitive matching).
+# A key is redacted if ANY of these appear as a substring in the lowered key.
+_SENSITIVE_SUBSTRINGS = (
+    "api_key", "apikey", "secret", "password", "token",
+    "authorization", "private_key", "credit_card",
+    "card_number", "cvv", "ssn",
+)
+
+
+def _is_sensitive_key(key: str) -> bool:
+    """Check if a key name contains any sensitive substring."""
+    lower = key.lower()
+    return any(sub in lower for sub in _SENSITIVE_SUBSTRINGS)
 
 
 def _sanitize_params(params: dict[str, Any]) -> dict[str, Any]:
     """Remove sensitive values from parameters before logging."""
     sanitized = {}
     for key, value in params.items():
-        if key.lower() in _SENSITIVE_KEYS:
+        if _is_sensitive_key(key):
             sanitized[key] = "[REDACTED]"
         elif isinstance(value, dict):
             sanitized[key] = _sanitize_params(value)

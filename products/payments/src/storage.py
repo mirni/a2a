@@ -335,9 +335,19 @@ class PaymentStorage:
         d["metadata"] = json.loads(d["metadata"])
         return d
 
+    _SUBSCRIPTION_COLUMNS = frozenset({
+        "payer", "payee", "amount", "interval", "description", "status",
+        "cancelled_by", "next_charge_at", "last_charged_at", "charge_count",
+        "updated_at", "metadata",
+    })
+
     async def update_subscription(self, sub_id: str, updates: dict[str, Any]) -> None:
         now = time.time()
         updates["updated_at"] = now
+        # Validate column names against allowlist
+        invalid = set(updates.keys()) - self._SUBSCRIPTION_COLUMNS
+        if invalid:
+            raise ValueError(f"Invalid column(s) in subscription update: {invalid}")
         if "metadata" in updates:
             updates["metadata"] = json.dumps(updates["metadata"])
         set_clause = ", ".join(f"{k} = ?" for k in updates)
