@@ -124,6 +124,7 @@ async def _search_services(ctx: AppContext, params: dict[str, Any]) -> dict[str,
                 "pricing": s.pricing.to_dict(),
                 "tags": s.tags,
                 "endpoint": s.endpoint,
+                "trust_score": s.trust_score,
             }
             for s in services
         ]
@@ -149,6 +150,7 @@ async def _best_match(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]
                     "name": m.service.name,
                     "description": m.service.description,
                     "pricing": m.service.pricing.to_dict(),
+                    "trust_score": m.service.trust_score,
                 },
                 "rank_score": m.rank_score,
                 "match_reasons": m.match_reasons,

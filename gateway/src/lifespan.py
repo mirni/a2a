@@ -74,16 +74,19 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     await payment_storage.connect()
     payment_engine = PaymentEngine(storage=payment_storage, wallet=tracker.wallet)
 
-    # --- Marketplace ---
-    marketplace_storage = MarketplaceStorage(marketplace_dsn)
-    await marketplace_storage.connect()
-    marketplace = Marketplace(storage=marketplace_storage)
-
-    # --- Trust ---
+    # --- Trust --- (must init before marketplace so we can wire the adapter)
     trust_storage = TrustStorage(trust_dsn)
     await trust_storage.connect()
     scorer = ScoreEngine(storage=trust_storage)
     trust_api = TrustAPI(storage=trust_storage, scorer=scorer)
+
+    # --- Marketplace ---
+    from gateway.src.trust_adapter import make_trust_provider
+
+    marketplace_storage = MarketplaceStorage(marketplace_dsn)
+    await marketplace_storage.connect()
+    trust_provider = make_trust_provider(trust_api)
+    marketplace = Marketplace(storage=marketplace_storage, trust_provider=trust_provider)
 
     # Store on app.state
     app.state.ctx = AppContext(
