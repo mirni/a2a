@@ -23,6 +23,9 @@ async def execute(request: Request) -> JSONResponse:
     except Exception:
         return await error_response(400, "Invalid JSON body", "bad_request")
 
+    if not isinstance(body, dict):
+        return await error_response(400, "Request body must be a JSON object", "bad_request")
+
     tool_name = body.get("tool")
     params = body.get("params", {})
 
