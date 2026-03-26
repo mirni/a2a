@@ -272,6 +272,29 @@ async def _update_server(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
 
 
 # ---------------------------------------------------------------------------
+# Event Bus tools
+# ---------------------------------------------------------------------------
+
+
+async def _publish_event(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    event_id = await ctx.event_bus.publish(
+        event_type=params["event_type"],
+        source=params["source"],
+        payload=params.get("payload", {}),
+    )
+    return {"event_id": event_id}
+
+
+async def _get_events(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    events = await ctx.event_bus.get_events(
+        event_type=params.get("event_type"),
+        since_id=params.get("since_id", 0),
+        limit=params.get("limit", 100),
+    )
+    return {"events": events}
+
+
+# ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 
@@ -297,4 +320,7 @@ TOOL_REGISTRY: dict[str, ToolFunc] = {
     "update_server": _update_server,
     # Paywall
     "get_global_audit_log": _get_global_audit_log,
+    # Event Bus
+    "publish_event": _publish_event,
+    "get_events": _get_events,
 }
