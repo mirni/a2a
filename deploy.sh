@@ -5,7 +5,8 @@
 #
 # Usage:
 #   chmod +x deploy.sh
-#   sudo ./deploy.sh
+#   sudo ./deploy.sh                                  # without Tailscale
+#   sudo TAILSCALE_AUTHKEY=tskey-auth-... ./deploy.sh  # with Tailscale SSH
 #
 # What this does:
 #   1. Installs system deps (Python 3.12, pip, git, nginx, certbot, sqlite3)
@@ -13,9 +14,10 @@
 #   3. Clones the repo and installs Python dependencies
 #   4. Creates systemd service for the gateway
 #   5. Configures nginx reverse proxy with HTTPS (Let's Encrypt)
-#   6. Sets up firewall (ufw)
-#   7. Creates initial admin API key
-#   8. Prints final instructions for secrets and DNS
+#   6. Installs Tailscale (if TAILSCALE_AUTHKEY set) — SSH via WireGuard mesh
+#   7. Sets up firewall (ufw) — SSH restricted to Tailscale if enabled
+#   8. Creates initial admin API key
+#   9. Prints final instructions for secrets and DNS
 #
 # After running, you MUST:
 #   - Point your domain DNS to this server's IP
@@ -302,17 +304,95 @@ rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
 
 # ---------------------------------------------------------------------------
-# Step 8: Configure firewall
+# Step 8a: Install and configure Tailscale
+# ---------------------------------------------------------------------------
+
+TAILSCALE_AUTHKEY="${TAILSCALE_AUTHKEY:-}"
+
+if [[ -n "$TAILSCALE_AUTHKEY" ]]; then
+    log "Installing Tailscale..."
+    curl -fsSL https://tailscale.com/install.sh | sh
+
+    log "Starting Tailscale with SSH enabled..."
+    tailscale up --authkey="$TAILSCALE_AUTHKEY" --ssh --hostname="a2a-gateway"
+
+    TAILSCALE_IP=$(tailscale ip -4 2>/dev/null || echo "pending")
+    log "Tailscale connected. IP: $TAILSCALE_IP"
+    log "Tailscale SSH enabled — you can now SSH via Tailscale without keys."
+else
+    warn "TAILSCALE_AUTHKEY not set — skipping Tailscale setup."
+    warn "SSH will remain open on the public interface (key-auth only)."
+    warn ""
+    warn "To enable Tailscale later:"
+    warn "  1. Get an auth key from https://login.tailscale.com/admin/settings/keys"
+    warn "  2. Run: curl -fsSL https://tailscale.com/install.sh | sh"
+    warn "  3. Run: tailscale up --authkey=tskey-auth-... --ssh --hostname=a2a-gateway"
+    warn "  4. Update UFW: ufw delete allow ssh && ufw allow from 100.64.0.0/10 to any port 22"
+fi
+
+# ---------------------------------------------------------------------------
+# Step 8b: Configure firewall
 # ---------------------------------------------------------------------------
 
 log "Configuring firewall..."
 ufw --force reset >/dev/null 2>&1
 ufw default deny incoming
 ufw default allow outgoing
-ufw allow ssh
+
+if [[ -n "$TAILSCALE_AUTHKEY" ]]; then
+    # SSH only via Tailscale (100.64.0.0/10 is Tailscale's CGNAT range)
+    ufw allow from 100.64.0.0/10 to any port 22
+    # WireGuard direct connections (improves latency vs relay)
+    ufw allow 41641/udp
+    # Emergency fallback: SSH on port 2222 with key-auth + fail2ban
+    ufw allow 2222/tcp
+    log "SSH restricted to Tailscale network. Emergency fallback on port 2222."
+else
+    ufw allow ssh
+fi
+
 ufw allow 80/tcp
 ufw allow 443/tcp
 ufw --force enable
+
+# ---------------------------------------------------------------------------
+# Step 8c: Configure emergency SSH fallback (port 2222)
+# ---------------------------------------------------------------------------
+
+if [[ -n "$TAILSCALE_AUTHKEY" ]]; then
+    log "Configuring emergency SSH fallback on port 2222..."
+
+    # Add port 2222 listener to sshd_config if not present
+    if ! grep -q "^Port 2222" /etc/ssh/sshd_config; then
+        # Keep port 22 (for Tailscale SSH) and add 2222 as fallback
+        if grep -q "^Port " /etc/ssh/sshd_config; then
+            sed -i '/^Port /a Port 2222' /etc/ssh/sshd_config
+        else
+            echo "Port 22" >> /etc/ssh/sshd_config
+            echo "Port 2222" >> /etc/ssh/sshd_config
+        fi
+    fi
+
+    # Harden: disable password auth (key-only)
+    sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+    sed -i 's/^#\?PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+
+    # Install fail2ban for the fallback port
+    apt-get install -y -qq fail2ban
+    cat > /etc/fail2ban/jail.d/sshd-fallback.conf << 'F2BEOF'
+[sshd]
+enabled = true
+port = 22,2222
+maxretry = 3
+bantime = 3600
+findtime = 600
+F2BEOF
+    systemctl enable fail2ban
+    systemctl restart fail2ban
+
+    systemctl restart sshd
+    log "fail2ban active on ports 22,2222 (3 strikes = 1h ban)."
+fi
 
 # ---------------------------------------------------------------------------
 # Step 9: Create initial admin API key
@@ -391,6 +471,24 @@ echo "  Config:     $ENV_FILE"
 echo ""
 echo "  Admin key:  $ADMIN_KEY"
 echo ""
+
+if [[ -n "$TAILSCALE_AUTHKEY" ]]; then
+    echo "============================================================================="
+    echo -e "${GREEN} Tailscale SSH Access:${NC}"
+    echo "============================================================================="
+    echo ""
+    echo "  Tailscale IP:  ${TAILSCALE_IP:-$(tailscale ip -4 2>/dev/null || echo 'pending')}"
+    echo "  SSH via:       ssh $(tailscale status --self --json 2>/dev/null | python3 -c 'import sys,json;print(json.load(sys.stdin).get("Self",{}).get("DNSName","a2a-gateway").rstrip("."))' 2>/dev/null || echo 'a2a-gateway')"
+    echo ""
+    echo "  Port 22: Tailscale network only (100.64.0.0/10)"
+    echo "  Port 2222: Emergency fallback (key-auth + fail2ban)"
+    echo "  fail2ban: 3 failed attempts = 1 hour ban"
+    echo ""
+    echo "  To add your laptop: install Tailscale, join same tailnet."
+    echo "  Admin panel: https://login.tailscale.com/admin/machines"
+    echo ""
+fi
+
 echo "============================================================================="
 echo -e "${YELLOW} REQUIRED NEXT STEPS:${NC}"
 echo "============================================================================="

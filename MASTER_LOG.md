@@ -894,3 +894,49 @@ Previous 49 tools + 4 new admin tools:
 | Service | New Tools |
 |---------|-----------|
 | admin | backup_database, restore_database, check_db_integrity, list_backups |
+
+---
+
+## Session 4 (cont.) — Tailscale SSH Access for Traveling User
+
+### Prompt
+
+> I am provisioning the server from Hetzner and configuring my ssh access. My source IP changes since I travel much. I saw a suggestion about using tailscale. Assume role of a security expert, review tailscale and other open-source alternatives, let human review the result and pick the alternative before implementing it in the deployment script.
+
+### Response
+
+**Security expert review of 8 approaches** for securing SSH with dynamic source IPs:
+
+| Approach | Verdict |
+|----------|---------|
+| **Tailscale** | **Recommended** — 5-min setup, DERP relay for restrictive networks, Tailscale SSH eliminates key management, free tier sufficient |
+| **Headscale** | Best fully-OSS option — same UX, self-hosted coordination server |
+| **NetBird** | Fully OSS, good, but no SSH-specific features |
+| **Raw WireGuard** | **Disqualified** — UDP-only, fails on hotel/airport WiFi |
+| **Nebula** | **Disqualified** — UDP-only, high cert maintenance for single-server |
+| **ZeroTier** | Shrinking free tier, muddier licensing, non-standard protocol |
+| **Firezone** | Self-hosting broken after 1.0 pivot, avoid |
+| **step-ca SSH Certs** | Elegant but leaves port 22 exposed to internet |
+
+**User chose: Tailscale**
+
+#### deploy.sh Changes
+
+- **Step 8a**: Tailscale installation and `--ssh` mode (conditional on `TAILSCALE_AUTHKEY` env var)
+- **Step 8b**: UFW rules — SSH restricted to Tailscale CGNAT range (100.64.0.0/10) when Tailscale is active
+- **Step 8c**: Emergency fallback — port 2222 with key-only auth + fail2ban (3 strikes = 1h ban)
+- Updated header with `TAILSCALE_AUTHKEY=tskey-auth-... ./deploy.sh` usage
+- Final instructions include Tailscale IP, DNS name, admin panel link
+
+**Usage:**
+```bash
+# Get auth key from https://login.tailscale.com/admin/settings/keys
+sudo TAILSCALE_AUTHKEY=tskey-auth-xxx A2A_DOMAIN=api.greenhelix.net ./deploy.sh
+```
+
+**Security posture with Tailscale:**
+- Port 22: closed to public, Tailscale network only
+- Port 2222: emergency fallback, key-auth + fail2ban
+- Port 80/443: public (nginx → gateway)
+- Port 41641/udp: WireGuard direct connections
+- All SSH traffic: WireGuard-encrypted, identity via SSO/OAuth
