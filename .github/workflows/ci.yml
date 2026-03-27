@@ -1,0 +1,113 @@
+# =============================================================================
+# A2A Commerce Platform — CI Pipeline
+# =============================================================================
+# Runs on every push and pull request to main.
+# Tests all modules independently to catch import/isolation issues.
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ matrix.python-version }}-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install \
+            "starlette>=0.37" \
+            "uvicorn>=0.29" \
+            "httpx>=0.27" \
+            "aiosqlite>=0.20" \
+            "pydantic>=2.0" \
+            "cryptography>=42.0" \
+            "pytest>=8.0" \
+            "pytest-asyncio>=0.23" \
+            "pytest-cov>=5.0"
+          pip install -e sdk/ || pip install sdk/
+
+      - name: Run gateway tests
+        run: PYTHONPATH=. python -m pytest gateway/tests/ -x -q --tb=short
+
+      - name: Run billing tests
+        run: |
+          cd products/billing
+          PYTHONPATH=../../:. python -m pytest tests/ -x -q --tb=short
+
+      - name: Run paywall tests
+        run: |
+          cd products/paywall
+          PYTHONPATH=../../:. python -m pytest tests/ -x -q --tb=short
+
+      - name: Run payments tests
+        run: |
+          cd products/payments
+          PYTHONPATH=../../:. python -m pytest tests/ -x -q --tb=short
+
+      - name: Run marketplace tests
+        run: |
+          cd products/marketplace
+          PYTHONPATH=../../:. python -m pytest tests/ -x -q --tb=short
+
+      - name: Run trust tests
+        run: |
+          cd products/trust
+          PYTHONPATH=../../:. python -m pytest tests/ -x -q --tb=short
+
+      - name: Run shared tests
+        run: |
+          cd products/shared
+          PYTHONPATH=../../:. python -m pytest tests/ -x -q --tb=short
+
+      - name: Run identity tests
+        run: |
+          cd products/identity
+          PYTHONPATH=../../:. python -m pytest tests/ -x -q --tb=short
+
+      - name: Run SDK tests
+        run: |
+          cd sdk
+          PYTHONPATH=../../:. python -m pytest tests/ -x -q --tb=short
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t a2a-gateway:ci .
+
+      - name: Verify container starts
+        run: |
+          docker run -d --name a2a-ci -p 8000:8000 a2a-gateway:ci
+          sleep 5
+          curl -sf http://localhost:8000/v1/health || (docker logs a2a-ci && exit 1)
+          docker stop a2a-ci

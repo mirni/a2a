@@ -1,0 +1,38 @@
+# Git
+.git
+.gitignore
+
+# Python artifacts
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+dist/
+build/
+
+# Test/coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Environment
+.env
+.venv
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Docs (not needed in runtime image)
+docs/
+*.md
+!README.md
+
+# Deploy script (not needed in container)
+deploy.sh
+
+# Docker files
+Dockerfile
+docker-compose.yml
+.dockerignore

@@ -1,0 +1,51 @@
+# =============================================================================
+# A2A Commerce Platform — Docker Compose
+# =============================================================================
+# Usage:
+#   cp .env.example .env   # then edit with your secrets
+#   docker compose up -d
+#   docker compose logs -f
+# =============================================================================
+
+services:
+  gateway:
+    build: .
+    container_name: a2a-gateway
+    restart: unless-stopped
+    ports:
+      - "${A2A_PORT:-8000}:8000"
+    volumes:
+      - a2a-data:/var/lib/a2a
+    env_file:
+      - .env
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v1/health"]
+      interval: 30s
+      timeout: 5s
+      start-period: 10s
+      retries: 3
+
+  # Optional: nginx reverse proxy with TLS termination
+  # Uncomment and configure DOMAIN in .env to use
+  #
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: a2a-nginx
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+  #     - certbot-data:/etc/letsencrypt:ro
+  #     - certbot-www:/var/www/certbot:ro
+  #   depends_on:
+  #     gateway:
+  #       condition: service_healthy
+
+volumes:
+  a2a-data:
+    driver: local

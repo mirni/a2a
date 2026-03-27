@@ -85,7 +85,7 @@ fi
 
 log "Creating directories..."
 mkdir -p "$INSTALL_DIR"
-mkdir -p "$DATA_DIR"/{billing,paywall,payments,marketplace,trust,events,webhooks}
+mkdir -p "$DATA_DIR"/{billing,paywall,payments,marketplace,trust,identity,messaging,disputes,events,webhooks}
 mkdir -p /var/log/a2a
 
 # ---------------------------------------------------------------------------
@@ -117,6 +117,7 @@ pip install \
     httpx'>=0.27' \
     aiosqlite'>=0.20' \
     pydantic'>=2.0' \
+    cryptography'>=42.0' \
     -q
 
 log "Installing SDK in editable mode..."
@@ -155,6 +156,9 @@ MARKETPLACE_DSN=sqlite:////var/lib/a2a/marketplace.db
 TRUST_DSN=sqlite:////var/lib/a2a/trust.db
 EVENT_BUS_DSN=sqlite:////var/lib/a2a/events.db
 WEBHOOK_DSN=sqlite:////var/lib/a2a/webhooks.db
+IDENTITY_DSN=sqlite:////var/lib/a2a/identity.db
+MESSAGING_DSN=sqlite:////var/lib/a2a/messaging.db
+DISPUTE_DSN=sqlite:////var/lib/a2a/disputes.db
 
 # --- Connector API Keys (fill in your real keys) ---
 # REQUIRED if using Stripe connector:
@@ -314,17 +318,20 @@ ufw --force enable
 # Step 9: Create initial admin API key
 # ---------------------------------------------------------------------------
 
-log "Starting gateway to create initial admin key..."
-systemctl start a2a-gateway
-sleep 3
-
-# Create admin wallet and pro key using the SDK
-ADMIN_KEY=$("$INSTALL_DIR/venv/bin/python" - << 'PYEOF'
+log "Creating initial admin API key..."
+# Create admin wallet and pro key via direct bootstrap (service not running yet)
+ADMIN_KEY=$(cd "$INSTALL_DIR" && "$INSTALL_DIR/venv/bin/python" - << 'PYEOF'
 import asyncio, sys, os
-sys.path.insert(0, os.environ.get("INSTALL_DIR", "/opt/a2a"))
+sys.path.insert(0, "/opt/a2a")
+os.environ.setdefault("BILLING_DSN", "sqlite:////var/lib/a2a/billing.db")
+os.environ.setdefault("PAYWALL_DSN", "sqlite:////var/lib/a2a/paywall.db")
+os.environ.setdefault("PAYMENTS_DSN", "sqlite:////var/lib/a2a/payments.db")
+os.environ.setdefault("MARKETPLACE_DSN", "sqlite:////var/lib/a2a/marketplace.db")
+os.environ.setdefault("TRUST_DSN", "sqlite:////var/lib/a2a/trust.db")
+os.environ.setdefault("EVENT_BUS_DSN", "sqlite:////var/lib/a2a/events.db")
+os.environ.setdefault("IDENTITY_DSN", "sqlite:////var/lib/a2a/identity.db")
 
 async def main():
-    # Bootstrap imports
     import gateway.src.bootstrap
     from gateway.src.lifespan import lifespan
     from gateway.src.app import create_app
@@ -334,7 +341,6 @@ async def main():
     await ctx_mgr.__aenter__()
     ctx = app.state.ctx
 
-    # Create admin wallet with 100k credits
     await ctx.tracker.wallet.create("admin", initial_balance=100000.0)
     key_info = await ctx.key_manager.create_key("admin", tier="pro")
 
@@ -344,6 +350,10 @@ async def main():
 asyncio.run(main())
 PYEOF
 ) 2>/dev/null || ADMIN_KEY="(failed — create manually after fixing .env)"
+
+log "Starting gateway service..."
+systemctl start a2a-gateway
+sleep 2
 
 # ---------------------------------------------------------------------------
 # Step 10: Create backup cron job
