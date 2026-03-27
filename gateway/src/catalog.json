@@ -718,5 +718,623 @@
     "pricing": {"per_call": 0.0},
     "sla": {"max_latency_ms": 200},
     "tier_required": "free"
+  },
+  {
+    "name": "create_subscription",
+    "service": "payments",
+    "description": "Create a recurring payment subscription between two agents.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "payer": {"type": "string", "description": "Agent paying the subscription"},
+        "payee": {"type": "string", "description": "Agent receiving payments"},
+        "amount": {"type": "number", "description": "Amount per interval"},
+        "interval": {"type": "string", "enum": ["hourly", "daily", "weekly", "monthly"]},
+        "description": {"type": "string"}
+      },
+      "required": ["payer", "payee", "amount", "interval"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"type": "string"},
+        "amount": {"type": "number"},
+        "interval": {"type": "string"},
+        "next_charge_at": {"type": "number"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 500},
+    "tier_required": "pro"
+  },
+  {
+    "name": "cancel_subscription",
+    "service": "payments",
+    "description": "Cancel an active or suspended subscription.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "subscription_id": {"type": "string"},
+        "cancelled_by": {"type": "string", "description": "Agent requesting cancellation"}
+      },
+      "required": ["subscription_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"type": "string"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 300},
+    "tier_required": "pro"
+  },
+  {
+    "name": "get_subscription",
+    "service": "payments",
+    "description": "Get details of a subscription by ID.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "subscription_id": {"type": "string"}
+      },
+      "required": ["subscription_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "payer": {"type": "string"},
+        "payee": {"type": "string"},
+        "amount": {"type": "number"},
+        "interval": {"type": "string"},
+        "status": {"type": "string"},
+        "next_charge_at": {"type": "number"},
+        "charge_count": {"type": "integer"},
+        "created_at": {"type": "number"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 200},
+    "tier_required": "pro"
+  },
+  {
+    "name": "list_subscriptions",
+    "service": "payments",
+    "description": "List subscriptions for an agent (as payer or payee).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string", "description": "Filter by agent (payer or payee)"},
+        "status": {"type": "string", "description": "Filter by status (active, cancelled, suspended)"},
+        "limit": {"type": "integer", "default": 100},
+        "offset": {"type": "integer", "default": 0}
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "subscriptions": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 300},
+    "tier_required": "pro"
+  },
+  {
+    "name": "reactivate_subscription",
+    "service": "payments",
+    "description": "Reactivate a suspended subscription.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "subscription_id": {"type": "string"}
+      },
+      "required": ["subscription_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"type": "string"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 300},
+    "tier_required": "pro"
+  },
+  {
+    "name": "create_wallet",
+    "service": "billing",
+    "description": "Create a new wallet for an agent (self-service onboarding).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string", "description": "Agent identifier for the new wallet"},
+        "initial_balance": {"type": "number", "description": "Starting balance (default 0)", "default": 0}
+      },
+      "required": ["agent_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string"},
+        "balance": {"type": "number"},
+        "created_at": {"type": "number"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 300},
+    "tier_required": "free"
+  },
+  {
+    "name": "withdraw",
+    "service": "billing",
+    "description": "Withdraw credits from an agent's wallet.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string"},
+        "amount": {"type": "number", "description": "Amount to withdraw"},
+        "description": {"type": "string", "description": "Reason for withdrawal"}
+      },
+      "required": ["agent_id", "amount"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "new_balance": {"type": "number"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 300},
+    "tier_required": "free"
+  },
+  {
+    "name": "search_agents_by_metrics",
+    "service": "identity",
+    "description": "Search for agents with verified metric claims (e.g., find bots with Sharpe >= 2.0).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "metric_name": {"type": "string", "description": "Metric to search (sharpe_30d, max_drawdown_30d, etc.)"},
+        "min_value": {"type": "number", "description": "Minimum bound value (for higher-is-better metrics)"},
+        "max_value": {"type": "number", "description": "Maximum bound value (for lower-is-better metrics)"},
+        "limit": {"type": "integer", "default": 50}
+      },
+      "required": ["metric_name"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "agents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "agent_id": {"type": "string"},
+              "metric_name": {"type": "string"},
+              "claim_type": {"type": "string"},
+              "bound_value": {"type": "number"},
+              "valid_until": {"type": "number"}
+            }
+          }
+        }
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 300},
+    "tier_required": "pro"
+  },
+  {
+    "name": "create_performance_escrow",
+    "service": "payments",
+    "description": "Create an escrow that auto-releases when payee's verified metrics meet a threshold.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "payer": {"type": "string"},
+        "payee": {"type": "string"},
+        "amount": {"type": "number"},
+        "metric_name": {"type": "string", "description": "Metric to gate on (e.g. sharpe_30d)"},
+        "threshold": {"type": "number", "description": "Value the metric must meet"},
+        "description": {"type": "string"}
+      },
+      "required": ["payer", "payee", "amount", "metric_name", "threshold"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "escrow_id": {"type": "string"},
+        "status": {"type": "string"},
+        "amount": {"type": "number"},
+        "metric_name": {"type": "string"},
+        "threshold": {"type": "number"}
+      }
+    },
+    "pricing": {"model": "percentage", "percentage": 1.5, "min_fee": 0.01, "max_fee": 10.0},
+    "sla": {"max_latency_ms": 500},
+    "tier_required": "pro"
+  },
+  {
+    "name": "check_performance_escrow",
+    "service": "payments",
+    "description": "Check if a performance-gated escrow's metric threshold is met and auto-release if so.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "escrow_id": {"type": "string"}
+      },
+      "required": ["escrow_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "released": {"type": "boolean"},
+        "settlement_id": {"type": "string"},
+        "reason": {"type": "string"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 500},
+    "tier_required": "pro"
+  },
+  {
+    "name": "open_dispute",
+    "service": "disputes",
+    "description": "Open a dispute against an escrow.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "escrow_id": {"type": "string"},
+        "opener": {"type": "string", "description": "Agent opening the dispute"},
+        "reason": {"type": "string"}
+      },
+      "required": ["escrow_id", "opener"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "escrow_id": {"type": "string"},
+        "status": {"type": "string"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 500},
+    "tier_required": "pro"
+  },
+  {
+    "name": "respond_to_dispute",
+    "service": "disputes",
+    "description": "Respond to an open dispute.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "dispute_id": {"type": "string"},
+        "respondent": {"type": "string"},
+        "response": {"type": "string"}
+      },
+      "required": ["dispute_id", "respondent", "response"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"type": "string"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 300},
+    "tier_required": "pro"
+  },
+  {
+    "name": "resolve_dispute",
+    "service": "disputes",
+    "description": "Resolve a dispute by refunding payer or releasing funds to payee.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "dispute_id": {"type": "string"},
+        "resolution": {"type": "string", "enum": ["refund", "release"]},
+        "resolved_by": {"type": "string"},
+        "notes": {"type": "string"}
+      },
+      "required": ["dispute_id", "resolution", "resolved_by"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"type": "string"},
+        "resolution": {"type": "string"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 500},
+    "tier_required": "pro"
+  },
+  {
+    "name": "rotate_key",
+    "service": "paywall",
+    "description": "Rotate an API key: revoke the current key and create a new one with the same tier.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "current_key": {"type": "string", "description": "The API key to rotate"}
+      },
+      "required": ["current_key"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "new_key": {"type": "string"},
+        "tier": {"type": "string"},
+        "agent_id": {"type": "string"},
+        "revoked": {"type": "boolean"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 300},
+    "tier_required": "free"
+  },
+  {
+    "name": "build_claim_chain",
+    "service": "identity",
+    "description": "Build a Merkle tree from an agent's attestation history for verifiable claim chains.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string"}
+      },
+      "required": ["agent_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "merkle_root": {"type": "string"},
+        "leaf_count": {"type": "integer"},
+        "period_start": {"type": "number"},
+        "period_end": {"type": "number"},
+        "chain_id": {"type": "integer"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 500},
+    "tier_required": "pro"
+  },
+  {
+    "name": "get_claim_chains",
+    "service": "identity",
+    "description": "Get stored Merkle claim chains for an agent.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string"},
+        "limit": {"type": "integer", "default": 10}
+      },
+      "required": ["agent_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "chains": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 300},
+    "tier_required": "pro"
+  },
+  {
+    "name": "send_message",
+    "service": "messaging",
+    "description": "Send a typed message to another agent.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "sender": {"type": "string"},
+        "recipient": {"type": "string"},
+        "message_type": {"type": "string", "enum": ["text", "price_negotiation", "task_specification", "counter_offer", "accept", "reject"]},
+        "subject": {"type": "string"},
+        "body": {"type": "string"},
+        "thread_id": {"type": "string"}
+      },
+      "required": ["sender", "recipient", "message_type"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "sender": {"type": "string"},
+        "recipient": {"type": "string"},
+        "thread_id": {"type": "string"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 200},
+    "tier_required": "free"
+  },
+  {
+    "name": "get_messages",
+    "service": "messaging",
+    "description": "Get messages for an agent (sent and received).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string"},
+        "thread_id": {"type": "string"},
+        "limit": {"type": "integer", "default": 50}
+      },
+      "required": ["agent_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "messages": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 200},
+    "tier_required": "free"
+  },
+  {
+    "name": "negotiate_price",
+    "service": "messaging",
+    "description": "Start a price negotiation with another agent.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "initiator": {"type": "string"},
+        "responder": {"type": "string"},
+        "amount": {"type": "number"},
+        "service_id": {"type": "string"},
+        "expires_hours": {"type": "number", "default": 24}
+      },
+      "required": ["initiator", "responder", "amount"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "negotiation_id": {"type": "string"},
+        "thread_id": {"type": "string"},
+        "status": {"type": "string"},
+        "proposed_amount": {"type": "number"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 300},
+    "tier_required": "free"
+  },
+  {
+    "name": "check_sla_compliance",
+    "service": "trust",
+    "description": "Check if a server meets its claimed SLA using trust probe data.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "server_id": {"type": "string"},
+        "claimed_uptime": {"type": "number", "description": "Claimed uptime percentage (e.g. 99.5)"}
+      },
+      "required": ["server_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "compliant": {"type": "boolean"},
+        "actual_uptime": {"type": "number"},
+        "violation_pct": {"type": "number"},
+        "confidence": {"type": "number"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 300},
+    "tier_required": "pro"
+  },
+  {
+    "name": "list_strategies",
+    "service": "marketplace",
+    "description": "List signal provider strategies in the marketplace.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "tags": {"type": "array", "items": {"type": "string"}},
+        "max_cost": {"type": "number"},
+        "min_trust_score": {"type": "number"},
+        "limit": {"type": "integer", "default": 50}
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "strategies": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 300},
+    "tier_required": "free"
+  },
+  {
+    "name": "get_service_analytics",
+    "service": "billing",
+    "description": "Get usage analytics for an agent (total calls, cost, tokens).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string"},
+        "since": {"type": "number", "description": "Unix timestamp to query from"}
+      },
+      "required": ["agent_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "total_calls": {"type": "integer"},
+        "total_cost": {"type": "number"},
+        "total_tokens": {"type": "integer"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 300},
+    "tier_required": "free"
+  },
+  {
+    "name": "get_revenue_report",
+    "service": "billing",
+    "description": "Get revenue report for a provider agent (incoming payments).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string"},
+        "limit": {"type": "integer", "default": 50}
+      },
+      "required": ["agent_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "total_revenue": {"type": "number"},
+        "payment_count": {"type": "integer"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 500},
+    "tier_required": "free"
+  },
+  {
+    "name": "create_split_intent",
+    "service": "payments",
+    "description": "Create a split payment across multiple payees with percentage-based distribution.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "payer": {"type": "string"},
+        "amount": {"type": "number"},
+        "splits": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "payee": {"type": "string"},
+              "percentage": {"type": "number"}
+            },
+            "required": ["payee", "percentage"]
+          }
+        },
+        "description": {"type": "string"}
+      },
+      "required": ["payer", "amount", "splits"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "status": {"type": "string"},
+        "settlements": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "pricing": {"model": "percentage", "percentage": 2.0, "min_fee": 0.01, "max_fee": 5.0},
+    "sla": {"max_latency_ms": 500},
+    "tier_required": "pro"
   }
 ]

@@ -163,3 +163,247 @@ class TestAttestationSigning:
         assert AgentCrypto.verify_attestation(
             pub, "agent-2", ["hash1"], 1000.0, 2000.0, "self_reported", sig
         ) is False
+
+
+class TestMerkleTreeComputeRoot:
+    """Tests for MerkleTree.compute_root."""
+
+    def test_empty_tree_returns_hash_of_empty(self):
+        """An empty leaf list should return the SHA3-256 hash of the empty string."""
+        import hashlib
+
+        from products.identity.src.crypto import MerkleTree
+
+        expected = hashlib.sha3_256(b"").hexdigest()
+        assert MerkleTree.compute_root([]) == expected
+
+    def test_single_leaf_returns_itself(self):
+        """A single leaf should be its own Merkle root."""
+        from products.identity.src.crypto import MerkleTree
+
+        leaf = "aa" * 32
+        assert MerkleTree.compute_root([leaf]) == leaf
+
+    def test_two_leaves(self):
+        """Two leaves should produce root = H(leaf0 || leaf1)."""
+        import hashlib
+
+        from products.identity.src.crypto import MerkleTree
+
+        leaf0 = "aa" * 32
+        leaf1 = "bb" * 32
+        expected = hashlib.sha3_256(
+            bytes.fromhex(leaf0) + bytes.fromhex(leaf1)
+        ).hexdigest()
+        assert MerkleTree.compute_root([leaf0, leaf1]) == expected
+
+    def test_three_leaves_duplicates_last(self):
+        """Odd number of leaves should duplicate the last leaf to make it even."""
+        import hashlib
+
+        from products.identity.src.crypto import MerkleTree
+
+        leaf0 = "aa" * 32
+        leaf1 = "bb" * 32
+        leaf2 = "cc" * 32
+        # Level 1: H(leaf0||leaf1), H(leaf2||leaf2)
+        h01 = hashlib.sha3_256(
+            bytes.fromhex(leaf0) + bytes.fromhex(leaf1)
+        ).hexdigest()
+        h22 = hashlib.sha3_256(
+            bytes.fromhex(leaf2) + bytes.fromhex(leaf2)
+        ).hexdigest()
+        # Root: H(h01||h22)
+        expected = hashlib.sha3_256(
+            bytes.fromhex(h01) + bytes.fromhex(h22)
+        ).hexdigest()
+        assert MerkleTree.compute_root([leaf0, leaf1, leaf2]) == expected
+
+    def test_four_leaves(self):
+        """Four leaves: balanced binary tree."""
+        import hashlib
+
+        from products.identity.src.crypto import MerkleTree
+
+        leaves = [f"{chr(ord('a') + i):02s}" * 32 for i in range(4)]
+        h01 = hashlib.sha3_256(
+            bytes.fromhex(leaves[0]) + bytes.fromhex(leaves[1])
+        ).hexdigest()
+        h23 = hashlib.sha3_256(
+            bytes.fromhex(leaves[2]) + bytes.fromhex(leaves[3])
+        ).hexdigest()
+        expected = hashlib.sha3_256(
+            bytes.fromhex(h01) + bytes.fromhex(h23)
+        ).hexdigest()
+        assert MerkleTree.compute_root(leaves) == expected
+
+    def test_root_is_deterministic(self):
+        """Same leaves in same order should always produce the same root."""
+        from products.identity.src.crypto import MerkleTree
+
+        leaves = ["ab" * 32, "cd" * 32, "ef" * 32]
+        root1 = MerkleTree.compute_root(leaves)
+        root2 = MerkleTree.compute_root(leaves)
+        assert root1 == root2
+
+    def test_root_changes_with_different_order(self):
+        """Different leaf order should produce a different root (Merkle trees are ordered)."""
+        from products.identity.src.crypto import MerkleTree
+
+        leaves_a = ["aa" * 32, "bb" * 32]
+        leaves_b = ["bb" * 32, "aa" * 32]
+        assert MerkleTree.compute_root(leaves_a) != MerkleTree.compute_root(leaves_b)
+
+    def test_root_is_valid_hex(self):
+        """Root should be a valid 64-char hex string (SHA3-256)."""
+        from products.identity.src.crypto import MerkleTree
+
+        root = MerkleTree.compute_root(["aa" * 32, "bb" * 32, "cc" * 32])
+        assert len(root) == 64
+        bytes.fromhex(root)  # Should not raise
+
+
+class TestMerkleTreeComputeProof:
+    """Tests for MerkleTree.compute_proof."""
+
+    def test_single_leaf_proof_is_empty(self):
+        """A single-leaf tree has no siblings, so proof is empty."""
+        from products.identity.src.crypto import MerkleTree
+
+        proof = MerkleTree.compute_proof(["aa" * 32], 0)
+        assert proof == []
+
+    def test_two_leaves_proof_for_left(self):
+        """Proof for left leaf (index 0) should include right sibling."""
+        from products.identity.src.crypto import MerkleTree
+
+        leaf0 = "aa" * 32
+        leaf1 = "bb" * 32
+        proof = MerkleTree.compute_proof([leaf0, leaf1], 0)
+        assert len(proof) == 1
+        assert proof[0] == (leaf1, "right")
+
+    def test_two_leaves_proof_for_right(self):
+        """Proof for right leaf (index 1) should include left sibling."""
+        from products.identity.src.crypto import MerkleTree
+
+        leaf0 = "aa" * 32
+        leaf1 = "bb" * 32
+        proof = MerkleTree.compute_proof([leaf0, leaf1], 1)
+        assert len(proof) == 1
+        assert proof[0] == (leaf0, "left")
+
+    def test_four_leaves_proof_depth(self):
+        """Proof for 4 leaves should have depth 2 (log2(4) = 2)."""
+        from products.identity.src.crypto import MerkleTree
+
+        leaves = [f"{chr(ord('a') + i):02s}" * 32 for i in range(4)]
+        proof = MerkleTree.compute_proof(leaves, 2)
+        assert len(proof) == 2
+
+    def test_proof_index_out_of_range_raises(self):
+        """Out-of-range leaf index should raise IndexError."""
+        from products.identity.src.crypto import MerkleTree
+
+        with pytest.raises(IndexError):
+            MerkleTree.compute_proof(["aa" * 32], 1)
+
+    def test_proof_negative_index_raises(self):
+        """Negative leaf index should raise IndexError."""
+        from products.identity.src.crypto import MerkleTree
+
+        with pytest.raises(IndexError):
+            MerkleTree.compute_proof(["aa" * 32, "bb" * 32], -1)
+
+    def test_proof_empty_tree_raises(self):
+        """Empty tree should raise IndexError for any index."""
+        from products.identity.src.crypto import MerkleTree
+
+        with pytest.raises(IndexError):
+            MerkleTree.compute_proof([], 0)
+
+
+class TestMerkleTreeVerifyProof:
+    """Tests for MerkleTree.verify_proof."""
+
+    def test_verify_single_leaf(self):
+        """Single leaf: proof is empty, root equals the leaf."""
+        from products.identity.src.crypto import MerkleTree
+
+        leaf = "aa" * 32
+        root = MerkleTree.compute_root([leaf])
+        proof = MerkleTree.compute_proof([leaf], 0)
+        assert MerkleTree.verify_proof(leaf, proof, root) is True
+
+    def test_verify_two_leaves_both_indices(self):
+        """Proof for either leaf in a 2-leaf tree should verify."""
+        from products.identity.src.crypto import MerkleTree
+
+        leaves = ["aa" * 32, "bb" * 32]
+        root = MerkleTree.compute_root(leaves)
+        for i in range(2):
+            proof = MerkleTree.compute_proof(leaves, i)
+            assert MerkleTree.verify_proof(leaves[i], proof, root) is True
+
+    def test_verify_four_leaves_all_indices(self):
+        """Proof for every leaf in a 4-leaf tree should verify."""
+        from products.identity.src.crypto import MerkleTree
+
+        leaves = [f"{chr(ord('a') + i):02s}" * 32 for i in range(4)]
+        root = MerkleTree.compute_root(leaves)
+        for i in range(4):
+            proof = MerkleTree.compute_proof(leaves, i)
+            assert MerkleTree.verify_proof(leaves[i], proof, root) is True
+
+    def test_verify_odd_leaf_count(self):
+        """Proof should also work for trees with odd number of leaves."""
+        from products.identity.src.crypto import MerkleTree
+
+        leaves = ["aa" * 32, "bb" * 32, "cc" * 32]
+        root = MerkleTree.compute_root(leaves)
+        for i in range(3):
+            proof = MerkleTree.compute_proof(leaves, i)
+            assert MerkleTree.verify_proof(leaves[i], proof, root) is True
+
+    def test_verify_fails_with_wrong_leaf(self):
+        """Verification should fail if the leaf hash does not match."""
+        from products.identity.src.crypto import MerkleTree
+
+        leaves = ["aa" * 32, "bb" * 32]
+        root = MerkleTree.compute_root(leaves)
+        proof = MerkleTree.compute_proof(leaves, 0)
+        assert MerkleTree.verify_proof("ff" * 32, proof, root) is False
+
+    def test_verify_fails_with_wrong_root(self):
+        """Verification should fail against a different root."""
+        from products.identity.src.crypto import MerkleTree
+
+        leaves = ["aa" * 32, "bb" * 32]
+        root = MerkleTree.compute_root(leaves)
+        proof = MerkleTree.compute_proof(leaves, 0)
+        assert MerkleTree.verify_proof(leaves[0], proof, "00" * 32) is False
+
+    def test_verify_fails_with_tampered_proof(self):
+        """Verification should fail if a proof element is tampered."""
+        from products.identity.src.crypto import MerkleTree
+
+        leaves = ["aa" * 32, "bb" * 32, "cc" * 32, "dd" * 32]
+        root = MerkleTree.compute_root(leaves)
+        proof = MerkleTree.compute_proof(leaves, 0)
+        # Tamper with the first proof element
+        tampered = [("ff" * 32, proof[0][1])] + proof[1:]
+        assert MerkleTree.verify_proof(leaves[0], tampered, root) is False
+
+    def test_verify_larger_tree(self):
+        """Roundtrip verify for a 7-leaf tree (odd, multiple levels)."""
+        import hashlib
+
+        from products.identity.src.crypto import MerkleTree
+
+        leaves = [
+            hashlib.sha3_256(f"leaf-{i}".encode()).hexdigest() for i in range(7)
+        ]
+        root = MerkleTree.compute_root(leaves)
+        for i in range(7):
+            proof = MerkleTree.compute_proof(leaves, i)
+            assert MerkleTree.verify_proof(leaves[i], proof, root) is True

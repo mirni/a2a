@@ -38,6 +38,10 @@ from trust_src.storage import StorageBackend as TrustStorage
 from identity_src.api import IdentityAPI
 from identity_src.storage import IdentityStorage
 
+# Messaging
+from messaging_src.api import MessagingAPI
+from messaging_src.storage import MessageStorage
+
 # Shared — Event Bus
 from shared_src.event_bus import EventBus
 
@@ -52,6 +56,9 @@ from gateway.src.health_monitor import HealthMonitor
 
 # Signing
 from gateway.src.signing import SigningManager
+
+# Disputes
+from gateway.src.disputes import DisputeEngine
 
 # Observability
 from gateway.src.middleware import setup_structured_logging
@@ -72,6 +79,8 @@ class AppContext:
     identity_api: IdentityAPI
     event_bus: EventBus
     webhook_manager: WebhookManager
+    messaging_api: MessagingAPI | None = None
+    dispute_engine: DisputeEngine | None = None
     scheduler: object | None = None
     health_monitor: HealthMonitor | None = None
     signing_manager: SigningManager | None = None
@@ -140,6 +149,17 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     await event_bus.connect()
     await register_all_handlers(event_bus, marketplace)
 
+    # --- Messaging ---
+    messaging_dsn = os.environ.get("MESSAGING_DSN", f"sqlite:///{data_dir}/messaging.db")
+    messaging_storage = MessageStorage(messaging_dsn)
+    await messaging_storage.connect()
+    messaging_api = MessagingAPI(storage=messaging_storage)
+
+    # --- Dispute Engine ---
+    dispute_dsn = os.environ.get("DISPUTE_DSN", f"sqlite:///{data_dir}/disputes.db")
+    dispute_engine = DisputeEngine(dsn=dispute_dsn, payment_engine=payment_engine)
+    await dispute_engine.connect()
+
     # --- Webhook Manager ---
     webhook_manager = WebhookManager(webhook_dsn)
     await webhook_manager.connect()
@@ -177,6 +197,8 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
         identity_api=identity_api,
         event_bus=event_bus,
         webhook_manager=webhook_manager,
+        messaging_api=messaging_api,
+        dispute_engine=dispute_engine,
         scheduler=scheduler,
         health_monitor=health_monitor,
         signing_manager=signing_manager,
@@ -201,6 +223,8 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
         except asyncio.CancelledError:
             pass
 
+    await messaging_storage.close()
+    await dispute_engine.close()
     await webhook_manager.close()
     await event_bus.close()
     await identity_storage.close()

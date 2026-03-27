@@ -181,3 +181,128 @@ class AgentCrypto:
         }
         message = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
         return AgentCrypto.verify(public_key_hex, message, signature_hex)
+
+
+class MerkleTree:
+    """Simple SHA3-256 Merkle tree for attestation chains.
+
+    Used to build verifiable claim chains: an agent can prove
+    "I had Sharpe > 2.0 for the past 6 months" by chaining
+    attestation hashes into a Merkle tree and providing inclusion proofs.
+    """
+
+    @staticmethod
+    def _hash_pair(left: str, right: str) -> str:
+        """Hash two hex strings together: SHA3-256(left_bytes || right_bytes)."""
+        return hashlib.sha3_256(
+            bytes.fromhex(left) + bytes.fromhex(right)
+        ).hexdigest()
+
+    @staticmethod
+    def compute_root(leaf_hashes: list[str]) -> str:
+        """Compute Merkle root from a list of hex hash strings.
+
+        - Empty list: returns SHA3-256 of empty string.
+        - Single leaf: returns the leaf itself.
+        - Otherwise: pair leaves (duplicate last if odd), hash pairs, recurse.
+
+        Args:
+            leaf_hashes: List of hex-encoded hash strings (the leaves).
+
+        Returns:
+            Hex-encoded SHA3-256 Merkle root.
+        """
+        if not leaf_hashes:
+            return hashlib.sha3_256(b"").hexdigest()
+        if len(leaf_hashes) == 1:
+            return leaf_hashes[0]
+
+        # Build one level up
+        level = list(leaf_hashes)
+        while len(level) > 1:
+            next_level: list[str] = []
+            # If odd, duplicate the last element
+            if len(level) % 2 == 1:
+                level.append(level[-1])
+            for i in range(0, len(level), 2):
+                next_level.append(MerkleTree._hash_pair(level[i], level[i + 1]))
+            level = next_level
+
+        return level[0]
+
+    @staticmethod
+    def compute_proof(
+        leaf_hashes: list[str], leaf_index: int
+    ) -> list[tuple[str, str]]:
+        """Compute a Merkle proof (authentication path) for a specific leaf.
+
+        Args:
+            leaf_hashes: List of hex-encoded hash strings (the leaves).
+            leaf_index: Index of the leaf to prove.
+
+        Returns:
+            List of (sibling_hash, position) tuples where position is
+            'left' or 'right', indicating where the sibling sits relative
+            to the current node.
+
+        Raises:
+            IndexError: If leaf_index is out of range or list is empty.
+        """
+        if not leaf_hashes or leaf_index < 0 or leaf_index >= len(leaf_hashes):
+            raise IndexError(
+                f"leaf_index {leaf_index} out of range for {len(leaf_hashes)} leaves"
+            )
+
+        if len(leaf_hashes) == 1:
+            return []
+
+        proof: list[tuple[str, str]] = []
+        level = list(leaf_hashes)
+        idx = leaf_index
+
+        while len(level) > 1:
+            # Duplicate last if odd
+            if len(level) % 2 == 1:
+                level.append(level[-1])
+
+            # Determine sibling
+            if idx % 2 == 0:
+                # Current is left child; sibling is on the right
+                sibling = level[idx + 1]
+                proof.append((sibling, "right"))
+            else:
+                # Current is right child; sibling is on the left
+                sibling = level[idx - 1]
+                proof.append((sibling, "left"))
+
+            # Move up: compute next level and track our index
+            next_level: list[str] = []
+            for i in range(0, len(level), 2):
+                next_level.append(MerkleTree._hash_pair(level[i], level[i + 1]))
+            level = next_level
+            idx = idx // 2
+
+        return proof
+
+    @staticmethod
+    def verify_proof(
+        leaf_hash: str, proof: list[tuple[str, str]], root: str
+    ) -> bool:
+        """Verify a Merkle proof against a known root.
+
+        Args:
+            leaf_hash: The hex hash of the leaf being verified.
+            proof: List of (sibling_hash, position) tuples from compute_proof.
+            root: The expected Merkle root hex hash.
+
+        Returns:
+            True if the proof is valid (leaf is included in the tree with
+            the given root).
+        """
+        current = leaf_hash
+        for sibling, position in proof:
+            if position == "left":
+                current = MerkleTree._hash_pair(sibling, current)
+            else:
+                current = MerkleTree._hash_pair(current, sibling)
+        return current == root

@@ -116,6 +116,29 @@ class TestSubmitMetrics:
         assert len(result["signature"]) > 0
 
     @pytest.mark.asyncio
+    async def test_submit_metrics_invalid_metric_returns_400(self, app, client, pro_api_key):
+        """submit_metrics with invalid metric name should return 400, not 500."""
+        await client.post(
+            "/v1/execute",
+            json={"tool": "register_agent", "params": {"agent_id": "pro-agent"}},
+            headers={"Authorization": f"Bearer {pro_api_key}"},
+        )
+
+        resp = await client.post(
+            "/v1/execute",
+            json={
+                "tool": "submit_metrics",
+                "params": {
+                    "agent_id": "pro-agent",
+                    "metrics": {"bogus_metric": 1.0},
+                },
+            },
+            headers={"Authorization": f"Bearer {pro_api_key}"},
+        )
+        assert resp.status_code == 400
+        assert "invalid_metric" in resp.json()["error"]["code"]
+
+    @pytest.mark.asyncio
     async def test_submit_metrics_requires_pro_tier(self, app, client, api_key):
         """submit_metrics should fail for free-tier API keys."""
         # Register agent first

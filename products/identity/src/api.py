@@ -6,9 +6,10 @@ Orchestrates crypto, storage, and attestation workflows.
 from __future__ import annotations
 
 import time
+import hashlib
 from dataclasses import dataclass, field
 
-from .crypto import AgentCrypto
+from .crypto import AgentCrypto, MerkleTree
 from .models import (
     SUPPORTED_METRICS,
     AgentIdentity,
@@ -201,6 +202,49 @@ class IdentityAPI:
         """Get agent's consumer-side reputation score."""
         return await self.storage.get_latest_reputation(agent_id)
 
+    async def search_agents_by_metrics(
+        self,
+        metric_name: str,
+        min_value: float | None = None,
+        max_value: float | None = None,
+        limit: int = 50,
+    ) -> list[dict]:
+        """Search for agents with verified claims matching metric criteria.
+
+        For "higher is better" metrics (sharpe, pnl, accuracy, win_rate, trades, aum),
+        use min_value to find agents claiming >= that value.
+        For "lower is better" metrics (max_drawdown, latency), use max_value.
+
+        Returns list of dicts with agent_id, metric_name, claim_type, bound_value.
+        """
+        if metric_name not in SUPPORTED_METRICS:
+            raise InvalidMetricError(
+                f"Unsupported metric: {metric_name}. "
+                f"Supported: {sorted(SUPPORTED_METRICS)}"
+            )
+
+        claims = await self.storage.search_claims(
+            metric_name=metric_name,
+            min_value=min_value,
+            max_value=max_value,
+            limit=limit,
+        )
+        # Deduplicate by agent_id (keep best claim per agent)
+        seen: dict[str, VerifiedClaim] = {}
+        for c in claims:
+            if c.agent_id not in seen:
+                seen[c.agent_id] = c
+        return [
+            {
+                "agent_id": c.agent_id,
+                "metric_name": c.metric_name,
+                "claim_type": c.claim_type,
+                "bound_value": c.bound_value,
+                "valid_until": c.valid_until,
+            }
+            for c in seen.values()
+        ]
+
     async def compute_reputation(self, agent_id: str) -> AgentReputation:
         """Recompute agent reputation from available data.
 
@@ -267,3 +311,73 @@ class IdentityAPI:
         )
         await self.storage.store_reputation(reputation)
         return reputation
+
+    async def build_claim_chain(self, agent_id: str) -> dict:
+        """Build a Merkle tree from all valid attestations for an agent.
+
+        Each attestation's signature is hashed (SHA3-256) to create a leaf.
+        The leaves are ordered by verified_at (oldest first) and assembled
+        into a Merkle tree. The resulting chain is stored for later proof
+        generation.
+
+        Args:
+            agent_id: The agent whose attestations to chain.
+
+        Returns:
+            Dict with keys: merkle_root, leaf_count, period_start, period_end, chain_id.
+
+        Raises:
+            AgentNotFoundError: If the agent_id is not registered.
+        """
+        identity = await self.storage.get_identity(agent_id)
+        if identity is None:
+            raise AgentNotFoundError(f"Agent not found: {agent_id}")
+
+        attestations = await self.storage.get_attestations(agent_id, valid_only=True)
+
+        if not attestations:
+            empty_root = hashlib.sha3_256(b"").hexdigest()
+            now = time.time()
+            chain_id = await self.storage.store_claim_chain(
+                agent_id=agent_id,
+                merkle_root=empty_root,
+                leaf_hashes=[],
+                period_start=now,
+                period_end=now,
+            )
+            return {
+                "merkle_root": empty_root,
+                "leaf_count": 0,
+                "period_start": now,
+                "period_end": now,
+                "chain_id": chain_id,
+            }
+
+        # Sort by verified_at ascending (oldest first) for deterministic ordering
+        attestations.sort(key=lambda a: a.verified_at)
+
+        # Create leaf hashes: SHA3-256 of each attestation's signature
+        leaf_hashes = [
+            hashlib.sha3_256(a.signature.encode()).hexdigest()
+            for a in attestations
+        ]
+
+        merkle_root = MerkleTree.compute_root(leaf_hashes)
+        period_start = attestations[0].verified_at
+        period_end = attestations[-1].verified_at
+
+        chain_id = await self.storage.store_claim_chain(
+            agent_id=agent_id,
+            merkle_root=merkle_root,
+            leaf_hashes=leaf_hashes,
+            period_start=period_start,
+            period_end=period_end,
+        )
+
+        return {
+            "merkle_root": merkle_root,
+            "leaf_count": len(leaf_hashes),
+            "period_start": period_start,
+            "period_end": period_end,
+            "chain_id": chain_id,
+        }

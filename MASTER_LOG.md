@@ -243,42 +243,150 @@ ZK-proof research: Full ZK is overkill for MVP (no production Python libraries, 
 
 ---
 
-## Next TODOs (Updated from Customer Feedback)
+---
 
-### P0 — Immediate
+## Session 3 — 2026-03-27: Full TODO Processing (15 Items)
 
-- [ ] **Expose subscription tools** — `create_subscription`, `cancel_subscription`, etc. (engine exists)
-- [ ] **Self-service wallet creation** — `create_wallet` tool
-- [ ] **Cross-agent metric search** — `search_agents_by_metrics` tool (find bots with Sharpe > 2.0)
-- [ ] **Fix submit_metrics error handling** — return 400 not 500 for invalid metric names
+### Prompt
+
+> Process the latest todos in MASTER_LOG.md (from customer feedback), in order. Skip the todos needed production/live API. TDD preferred.
+
+### Response
+
+**15 items implemented. 833 tests passing across 10 modules (was 730).**
+
+#### P0 — Immediate (4 items)
+
+| # | Item | Status | New Tests |
+|---|------|--------|-----------|
+| 1 | Expose subscription tools (5 tools) | DONE | 6 |
+| 2 | Self-service wallet creation + withdraw | DONE | 5 |
+| 3 | Cross-agent metric search | DONE | 3 |
+| 4 | Fix submit_metrics error handling (400 not 500) | DONE | 1 |
+
+#### P1 — Next Sprint (3 items)
+
+| # | Item | Status | New Tests |
+|---|------|--------|-----------|
+| 5 | Performance-gated escrow | DONE | 3 |
+| 6 | Dispute resolution engine | DONE | 4 |
+| 7 | Key rotation tool | DONE | 2 |
+
+#### P2 — Backlog (7 items)
+
+| # | Item | Status | New Tests |
+|---|------|--------|-----------|
+| 8 | Historical claim chain (Merkle tree) | DONE | 32 (identity product) |
+| 9 | Agent-to-agent messaging | DONE | 35 (new module) |
+| 10 | SLA enforcement automation | DONE | 1 |
+| 11 | Strategy marketplace vertical | DONE | 1 |
+| 12 | Analytics suite | DONE | 2 |
+| 13 | Multi-party payment splits | DONE | 2 |
+| 14 | Swagger UI at /docs | DONE | 1 |
+
+#### Skipped (need production/live API)
+
+- Fiat on-ramp (Stripe Checkout)
+- Deploy to production
+- TypeScript SDK (npm ecosystem)
+- Metered connectors (Stripe/GitHub/PostgreSQL)
+
+### New Files Created
+
+- `gateway/src/disputes.py` — DisputeEngine (open/respond/resolve against escrows)
+- `gateway/src/swagger.py` — Swagger UI HTML handler
+- `gateway/tests/test_subscriptions.py` — 6 subscription tests
+- `gateway/tests/test_wallet_tools.py` — 5 wallet tests
+- `gateway/tests/test_metric_search.py` — 3 cross-agent search tests
+- `gateway/tests/test_performance_escrow.py` — 3 performance escrow tests
+- `gateway/tests/test_disputes.py` — 4 dispute tests
+- `gateway/tests/test_key_rotation.py` — 2 key rotation tests
+- `gateway/tests/test_p2_features.py` — 12 P2 feature tests
+- `products/messaging/` — NEW MODULE (8 source files, 3 test files, 35 tests)
+
+### Modified Files
+
+- `gateway/src/tools.py` — 20 new tool functions, registry expanded to 49 tools
+- `gateway/src/catalog.json` — 20 new tool definitions (49 total)
+- `gateway/src/errors.py` — Added InvalidMetricError→400, ValueError→400, dispute/subscription errors
+- `gateway/src/lifespan.py` — Added MessagingAPI, DisputeEngine to AppContext
+- `gateway/src/bootstrap.py` — Added messaging product bootstrap
+- `gateway/src/app.py` — Added /docs Swagger UI route
+- `gateway/tests/conftest.py` — Added DISPUTE_DSN, MESSAGING_DSN
+- `gateway/tests/test_identity.py` — Added submit_metrics 400 error test
+- `products/identity/src/storage.py` — Added search_claims(), claim_chains table
+- `products/identity/src/api.py` — Added search_agents_by_metrics(), build_claim_chain()
+- `products/identity/src/crypto.py` — Added MerkleTree class
+
+### Test Summary
+
+```
+billing     103 passed
+paywall     106 passed
+payments    164 passed
+marketplace 128 passed
+trust       103 passed
+identity     72 passed  (+32 from Merkle tree)
+messaging    35 passed  (NEW)
+gateway     111 passed  (+36 from new tools)
+sdk          11 passed
+────────────────────────────
+TOTAL       833 passed  (+103 from Session 2)
+```
+
+### Tool Catalog Summary (49 tools)
+
+| Service | Tools | Count |
+|---------|-------|-------|
+| billing | get_balance, get_usage_summary, deposit, create_wallet, withdraw, get_service_analytics, get_revenue_report | 7 |
+| payments | create_intent, capture_intent, create_escrow, release_escrow, get_payment_history, create_subscription, cancel_subscription, get_subscription, list_subscriptions, reactivate_subscription, process_due_subscriptions, create_performance_escrow, check_performance_escrow, create_split_intent | 14 |
+| marketplace | search_services, best_match, register_service, list_strategies | 4 |
+| trust | get_trust_score, search_servers, delete_server, update_server, check_sla_compliance | 5 |
+| identity | register_agent, verify_agent, submit_metrics, get_agent_identity, get_verified_claims, get_agent_reputation, search_agents_by_metrics, build_claim_chain, get_claim_chains | 9 |
+| messaging | send_message, get_messages, negotiate_price | 3 |
+| disputes | open_dispute, respond_to_dispute, resolve_dispute | 3 |
+| events | publish_event, get_events | 2 |
+| webhooks | register_webhook, list_webhooks, delete_webhook | 3 |
+| paywall | get_global_audit_log, rotate_key | 2 |
+
+---
+
+## Next TODOs (Remaining)
+
+### Requires Production/Live API
+
 - [ ] **Fiat on-ramp** — Stripe Checkout → deposit
 - [ ] **Deploy to production** — api.greenhelix.net
-
-### P1 — Next Sprint
-
-- [ ] **Withdraw/payout** tool
-- [ ] **Performance-gated escrow** — auto-release based on verified metrics
-- [ ] **Dispute resolution engine**
-- [ ] **TypeScript SDK**
-- [ ] **Key rotation** — `rotate_key` tool
+- [ ] **TypeScript SDK** — port to npm
 - [ ] **Metered connectors** — route Stripe/GitHub/PostgreSQL through gateway
-
-### P2 — Backlog
-
-- [x] ~~Agent Identity and Authentication~~ (DONE — Session 2)
-- [x] ~~Agent Reputation Score~~ (DONE — Session 2)
-- [x] ~~Pricing update~~ (DONE — Session 2)
-- [ ] **Historical claim chain** — Merkle tree of attestations
-- [ ] **Agent-to-agent messaging/negotiation**
-- [ ] **SLA enforcement automation**
-- [ ] **Bulletproofs range proofs** (Rust FFI)
-- [ ] **Strategy marketplace vertical**
-- [ ] **Analytics suite**
-- [ ] **Multi-party payment splits**
 
 ### Infrastructure
 
-- [ ] **Add Swagger UI** — `/docs` endpoint
 - [ ] **Hosted sandbox** — `sandbox.greenhelix.net`
 - [ ] **PostgreSQL migration** — DSN abstraction ready
 - [ ] **CI/CD pipeline** — GitHub Actions
+
+### Future (from CMO analysis)
+
+- [ ] **Bulletproofs range proofs** (Rust FFI)
+- [x] ~~Agent Identity and Authentication~~ (DONE — Session 2)
+- [x] ~~Agent Reputation Score~~ (DONE — Session 2)
+- [x] ~~Pricing update~~ (DONE — Session 2)
+- [x] ~~Subscription tools~~ (DONE — Session 3)
+- [x] ~~Self-service wallet~~ (DONE — Session 3)
+- [x] ~~Cross-agent metric search~~ (DONE — Session 3)
+- [x] ~~Dispute resolution~~ (DONE — Session 3)
+- [x] ~~Performance-gated escrow~~ (DONE — Session 3)
+- [x] ~~Historical claim chain~~ (DONE — Session 3)
+- [x] ~~Agent messaging~~ (DONE — Session 3)
+- [x] ~~SLA enforcement~~ (DONE — Session 3)
+- [x] ~~Strategy marketplace~~ (DONE — Session 3)
+- [x] ~~Analytics suite~~ (DONE — Session 3)
+- [x] ~~Multi-party splits~~ (DONE — Session 3)
+- [x] ~~Swagger UI~~ (DONE — Session 3)
+- [x] ~~Key rotation~~ (DONE — Session 3)
+
+
+## Prompt
+* Commit changes. Always commit changes at the end of work.
+* Assume role of senior software architect. Review Agent Identity design, and produce a report on strong and weak points, technical debt, possible extensions/generalizations, future-proofing, etc. Create actionable todo list but do not change code yet.

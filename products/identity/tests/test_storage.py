@@ -227,3 +227,80 @@ class TestReputationStorage:
         """Getting reputation for a non-existent agent should return None."""
         result = await storage.get_latest_reputation("ghost")
         assert result is None
+
+
+class TestClaimChainStorage:
+    """Tests for claim_chains table storage."""
+
+    @pytest.mark.asyncio
+    async def test_store_and_get_claim_chain(self, storage):
+        """Storing a claim chain should be retrievable by agent_id."""
+        import json
+
+        leaf_hashes = ["aa" * 32, "bb" * 32, "cc" * 32]
+        now = time.time()
+        chain_id = await storage.store_claim_chain(
+            agent_id="bot-1",
+            merkle_root="dd" * 32,
+            leaf_hashes=leaf_hashes,
+            period_start=now - 86400 * 180,
+            period_end=now,
+        )
+        assert chain_id > 0
+
+        chains = await storage.get_claim_chains("bot-1")
+        assert len(chains) == 1
+        chain = chains[0]
+        assert chain["agent_id"] == "bot-1"
+        assert chain["merkle_root"] == "dd" * 32
+        assert json.loads(chain["leaf_hashes"]) == leaf_hashes
+        assert chain["chain_length"] == 3
+        assert chain["period_start"] == pytest.approx(now - 86400 * 180, abs=1.0)
+        assert chain["period_end"] == pytest.approx(now, abs=1.0)
+
+    @pytest.mark.asyncio
+    async def test_get_claim_chains_respects_limit(self, storage):
+        """get_claim_chains should respect the limit parameter."""
+        now = time.time()
+        for i in range(5):
+            await storage.store_claim_chain(
+                agent_id="bot-limit",
+                merkle_root=f"{i:02x}" * 32,
+                leaf_hashes=[f"{i:02x}" * 32],
+                period_start=now - 1000 + i,
+                period_end=now + i,
+            )
+
+        chains = await storage.get_claim_chains("bot-limit", limit=3)
+        assert len(chains) == 3
+
+    @pytest.mark.asyncio
+    async def test_get_claim_chains_returns_newest_first(self, storage):
+        """Chains should be ordered by created_at descending."""
+        now = time.time()
+        await storage.store_claim_chain(
+            agent_id="bot-order",
+            merkle_root="aa" * 32,
+            leaf_hashes=["aa" * 32],
+            period_start=now - 200,
+            period_end=now - 100,
+        )
+        await storage.store_claim_chain(
+            agent_id="bot-order",
+            merkle_root="bb" * 32,
+            leaf_hashes=["bb" * 32],
+            period_start=now - 100,
+            period_end=now,
+        )
+
+        chains = await storage.get_claim_chains("bot-order")
+        assert len(chains) == 2
+        # Most recent first (higher created_at)
+        assert chains[0]["merkle_root"] == "bb" * 32
+        assert chains[1]["merkle_root"] == "aa" * 32
+
+    @pytest.mark.asyncio
+    async def test_get_claim_chains_empty(self, storage):
+        """Should return empty list for agent with no chains."""
+        chains = await storage.get_claim_chains("ghost-agent")
+        assert chains == []

@@ -194,3 +194,89 @@ class TestReputation:
         """compute_reputation should raise AgentNotFoundError for unknown agent."""
         with pytest.raises(AgentNotFoundError):
             await api.compute_reputation("ghost")
+
+
+class TestBuildClaimChain:
+    """Tests for build_claim_chain API method."""
+
+    @pytest.mark.asyncio
+    async def test_build_claim_chain_from_attestations(self, api):
+        """build_claim_chain should build a Merkle tree from valid attestations."""
+        from products.identity.src.crypto import MerkleTree
+
+        await api.register_agent("bot-chain")
+        # Submit multiple rounds of metrics to create multiple attestations
+        att1 = await api.submit_metrics(
+            "bot-chain", {"sharpe_30d": 2.5}, data_source="platform_verified"
+        )
+        att2 = await api.submit_metrics(
+            "bot-chain", {"sharpe_30d": 2.8, "max_drawdown_30d": 3.0},
+            data_source="exchange_api",
+        )
+
+        result = await api.build_claim_chain("bot-chain")
+        assert "merkle_root" in result
+        assert "leaf_count" in result
+        assert "period_start" in result
+        assert "period_end" in result
+        assert "chain_id" in result
+
+        # Should have 2 attestation hashes as leaves
+        assert result["leaf_count"] == 2
+
+        # Root should be verifiable
+        assert len(result["merkle_root"]) == 64
+        bytes.fromhex(result["merkle_root"])
+
+        # period_start should be the earliest verified_at
+        assert result["period_start"] <= result["period_end"]
+
+    @pytest.mark.asyncio
+    async def test_build_claim_chain_no_attestations(self, api):
+        """build_claim_chain with no attestations should return empty chain info."""
+        import hashlib
+
+        await api.register_agent("bot-empty-chain")
+        result = await api.build_claim_chain("bot-empty-chain")
+        assert result["leaf_count"] == 0
+        expected_root = hashlib.sha3_256(b"").hexdigest()
+        assert result["merkle_root"] == expected_root
+
+    @pytest.mark.asyncio
+    async def test_build_claim_chain_agent_not_found(self, api):
+        """build_claim_chain for unknown agent should raise AgentNotFoundError."""
+        with pytest.raises(AgentNotFoundError):
+            await api.build_claim_chain("ghost")
+
+    @pytest.mark.asyncio
+    async def test_build_claim_chain_stores_in_db(self, api):
+        """build_claim_chain should persist the chain in storage."""
+        await api.register_agent("bot-persist")
+        await api.submit_metrics("bot-persist", {"sharpe_30d": 1.5})
+
+        result = await api.build_claim_chain("bot-persist")
+        assert result["chain_id"] > 0
+
+        # Verify it's in storage
+        chains = await api.storage.get_claim_chains("bot-persist")
+        assert len(chains) == 1
+        assert chains[0]["merkle_root"] == result["merkle_root"]
+
+    @pytest.mark.asyncio
+    async def test_build_claim_chain_leaf_hashes_are_attestation_hashes(self, api):
+        """Leaf hashes should be SHA3-256 of each attestation's signature."""
+        import hashlib
+        import json
+
+        await api.register_agent("bot-leaf-check")
+        att = await api.submit_metrics(
+            "bot-leaf-check", {"sharpe_30d": 3.0}
+        )
+
+        result = await api.build_claim_chain("bot-leaf-check")
+
+        # The leaf hash should be SHA3-256 of the attestation signature
+        expected_leaf = hashlib.sha3_256(att.signature.encode()).hexdigest()
+        chains = await api.storage.get_claim_chains("bot-leaf-check")
+        stored_leaves = json.loads(chains[0]["leaf_hashes"])
+        assert expected_leaf in stored_leaves

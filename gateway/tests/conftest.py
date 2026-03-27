@@ -43,6 +43,8 @@ async def app(tmp_data_dir, monkeypatch):
     monkeypatch.setenv("IDENTITY_DSN", f"sqlite:///{tmp_data_dir}/identity.db")
     monkeypatch.setenv("EVENT_BUS_DSN", f"sqlite:///{tmp_data_dir}/event_bus.db")
     monkeypatch.setenv("WEBHOOK_DSN", f"sqlite:///{tmp_data_dir}/webhooks.db")
+    monkeypatch.setenv("DISPUTE_DSN", f"sqlite:///{tmp_data_dir}/disputes.db")
+    monkeypatch.setenv("MESSAGING_DSN", f"sqlite:///{tmp_data_dir}/messaging.db")
 
     application = create_app()
 

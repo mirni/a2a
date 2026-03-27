@@ -84,6 +84,19 @@ CREATE TABLE IF NOT EXISTS agent_reputation (
 
 CREATE INDEX IF NOT EXISTS idx_reputation_agent ON agent_reputation(agent_id);
 CREATE INDEX IF NOT EXISTS idx_reputation_ts    ON agent_reputation(timestamp);
+
+CREATE TABLE IF NOT EXISTS claim_chains (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_id TEXT NOT NULL,
+    merkle_root TEXT NOT NULL,
+    leaf_hashes TEXT NOT NULL,
+    chain_length INTEGER NOT NULL,
+    period_start REAL NOT NULL,
+    period_end REAL NOT NULL,
+    created_at REAL NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_chain_agent ON claim_chains(agent_id);
 """
 
 
@@ -300,6 +313,53 @@ class IdentityStorage:
             for r in rows
         ]
 
+    async def search_claims(
+        self,
+        metric_name: str,
+        claim_type: str | None = None,
+        min_value: float | None = None,
+        max_value: float | None = None,
+        limit: int = 100,
+    ) -> list[VerifiedClaim]:
+        """Search verified claims across all agents.
+
+        Args:
+            metric_name: The metric to search (e.g. "sharpe_30d").
+            claim_type: Filter by claim_type ("gte" or "lte"). Optional.
+            min_value: Minimum bound_value (agents claiming >= this). Optional.
+            max_value: Maximum bound_value (agents claiming <= this). Optional.
+            limit: Max results.
+
+        Returns:
+            List of matching VerifiedClaim objects (only non-expired).
+        """
+        query = "SELECT * FROM verified_claims WHERE metric_name = ? AND valid_until > ?"
+        params: list[Any] = [metric_name, time.time()]
+        if claim_type is not None:
+            query += " AND claim_type = ?"
+            params.append(claim_type)
+        if min_value is not None:
+            query += " AND bound_value >= ?"
+            params.append(min_value)
+        if max_value is not None:
+            query += " AND bound_value <= ?"
+            params.append(max_value)
+        query += " ORDER BY bound_value DESC LIMIT ?"
+        params.append(limit)
+        cursor = await self.db.execute(query, params)
+        rows = await cursor.fetchall()
+        return [
+            VerifiedClaim(
+                agent_id=r["agent_id"],
+                metric_name=r["metric_name"],
+                claim_type=r["claim_type"],
+                bound_value=r["bound_value"],
+                attestation_signature="",
+                valid_until=r["valid_until"],
+            )
+            for r in rows
+        ]
+
     # -----------------------------------------------------------------------
     # Agent reputation
     # -----------------------------------------------------------------------
@@ -343,3 +403,79 @@ class IdentityStorage:
             composite_score=row["composite_score"],
             confidence=row["confidence"],
         )
+
+    # -----------------------------------------------------------------------
+    # Claim chains
+    # -----------------------------------------------------------------------
+
+    async def store_claim_chain(
+        self,
+        agent_id: str,
+        merkle_root: str,
+        leaf_hashes: list[str],
+        period_start: float,
+        period_end: float,
+    ) -> int:
+        """Store a claim chain (Merkle tree of attestation hashes).
+
+        Args:
+            agent_id: The agent this chain belongs to.
+            merkle_root: Hex-encoded Merkle root of the attestation hashes.
+            leaf_hashes: List of hex attestation hashes (the leaves).
+            period_start: Unix timestamp of the earliest attestation.
+            period_end: Unix timestamp of the latest attestation.
+
+        Returns:
+            The row ID of the stored claim chain.
+        """
+        now = time.time()
+        cursor = await self.db.execute(
+            "INSERT INTO claim_chains "
+            "(agent_id, merkle_root, leaf_hashes, chain_length, "
+            "period_start, period_end, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                agent_id,
+                merkle_root,
+                json.dumps(leaf_hashes),
+                len(leaf_hashes),
+                period_start,
+                period_end,
+                now,
+            ),
+        )
+        await self.db.commit()
+        return cursor.lastrowid  # type: ignore[return-value]
+
+    async def get_claim_chains(
+        self, agent_id: str, limit: int = 10
+    ) -> list[dict]:
+        """Retrieve claim chains for an agent, newest first.
+
+        Args:
+            agent_id: The agent to query.
+            limit: Maximum number of chains to return.
+
+        Returns:
+            List of dicts with keys: id, agent_id, merkle_root, leaf_hashes,
+            chain_length, period_start, period_end, created_at.
+        """
+        cursor = await self.db.execute(
+            "SELECT * FROM claim_chains WHERE agent_id = ? "
+            "ORDER BY created_at DESC LIMIT ?",
+            (agent_id, limit),
+        )
+        rows = await cursor.fetchall()
+        return [
+            {
+                "id": r["id"],
+                "agent_id": r["agent_id"],
+                "merkle_root": r["merkle_root"],
+                "leaf_hashes": r["leaf_hashes"],
+                "chain_length": r["chain_length"],
+                "period_start": r["period_start"],
+                "period_end": r["period_end"],
+                "created_at": r["created_at"],
+            }
+            for r in rows
+        ]

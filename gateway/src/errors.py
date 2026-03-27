@@ -38,12 +38,20 @@ async def handle_product_exception(request: Request, exc: Exception) -> JSONResp
         "IntentNotFoundError": (404, "intent_not_found"),
         "EscrowNotFoundError": (404, "escrow_not_found"),
         "WalletNotFoundError": (404, "wallet_not_found"),
+        "SubscriptionNotFoundError": (404, "subscription_not_found"),
+        "AgentNotFoundError": (404, "agent_not_found"),
         # Conflict / invalid state
         "InvalidStateError": (409, "invalid_state"),
         "DuplicateIntentError": (409, "duplicate_intent"),
         "DuplicateServiceError": (409, "duplicate_service"),
         # Validation
         "ValidationError": (400, "validation_error"),
+        "InvalidMetricError": (400, "invalid_metric"),
+        "ValueError": (400, "bad_request"),
+        # Disputes
+        "DisputeNotFoundError": (404, "dispute_not_found"),
+        "DisputeStateError": (409, "dispute_state_error"),
+        "SubscriptionStateError": (409, "invalid_state"),
     }
 
     if exc_type in mapping:
