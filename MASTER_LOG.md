@@ -387,6 +387,272 @@ TOTAL       833 passed  (+103 from Session 2)
 - [x] ~~Key rotation~~ (DONE — Session 3)
 
 
-## Prompt
+## Prompt (Session 3, continued)
 * Commit changes. Always commit changes at the end of work.
 * Assume role of senior software architect. Review Agent Identity design, and produce a report on strong and weak points, technical debt, possible extensions/generalizations, future-proofing, etc. Create actionable todo list but do not change code yet.
+
+---
+
+## Senior Architect Review: Agent Identity System
+
+**Reviewer**: Senior Software Architect (automated)
+**Date**: 2026-03-27
+**Scope**: `products/identity/src/` — models.py (81 LOC), crypto.py (309 LOC), api.py (384 LOC), storage.py (482 LOC)
+**Test Coverage**: 72 tests across test_crypto.py, test_api.py, test_storage.py
+
+---
+
+### 1. Strong Points
+
+**1.1 Cryptographic Foundation — Ed25519 + SHA3-256**
+- Correct choice. Ed25519 is compact (32-byte keys, 64-byte sigs), fast, and deterministic (no nonce reuse risk unlike ECDSA). The `cryptography` library is the gold-standard Python wrapper.
+- SHA3-256 for commitments/Merkle trees avoids length-extension attacks that plague SHA-256. Good forward-looking choice.
+- Attestation signing uses JSON canonical form (`sort_keys=True, separators=(",",":")`) — prevents signature malleability from key ordering or whitespace.
+
+**1.2 Commitment Scheme Design**
+- Hiding commitments with 32-byte random blinding factors provide statistical hiding — the commitment reveals nothing about the value without the blinding factor.
+- Integer scaling (`int(value * 10000)`) before hashing avoids floating-point representation ambiguity across platforms.
+- Metric-name binding in the hash preimage prevents cross-metric commitment substitution (e.g., reusing a Sharpe commitment as a drawdown commitment).
+
+**1.3 Clean Separation of Concerns**
+- 4-file architecture (models / crypto / api / storage) is well-factored. Crypto operations are pure/stateless, storage is async I/O, API orchestrates.
+- Pydantic models with `Field(ge=, le=)` validators catch bad data at the boundary.
+- The dataclass-based `IdentityAPI` with dependency injection (`storage`, `auditor_private_key`) is test-friendly.
+
+**1.4 Merkle Claim Chains**
+- Correct implementation of binary Merkle tree with proof generation and verification.
+- Odd-leaf-count handling (duplicate last leaf) follows standard convention.
+- `compute_proof` + `verify_proof` roundtrip is thoroughly tested (7 edge cases including tampering).
+
+**1.5 Test Quality**
+- 72 tests with strong coverage: edge cases (empty tree, single leaf, wrong key, tampered sigs, expired attestations), error paths (AgentNotFoundError, InvalidMetricError, IndexError).
+- TDD approach is evident — test class structure maps directly to feature classes.
+
+---
+
+### 2. Weak Points
+
+**2.1 CRITICAL — Blinding Factor Discarded (Commitment Scheme Broken)**
+In `api.py:147`:
+```python
+commit_hash, _blinding = AgentCrypto.create_commitment(value, metric_name)
+```
+The blinding factor is created then **immediately discarded** (`_blinding`). This means:
+- The agent can never open (reveal) the commitment to prove the value.
+- The commitment scheme becomes one-way — it's a hash, not a usable commitment.
+- `verify_commitment()` in crypto.py exists but is **unreachable** in practice because no one has the blinding factor.
+
+**Severity**: CRITICAL — the entire commitment/reveal protocol is non-functional.
+**Fix**: Store blinding factors in a `commitment_secrets` table (encrypted at rest, accessible only to the committing agent or auditor).
+
+**2.2 HIGH — No Commitment Reveal/Open Protocol**
+Related to 2.1: there is no `open_commitment()` or `reveal_metrics()` API method. The design has `create_commitment` and `verify_commitment` but no workflow that connects them. A consumer cannot verify that a claimed Sharpe of 2.35 actually matches the commitment hash.
+
+**2.3 HIGH — Auditor Key is Ephemeral**
+In `api.py:52-57`:
+```python
+def __post_init__(self) -> None:
+    if not self.auditor_private_key:
+        priv, pub = AgentCrypto.generate_keypair()
+```
+The platform auditor keypair is auto-generated on every `IdentityAPI` instantiation. This means:
+- After a server restart, all existing attestation signatures become **unverifiable** (new public key, old signatures).
+- No key rotation protocol — old keys are simply lost.
+- The auditor public key isn't published or discoverable by consumers.
+
+**Severity**: HIGH — attestation verification breaks across restarts.
+**Fix**: Persist auditor keypair (env var, vault, or DB), add key rotation with validity periods, publish public key at a well-known endpoint.
+
+**2.4 HIGH — No Private Key Management for Agents**
+In `api.py:72-73`:
+```python
+if public_key is None:
+    _private_key, public_key = AgentCrypto.generate_keypair()
+```
+When auto-generating, the private key is discarded (`_private_key`). The agent never receives it. This means:
+- Auto-registered agents can never sign anything (their private key is lost).
+- `verify_agent()` will always fail for auto-registered agents since no one can produce a valid signature.
+
+**Severity**: HIGH — auto-registration is broken as an identity mechanism.
+**Fix**: Return the private key to the caller (and only the caller) on registration. Never store private keys server-side.
+
+**2.5 MEDIUM — Reputation Model is Placeholder**
+`compute_reputation()` uses attestation count and data source as proxies for payment reliability and dispute rate. The field names are misleading:
+- `payment_reliability` is actually "attestation count × 10"
+- `dispute_rate` is actually "average data source quality score" (higher = better, contrary to the name "dispute_rate")
+- No actual payment or dispute data is consulted
+
+**2.6 MEDIUM — No Attestation Revocation**
+Attestations can only expire (7-day TTL). There is no mechanism to:
+- Revoke a compromised attestation before expiry
+- Blacklist a fraudulent agent's claims
+- Update an attestation when new data contradicts it
+
+**2.7 MEDIUM — VerifiedClaim.attestation_signature Not Round-Trippable**
+In `storage.py:310`:
+```python
+attestation_signature="",  # Not stored directly; linked via attestation_id
+```
+Claims are stored with `attestation_id` (FK) but reconstructed with empty `attestation_signature`. The Pydantic model says the field should be the signature, but it's blank after retrieval. This breaks any downstream code that relies on `claim.attestation_signature`.
+
+**2.8 LOW — No Pagination for search_claims**
+`search_claims()` accepts `limit` but no `offset`/cursor. For a marketplace with thousands of agents, the first page is all you get.
+
+**2.9 LOW — SQLite DSN Parsing is Fragile**
+```python
+db_path = self.dsn.replace("sqlite:///", "")
+```
+Only handles `sqlite:///` prefix. `:memory:` DSNs, relative paths, or `sqlite://` (2 slashes) will produce wrong paths.
+
+---
+
+### 3. Technical Debt
+
+| ID | Item | Severity | Effort |
+|----|------|----------|--------|
+| TD-1 | Blinding factors discarded — commitment/reveal broken | Critical | M |
+| TD-2 | Auditor keypair ephemeral — signatures unverifiable after restart | High | S |
+| TD-3 | Agent private keys discarded on auto-registration | High | S |
+| TD-4 | `attestation_signature` empty on claim retrieval from DB | Medium | S |
+| TD-5 | `dispute_rate` field name is semantically inverted | Medium | S |
+| TD-6 | No attestation revocation mechanism | Medium | M |
+| TD-7 | No pagination (offset/cursor) on search endpoints | Low | S |
+| TD-8 | Fragile DSN parsing | Low | XS |
+| TD-9 | `store_identity` uses INSERT OR REPLACE — silently overwrites keys | Medium | S |
+| TD-10 | No index on `verified_claims(metric_name)` — search_claims scans | Low | XS |
+
+---
+
+### 4. Possible Extensions / Generalizations
+
+**4.1 Decentralized Identity (DID) Compatibility**
+The current `agent_id` is an opaque string. Mapping to W3C DID format (`did:a2a:<agent_id>`) would:
+- Enable interoperability with external identity systems
+- Allow agents to bring their own identity from other platforms
+- Support DID Documents for key discovery
+
+**4.2 Verifiable Credentials (VC) Standard**
+Attestations are semantically identical to W3C Verifiable Credentials. Aligning the data model would:
+- Make claims portable across platforms
+- Enable standard VC wallets to hold agent credentials
+- Support JSON-LD proof formats
+
+**4.3 Zero-Knowledge Range Proofs**
+Current claims are binary (gte/lte). With Bulletproofs or similar:
+- An agent could prove "my Sharpe > 2.0" without revealing the exact value
+- Commitment scheme becomes actually useful (currently broken per 2.1)
+- Eliminates the need for a trusted auditor to vouch for exact values
+
+**4.4 Multi-Auditor Attestation (Threshold Signatures)**
+Currently a single platform auditor signs everything. Multi-auditor would:
+- Require k-of-n auditors to agree (threshold Ed25519 or Schnorr)
+- Remove single point of trust failure
+- Enable third-party auditors (exchanges, analytics providers)
+
+**4.5 Temporal Reputation with Decay**
+Current reputation is a snapshot. A time-series model would:
+- Weight recent attestations more heavily
+- Detect reputation degradation trends
+- Support "reputation velocity" as a signal
+
+**4.6 Cross-Platform Claim Portability**
+Merkle claim chains could be anchored to a public blockchain or timestamping service:
+- Provides tamper-evident proof without trusting the platform
+- Enables agents to prove their history to third parties
+- Would require anchoring the Merkle root periodically (e.g., Bitcoin OP_RETURN, Ethereum event log)
+
+**4.7 Metric Composition**
+Allow composite metrics ("risk-adjusted alpha") that combine multiple base metrics with defined formulas. This would enable:
+- Custom scoring models per marketplace
+- Normalized comparison across different strategy types
+- Derived claims from base claims
+
+---
+
+### 5. Future-Proofing Assessment
+
+| Dimension | Current State | Risk | Recommendation |
+|-----------|---------------|------|----------------|
+| **Algorithm agility** | Hardcoded Ed25519 + SHA3-256 | Low | Good choices, but add `algorithm` field to attestations for future rotation |
+| **Key rotation** | None | High | Implement key versioning with validity periods |
+| **Storage backend** | SQLite only | Medium | Already have DSN pattern; add abstract storage interface |
+| **Metric schema** | Hardcoded set of 8 | Medium | Move to registry pattern; allow per-marketplace custom metrics |
+| **Attestation format** | Custom JSON | Medium | Align with W3C VC for interop; add `version` field now |
+| **Multi-tenancy** | `org_id` field exists but unused in queries | Low | Already scaffolded; just needs query filters |
+| **Scale** | In-memory SQLite per test, single-file prod | High | OK for MVP; needs connection pooling + PostgreSQL for >100 agents |
+| **Claim expiry** | 7-day fixed TTL | Medium | Make TTL configurable per metric and per tier |
+
+---
+
+### 6. Actionable TODO List
+
+**P0 — Must Fix (Correctness Broken)**
+
+- [ ] **TODO-1**: Store blinding factors — add `commitment_secrets` table, return blinding to agent on `submit_metrics`, add `reveal_commitment(agent_id, metric_name, blinding)` API method
+- [ ] **TODO-2**: Persist auditor keypair — load from env `AUDITOR_PRIVATE_KEY` / `AUDITOR_PUBLIC_KEY`, fall back to DB storage, add startup validation
+- [ ] **TODO-3**: Return agent private key on auto-registration — modify `register_agent()` return type to include private key when auto-generated (one-time, never stored server-side)
+
+**P1 — Should Fix (Data Integrity / Semantics)**
+
+- [ ] **TODO-4**: Fix `attestation_signature` round-trip — join claims with attestations table on retrieval, populate the field correctly
+- [ ] **TODO-5**: Rename `dispute_rate` to `data_source_quality` or split reputation model into clearly-named sub-scores
+- [ ] **TODO-6**: Change `store_identity` from INSERT OR REPLACE to INSERT with conflict detection — raise `AgentAlreadyExistsError` on duplicate
+- [ ] **TODO-7**: Add `CREATE INDEX idx_claim_metric ON verified_claims(metric_name)` for search_claims performance
+- [ ] **TODO-8**: Add `version` field to AuditorAttestation model (default "1.0") for format evolution
+
+**P2 — Should Add (Protocol Completeness)**
+
+- [ ] **TODO-9**: Implement attestation revocation — add `revoked_at` column, `revoke_attestation(attestation_id, reason)` API, filter revoked in all queries
+- [ ] **TODO-10**: Add commitment reveal/open workflow — `open_commitment(agent_id, metric_name, value, blinding)` that verifies and publishes the revealed value
+- [ ] **TODO-11**: Add pagination (offset + limit or cursor) to `search_claims`, `get_attestations`, `get_commitments`, `get_claim_chains`
+- [ ] **TODO-12**: Harden DSN parsing — handle `:memory:`, `sqlite://` (2 slashes), relative paths, and reject unsupported schemes
+
+**P3 — Future Enhancement (Extensibility)**
+
+- [ ] **TODO-13**: Add `algorithm` field to attestation schema (e.g., "ed25519-sha3-256") for crypto agility
+- [ ] **TODO-14**: Make metric set configurable — move SUPPORTED_METRICS to storage/config, allow per-org custom metrics
+- [ ] **TODO-15**: Implement auditor key rotation — key versioning table, sign attestations with current key, verify against key valid at attestation time
+- [ ] **TODO-16**: Align attestation model with W3C Verifiable Credentials structure (issuer, credentialSubject, proof)
+- [ ] **TODO-17**: Add Merkle proof endpoint — `get_inclusion_proof(chain_id, attestation_index)` returning sibling path for client-side verification
+- [ ] **TODO-18**: Integrate reputation with actual payment/dispute data from billing and dispute engines (replace proxy scores)
+
+---
+
+### 7. Architecture Diagram (Current State)
+
+```
+┌─────────────┐     ┌──────────────┐     ┌────────────────┐
+│  Gateway     │────▶│ IdentityAPI  │────▶│IdentityStorage │
+│  tools.py    │     │  (api.py)    │     │ (storage.py)   │
+└─────────────┘     └──────┬───────┘     └────────────────┘
+                           │                     │
+                    ┌──────▼───────┐       SQLite (6 tables)
+                    │ AgentCrypto  │       ├─ agent_identities
+                    │ (crypto.py)  │       ├─ metric_commitments
+                    │              │       ├─ attestations
+                    │ • Ed25519    │       ├─ verified_claims
+                    │ • SHA3-256   │       ├─ agent_reputation
+                    │ • MerkleTree │       └─ claim_chains
+                    └──────────────┘
+
+Data Flow:
+  register_agent ──▶ store_identity (public_key only)
+  submit_metrics ──▶ create_commitment ──▶ store_commitment
+                 ──▶ sign_attestation  ──▶ store_attestation
+                 ──▶ create_claim      ──▶ store_claim
+  build_chain    ──▶ get_attestations ──▶ MerkleTree.compute_root
+                                       ──▶ store_claim_chain
+```
+
+### 8. Summary
+
+The Agent Identity system has a **solid cryptographic foundation** (Ed25519, SHA3-256, Merkle trees) and **clean architecture** (4-layer separation, Pydantic validation, async I/O). The test suite is strong at 72 tests with good edge-case coverage.
+
+However, there are **3 critical/high correctness bugs** that make the commitment scheme and identity verification non-functional in practice:
+1. Blinding factors are discarded (commitments can never be opened)
+2. Auditor keys are ephemeral (attestations unverifiable after restart)
+3. Agent private keys are discarded on auto-registration (agents can't sign)
+
+These must be fixed before the identity system can be used for any trust-critical workflow. The remaining technical debt is manageable and the extension points (DID, VC, ZK proofs, multi-auditor) are well-positioned by the current abstractions.
+
+**Overall assessment**: Strong MVP skeleton, correct crypto primitives, but the **protocol-level plumbing** that connects the primitives into a usable trust workflow is incomplete. Fix P0 items first, then P1 for data integrity, before pursuing any extensions.
