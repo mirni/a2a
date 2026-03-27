@@ -10,6 +10,7 @@ class TierName(str, Enum):
     """Supported subscription tiers."""
 
     FREE = "free"
+    STARTER = "starter"
     PRO = "pro"
     ENTERPRISE = "enterprise"
 
@@ -44,10 +45,18 @@ TIER_CONFIGS: dict[TierName, TierConfig] = {
         support_level="none",
         burst_allowance=10,
     ),
+    TierName.STARTER: TierConfig(
+        name=TierName.STARTER,
+        rate_limit_per_hour=1_000,
+        cost_per_call=0,
+        audit_log_retention_days=7,
+        support_level="community",
+        burst_allowance=25,
+    ),
     TierName.PRO: TierConfig(
         name=TierName.PRO,
         rate_limit_per_hour=10_000,
-        cost_per_call=1,
+        cost_per_call=0,
         audit_log_retention_days=30,
         support_level="email",
         burst_allowance=100,
@@ -55,7 +64,7 @@ TIER_CONFIGS: dict[TierName, TierConfig] = {
     TierName.ENTERPRISE: TierConfig(
         name=TierName.ENTERPRISE,
         rate_limit_per_hour=100_000,
-        cost_per_call=1,
+        cost_per_call=0,
         audit_log_retention_days=90,
         support_level="priority",
         burst_allowance=1000,
@@ -79,7 +88,7 @@ def get_tier_config(tier: str | TierName) -> TierConfig:
 
 
 # Tier ordering for access checks: higher index = higher tier
-_TIER_ORDER = {TierName.FREE: 0, TierName.PRO: 1, TierName.ENTERPRISE: 2}
+_TIER_ORDER = {TierName.FREE: 0, TierName.STARTER: 1, TierName.PRO: 2, TierName.ENTERPRISE: 3}
 
 
 def tier_has_access(agent_tier: str | TierName, required_tier: str | TierName) -> bool:

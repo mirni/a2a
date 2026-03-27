@@ -34,6 +34,10 @@ from trust_src.api import TrustAPI
 from trust_src.scorer import ScoreEngine
 from trust_src.storage import StorageBackend as TrustStorage
 
+# Identity
+from identity_src.api import IdentityAPI
+from identity_src.storage import IdentityStorage
+
 # Shared — Event Bus
 from shared_src.event_bus import EventBus
 
@@ -65,6 +69,7 @@ class AppContext:
     payment_engine: PaymentEngine
     marketplace: Marketplace
     trust_api: TrustAPI
+    identity_api: IdentityAPI
     event_bus: EventBus
     webhook_manager: WebhookManager
     scheduler: object | None = None
@@ -89,6 +94,7 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
         "MARKETPLACE_DSN", f"sqlite:///{data_dir}/marketplace.db"
     )
     trust_dsn = os.environ.get("TRUST_DSN", f"sqlite:///{data_dir}/trust.db")
+    identity_dsn = os.environ.get("IDENTITY_DSN", f"sqlite:///{data_dir}/identity.db")
     event_bus_dsn = os.environ.get(
         "EVENT_BUS_DSN", f"sqlite:///{data_dir}/event_bus.db"
     )
@@ -115,6 +121,11 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     await trust_storage.connect()
     scorer = ScoreEngine(storage=trust_storage)
     trust_api = TrustAPI(storage=trust_storage, scorer=scorer)
+
+    # --- Identity ---
+    identity_storage = IdentityStorage(identity_dsn)
+    await identity_storage.connect()
+    identity_api = IdentityAPI(storage=identity_storage)
 
     # --- Marketplace ---
     from gateway.src.trust_adapter import make_trust_provider
@@ -163,6 +174,7 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
         payment_engine=payment_engine,
         marketplace=marketplace,
         trust_api=trust_api,
+        identity_api=identity_api,
         event_bus=event_bus,
         webhook_manager=webhook_manager,
         scheduler=scheduler,
@@ -191,6 +203,7 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
 
     await webhook_manager.close()
     await event_bus.close()
+    await identity_storage.close()
     await trust_storage.close()
     await marketplace_storage.close()
     await payment_storage.close()

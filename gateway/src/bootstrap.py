@@ -10,6 +10,7 @@ After calling bootstrap(), modules are available as:
   payments_src.engine, payments_src.storage, payments_src.models, ...
   marketplace_src.marketplace, marketplace_src.models, marketplace_src.storage
   trust_src.api, trust_src.scorer, trust_src.storage, trust_src.models
+  identity_src.api, identity_src.crypto, identity_src.storage, identity_src.models
   shared_src.event_bus, shared_src.errors, shared_src.audit_log, ...
 """
 
@@ -133,6 +134,7 @@ def bootstrap() -> None:
     _load_payments()
     _load_product_simple("marketplace", "marketplace")
     _load_product_simple("trust", "trust")
+    _load_product_simple("identity", "identity")
 
     _bootstrapped = True
 

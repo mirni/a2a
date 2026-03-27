@@ -166,3 +166,119 @@ Outlined 3 tiers:
 - [ ] **Hosted sandbox** — `sandbox.greenhelix.net` with pre-provisioned free-tier keys for instant onboarding.
 - [ ] **PostgreSQL migration** — When write throughput exceeds ~100 TPS. DSN abstraction layer is ready.
 - [ ] **CI/CD pipeline** — GitHub Actions for test + deploy on push to main.
+
+
+---
+
+## Session 2 — 2026-03-27 (Overnight): Identity, Pricing, Customer Agent
+
+### Prompt
+
+> Continue with implementing the TODOs above, following up on CMO_ANALYSIS.md. Use TDD for implementation as much as possible:
+> * Promote 5.4 (Agent Identity and Authentication) and 5.8 (Agent Reputation Score) to higher priority. Research and consider ZK-proofs in the implementation if suitable.
+> * Focus on building domain-specific trust layer on top of identity. E.g. for trading bots. Build Agent Reputation + Execution Verification Layer, with PnL verification, latency scoring, signal accuracy tracking
+> * Update pricing per 4.1 Pricing Strategy Critique.
+> * Create a new agent -- an incidental customer -- and let it explore the products and gather feedback.
+> * Keep documentation in-code, with on-demand documentation generation.
+>
+> Human is going to bed now -- work autonomously and iteratively, and provide a detailed report when done, with details on the agent identity schema for trading bots. As a CMO, review the report and consider existing products in the domain of trading bots.
+
+### Response
+
+**4 major items implemented overnight. 730 tests passing across 9 modules.**
+
+#### 1. Agent Identity System (`products/identity/`) — NEW PRODUCT
+
+- Ed25519 keypair generation + signature verification
+- SHA3-256 hiding commitments for trading bot metrics (Sharpe, DD, PnL, latency, signal accuracy, win rate, trade count, AUM)
+- Platform auditor attestations (Ed25519 signed, 7-day validity)
+- Verified claims ("Sharpe >= 2.15", "MaxDD <= 3.2%")
+- Consumer-side reputation scoring (payment reliability, data source quality, volume)
+- 6 new gateway tools: `register_agent`, `verify_agent`, `submit_metrics`, `get_agent_identity`, `get_verified_claims`, `get_agent_reputation`
+- 40 product tests + 7 gateway integration tests
+
+ZK-proof research: Full ZK is overkill for MVP (no production Python libraries, circuit authoring too complex). Implemented hiding commitments + signed attestations instead. Migration path to Bulletproofs (month 3-6) and ZK circuits (month 6-12) documented.
+
+#### 2. Pricing Update
+
+- Added **Starter tier** (1,000/hr, 25 burst, 7-day audit, community support)
+- Removed per-call surcharge from Pro/Enterprise ($1.00 → $0.00)
+- Switched `create_intent` to **2% of amount** (min $0.01, max $5.00)
+- Switched `create_escrow` to **1.5% of amount** (min $0.01, max $10.00)
+- `capture_intent` and `release_escrow` now free (fee at creation)
+- Added `calculate_tool_cost()` helper to execute route
+
+#### 3. Customer Agent Simulation (AlphaBot-v3)
+
+- Exercised all 28 tools across all modules: 107 API calls, 97 passed
+- NPS scores: Infrastructure 8, Payments 7, Metrics 7, Webhooks 7, Billing 6, Marketplace 6, Identity 6, Trust 5, Rate Limiting 5, Admin 5
+- Key gaps identified: no self-service onboarding, no subscription tools, no withdraw, no dispute resolution, no cross-agent metric search
+- Full report: `CUSTOMER_AGENT_FEEDBACK.md`
+
+#### 4. CMO Review: Trading Bot Market
+
+- No competitor offers crypto-verified performance claims for trading bots
+- Differentiation: commitment-based metrics + escrow-backed signal purchases + trust scoring
+- Key competitors analyzed: Collective2, QuantConnect, Numerai, 3Commas
+- Top P0 recommendations: expose subscription tools, cross-agent metric search, self-service wallet
+
+**Detailed report**: `OVERNIGHT_REPORT_20260327.md`
+
+### Files Created
+- `products/identity/` — 8 source files, 3 test files (1,501 lines)
+- `gateway/tests/test_identity.py` — 7 integration tests
+- `customer_agent_report.py` — 1,709 lines (simulation script)
+- `CUSTOMER_AGENT_FEEDBACK.md` — 578 lines
+- `OVERNIGHT_REPORT_20260327.md` — overnight report
+
+### Files Modified
+- `products/paywall/src/tiers.py` — Starter tier, removed surcharges
+- `gateway/src/catalog.json` — 6 identity tools, percentage pricing
+- `gateway/src/routes/execute.py` — `calculate_tool_cost()` for percentage pricing
+- `gateway/src/tools.py` — 6 identity tool functions
+- `gateway/src/lifespan.py` — IdentityAPI in AppContext
+- `gateway/src/bootstrap.py` — identity product namespace
+- `gateway/tests/conftest.py` — IDENTITY_DSN
+- `gateway/tests/test_integration.py` — Updated fee assertions
+
+---
+
+## Next TODOs (Updated from Customer Feedback)
+
+### P0 — Immediate
+
+- [ ] **Expose subscription tools** — `create_subscription`, `cancel_subscription`, etc. (engine exists)
+- [ ] **Self-service wallet creation** — `create_wallet` tool
+- [ ] **Cross-agent metric search** — `search_agents_by_metrics` tool (find bots with Sharpe > 2.0)
+- [ ] **Fix submit_metrics error handling** — return 400 not 500 for invalid metric names
+- [ ] **Fiat on-ramp** — Stripe Checkout → deposit
+- [ ] **Deploy to production** — api.greenhelix.net
+
+### P1 — Next Sprint
+
+- [ ] **Withdraw/payout** tool
+- [ ] **Performance-gated escrow** — auto-release based on verified metrics
+- [ ] **Dispute resolution engine**
+- [ ] **TypeScript SDK**
+- [ ] **Key rotation** — `rotate_key` tool
+- [ ] **Metered connectors** — route Stripe/GitHub/PostgreSQL through gateway
+
+### P2 — Backlog
+
+- [x] ~~Agent Identity and Authentication~~ (DONE — Session 2)
+- [x] ~~Agent Reputation Score~~ (DONE — Session 2)
+- [x] ~~Pricing update~~ (DONE — Session 2)
+- [ ] **Historical claim chain** — Merkle tree of attestations
+- [ ] **Agent-to-agent messaging/negotiation**
+- [ ] **SLA enforcement automation**
+- [ ] **Bulletproofs range proofs** (Rust FFI)
+- [ ] **Strategy marketplace vertical**
+- [ ] **Analytics suite**
+- [ ] **Multi-party payment splits**
+
+### Infrastructure
+
+- [ ] **Add Swagger UI** — `/docs` endpoint
+- [ ] **Hosted sandbox** — `sandbox.greenhelix.net`
+- [ ] **PostgreSQL migration** — DSN abstraction ready
+- [ ] **CI/CD pipeline** — GitHub Actions

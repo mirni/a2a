@@ -106,7 +106,7 @@ class TestProjectedCost:
         projection = await usage_api.get_projected_cost("agent-1")
         assert projection["projected_24h_cost"] == 0
         assert projection["tier"] == "pro"
-        assert projection["cost_per_call"] == 1
+        assert projection["cost_per_call"] == 0
 
     async def test_projected_with_usage(
         self, usage_api: UsageAPI, key_manager: KeyManager, tracker

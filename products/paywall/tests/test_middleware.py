@@ -270,25 +270,25 @@ class TestWalletCheck:
         result = await free_tool(agent_id="agent-1")
         assert result == {"ok": True}
 
-    async def test_pro_tier_insufficient_balance(
+    async def test_pro_tier_no_per_call_charge(
         self, middleware: PaywallMiddleware, key_manager: KeyManager, tracker
     ):
-        """Pro tier with cost should fail if wallet is empty."""
+        """Pro tier has cost_per_call=0, so middleware does not charge even if cost is declared."""
         await key_manager.create_key(agent_id="agent-1", tier="pro")
-        # Create wallet with 0 balance
+        # Create wallet with 0 balance — should still succeed because cost_per_call=0
         await tracker.wallet.create("agent-1", initial_balance=0.0)
 
         @middleware.gated(tier="free", cost=1)
         async def paid_tool(agent_id: str):
             return {"ok": True}
 
-        with pytest.raises(InsufficientBalanceError, match="insufficient balance"):
-            await paid_tool(agent_id="agent-1")
+        result = await paid_tool(agent_id="agent-1")
+        assert result == {"ok": True}
 
     async def test_pro_tier_sufficient_balance(
         self, middleware: PaywallMiddleware, key_manager: KeyManager, tracker
     ):
-        """Pro tier with cost should succeed if wallet has balance."""
+        """Pro tier with cost_per_call=0 should succeed regardless of balance."""
         await key_manager.create_key(agent_id="agent-1", tier="pro")
         await tracker.wallet.create("agent-1", initial_balance=100.0)
 
@@ -299,10 +299,10 @@ class TestWalletCheck:
         result = await paid_tool(agent_id="agent-1")
         assert result == {"ok": True}
 
-    async def test_wallet_charged_after_call(
+    async def test_wallet_not_charged_when_cost_per_call_zero(
         self, middleware: PaywallMiddleware, key_manager: KeyManager, tracker
     ):
-        """After successful call, wallet should be charged."""
+        """With cost_per_call=0, wallet should not be charged even if cost is declared."""
         await key_manager.create_key(agent_id="agent-1", tier="pro")
         await tracker.wallet.create("agent-1", initial_balance=100.0)
 
@@ -312,7 +312,7 @@ class TestWalletCheck:
 
         await paid_tool(agent_id="agent-1")
         balance = await tracker.get_balance("agent-1")
-        assert balance == 95.0
+        assert balance == 100.0  # No charge because cost_per_call=0
 
     async def test_free_tier_cost_zero_even_if_declared(
         self, middleware: PaywallMiddleware, key_manager: KeyManager
@@ -377,10 +377,10 @@ class TestAuditLogging:
 
 
 class TestUsageMetering:
-    async def test_usage_recorded_in_billing(
+    async def test_usage_not_recorded_when_cost_per_call_zero(
         self, middleware: PaywallMiddleware, key_manager: KeyManager, tracker
     ):
-        """Pro tier calls should be recorded in the billing layer."""
+        """Pro tier with cost_per_call=0 should not record usage in billing layer."""
         await key_manager.create_key(agent_id="agent-1", tier="pro")
         await tracker.wallet.create("agent-1", initial_balance=100.0)
 
@@ -391,9 +391,7 @@ class TestUsageMetering:
         await paid_tool(agent_id="agent-1")
 
         usage = await tracker.get_usage("agent-1")
-        assert len(usage) == 1
-        assert usage[0]["cost"] == 1.0
-        assert usage[0]["metadata"]["connector"] == "test_connector"
+        assert len(usage) == 0  # cost_per_call=0, so no billing usage recorded
 
     async def test_free_tier_no_usage_recorded(
         self, middleware: PaywallMiddleware, key_manager: KeyManager, tracker
@@ -442,54 +440,47 @@ class TestEdgeCases:
 
 
 class TestChargeFailureHandling:
-    """Tests that charge failures after tool execution are logged, not silenced."""
+    """Tests that charge failures after tool execution are handled correctly.
 
-    async def test_charge_failure_logs_audit_event(
+    With cost_per_call=0 on all tiers, the middleware does not attempt charges.
+    These tests verify the no-charge behavior under the subscription-based model.
+    """
+
+    async def test_no_charge_attempted_when_cost_per_call_zero(
         self, middleware: PaywallMiddleware, key_manager: KeyManager,
         tracker, paywall_storage,
     ):
-        """When wallet charge fails post-execution, an audit record should
-        be written with reason 'charge_failed', not silently swallowed."""
+        """When cost_per_call=0, no charge or charge_failed audit should be recorded."""
         await key_manager.create_key(agent_id="agent-1", tier="pro")
-        # Create wallet with just enough to pass the balance check but
-        # then drain it before the charge can happen
         await tracker.wallet.create("agent-1", initial_balance=5.0)
-
-        call_count = 0
 
         @middleware.gated(tier="free", cost=5)
         async def paid_tool(agent_id: str):
-            nonlocal call_count
-            call_count += 1
-            # Drain the wallet during execution so the post-call charge fails
-            if call_count == 1:
-                await tracker.wallet.withdraw("agent-1", 5.0, "drain")
             return {"ok": True}
 
-        # The tool should still return successfully (charge is post-execution)
         result = await paid_tool(agent_id="agent-1")
         assert result == {"ok": True}
 
-        # But the charge failure should be recorded in audit log
+        # No charge_failed audit since no charge was attempted
         logs = await paywall_storage.get_audit_log("agent-1")
-        # Should have: 1 success audit + 1 charge_failed audit
         charge_failed_logs = [l for l in logs if l.get("reason") and "charge_failed" in l["reason"]]
-        assert len(charge_failed_logs) >= 1
+        assert len(charge_failed_logs) == 0
 
-    async def test_charge_failure_does_not_block_response(
+    async def test_tool_succeeds_without_charge(
         self, middleware: PaywallMiddleware, key_manager: KeyManager,
         tracker, paywall_storage,
     ):
-        """Tool result is returned even when charge fails."""
+        """Tool result is returned and wallet is not charged when cost_per_call=0."""
         await key_manager.create_key(agent_id="agent-1", tier="pro")
-        # Balance passes the pre-check (10 >= 5) but is drained during execution
         await tracker.wallet.create("agent-1", initial_balance=10.0)
 
         @middleware.gated(tier="free", cost=5)
         async def paid_tool(agent_id: str):
-            # Drain wallet during execution so the post-call charge fails
-            await tracker.wallet.withdraw("agent-1", 10.0, "drain")
             return {"data": [1, 2, 3]}
 
         result = await paid_tool(agent_id="agent-1")
         assert result == {"data": [1, 2, 3]}
+
+        # Balance unchanged since cost_per_call=0
+        balance = await tracker.get_balance("agent-1")
+        assert balance == 10.0

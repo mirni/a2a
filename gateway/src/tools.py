@@ -340,6 +340,99 @@ async def _process_due_subscriptions(
 
 
 # ---------------------------------------------------------------------------
+# Identity tools
+# ---------------------------------------------------------------------------
+
+
+async def _register_agent(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    identity = await ctx.identity_api.register_agent(
+        agent_id=params["agent_id"],
+        public_key=params.get("public_key"),
+    )
+    return {
+        "agent_id": identity.agent_id,
+        "public_key": identity.public_key,
+        "created_at": identity.created_at,
+    }
+
+
+async def _verify_agent(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    message = params["message"].encode() if isinstance(params["message"], str) else params["message"]
+    valid = await ctx.identity_api.verify_agent(
+        agent_id=params["agent_id"],
+        message=message,
+        signature_hex=params["signature"],
+    )
+    return {"valid": valid}
+
+
+async def _submit_metrics(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    attestation = await ctx.identity_api.submit_metrics(
+        agent_id=params["agent_id"],
+        metrics=params["metrics"],
+        data_source=params.get("data_source", "self_reported"),
+    )
+    return {
+        "agent_id": attestation.agent_id,
+        "commitment_hashes": attestation.commitment_hashes,
+        "verified_at": attestation.verified_at,
+        "valid_until": attestation.valid_until,
+        "data_source": attestation.data_source,
+        "signature": attestation.signature,
+    }
+
+
+async def _get_agent_identity(
+    ctx: AppContext, params: dict[str, Any]
+) -> dict[str, Any]:
+    identity = await ctx.identity_api.get_identity(params["agent_id"])
+    if identity is None:
+        return {"agent_id": params["agent_id"], "found": False}
+    return {
+        "agent_id": identity.agent_id,
+        "public_key": identity.public_key,
+        "created_at": identity.created_at,
+        "org_id": identity.org_id,
+        "found": True,
+    }
+
+
+async def _get_verified_claims(
+    ctx: AppContext, params: dict[str, Any]
+) -> dict[str, Any]:
+    claims = await ctx.identity_api.get_verified_claims(params["agent_id"])
+    return {
+        "claims": [
+            {
+                "agent_id": c.agent_id,
+                "metric_name": c.metric_name,
+                "claim_type": c.claim_type,
+                "bound_value": c.bound_value,
+                "valid_until": c.valid_until,
+            }
+            for c in claims
+        ]
+    }
+
+
+async def _get_agent_reputation(
+    ctx: AppContext, params: dict[str, Any]
+) -> dict[str, Any]:
+    reputation = await ctx.identity_api.get_reputation(params["agent_id"])
+    if reputation is None:
+        return {"agent_id": params["agent_id"], "found": False}
+    return {
+        "agent_id": reputation.agent_id,
+        "payment_reliability": reputation.payment_reliability,
+        "dispute_rate": reputation.dispute_rate,
+        "transaction_volume_score": reputation.transaction_volume_score,
+        "composite_score": reputation.composite_score,
+        "confidence": reputation.confidence,
+        "found": True,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 
@@ -374,4 +467,11 @@ TOOL_REGISTRY: dict[str, ToolFunc] = {
     "delete_webhook": _delete_webhook,
     # Scheduler
     "process_due_subscriptions": _process_due_subscriptions,
+    # Identity
+    "register_agent": _register_agent,
+    "verify_agent": _verify_agent,
+    "submit_metrics": _submit_metrics,
+    "get_agent_identity": _get_agent_identity,
+    "get_verified_claims": _get_verified_claims,
+    "get_agent_reputation": _get_agent_reputation,
 }

@@ -90,7 +90,7 @@
         "amount": {"type": "number"}
       }
     },
-    "pricing": {"per_call": 0.5},
+    "pricing": {"model": "percentage", "percentage": 2.0, "min_fee": 0.01, "max_fee": 5.0},
     "sla": {"max_latency_ms": 500},
     "tier_required": "free"
   },
@@ -113,7 +113,7 @@
         "amount": {"type": "number"}
       }
     },
-    "pricing": {"per_call": 0.5},
+    "pricing": {"per_call": 0.0},
     "sla": {"max_latency_ms": 500},
     "tier_required": "free"
   },
@@ -140,7 +140,7 @@
         "amount": {"type": "number"}
       }
     },
-    "pricing": {"per_call": 1.0},
+    "pricing": {"model": "percentage", "percentage": 1.5, "min_fee": 0.01, "max_fee": 10.0},
     "sla": {"max_latency_ms": 500},
     "tier_required": "pro"
   },
@@ -163,7 +163,7 @@
         "amount": {"type": "number"}
       }
     },
-    "pricing": {"per_call": 0.5},
+    "pricing": {"per_call": 0.0},
     "sla": {"max_latency_ms": 500},
     "tier_required": "pro"
   },
@@ -558,5 +558,165 @@
     "pricing": {"per_call": 0.0},
     "sla": {"max_latency_ms": 5000},
     "tier_required": "pro"
+  },
+  {
+    "name": "register_agent",
+    "service": "identity",
+    "description": "Register a cryptographic identity for an agent. Generates Ed25519 keypair.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string", "description": "Unique agent identifier"},
+        "public_key": {"type": "string", "description": "Optional Ed25519 public key hex. Auto-generated if omitted."}
+      },
+      "required": ["agent_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string"},
+        "public_key": {"type": "string"},
+        "created_at": {"type": "number"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 300},
+    "tier_required": "free"
+  },
+  {
+    "name": "verify_agent",
+    "service": "identity",
+    "description": "Verify that a message was signed by the claimed agent.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string", "description": "The agent who claims to have signed"},
+        "message": {"type": "string", "description": "The original message (string)"},
+        "signature": {"type": "string", "description": "Ed25519 signature hex"}
+      },
+      "required": ["agent_id", "message", "signature"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "valid": {"type": "boolean"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 200},
+    "tier_required": "free"
+  },
+  {
+    "name": "submit_metrics",
+    "service": "identity",
+    "description": "Submit trading bot metrics (Sharpe, drawdown, latency, etc.) for platform attestation.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string", "description": "The agent submitting metrics"},
+        "metrics": {"type": "object", "description": "Dict of metric_name -> value (e.g. {\"sharpe_30d\": 2.35})"},
+        "data_source": {"type": "string", "description": "One of: self_reported, exchange_api, platform_verified", "default": "self_reported"}
+      },
+      "required": ["agent_id", "metrics"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string"},
+        "commitment_hashes": {"type": "array", "items": {"type": "string"}},
+        "verified_at": {"type": "number"},
+        "valid_until": {"type": "number"},
+        "data_source": {"type": "string"},
+        "signature": {"type": "string"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 500},
+    "tier_required": "pro"
+  },
+  {
+    "name": "get_agent_identity",
+    "service": "identity",
+    "description": "Get the cryptographic identity and public key for an agent.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string", "description": "The agent identifier"}
+      },
+      "required": ["agent_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string"},
+        "public_key": {"type": "string"},
+        "created_at": {"type": "number"},
+        "org_id": {"type": "string"},
+        "found": {"type": "boolean"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 200},
+    "tier_required": "free"
+  },
+  {
+    "name": "get_verified_claims",
+    "service": "identity",
+    "description": "Get all verified metric claims for an agent (e.g., Sharpe >= 2.0).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string", "description": "The agent identifier"}
+      },
+      "required": ["agent_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "claims": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "agent_id": {"type": "string"},
+              "metric_name": {"type": "string"},
+              "claim_type": {"type": "string"},
+              "bound_value": {"type": "number"},
+              "valid_until": {"type": "number"}
+            }
+          }
+        }
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 200},
+    "tier_required": "free"
+  },
+  {
+    "name": "get_agent_reputation",
+    "service": "identity",
+    "description": "Get the consumer-side reputation score for an agent.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string", "description": "The agent identifier"}
+      },
+      "required": ["agent_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string"},
+        "payment_reliability": {"type": "number"},
+        "dispute_rate": {"type": "number"},
+        "transaction_volume_score": {"type": "number"},
+        "composite_score": {"type": "number"},
+        "confidence": {"type": "number"},
+        "found": {"type": "boolean"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 200},
+    "tier_required": "free"
   }
 ]

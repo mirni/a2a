@@ -16,6 +16,25 @@ from gateway.src.middleware import Metrics
 from gateway.src.tools import TOOL_REGISTRY
 
 
+def calculate_tool_cost(pricing: dict[str, Any], params: dict[str, Any]) -> float:
+    """Calculate the cost of a tool call based on the pricing model.
+
+    Supports two pricing models:
+    - "percentage": fee = clamp(amount * percentage / 100, min_fee, max_fee)
+    - flat (default): fee = pricing["per_call"]
+    """
+    model = pricing.get("model")
+    if model == "percentage":
+        amount = float(params.get("amount", 0))
+        pct = float(pricing.get("percentage", 0))
+        min_fee = float(pricing.get("min_fee", 0))
+        max_fee = float(pricing.get("max_fee", float("inf")))
+        raw_fee = amount * pct / 100.0
+        return max(min_fee, min(max_fee, raw_fee))
+    # Flat per-call pricing (default)
+    return float(pricing.get("per_call", 0.0))
+
+
 async def execute(request: Request) -> JSONResponse:
     """Execute a tool with authentication, tier checks, rate limiting, and billing."""
     _start_time = time.time()
@@ -110,14 +129,15 @@ async def execute(request: Request) -> JSONResponse:
         pass  # If rate counting fails, allow the request
 
     # --- 5. Check balance if tool costs credits ---
-    per_call = tool_def.get("pricing", {}).get("per_call", 0.0)
-    if per_call > 0:
+    tool_pricing = tool_def.get("pricing", {})
+    cost = calculate_tool_cost(tool_pricing, params)
+    if cost > 0:
         try:
             balance = await ctx.tracker.get_balance(agent_id)
-            if balance < per_call:
+            if balance < cost:
                 return await error_response(
                     402,
-                    f"Insufficient balance: {balance} < {per_call} credits required",
+                    f"Insufficient balance: {balance} < {cost} credits required",
                     "insufficient_balance",
                 )
         except Exception as exc:
@@ -137,10 +157,10 @@ async def execute(request: Request) -> JSONResponse:
         await ctx.tracker.storage.record_usage(
             agent_id=agent_id,
             function=tool_name,
-            cost=per_call,
+            cost=cost,
         )
-        if per_call > 0:
-            await ctx.tracker.wallet.charge(agent_id, per_call, description=f"gateway:{tool_name}")
+        if cost > 0:
+            await ctx.tracker.wallet.charge(agent_id, cost, description=f"gateway:{tool_name}")
         # Record rate event for sliding window tracking
         await ctx.paywall_storage.record_rate_event(agent_id, window_key, tool_name)
     except Exception:
@@ -163,11 +183,11 @@ async def execute(request: Request) -> JSONResponse:
         from gateway.src.signing import sign_response
         import json as _json
 
-        body_bytes = _json.dumps({"success": True, "result": result, "charged": per_call}).encode()
+        body_bytes = _json.dumps({"success": True, "result": result, "charged": cost}).encode()
         headers.update(sign_response(signing_manager, body_bytes))
 
     return JSONResponse(
-        {"success": True, "result": result, "charged": per_call},
+        {"success": True, "result": result, "charged": cost},
         headers=headers,
     )
 

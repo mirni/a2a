@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "a2a-identity"
+version = "0.1.0"
+description = "Agent Identity system with Ed25519 keys and metric commitments"
+requires-python = ">=3.12"
+dependencies = [
+    "aiosqlite>=0.20",
+    "pydantic>=2.0",
+    "cryptography>=42.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

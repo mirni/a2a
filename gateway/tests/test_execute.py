@@ -149,7 +149,8 @@ async def test_execute_pro_tier_access(client, pro_api_key, app):
     data = resp.json()
     assert data["success"] is True
     assert data["result"]["status"] == "held"
-    assert data["charged"] == 1.0
+    # 1.5% of amount=10 → max(0.01, min(10.0, 0.15)) = 0.15
+    assert data["charged"] == 0.15
 
 
 @pytest.mark.asyncio
