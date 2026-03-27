@@ -3,10 +3,24 @@
 # A2A Commerce Platform — Automated Deployment Script
 # Target: Ubuntu 24.04 LTS (clean machine)
 #
-# Usage:
+# Usage (manual):
 #   chmod +x deploy.sh
 #   sudo ./deploy.sh                                  # without Tailscale
 #   sudo TAILSCALE_AUTHKEY=tskey-auth-... ./deploy.sh  # with Tailscale SSH
+#
+# Usage (Hetzner cloud-init):
+#   Paste this script into the "Cloud config" field when creating a server,
+#   or pass via API:
+#     hcloud server create --name a2a --type cx22 --image ubuntu-24.04 \
+#       --user-data-from-file deploy.sh
+#   Pass secrets via a wrapper (see below) — do NOT embed them in user-data.
+#
+# Cloud-init notes:
+#   - Runs as root on first boot only (Stage 5 / final)
+#   - Logs: /var/log/cloud-init-output.log + /var/log/a2a-deploy.log
+#   - Completion signal: /var/log/a2a-deploy-done (touch on success)
+#   - Hetzner marks server "running" BEFORE this finishes
+#   - To wait: ssh root@IP "cloud-init status --wait"
 #
 # What this does:
 #   1. Installs system deps (Python 3.12, pip, git, nginx, certbot, sqlite3)
@@ -27,6 +41,44 @@
 # =============================================================================
 
 set -euo pipefail
+
+# ---------------------------------------------------------------------------
+# Cloud-init compatibility: logging, environment, apt lock handling
+# ---------------------------------------------------------------------------
+
+# Log everything to file (cloud-init also captures stdout, but this persists)
+exec > >(tee -a /var/log/a2a-deploy.log) 2>&1
+echo "=== deploy.sh started at $(date -u) ==="
+
+# Ensure a sane environment (cloud-init runs with minimal env)
+export HOME="${HOME:-/root}"
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+
+# Trap: log failures with line number
+trap 'echo "FAILED at line $LINENO (exit code $?)" | tee -a /var/log/a2a-deploy.log' ERR
+
+# Wait for any apt/dpkg locks (cloud-init or unattended-upgrades may hold them)
+_wait_for_apt() {
+    local tries=0
+    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || \
+          fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
+        if (( tries++ > 60 )); then
+            echo "ERROR: apt lock held for >5 minutes, aborting"
+            return 1
+        fi
+        echo "Waiting for apt lock (attempt $tries)..."
+        sleep 5
+    done
+}
+
+# Safe apt wrapper: waits for locks, forces non-interactive config
+_apt_get() {
+    _wait_for_apt
+    apt-get -o DPkg::Lock::Timeout=60 \
+            -o Dpkg::Options::="--force-confdef" \
+            -o Dpkg::Options::="--force-confold" \
+            "$@"
+}
 
 # ---------------------------------------------------------------------------
 # Configuration — change these before running
@@ -67,11 +119,11 @@ log "Starting A2A Commerce Platform deployment on $(lsb_release -ds 2>/dev/null 
 
 log "Updating system packages..."
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq
-apt-get upgrade -y -qq
+_apt_get update -qq
+_apt_get upgrade -y -qq
 
 log "Installing Python 3.12, nginx, certbot, sqlite3, ufw..."
-apt-get install -y -qq \
+_apt_get install -y -qq \
     python3.12 python3.12-venv python3.12-dev python3-pip \
     nginx certbot python3-certbot-nginx \
     sqlite3 git curl ufw
@@ -309,6 +361,17 @@ nginx -t && systemctl reload nginx
 
 TAILSCALE_AUTHKEY="${TAILSCALE_AUTHKEY:-}"
 
+# Security: if running via cloud-init, TAILSCALE_AUTHKEY should be passed as
+# an env var from a wrapper script, NOT embedded in user-data (which is readable
+# from the VM metadata endpoint by any process). Example wrapper:
+#
+#   #!/bin/bash
+#   export TAILSCALE_AUTHKEY="tskey-auth-..."
+#   export A2A_DOMAIN="api.greenhelix.net"
+#   curl -fsSL https://raw.githubusercontent.com/you/repo/main/deploy.sh | bash
+#
+# Or set it via Hetzner's metadata labels + a small bootstrap script.
+
 if [[ -n "$TAILSCALE_AUTHKEY" ]]; then
     log "Installing Tailscale..."
     curl -fsSL https://tailscale.com/install.sh | sh
@@ -378,7 +441,7 @@ if [[ -n "$TAILSCALE_AUTHKEY" ]]; then
     sed -i 's/^#\?PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
 
     # Install fail2ban for the fallback port
-    apt-get install -y -qq fail2ban
+    _apt_get install -y -qq fail2ban
     cat > /etc/fail2ban/jail.d/sshd-fallback.conf << 'F2BEOF'
 [sshd]
 enabled = true
@@ -456,8 +519,11 @@ CRONEOF
 chmod +x /etc/cron.daily/a2a-backup
 
 # ---------------------------------------------------------------------------
-# Done
+# Done — signal completion (for cloud-init monitoring)
 # ---------------------------------------------------------------------------
+
+echo "=== deploy.sh finished at $(date -u) ==="
+touch /var/log/a2a-deploy-done
 
 echo ""
 echo "============================================================================="

@@ -940,3 +940,44 @@ sudo TAILSCALE_AUTHKEY=tskey-auth-xxx A2A_DOMAIN=api.greenhelix.net ./deploy.sh
 - Port 80/443: public (nginx → gateway)
 - Port 41641/udp: WireGuard direct connections
 - All SSH traffic: WireGuard-encrypted, identity via SSO/OAuth
+
+### Prompt (Session 4, continued)
+
+> Is the deploy.sh compatible with cloud-init? I am setting up a Hetzner server and have an option to use cloud-init
+
+### Response — Cloud-Init Compatibility Fixes
+
+**deploy.sh was almost compatible but had 5 issues. All fixed.**
+
+| Issue | Fix |
+|-------|-----|
+| **apt lock conflicts** — cloud-init/unattended-upgrades holds dpkg lock | Added `_wait_for_apt()` helper + `DPkg::Lock::Timeout=60` on all apt calls |
+| **Interactive dpkg prompts** — grub/kernel upgrades hang with no stdin | Added `--force-confdef --force-confold` to all apt operations |
+| **No logging** — hard to debug failed cloud-init runs | Added `exec > >(tee -a /var/log/a2a-deploy.log) 2>&1` + ERR trap with line numbers |
+| **No completion signal** — Hetzner marks server "running" before script finishes | Added `touch /var/log/a2a-deploy-done` on success |
+| **Secrets in user-data** — TAILSCALE_AUTHKEY readable from metadata endpoint | Added security comment with wrapper pattern; recommended NOT embedding secrets in user-data |
+
+**File size: 22KB (under 32KB cloud-init limit)**
+
+**Cloud-init usage:**
+```bash
+# Direct (paste into Hetzner "Cloud config" field):
+hcloud server create --name a2a --type cx22 --image ubuntu-24.04 \
+  --user-data-from-file deploy.sh
+
+# Wait for completion:
+ssh root@IP "cloud-init status --wait"
+# or: ssh root@IP "test -f /var/log/a2a-deploy-done"
+
+# Check logs:
+ssh root@IP "cat /var/log/a2a-deploy.log"
+```
+
+**Recommended pattern for secrets (don't embed in user-data):**
+```bash
+# bootstrap.sh (this is what you paste into cloud-init):
+#!/bin/bash
+export TAILSCALE_AUTHKEY="tskey-auth-..."
+export A2A_DOMAIN="api.greenhelix.net"
+curl -fsSL https://raw.githubusercontent.com/you/repo/main/deploy.sh | bash
+```
