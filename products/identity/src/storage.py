@@ -52,7 +52,11 @@ CREATE TABLE IF NOT EXISTS attestations (
     verified_at       REAL NOT NULL,
     valid_until       REAL NOT NULL,
     data_source       TEXT NOT NULL,
-    signature         TEXT NOT NULL
+    signature         TEXT NOT NULL,
+    version           TEXT NOT NULL DEFAULT '1.0',
+    algorithm         TEXT NOT NULL DEFAULT 'ed25519-sha3-256',
+    revoked_at        REAL,
+    revocation_reason TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_attestation_agent ON attestations(agent_id);
@@ -70,13 +74,14 @@ CREATE TABLE IF NOT EXISTS verified_claims (
 
 CREATE INDEX IF NOT EXISTS idx_claim_agent ON verified_claims(agent_id);
 CREATE INDEX IF NOT EXISTS idx_claim_valid ON verified_claims(valid_until);
+CREATE INDEX IF NOT EXISTS idx_claim_metric ON verified_claims(metric_name);
 
 CREATE TABLE IF NOT EXISTS agent_reputation (
     id                       INTEGER PRIMARY KEY AUTOINCREMENT,
     agent_id                 TEXT NOT NULL,
     timestamp                REAL NOT NULL,
     payment_reliability      REAL NOT NULL DEFAULT 0.0,
-    dispute_rate             REAL NOT NULL DEFAULT 0.0,
+    data_source_quality      REAL NOT NULL DEFAULT 0.0,
     transaction_volume_score REAL NOT NULL DEFAULT 0.0,
     composite_score          REAL NOT NULL DEFAULT 0.0,
     confidence               REAL NOT NULL DEFAULT 0.0
@@ -97,6 +102,17 @@ CREATE TABLE IF NOT EXISTS claim_chains (
 );
 
 CREATE INDEX IF NOT EXISTS idx_chain_agent ON claim_chains(agent_id);
+
+CREATE TABLE IF NOT EXISTS commitment_secrets (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_id        TEXT NOT NULL,
+    metric_name     TEXT NOT NULL,
+    commitment_hash TEXT NOT NULL,
+    blinding_factor TEXT NOT NULL,
+    created_at      REAL NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_secret_agent_metric ON commitment_secrets(agent_id, metric_name);
 """
 
 
@@ -107,9 +123,38 @@ class IdentityStorage:
     dsn: str
     _db: aiosqlite.Connection | None = field(default=None, init=False, repr=False)
 
+    @staticmethod
+    def _parse_dsn(dsn: str) -> str:
+        """Parse a DSN string into a database path.
+
+        Supported formats:
+          - ':memory:'         -> in-memory SQLite
+          - 'sqlite:///path'   -> path after authority (e.g. sqlite:///tmp/x -> /tmp/x)
+          - 'sqlite://path'   -> path (e.g. sqlite://relative.db -> relative.db)
+          - '/path/to/db'     -> bare absolute path
+          - 'relative.db'     -> bare relative path
+
+        Raises:
+            ValueError: For unsupported schemes (e.g. postgres://).
+        """
+        if dsn == ":memory:":
+            return ":memory:"
+        if dsn.startswith("sqlite://"):
+            # Strip 'sqlite://' — remaining path may start with '/' for absolute
+            path = dsn[len("sqlite://"):]
+            # Remove empty authority: sqlite:///path -> /path (leading / preserved)
+            return path
+        if "://" in dsn:
+            scheme = dsn.split("://")[0]
+            raise ValueError(
+                f"Unsupported DSN scheme: '{scheme}'. "
+                "Only 'sqlite://' and bare paths are supported."
+            )
+        return dsn
+
     async def connect(self) -> None:
         """Open the database connection and ensure schema exists."""
-        db_path = self.dsn.replace("sqlite:///", "")
+        db_path = self._parse_dsn(self.dsn)
         self._db = await aiosqlite.connect(db_path)
         self._db.row_factory = aiosqlite.Row
         await self._db.executescript(_SCHEMA)
@@ -178,7 +223,8 @@ class IdentityStorage:
         return cursor.lastrowid  # type: ignore[return-value]
 
     async def get_commitments(
-        self, agent_id: str, since: float | None = None, limit: int = 100
+        self, agent_id: str, since: float | None = None,
+        limit: int = 100, offset: int = 0,
     ) -> list[MetricCommitment]:
         """Retrieve metric commitments for an agent."""
         query = "SELECT * FROM metric_commitments WHERE agent_id = ?"
@@ -186,8 +232,8 @@ class IdentityStorage:
         if since is not None:
             query += " AND timestamp >= ?"
             params.append(since)
-        query += " ORDER BY timestamp DESC LIMIT ?"
-        params.append(limit)
+        query += " ORDER BY timestamp DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
         cursor = await self.db.execute(query, params)
         rows = await cursor.fetchall()
         return [
@@ -210,7 +256,7 @@ class IdentityStorage:
         cursor = await self.db.execute(
             "INSERT INTO attestations "
             "(agent_id, auditor_id, commitment_hashes, verified_at, valid_until, "
-            "data_source, signature) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "data_source, signature, version, algorithm) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 attestation.agent_id,
                 attestation.auditor_id,
@@ -219,21 +265,25 @@ class IdentityStorage:
                 attestation.valid_until,
                 attestation.data_source,
                 attestation.signature,
+                attestation.version,
+                attestation.algorithm,
             ),
         )
         await self.db.commit()
         return cursor.lastrowid  # type: ignore[return-value]
 
     async def get_attestations(
-        self, agent_id: str, valid_only: bool = True
+        self, agent_id: str, valid_only: bool = True,
+        limit: int = 100, offset: int = 0,
     ) -> list[AuditorAttestation]:
-        """Retrieve attestations for an agent, optionally filtering expired ones."""
+        """Retrieve attestations for an agent, optionally filtering expired/revoked."""
         query = "SELECT * FROM attestations WHERE agent_id = ?"
         params: list[Any] = [agent_id]
         if valid_only:
-            query += " AND valid_until > ?"
+            query += " AND valid_until > ? AND revoked_at IS NULL"
             params.append(time.time())
-        query += " ORDER BY verified_at DESC"
+        query += " ORDER BY verified_at DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
         cursor = await self.db.execute(query, params)
         rows = await cursor.fetchall()
         return [
@@ -245,6 +295,8 @@ class IdentityStorage:
                 valid_until=r["valid_until"],
                 data_source=r["data_source"],
                 signature=r["signature"],
+                version=r["version"],
+                algorithm=r["algorithm"],
             )
             for r in rows
         ]
@@ -265,7 +317,32 @@ class IdentityStorage:
             valid_until=row["valid_until"],
             data_source=row["data_source"],
             signature=row["signature"],
+            version=row["version"],
+            algorithm=row["algorithm"],
         )
+
+    async def revoke_attestation(
+        self, attestation_id: int, reason: str = ""
+    ) -> bool:
+        """Revoke an attestation by setting revoked_at timestamp.
+
+        Returns True if attestation was found and revoked.
+        """
+        cursor = await self.db.execute(
+            "UPDATE attestations SET revoked_at = ?, revocation_reason = ? "
+            "WHERE id = ? AND revoked_at IS NULL",
+            (time.time(), reason, attestation_id),
+        )
+        await self.db.commit()
+        return cursor.rowcount > 0
+
+    async def get_attestation_id_by_signature(self, signature: str) -> int | None:
+        """Look up an attestation row ID by its signature."""
+        cursor = await self.db.execute(
+            "SELECT id FROM attestations WHERE signature = ?", (signature,)
+        )
+        row = await cursor.fetchone()
+        return row["id"] if row else None
 
     # -----------------------------------------------------------------------
     # Verified claims
@@ -292,13 +369,18 @@ class IdentityStorage:
     async def get_claims(
         self, agent_id: str, valid_only: bool = True
     ) -> list[VerifiedClaim]:
-        """Retrieve verified claims for an agent, optionally filtering expired."""
-        query = "SELECT * FROM verified_claims WHERE agent_id = ?"
+        """Retrieve verified claims for an agent, filtering expired and revoked."""
+        query = (
+            "SELECT vc.*, a.signature AS attestation_sig "
+            "FROM verified_claims vc "
+            "LEFT JOIN attestations a ON vc.attestation_id = a.id "
+            "WHERE vc.agent_id = ?"
+        )
         params: list[Any] = [agent_id]
         if valid_only:
-            query += " AND valid_until > ?"
+            query += " AND vc.valid_until > ? AND (a.revoked_at IS NULL OR a.id IS NULL)"
             params.append(time.time())
-        query += " ORDER BY valid_until DESC"
+        query += " ORDER BY vc.valid_until DESC"
         cursor = await self.db.execute(query, params)
         rows = await cursor.fetchall()
         return [
@@ -307,7 +389,7 @@ class IdentityStorage:
                 metric_name=r["metric_name"],
                 claim_type=r["claim_type"],
                 bound_value=r["bound_value"],
-                attestation_signature="",  # Not stored directly; linked via attestation_id
+                attestation_signature=r["attestation_sig"] or "",
                 valid_until=r["valid_until"],
             )
             for r in rows
@@ -320,6 +402,7 @@ class IdentityStorage:
         min_value: float | None = None,
         max_value: float | None = None,
         limit: int = 100,
+        offset: int = 0,
     ) -> list[VerifiedClaim]:
         """Search verified claims across all agents.
 
@@ -329,23 +412,29 @@ class IdentityStorage:
             min_value: Minimum bound_value (agents claiming >= this). Optional.
             max_value: Maximum bound_value (agents claiming <= this). Optional.
             limit: Max results.
+            offset: Number of results to skip.
 
         Returns:
             List of matching VerifiedClaim objects (only non-expired).
         """
-        query = "SELECT * FROM verified_claims WHERE metric_name = ? AND valid_until > ?"
+        query = (
+            "SELECT vc.*, a.signature AS attestation_sig "
+            "FROM verified_claims vc "
+            "LEFT JOIN attestations a ON vc.attestation_id = a.id "
+            "WHERE vc.metric_name = ? AND vc.valid_until > ?"
+        )
         params: list[Any] = [metric_name, time.time()]
         if claim_type is not None:
-            query += " AND claim_type = ?"
+            query += " AND vc.claim_type = ?"
             params.append(claim_type)
         if min_value is not None:
-            query += " AND bound_value >= ?"
+            query += " AND vc.bound_value >= ?"
             params.append(min_value)
         if max_value is not None:
-            query += " AND bound_value <= ?"
+            query += " AND vc.bound_value <= ?"
             params.append(max_value)
-        query += " ORDER BY bound_value DESC LIMIT ?"
-        params.append(limit)
+        query += " ORDER BY vc.bound_value DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
         cursor = await self.db.execute(query, params)
         rows = await cursor.fetchall()
         return [
@@ -354,7 +443,7 @@ class IdentityStorage:
                 metric_name=r["metric_name"],
                 claim_type=r["claim_type"],
                 bound_value=r["bound_value"],
-                attestation_signature="",
+                attestation_signature=r["attestation_sig"] or "",
                 valid_until=r["valid_until"],
             )
             for r in rows
@@ -368,14 +457,14 @@ class IdentityStorage:
         """Store a reputation record and return its row ID."""
         cursor = await self.db.execute(
             "INSERT INTO agent_reputation "
-            "(agent_id, timestamp, payment_reliability, dispute_rate, "
+            "(agent_id, timestamp, payment_reliability, data_source_quality, "
             "transaction_volume_score, composite_score, confidence) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (
                 reputation.agent_id,
                 reputation.timestamp,
                 reputation.payment_reliability,
-                reputation.dispute_rate,
+                reputation.data_source_quality,
                 reputation.transaction_volume_score,
                 reputation.composite_score,
                 reputation.confidence,
@@ -398,7 +487,7 @@ class IdentityStorage:
             agent_id=row["agent_id"],
             timestamp=row["timestamp"],
             payment_reliability=row["payment_reliability"],
-            dispute_rate=row["dispute_rate"],
+            data_source_quality=row["data_source_quality"],
             transaction_volume_score=row["transaction_volume_score"],
             composite_score=row["composite_score"],
             confidence=row["confidence"],
@@ -447,14 +536,74 @@ class IdentityStorage:
         await self.db.commit()
         return cursor.lastrowid  # type: ignore[return-value]
 
+    # -----------------------------------------------------------------------
+    # Commitment secrets
+    # -----------------------------------------------------------------------
+
+    async def store_commitment_secret(
+        self,
+        agent_id: str,
+        metric_name: str,
+        commitment_hash: str,
+        blinding_factor: str,
+    ) -> int:
+        """Store the blinding factor for a commitment.
+
+        Args:
+            agent_id: The agent who created the commitment.
+            metric_name: Which metric this commitment is for.
+            commitment_hash: The commitment hash.
+            blinding_factor: The hex-encoded blinding factor.
+
+        Returns:
+            Row ID of the stored secret.
+        """
+        import time as _time
+
+        cursor = await self.db.execute(
+            "INSERT INTO commitment_secrets "
+            "(agent_id, metric_name, commitment_hash, blinding_factor, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (agent_id, metric_name, commitment_hash, blinding_factor, _time.time()),
+        )
+        await self.db.commit()
+        return cursor.lastrowid  # type: ignore[return-value]
+
+    async def get_commitment_secrets(
+        self, agent_id: str, metric_name: str
+    ) -> list[dict]:
+        """Retrieve blinding factors for an agent's metric commitments.
+
+        Returns newest first.
+        """
+        cursor = await self.db.execute(
+            "SELECT * FROM commitment_secrets "
+            "WHERE agent_id = ? AND metric_name = ? "
+            "ORDER BY created_at DESC",
+            (agent_id, metric_name),
+        )
+        rows = await cursor.fetchall()
+        return [
+            {
+                "id": r["id"],
+                "agent_id": r["agent_id"],
+                "metric_name": r["metric_name"],
+                "commitment_hash": r["commitment_hash"],
+                "blinding_factor": r["blinding_factor"],
+                "created_at": r["created_at"],
+            }
+            for r in rows
+        ]
+
     async def get_claim_chains(
-        self, agent_id: str, limit: int = 10
+        self, agent_id: str, limit: int = 10, offset: int = 0,
     ) -> list[dict]:
         """Retrieve claim chains for an agent, newest first.
 
         Args:
             agent_id: The agent to query.
             limit: Maximum number of chains to return.
+            offset: Number of chains to skip.
 
         Returns:
             List of dicts with keys: id, agent_id, merkle_root, leaf_hashes,
@@ -462,8 +611,31 @@ class IdentityStorage:
         """
         cursor = await self.db.execute(
             "SELECT * FROM claim_chains WHERE agent_id = ? "
-            "ORDER BY created_at DESC LIMIT ?",
-            (agent_id, limit),
+            "ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (agent_id, limit, offset),
+        )
+        rows = await cursor.fetchall()
+        return [
+            {
+                "id": r["id"],
+                "agent_id": r["agent_id"],
+                "merkle_root": r["merkle_root"],
+                "leaf_hashes": r["leaf_hashes"],
+                "chain_length": r["chain_length"],
+                "period_start": r["period_start"],
+                "period_end": r["period_end"],
+                "created_at": r["created_at"],
+            }
+            for r in rows
+        ]
+
+    async def get_claim_chains_by_id(self, chain_id: int) -> list[dict]:
+        """Retrieve a single claim chain by its row ID.
+
+        Returns a list with 0 or 1 elements (for API consistency).
+        """
+        cursor = await self.db.execute(
+            "SELECT * FROM claim_chains WHERE id = ?", (chain_id,)
         )
         rows = await cursor.fetchall()
         return [

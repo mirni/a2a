@@ -656,3 +656,8 @@ However, there are **3 critical/high correctness bugs** that make the commitment
 These must be fixed before the identity system can be used for any trust-critical workflow. The remaining technical debt is manageable and the extension points (DID, VC, ZK proofs, multi-auditor) are well-positioned by the current abstractions.
 
 **Overall assessment**: Strong MVP skeleton, correct crypto primitives, but the **protocol-level plumbing** that connects the primitives into a usable trust workflow is incomplete. Fix P0 items first, then P1 for data integrity, before pursuing any extensions.
+
+
+## Prompt
+* Store the above diagram in a format that's easily machine-updateable and that can be converted into a pretty printed diagram easily (grahviz/dot? whatever lightweight tool is available).
+* Implement all todos in the list, in order (follow TDD principles)

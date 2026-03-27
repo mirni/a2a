@@ -1,0 +1,121 @@
+// Agent Identity System — Architecture Diagram
+// Render: dot -Tpng docs/identity_architecture.dot -o docs/identity_architecture.png
+//         dot -Tsvg docs/identity_architecture.dot -o docs/identity_architecture.svg
+//
+// Machine-updateable: add nodes/edges as modules evolve.
+
+digraph identity_architecture {
+    rankdir=LR;
+    fontname="Helvetica";
+    node [fontname="Helvetica", fontsize=11, shape=box, style="rounded,filled", fillcolor="#f0f4ff"];
+    edge [fontname="Helvetica", fontsize=9];
+
+    // --- Layers ---
+    subgraph cluster_gateway {
+        label="Gateway Layer";
+        style="dashed";
+        color="#888";
+        fontsize=12;
+
+        tools [label="gateway/src/tools.py\n(49 registered tools)", fillcolor="#dce8ff"];
+        catalog [label="gateway/src/catalog.json\n(tool definitions)", fillcolor="#dce8ff"];
+    }
+
+    subgraph cluster_api {
+        label="Identity API Layer";
+        style="dashed";
+        color="#888";
+        fontsize=12;
+
+        identity_api [label="IdentityAPI\n(api.py)\n─────────────\nregister_agent()\nverify_agent()\nsubmit_metrics()\nget_verified_claims()\nsearch_agents_by_metrics()\ncompute_reputation()\nbuild_claim_chain()\nreveal_commitment()", fillcolor="#d4edda"];
+    }
+
+    subgraph cluster_crypto {
+        label="Crypto Layer (stateless)";
+        style="dashed";
+        color="#888";
+        fontsize=12;
+
+        agent_crypto [label="AgentCrypto\n(crypto.py)\n─────────────\nEd25519 keygen/sign/verify\nSHA3-256 commitments\nAttestation sign/verify", fillcolor="#fff3cd"];
+        merkle [label="MerkleTree\n(crypto.py)\n─────────────\ncompute_root()\ncompute_proof()\nverify_proof()", fillcolor="#fff3cd"];
+    }
+
+    subgraph cluster_storage {
+        label="Storage Layer (async SQLite)";
+        style="dashed";
+        color="#888";
+        fontsize=12;
+
+        storage [label="IdentityStorage\n(storage.py)", fillcolor="#f8d7da"];
+
+        subgraph cluster_tables {
+            label="Tables";
+            style="solid";
+            color="#ccc";
+            node [shape=folder, fillcolor="#fefefe"];
+
+            t_identities [label="agent_identities\nPK: agent_id"];
+            t_commitments [label="metric_commitments\nFK: agent_id"];
+            t_secrets [label="commitment_secrets\nFK: commitment_id"];
+            t_attestations [label="attestations\nFK: agent_id"];
+            t_claims [label="verified_claims\nFK: attestation_id"];
+            t_reputation [label="agent_reputation\nFK: agent_id"];
+            t_chains [label="claim_chains\nFK: agent_id"];
+        }
+    }
+
+    subgraph cluster_models {
+        label="Domain Models (Pydantic)";
+        style="dashed";
+        color="#888";
+        fontsize=12;
+
+        node [shape=note, fillcolor="#e8e0f0"];
+        m_identity [label="AgentIdentity"];
+        m_commitment [label="MetricCommitment"];
+        m_attestation [label="AuditorAttestation"];
+        m_claim [label="VerifiedClaim"];
+        m_reputation [label="AgentReputation"];
+    }
+
+    // --- Edges ---
+    tools -> identity_api [label="calls"];
+    catalog -> tools [label="defines", style=dashed];
+
+    identity_api -> agent_crypto [label="keygen, sign,\ncommit, verify"];
+    identity_api -> merkle [label="build chains,\nproofs"];
+    identity_api -> storage [label="CRUD"];
+
+    storage -> t_identities;
+    storage -> t_commitments;
+    storage -> t_secrets;
+    storage -> t_attestations;
+    storage -> t_claims;
+    storage -> t_reputation;
+    storage -> t_chains;
+
+    // Model usage (light edges)
+    identity_api -> m_identity [style=dotted, color="#aaa"];
+    identity_api -> m_commitment [style=dotted, color="#aaa"];
+    identity_api -> m_attestation [style=dotted, color="#aaa"];
+    identity_api -> m_claim [style=dotted, color="#aaa"];
+    identity_api -> m_reputation [style=dotted, color="#aaa"];
+
+    // --- Data Flow annotations ---
+    subgraph cluster_flows {
+        label="Key Data Flows";
+        style="invis";
+        node [shape=plaintext, fillcolor="white"];
+
+        flow [label=<
+            <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2">
+            <TR><TD ALIGN="LEFT"><B>register_agent</B> → store_identity (public_key only)</TD></TR>
+            <TR><TD ALIGN="LEFT"><B>submit_metrics</B> → create_commitment → store_commitment + store_secret</TD></TR>
+            <TR><TD ALIGN="LEFT">                → sign_attestation → store_attestation</TD></TR>
+            <TR><TD ALIGN="LEFT">                → create_claim → store_claim</TD></TR>
+            <TR><TD ALIGN="LEFT"><B>reveal_commitment</B> → verify_commitment → publish revealed value</TD></TR>
+            <TR><TD ALIGN="LEFT"><B>build_chain</B> → get_attestations → MerkleTree.compute_root → store_chain</TD></TR>
+            </TABLE>
+        >];
+    }
+}

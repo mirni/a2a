@@ -44,6 +44,7 @@ async def handle_product_exception(request: Request, exc: Exception) -> JSONResp
         "InvalidStateError": (409, "invalid_state"),
         "DuplicateIntentError": (409, "duplicate_intent"),
         "DuplicateServiceError": (409, "duplicate_service"),
+        "AgentAlreadyExistsError": (409, "agent_already_exists"),
         # Validation
         "ValidationError": (400, "validation_error"),
         "InvalidMetricError": (400, "invalid_metric"),

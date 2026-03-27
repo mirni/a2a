@@ -633,7 +633,7 @@ async def _get_agent_reputation(
     return {
         "agent_id": reputation.agent_id,
         "payment_reliability": reputation.payment_reliability,
-        "dispute_rate": reputation.dispute_rate,
+        "data_source_quality": reputation.data_source_quality,
         "transaction_volume_score": reputation.transaction_volume_score,
         "composite_score": reputation.composite_score,
         "confidence": reputation.confidence,

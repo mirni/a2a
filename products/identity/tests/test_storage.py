@@ -187,7 +187,7 @@ class TestReputationStorage:
             agent_id="bot-1",
             timestamp=now,
             payment_reliability=80.0,
-            dispute_rate=10.0,
+            data_source_quality=10.0,
             transaction_volume_score=50.0,
             composite_score=55.0,
             confidence=0.8,
