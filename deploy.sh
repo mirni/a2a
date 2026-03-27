@@ -5,15 +5,20 @@
 #
 # Usage (manual):
 #   chmod +x deploy.sh
-#   sudo ./deploy.sh                                  # without Tailscale
-#   sudo TAILSCALE_AUTHKEY=tskey-auth-... ./deploy.sh  # with Tailscale SSH
+#   sudo ./deploy.sh                                    # public repo, no Tailscale
+#   sudo GITHUB_PAT=ghp_... ./deploy.sh                 # private repo
+#   sudo GITHUB_PAT=ghp_... TAILSCALE_AUTHKEY=tskey-auth-... ./deploy.sh
 #
-# Usage (Hetzner cloud-init):
-#   Paste this script into the "Cloud config" field when creating a server,
-#   or pass via API:
-#     hcloud server create --name a2a --type cx22 --image ubuntu-24.04 \
-#       --user-data-from-file deploy.sh
-#   Pass secrets via a wrapper (see below) — do NOT embed them in user-data.
+# Usage (Hetzner cloud-init — use a bootstrap script, NOT raw secrets):
+#   hcloud server create --name a2a --type cx22 --image ubuntu-24.04 \
+#     --user-data-from-file bootstrap.sh
+#
+#   Where bootstrap.sh is:
+#     #!/bin/bash
+#     export GITHUB_PAT="ghp_..."
+#     export TAILSCALE_AUTHKEY="tskey-auth-..."
+#     export A2A_DOMAIN="api.greenhelix.net"
+#     curl -fsSL "https://x-access-token:${GITHUB_PAT}@raw.githubusercontent.com/mirni/a2a/main/deploy.sh" | bash
 #
 # Cloud-init notes:
 #   - Runs as root on first boot only (Stage 5 / final)
@@ -85,8 +90,16 @@ _apt_get() {
 # ---------------------------------------------------------------------------
 
 DOMAIN="${A2A_DOMAIN:-a2a.example.com}"
-REPO_URL="${A2A_REPO_URL:-https://github.com/YOUR_ORG/a2a-commerce.git}"
 BRANCH="${A2A_BRANCH:-main}"
+GITHUB_PAT="${GITHUB_PAT:-}"
+
+# Build repo URL — if GITHUB_PAT is set, embed it for private repo access.
+# The PAT is used once for git clone/pull and NOT persisted on disk.
+if [[ -n "$GITHUB_PAT" ]]; then
+    REPO_URL="${A2A_REPO_URL:-https://x-access-token:${GITHUB_PAT}@github.com/mirni/a2a.git}"
+else
+    REPO_URL="${A2A_REPO_URL:-https://github.com/mirni/a2a.git}"
+fi
 INSTALL_DIR="/opt/a2a"
 DATA_DIR="/var/lib/a2a"
 A2A_USER="a2a"
@@ -155,6 +168,13 @@ if [[ -d "$INSTALL_DIR/.git" ]]; then
 else
     log "Cloning repository..."
     git clone --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
+fi
+
+# Strip PAT from stored remote URL so it's not persisted in .git/config
+if [[ -n "$GITHUB_PAT" && -d "$INSTALL_DIR/.git" ]]; then
+    CLEAN_URL=$(cd "$INSTALL_DIR" && git remote get-url origin | sed 's|//x-access-token:[^@]*@|//|')
+    cd "$INSTALL_DIR" && git remote set-url origin "$CLEAN_URL"
+    log "Stripped PAT from git remote (not persisted on disk)."
 fi
 
 cd "$INSTALL_DIR"
