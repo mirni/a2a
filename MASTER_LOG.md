@@ -796,3 +796,101 @@ To enable CI on your GitHub repo:
 | **TOTAL** | **1,116** | **ALL PASS** |
 
 **Commit**: `0ca87f9` — "feat: add Docker deployment, GitHub Actions CI, fix deploy.sh issues"
+
+---
+
+## Session 4 — 2026-03-27: SQLite Database Security — Backup, Restore, Hardening
+
+### Prompt
+
+> Implement the following plan: SQLite Database Security — Backup, Restore, Hardening
+
+Context: 11 SQLite databases across the platform. Only 2/11 use WAL mode, only 1 has integrity hashing, no programmatic backup/restore API (only a cron job in deploy.sh), no encryption at rest. TDD approach.
+
+### Response
+
+**31 new tests, 1,136 total across 10 modules. All passing.**
+
+#### 1. New Shared Module: `db_security.py`
+
+Created `products/shared/src/db_security.py` with 5 async utility functions:
+
+| Function | Purpose |
+|----------|---------|
+| `harden_connection(db)` | Applies WAL, foreign_keys, secure_delete, auto_vacuum PRAGMAs |
+| `backup_database(src, dest)` | Hot backup via SQLite `backup()` API, returns metadata |
+| `restore_database(backup, target)` | Reverse backup, applies hardening after restore |
+| `integrity_check(db_path)` | PRAGMA integrity_check + page_count + freelist_count |
+| `encrypt_backup(src, dest, key?)` | Fernet symmetric encryption, auto-generates key |
+| `decrypt_backup(src, dest, key)` | Fernet decryption |
+
+- `auto_vacuum=INCREMENTAL` applied conditionally (only on empty DBs, requires VACUUM)
+- `integrity_check` handles severely corrupted DBs (catches `sqlite3.DatabaseError`)
+- `cryptography>=42.0` added to shared module dependencies
+
+#### 2. Hardening Applied to All 11 Storage Modules
+
+Every `connect()` method now calls `harden_connection()` before schema creation. Manual PRAGMAs in payments (WAL+FK) and event_bus (WAL) replaced with the shared function.
+
+Import resolution: dual-path `try: from shared_src... except: from src...` handles both gateway (bootstrap) and standalone test contexts. Each product's `conftest.py` registers a `shared_src` virtual package for test isolation.
+
+**Files modified (11 storage modules):**
+- `products/billing/src/storage.py`
+- `products/paywall/src/storage.py`
+- `products/marketplace/src/storage.py`
+- `products/trust/src/storage.py`
+- `products/identity/src/storage.py`
+- `products/messaging/src/storage.py`
+- `products/reputation/src/storage.py`
+- `products/payments/src/storage.py` (replaced manual WAL+FK)
+- `products/shared/src/event_bus.py` (replaced manual WAL)
+- `gateway/src/webhooks.py`
+- `gateway/src/disputes.py`
+
+#### 3. Gateway Admin Tools (4 new tools)
+
+| Tool | Description |
+|------|-------------|
+| `backup_database` | Hot backup with optional Fernet encryption |
+| `restore_database` | Restore from backup with optional decryption |
+| `check_db_integrity` | Run integrity + page diagnostics |
+| `list_backups` | List available backup files |
+
+All pro-tier, zero-cost admin tools. Resolves logical DB name → DSN path via env var map (10 databases).
+
+#### 4. Test Summary
+
+```
+shared       94 passed  (+23 new: db_security unit tests)
+billing     103 passed
+paywall     106 passed
+payments    164 passed
+marketplace 128 passed
+trust       103 passed
+identity    122 passed
+messaging    35 passed
+reputation  162 passed
+gateway     119 passed  (+8 new: db security integration tests)
+────────────────────────────
+TOTAL     1,136 passed  (+20 from Session 3)
+```
+
+### New Files Created
+- `products/shared/src/db_security.py` — shared security utilities (155 lines)
+- `products/shared/tests/test_db_security.py` — 23 unit tests across 5 test classes
+- `gateway/tests/test_db_security_tools.py` — 8 gateway integration tests
+
+### Files Modified (22)
+- 11 storage modules — added `harden_connection()` call
+- 9 product `conftest.py` files — registered `shared_src` virtual package
+- `gateway/src/tools.py` — 4 new tool functions + registry entries
+- `gateway/src/catalog.json` — 4 new tool definitions (53 total)
+- `products/shared/pyproject.toml` — added `aiosqlite>=0.20`, `cryptography>=42.0`
+
+### Tool Catalog Summary (53 tools)
+
+Previous 49 tools + 4 new admin tools:
+
+| Service | New Tools |
+|---------|-----------|
+| admin | backup_database, restore_database, check_db_integrity, list_backups |

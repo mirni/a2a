@@ -43,9 +43,14 @@ class EventBus:
 
     async def connect(self) -> None:
         """Open the database and create tables if needed."""
+        try:
+            from shared_src.db_security import harden_connection
+        except ImportError:
+            from src.db_security import harden_connection
+
         self._db = await aiosqlite.connect(self._db_path)
         self._db.row_factory = aiosqlite.Row
-        await self._db.execute("PRAGMA journal_mode=WAL")
+        await harden_connection(self._db)
         await self._db.executescript(
             """
             CREATE TABLE IF NOT EXISTS events (

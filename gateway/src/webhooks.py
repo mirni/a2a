@@ -59,9 +59,12 @@ class WebhookManager:
 
     async def connect(self) -> None:
         """Open the database connection and create the schema."""
+        from shared_src.db_security import harden_connection
+
         db_path = self._dsn.replace("sqlite:///", "")
         self._db = await aiosqlite.connect(db_path)
         self._db.row_factory = aiosqlite.Row
+        await harden_connection(self._db)
         await self._db.execute(_SCHEMA_WEBHOOKS)
         await self._db.execute(_SCHEMA_DELIVERIES)
         await self._db.commit()

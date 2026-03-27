@@ -27,6 +27,18 @@ if _billing_root not in sys.path:
     sys.path.insert(0, _billing_root)
 
 # ---------------------------------------------------------------------------
+# Register shared_src so cross-product imports (db_security) resolve
+# ---------------------------------------------------------------------------
+_shared_src_dir = os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "shared", "src")
+)
+if "shared_src" not in sys.modules:
+    _shared_pkg = types.ModuleType("shared_src")
+    _shared_pkg.__path__ = [_shared_src_dir]
+    _shared_pkg.__package__ = "shared_src"
+    sys.modules["shared_src"] = _shared_pkg
+
+# ---------------------------------------------------------------------------
 # Register 'payments' as a virtual package pointing to payments/src/
 # ---------------------------------------------------------------------------
 _payments_src = os.path.join(_payments_root, "src")

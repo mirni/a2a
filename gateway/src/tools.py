@@ -836,6 +836,123 @@ async def _create_split_intent(ctx: AppContext, params: dict[str, Any]) -> dict[
 
 
 # ---------------------------------------------------------------------------
+# Database security tools
+# ---------------------------------------------------------------------------
+
+# Map of logical database names to environment variable names holding the DSN
+_DB_DSN_MAP = {
+    "billing": "BILLING_DSN",
+    "paywall": "PAYWALL_DSN",
+    "payments": "PAYMENTS_DSN",
+    "marketplace": "MARKETPLACE_DSN",
+    "trust": "TRUST_DSN",
+    "identity": "IDENTITY_DSN",
+    "event_bus": "EVENT_BUS_DSN",
+    "webhooks": "WEBHOOK_DSN",
+    "disputes": "DISPUTE_DSN",
+    "messaging": "MESSAGING_DSN",
+}
+
+
+def _resolve_db_path(db_name: str) -> str:
+    """Resolve a logical database name to its file path."""
+    import os
+
+    env_var = _DB_DSN_MAP.get(db_name)
+    if not env_var:
+        raise ValueError(f"Unknown database: {db_name}")
+    dsn = os.environ.get(env_var, "")
+    if not dsn:
+        raise ValueError(f"DSN not configured for {db_name} (env: {env_var})")
+    return dsn.replace("sqlite:///", "")
+
+
+async def _backup_database(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    import os
+    from datetime import datetime, timezone
+
+    from shared_src.db_security import backup_database, encrypt_backup
+
+    db_name = params["database"]
+    db_path = _resolve_db_path(db_name)
+    data_dir = os.environ.get("A2A_DATA_DIR", "/tmp/a2a_gateway")
+    backup_dir = os.path.join(data_dir, "backups")
+    os.makedirs(backup_dir, exist_ok=True)
+
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    dest = os.path.join(backup_dir, f"{db_name}_{ts}.db")
+
+    meta = await backup_database(db_path, dest)
+
+    if params.get("encrypt"):
+        enc_dest = dest + ".enc"
+        enc_meta = await encrypt_backup(dest, enc_dest)
+        os.unlink(dest)
+        meta["path"] = enc_dest
+        meta["size_bytes"] = enc_meta["size_bytes"]
+        meta["key"] = enc_meta["key"]
+        meta["encrypted"] = True
+
+    return meta
+
+
+async def _restore_database(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    import os
+
+    from shared_src.db_security import decrypt_backup, restore_database
+
+    db_name = params["database"]
+    db_path = _resolve_db_path(db_name)
+    backup_path = params["backup_path"]
+
+    if not os.path.exists(backup_path):
+        raise FileNotFoundError(f"Backup not found: {backup_path}")
+
+    # If encrypted, decrypt first
+    source = backup_path
+    if params.get("key"):
+        dec_path = backup_path + ".dec"
+        await decrypt_backup(backup_path, dec_path, params["key"])
+        source = dec_path
+
+    meta = await restore_database(source, db_path)
+
+    if source != backup_path and os.path.exists(source):
+        os.unlink(source)
+
+    return meta
+
+
+async def _check_db_integrity(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    from shared_src.db_security import integrity_check
+
+    db_name = params["database"]
+    db_path = _resolve_db_path(db_name)
+    return await integrity_check(db_path)
+
+
+async def _list_backups(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    import os
+
+    data_dir = os.environ.get("A2A_DATA_DIR", "/tmp/a2a_gateway")
+    backup_dir = os.path.join(data_dir, "backups")
+
+    if not os.path.isdir(backup_dir):
+        return {"backups": []}
+
+    backups = []
+    for fname in sorted(os.listdir(backup_dir)):
+        fpath = os.path.join(backup_dir, fname)
+        if os.path.isfile(fpath):
+            backups.append({
+                "filename": fname,
+                "path": fpath,
+                "size_bytes": os.path.getsize(fpath),
+            })
+    return {"backups": backups}
+
+
+# ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 
@@ -911,4 +1028,9 @@ TOOL_REGISTRY: dict[str, ToolFunc] = {
     "get_revenue_report": _get_revenue_report,
     # Multi-party splits
     "create_split_intent": _create_split_intent,
+    # Database security
+    "backup_database": _backup_database,
+    "restore_database": _restore_database,
+    "check_db_integrity": _check_db_integrity,
+    "list_backups": _list_backups,
 }

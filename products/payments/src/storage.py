@@ -105,11 +105,15 @@ class PaymentStorage:
 
     async def connect(self) -> None:
         """Open the database connection and ensure schema exists."""
+        try:
+            from shared_src.db_security import harden_connection
+        except ImportError:
+            from src.db_security import harden_connection
+
         db_path = self.dsn.replace("sqlite:///", "")
         self._db = await aiosqlite.connect(db_path)
         self._db.row_factory = aiosqlite.Row
-        await self._db.execute("PRAGMA journal_mode=WAL")
-        await self._db.execute("PRAGMA foreign_keys=ON")
+        await harden_connection(self._db)
         await self._db.executescript(_SCHEMA)
         await self._db.commit()
 

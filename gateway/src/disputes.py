@@ -33,8 +33,11 @@ class DisputeEngine:
         self.db: aiosqlite.Connection | None = None
 
     async def connect(self) -> None:
+        from shared_src.db_security import harden_connection
+
         self.db = await aiosqlite.connect(self.dsn)
         self.db.row_factory = aiosqlite.Row
+        await harden_connection(self.db)
         await self.db.executescript(
             """
             CREATE TABLE IF NOT EXISTS disputes (

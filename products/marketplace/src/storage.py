@@ -27,12 +27,18 @@ class MarketplaceStorage:
         return self._dsn.replace("sqlite:///", "")
 
     async def connect(self) -> None:
+        try:
+            from shared_src.db_security import harden_connection
+        except ImportError:
+            from src.db_security import harden_connection
+
         path = self._db_path()
         if path == ":memory:":
             self._db = await aiosqlite.connect(":memory:")
         else:
             self._db = await aiosqlite.connect(path)
         self._db.row_factory = aiosqlite.Row
+        await harden_connection(self._db)
         await self._create_tables()
 
     async def close(self) -> None:

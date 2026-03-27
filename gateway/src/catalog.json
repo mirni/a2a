@@ -1336,5 +1336,107 @@
     "pricing": {"model": "percentage", "percentage": 2.0, "min_fee": 0.01, "max_fee": 5.0},
     "sla": {"max_latency_ms": 500},
     "tier_required": "pro"
+  },
+  {
+    "name": "backup_database",
+    "service": "admin",
+    "description": "Create a hot backup of a SQLite database, optionally encrypted with Fernet.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "database": {"type": "string", "description": "Logical database name (billing, payments, etc.)"},
+        "encrypt": {"type": "boolean", "description": "Whether to encrypt the backup"}
+      },
+      "required": ["database"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "path": {"type": "string"},
+        "size_bytes": {"type": "integer"},
+        "created_at": {"type": "string"},
+        "key": {"type": "string"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 5000},
+    "tier_required": "pro"
+  },
+  {
+    "name": "restore_database",
+    "service": "admin",
+    "description": "Restore a SQLite database from a backup file, with optional decryption.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "database": {"type": "string", "description": "Logical database name to restore into"},
+        "backup_path": {"type": "string", "description": "Path to the backup file"},
+        "key": {"type": "string", "description": "Decryption key if backup is encrypted"}
+      },
+      "required": ["database", "backup_path"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "path": {"type": "string"},
+        "size_bytes": {"type": "integer"},
+        "restored_at": {"type": "string"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 5000},
+    "tier_required": "pro"
+  },
+  {
+    "name": "check_db_integrity",
+    "service": "admin",
+    "description": "Run SQLite integrity check and return page diagnostics for a database.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "database": {"type": "string", "description": "Logical database name to check"}
+      },
+      "required": ["database"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "ok": {"type": "boolean"},
+        "details": {"type": "string"},
+        "page_count": {"type": "integer"},
+        "freelist_count": {"type": "integer"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 2000},
+    "tier_required": "pro"
+  },
+  {
+    "name": "list_backups",
+    "service": "admin",
+    "description": "List all available database backup files.",
+    "input_schema": {
+      "type": "object",
+      "properties": {}
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "backups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "filename": {"type": "string"},
+              "path": {"type": "string"},
+              "size_bytes": {"type": "integer"}
+            }
+          }
+        }
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 500},
+    "tier_required": "pro"
   }
 ]
