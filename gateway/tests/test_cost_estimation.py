@@ -61,7 +61,7 @@ async def test_estimate_cost_with_agent_discount(client, api_key, app):
 
 
 async def test_estimate_cost_unknown_tool(client, api_key):
-    """Estimating cost for unknown tool returns error."""
+    """Estimating cost for unknown tool returns 404 ToolNotFoundError."""
     resp = await client.post(
         "/v1/execute",
         json={
@@ -73,9 +73,9 @@ async def test_estimate_cost_unknown_tool(client, api_key):
         },
         headers={"Authorization": f"Bearer {api_key}"},
     )
-    assert resp.status_code == 200
-    result = resp.json()["result"]
-    assert result.get("error") is not None or result.get("unit_price") == 0
+    assert resp.status_code == 404
+    body = resp.json()
+    assert body["error"]["code"] == "not_found"
 
 
 async def test_estimate_cost_missing_params(client, api_key):

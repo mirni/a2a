@@ -38,6 +38,8 @@ def calculate_tool_cost(pricing: dict[str, Any], params: dict[str, Any]) -> floa
     - "percentage": fee = clamp(amount * percentage / 100, min_fee, max_fee)
     - flat (default): fee = pricing["per_call"]
     """
+    from gateway.src.tool_errors import NegativeCostError
+
     model = pricing.get("model")
     if model == "percentage":
         amount = float(params.get("amount", 0))
@@ -45,9 +47,12 @@ def calculate_tool_cost(pricing: dict[str, Any], params: dict[str, Any]) -> floa
         min_fee = float(pricing.get("min_fee", 0))
         max_fee = float(pricing.get("max_fee", float("inf")))
         raw_fee = amount * pct / 100.0
-        return max(min_fee, min(max_fee, raw_fee))
+        cost = max(min_fee, min(max_fee, raw_fee))
+        if cost < 0:
+            raise NegativeCostError(f"Negative cost calculated: {cost}")
+        return cost
     # Flat per-call pricing (default)
-    return float(pricing.get("per_call", 0.0))
+    return max(0.0, float(pricing.get("per_call", 0.0)))
 
 
 async def execute(request: Request) -> JSONResponse:

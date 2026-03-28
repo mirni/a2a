@@ -183,7 +183,8 @@ async def _rate_service_tool(ctx: AppContext, params: dict[str, Any]) -> dict[st
     review = params.get("review", "")
 
     if rating < 1 or rating > 5:
-        return {"error": "Rating must be between 1 and 5"}
+        from gateway.src.tool_errors import ToolValidationError
+        raise ToolValidationError("Rating must be between 1 and 5")
 
     import time as _time
     now = _time.time()

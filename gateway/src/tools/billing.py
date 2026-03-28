@@ -66,9 +66,11 @@ async def _get_metrics_timeseries(ctx: AppContext, params: dict[str, Any]) -> di
     since = params.get("since")
     limit = params.get("limit", 24)
 
+    from gateway.src.tool_errors import ToolValidationError
+
     _VALID_INTERVALS = {"hour", "day"}
     if interval not in _VALID_INTERVALS:
-        return {"error": f"Invalid interval '{interval}': must be one of {sorted(_VALID_INTERVALS)}"}
+        raise ToolValidationError(f"Invalid interval '{interval}': must be one of {sorted(_VALID_INTERVALS)}")
 
     # Determine the SQL bucket expression
     if interval == "hour":
@@ -227,14 +229,8 @@ async def _estimate_cost(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
         pricing = tool_def.get("pricing", {})
         unit_price = float(pricing.get("per_call", 0.0))
     else:
-        return {
-            "tool_name": tool_name,
-            "quantity": quantity,
-            "unit_price": 0,
-            "discount_pct": 0,
-            "total_cost": 0,
-            "error": f"Tool not found: {tool_name}",
-        }
+        from gateway.src.tool_errors import ToolNotFoundError
+        raise ToolNotFoundError(f"Tool not found: {tool_name}")
 
     discount_pct = 0
     if agent_id:
