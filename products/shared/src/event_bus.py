@@ -37,6 +37,12 @@ class EventBus:
         default_factory=dict, init=False, repr=False
     )
 
+    def _require_db(self) -> aiosqlite.Connection:
+        """Return the database connection, raising RuntimeError if not connected."""
+        if self._db is None:
+            raise RuntimeError("EventBus not connected — call connect() first")
+        return self._db
+
     @property
     def _db_path(self) -> str:
         return self.dsn.replace("sqlite:///", "")
@@ -94,7 +100,7 @@ class EventBus:
         Returns:
             The auto-generated event ID.
         """
-        assert self._db is not None, "EventBus not connected"
+        self._require_db()
 
         created_at = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
         payload_json = json.dumps(payload, sort_keys=True)
@@ -110,7 +116,8 @@ class EventBus:
         )
         await self._db.commit()
         event_id = cursor.lastrowid
-        assert event_id is not None
+        if event_id is None:
+            raise RuntimeError("Failed to insert event")
 
         # Build event dict for handlers
         event = {
@@ -148,7 +155,7 @@ class EventBus:
         Returns:
             A unique subscription ID.
         """
-        assert self._db is not None, "EventBus not connected"
+        self._require_db()
 
         sub_id = uuid.uuid4().hex
         created_at = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
@@ -172,7 +179,7 @@ class EventBus:
 
     async def unsubscribe(self, subscription_id: str) -> None:
         """Remove a subscription."""
-        assert self._db is not None, "EventBus not connected"
+        self._require_db()
 
         self._subscribers.pop(subscription_id, None)
 
@@ -201,7 +208,7 @@ class EventBus:
         Returns:
             List of event dicts in FIFO (ascending id) order.
         """
-        assert self._db is not None, "EventBus not connected"
+        self._require_db()
 
         if event_type is not None:
             cursor = await self._db.execute(
@@ -239,7 +246,7 @@ class EventBus:
         Returns:
             True if the event has not been tampered with.
         """
-        assert self._db is not None, "EventBus not connected"
+        self._require_db()
 
         cursor = await self._db.execute(
             """
@@ -267,7 +274,7 @@ class EventBus:
         Updates the subscription's last_ack_id so consumers can track
         their position in the event stream.
         """
-        assert self._db is not None, "EventBus not connected"
+        self._require_db()
 
         await self._db.execute(
             "UPDATE subscriptions SET last_ack_id = ? WHERE id = ?",
@@ -289,7 +296,7 @@ class EventBus:
         Returns:
             Number of events deleted.
         """
-        assert self._db is not None, "EventBus not connected"
+        self._require_db()
 
         cutoff = time.strftime(
             "%Y-%m-%dT%H:%M:%S", time.gmtime(time.time() - older_than_seconds)

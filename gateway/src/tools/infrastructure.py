@@ -59,7 +59,8 @@ async def _register_event_schema(ctx: AppContext, params: dict[str, Any]) -> dic
     schema_json = _json.dumps(schema, sort_keys=True)
 
     db = ctx.event_bus._db
-    assert db is not None, "EventBus not connected"
+    if db is None:
+        raise RuntimeError("EventBus not connected")
 
     await db.execute(
         """
@@ -92,7 +93,8 @@ async def _get_event_schema(ctx: AppContext, params: dict[str, Any]) -> dict[str
 
     event_type = params["event_type"]
     db = ctx.event_bus._db
-    assert db is not None, "EventBus not connected"
+    if db is None:
+        raise RuntimeError("EventBus not connected")
 
     await db.execute(
         """
@@ -166,7 +168,7 @@ async def _test_webhook(ctx: AppContext, params: dict[str, Any]) -> dict[str, An
     webhook_id = params["webhook_id"]
     wm = ctx.webhook_manager
 
-    assert wm._db is not None, "WebhookManager not connected"
+    wm._require_db()
 
     cursor = await wm._db.execute(
         "SELECT * FROM webhooks WHERE id = ? AND active = 1",

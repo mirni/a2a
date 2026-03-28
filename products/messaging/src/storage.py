@@ -86,6 +86,12 @@ class MessageStorage:
         await self._db.executescript(_SCHEMA)
         await self._db.commit()
 
+    def _require_db(self) -> aiosqlite.Connection:
+        """Return the database connection, raising RuntimeError if not connected."""
+        if self._db is None:
+            raise RuntimeError("MessageStorage not connected — call connect() first")
+        return self._db
+
     async def close(self) -> None:
         """Close the database connection."""
         if self._db:
@@ -98,7 +104,7 @@ class MessageStorage:
 
     async def store_message(self, message: Message) -> str:
         """Store a message and return its id."""
-        assert self._db is not None
+        self._require_db()
         await self._db.execute(
             """
             INSERT INTO messages (id, sender, recipient, message_type, subject, body, metadata, thread_id, created_at, read_at)
@@ -130,7 +136,7 @@ class MessageStorage:
 
         If thread_id is provided, filter to that thread only.
         """
-        assert self._db is not None
+        self._require_db()
         if thread_id is not None:
             cursor = await self._db.execute(
                 """
@@ -156,7 +162,7 @@ class MessageStorage:
 
     async def get_thread(self, thread_id: str) -> list[dict]:
         """Get all messages in a thread, ordered oldest first."""
-        assert self._db is not None
+        self._require_db()
         cursor = await self._db.execute(
             """
             SELECT * FROM messages
@@ -173,7 +179,7 @@ class MessageStorage:
 
         Returns True if the message was found and the agent is the recipient.
         """
-        assert self._db is not None
+        self._require_db()
         now = time.time()
         cursor = await self._db.execute(
             """
@@ -191,7 +197,7 @@ class MessageStorage:
 
     async def store_negotiation(self, data: dict) -> str:
         """Store a negotiation record and return its id."""
-        assert self._db is not None
+        self._require_db()
         neg_id = uuid.uuid4().hex
         now = time.time()
         await self._db.execute(
@@ -218,7 +224,7 @@ class MessageStorage:
 
     async def get_negotiation(self, negotiation_id: str) -> dict | None:
         """Retrieve a negotiation by id. Returns None if not found."""
-        assert self._db is not None
+        self._require_db()
         cursor = await self._db.execute(
             "SELECT * FROM negotiations WHERE id = ?",
             (negotiation_id,),
@@ -230,7 +236,7 @@ class MessageStorage:
 
     async def update_negotiation(self, negotiation_id: str, updates: dict) -> None:
         """Update specific fields of a negotiation."""
-        assert self._db is not None
+        self._require_db()
         updates["updated_at"] = time.time()
         set_clauses = ", ".join(f"{k} = ?" for k in updates)
         values = list(updates.values()) + [negotiation_id]

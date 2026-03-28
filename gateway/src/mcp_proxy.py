@@ -134,7 +134,8 @@ class MCPConnection:
 
     async def _read_loop(self) -> None:
         """Read JSON-RPC responses from stdout."""
-        assert self.process.stdout is not None
+        if self.process.stdout is None:
+            raise RuntimeError("MCP process stdout is not available")
         buffer = b""
         while True:
             try:

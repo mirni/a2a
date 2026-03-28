@@ -53,6 +53,12 @@ class WebhookManager:
         self._dsn = dsn
         self._db: aiosqlite.Connection | None = None
 
+    def _require_db(self) -> aiosqlite.Connection:
+        """Return the database connection, raising RuntimeError if not connected."""
+        if self._db is None:
+            raise RuntimeError("WebhookManager not connected — call connect() first")
+        return self._db
+
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
@@ -87,7 +93,7 @@ class WebhookManager:
         secret: str,
     ) -> dict[str, Any]:
         """Register a new webhook and return its representation."""
-        assert self._db is not None, "call connect() first"
+        self._require_db()
 
         webhook_id = f"whk-{secrets.token_hex(12)}"
         created_at = time.time()
@@ -114,7 +120,7 @@ class WebhookManager:
 
     async def list_webhooks(self, agent_id: str) -> list[dict[str, Any]]:
         """Return all webhooks belonging to *agent_id*."""
-        assert self._db is not None, "call connect() first"
+        self._require_db()
 
         cursor = await self._db.execute(
             "SELECT * FROM webhooks WHERE agent_id = ? AND active = 1",
@@ -125,7 +131,7 @@ class WebhookManager:
 
     async def delete_webhook(self, webhook_id: str) -> bool:
         """Soft-delete a webhook. Returns True if it existed and was active."""
-        assert self._db is not None, "call connect() first"
+        self._require_db()
 
         cursor = await self._db.execute(
             "UPDATE webhooks SET active = 0 WHERE id = ? AND active = 1",
@@ -140,7 +146,7 @@ class WebhookManager:
 
     async def deliver(self, event: dict[str, Any]) -> None:
         """Queue delivery records for every active webhook matching *event_type*."""
-        assert self._db is not None, "call connect() first"
+        self._require_db()
 
         event_type = event.get("type", "")
         now = time.time()
@@ -172,7 +178,7 @@ class WebhookManager:
         event: dict[str, Any],
     ) -> None:
         """POST the event payload to the webhook URL with HMAC-SHA3 signature."""
-        assert self._db is not None, "call connect() first"
+        self._require_db()
 
         payload_bytes = json.dumps(event).encode()
         signature = hmac.new(
@@ -241,7 +247,7 @@ class WebhookManager:
 
     async def process_retries(self) -> None:
         """Retry all pending deliveries whose next_retry_at has elapsed."""
-        assert self._db is not None, "call connect() first"
+        self._require_db()
 
         now = time.time()
         cursor = await self._db.execute(
@@ -278,7 +284,7 @@ class WebhookManager:
         self, webhook_id: str, limit: int = 50
     ) -> list[dict]:
         """Return delivery history for a webhook, most recent first."""
-        assert self._db is not None, "call connect() first"
+        self._require_db()
 
         cursor = await self._db.execute(
             """
@@ -307,7 +313,7 @@ class WebhookManager:
         now: float,
     ) -> int:
         """Insert a new delivery record and return its id."""
-        assert self._db is not None
+        self._require_db()
         cursor = await self._db.execute(
             """
             INSERT INTO webhook_deliveries
@@ -317,7 +323,8 @@ class WebhookManager:
             (webhook_id, event_type, payload_json, now),
         )
         await self._db.commit()
-        assert cursor.lastrowid is not None
+        if cursor.lastrowid is None:
+            raise RuntimeError("Failed to insert delivery record")
         return cursor.lastrowid
 
     @staticmethod
