@@ -55,6 +55,10 @@ async def handle_product_exception(request: Request, exc: Exception) -> JSONResp
         "ValidationError": (400, "validation_error"),
         "InvalidMetricError": (400, "invalid_metric"),
         "ValueError": (400, "bad_request"),
+        # Tool-level errors
+        "ToolValidationError": (400, "validation_error"),
+        "ToolNotFoundError": (404, "not_found"),
+        "NegativeCostError": (500, "pricing_error"),
         # Disputes
         "DisputeNotFoundError": (404, "dispute_not_found"),
         "DisputeStateError": (409, "dispute_state_error"),
