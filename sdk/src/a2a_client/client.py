@@ -35,7 +35,7 @@ class A2AClient:
 
     def __init__(
         self,
-        base_url: str = "http://localhost:8000",
+        base_url: str | None = None,
         api_key: str | None = None,
         timeout: float = 30.0,
         max_retries: int = 3,
@@ -44,8 +44,9 @@ class A2AClient:
         max_keepalive: int = 20,
         pricing_cache_ttl: float = 300.0,
     ) -> None:
-        self.base_url = base_url.rstrip("/")
-        self.api_key = api_key
+        import os
+        self.base_url = (base_url or os.environ.get("A2A_BASE_URL", "http://localhost:8000")).rstrip("/")
+        self.api_key = api_key or os.environ.get("A2A_API_KEY")
         self.max_retries = max_retries
         self.retry_base_delay = retry_base_delay
         self.pricing_cache_ttl = pricing_cache_ttl
@@ -136,7 +137,9 @@ class A2AClient:
 
         resp = await self._request_with_retry("GET", "/v1/pricing")
         resp.raise_for_status()
-        result = [ToolPricing.from_dict(t) for t in resp.json()["tools"]]
+        data = resp.json()
+        tools = data.get("tools", [])
+        result = [ToolPricing.from_dict(t) for t in tools]
 
         self._pricing_cache = result
         self._pricing_cache_time = now
@@ -147,7 +150,9 @@ class A2AClient:
         resp = await self._request_with_retry("GET", f"/v1/pricing/{tool_name}")
         if resp.status_code != 200:
             raise_for_status(resp.status_code, resp.json())
-        return ToolPricing.from_dict(resp.json()["tool"])
+        data = resp.json()
+        tool_data = data.get("tool", data)
+        return ToolPricing.from_dict(tool_data)
 
     async def execute(
         self, tool: str, params: dict[str, Any] | None = None
@@ -305,3 +310,27 @@ class A2AClient:
             {"agent_id": agent_id, "limit": limit, "offset": offset},
         )
         return result.result["history"]
+
+    # ----- Batch execution -----
+
+    async def batch_execute(
+        self, calls: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """POST /v1/batch — execute multiple tool calls in one request.
+
+        Args:
+            calls: List of {"tool": str, "params": dict} dicts.
+
+        Returns:
+            List of result dicts, one per call.
+        """
+        resp = await self._request_with_retry(
+            "POST",
+            "/v1/batch",
+            json={"calls": calls},
+            headers=self._headers(),
+        )
+        body = resp.json()
+        if resp.status_code != 200:
+            raise_for_status(resp.status_code, body)
+        return body.get("results", [])

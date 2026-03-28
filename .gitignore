@@ -2,11 +2,46 @@
 *.egg-info/
 __pycache__/
 *.pyc
+*.pyo
+dist/
+build/
+*.egg
+*.whl
 
 # Test/coverage
 .coverage
 htmlcov/
 .pytest_cache/
+.tox/
 
-# Environment
+# Linting/typing caches
+.mypy_cache/
+.ruff_cache/
+
+# Environment & secrets
 .env
+.env.*
+*.key
+*.pem
+
+# Virtual environments
+venv/
+.venv/
+
+# IDE/editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.#*
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data/runtime
+*.db
+*.sqlite3
+*.log
+tmp/
