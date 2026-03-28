@@ -18,6 +18,15 @@ Infrastructure code is exempt from this rule.
 
 ## General coding guidelines:
 * Keep functions small and "pure". Follow Single Responsibility Principle. Prefer "Pure Functions" (functions that don't change state) for your transaction calculation logic.
+* Every model must include a `schema_extra` or `json_schema_extra` example for documentation. This can be used in tests to generate a valid test payload (e.g. `AgentTransaction.Config.schema_extra["example"]`), and to make sure test and documentation are always in-sync.
+* Use Input Randomization and Contract Testing (with example acting as the "Golden Standard" for the contract): Use libraries like Hypothesis where it makes sense in the tests.
+* Use Negative Testing: Specifically write tests that must fail. E.g.: "Send a Stripe refund request with an expired JWT. Confirm it returns 401 Unauthorized and logs the attempt."
+
+
+## Security & Validation
+* All API endpoints MUST use Pydantic models for request/response validation.
+* `extra = "forbid"` must be enabled on all request models.
+* Use `Decimal` for all currency-related fields; never use `float`.
 
 
 # Append all prompts and outputs into MASTER_LOG.md
