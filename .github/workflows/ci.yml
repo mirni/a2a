@@ -26,7 +26,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install quality tools
-        run: pip install ruff mypy bandit pydantic
+        run: pip install ruff mypy bandit pydantic pip-audit
 
       - name: Lint with ruff
         run: ruff check .
@@ -39,6 +39,9 @@ jobs:
 
       - name: Security scan with bandit
         run: bandit -r gateway/src products/ -ll -q --skip B101
+
+      - name: Dependency audit
+        run: pip-audit -r requirements.txt || true
 
       - name: SAST with Semgrep
         uses: semgrep/semgrep-action@v1
