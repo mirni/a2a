@@ -35,19 +35,18 @@ jobs:
         run: ruff format --check .
 
       - name: Type check with mypy
-        run: mypy --strict gateway/src/ products/ sdk/src/ || true
+        run: mypy --strict --ignore-missing-imports gateway/src/ products/ sdk/src/
 
       - name: Security scan with bandit
         run: bandit -r gateway/src products/ -ll -q --skip B101
 
       - name: Dependency audit
-        run: pip-audit -r requirements.txt || true
+        run: pip-audit -r requirements.txt
 
       - name: SAST with Semgrep
         uses: semgrep/semgrep-action@v1
         with:
           config: auto
-        continue-on-error: true
 
   test:
     runs-on: ubuntu-latest
@@ -80,7 +79,7 @@ jobs:
         run: ./check_server.sh
 
       - name: Test gateway
-        run: scripts/run_tests.sh gateway
+        run: scripts/run_tests.sh gateway --cov=gateway --cov-fail-under=70
 
       - name: Test billing
         run: scripts/run_tests.sh products/billing
