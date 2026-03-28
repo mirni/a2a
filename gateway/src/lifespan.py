@@ -165,6 +165,17 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     webhook_manager = WebhookManager(webhook_dsn)
     await webhook_manager.connect()
 
+    # --- Pre-create tool-managed tables ---
+    from gateway.src.tools._schemas import (
+        ensure_budget_caps_table,
+        ensure_event_schemas_table,
+        ensure_service_ratings_table,
+    )
+
+    await ensure_budget_caps_table(tracker.storage.db)
+    await ensure_service_ratings_table(marketplace_storage.db)
+    await ensure_event_schemas_table(event_bus.db)
+
     # --- Subscription Scheduler ---
     scheduler = None
     scheduler_task = None

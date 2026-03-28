@@ -58,20 +58,7 @@ async def _register_event_schema(ctx: AppContext, params: dict[str, Any]) -> dic
     schema = params["schema"]
     schema_json = _json.dumps(schema, sort_keys=True)
 
-    db = ctx.event_bus._db
-    if db is None:
-        raise RuntimeError("EventBus not connected")
-
-    await db.execute(
-        """
-        CREATE TABLE IF NOT EXISTS event_schemas (
-            event_type TEXT PRIMARY KEY,
-            schema     TEXT NOT NULL,
-            created_at REAL NOT NULL,
-            updated_at REAL NOT NULL
-        )
-        """
-    )
+    db = ctx.event_bus.db
 
     import time as _time
     now = _time.time()
@@ -92,20 +79,7 @@ async def _get_event_schema(ctx: AppContext, params: dict[str, Any]) -> dict[str
     import json as _json
 
     event_type = params["event_type"]
-    db = ctx.event_bus._db
-    if db is None:
-        raise RuntimeError("EventBus not connected")
-
-    await db.execute(
-        """
-        CREATE TABLE IF NOT EXISTS event_schemas (
-            event_type TEXT PRIMARY KEY,
-            schema     TEXT NOT NULL,
-            created_at REAL NOT NULL,
-            updated_at REAL NOT NULL
-        )
-        """
-    )
+    db = ctx.event_bus.db
 
     cursor = await db.execute(
         "SELECT event_type, schema FROM event_schemas WHERE event_type = ?",
@@ -162,53 +136,15 @@ async def _get_webhook_deliveries(ctx: AppContext, params: dict[str, Any]) -> di
 
 async def _test_webhook(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     """Send a test.ping event to a registered webhook and return the delivery result."""
-    import json as _json
-    import time as _time
+    from gateway.src.tool_errors import ToolNotFoundError
 
     webhook_id = params["webhook_id"]
     wm = ctx.webhook_manager
 
-    wm._require_db()
-
-    cursor = await wm._db.execute(
-        "SELECT * FROM webhooks WHERE id = ? AND active = 1",
-        (webhook_id,),
-    )
-    row = await cursor.fetchone()
-    if row is None:
-        return {"error": "Webhook not found", "found": False}
-
-    webhook = wm._row_to_webhook(row)
-
-    now = _time.time()
-    event = {
-        "type": "test.ping",
-        "webhook_id": webhook_id,
-        "timestamp": now,
-        "message": "Test ping from A2A gateway",
-    }
-    payload_json = _json.dumps(event)
-
-    delivery_id = await wm._insert_delivery(
-        webhook_id=webhook_id,
-        event_type="test.ping",
-        payload_json=payload_json,
-        now=now,
-    )
-
-    await wm._send(webhook, delivery_id, event)
-
-    cursor2 = await wm._db.execute(
-        "SELECT id, status, response_code FROM webhook_deliveries WHERE id = ?",
-        (delivery_id,),
-    )
-    result_row = await cursor2.fetchone()
-
-    return {
-        "delivery_id": result_row["id"],
-        "status": result_row["status"],
-        "response_code": result_row["response_code"],
-    }
+    try:
+        return await wm.send_test_ping(webhook_id)
+    except LookupError:
+        raise ToolNotFoundError(f"Webhook not found: {webhook_id}")
 
 
 # ---------------------------------------------------------------------------

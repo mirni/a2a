@@ -37,6 +37,11 @@ class EventBus:
         default_factory=dict, init=False, repr=False
     )
 
+    @property
+    def db(self) -> aiosqlite.Connection:
+        """Public accessor for the database connection."""
+        return self._require_db()
+
     def _require_db(self) -> aiosqlite.Connection:
         """Return the database connection, raising RuntimeError if not connected."""
         if self._db is None:

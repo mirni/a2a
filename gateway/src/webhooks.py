@@ -302,6 +302,63 @@ class WebhookManager:
         return [dict(row) for row in rows]
 
     # ------------------------------------------------------------------
+    # Public query methods
+    # ------------------------------------------------------------------
+
+    async def get_webhook(self, webhook_id: str) -> dict[str, Any] | None:
+        """Look up a single webhook by id. Returns None if not found or inactive."""
+        self._require_db()
+        cursor = await self._db.execute(
+            "SELECT * FROM webhooks WHERE id = ? AND active = 1",
+            (webhook_id,),
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        return self._row_to_webhook(row)
+
+    async def send_test_ping(self, webhook_id: str) -> dict[str, Any]:
+        """Send a test.ping event to a registered webhook and return delivery result."""
+        import json as _json
+        import time as _time
+
+        self._require_db()
+
+        webhook = await self.get_webhook(webhook_id)
+        if webhook is None:
+            raise LookupError(f"Webhook not found: {webhook_id}")
+
+        now = _time.time()
+        event = {
+            "type": "test.ping",
+            "webhook_id": webhook_id,
+            "timestamp": now,
+            "message": "Test ping from A2A gateway",
+        }
+        payload_json = _json.dumps(event)
+
+        delivery_id = await self._insert_delivery(
+            webhook_id=webhook_id,
+            event_type="test.ping",
+            payload_json=payload_json,
+            now=now,
+        )
+
+        await self._send(webhook, delivery_id, event)
+
+        cursor = await self._db.execute(
+            "SELECT id, status, response_code FROM webhook_deliveries WHERE id = ?",
+            (delivery_id,),
+        )
+        result_row = await cursor.fetchone()
+
+        return {
+            "delivery_id": result_row["id"],
+            "status": result_row["status"],
+            "response_code": result_row["response_code"],
+        }
+
+    # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 

@@ -188,17 +188,7 @@ async def _rate_service_tool(ctx: AppContext, params: dict[str, Any]) -> dict[st
     import time as _time
     now = _time.time()
 
-    db = ctx.marketplace._storage.db
-    await db.execute(
-        """CREATE TABLE IF NOT EXISTS service_ratings (
-            service_id TEXT NOT NULL,
-            agent_id TEXT NOT NULL,
-            rating INTEGER NOT NULL,
-            review TEXT DEFAULT '',
-            created_at REAL NOT NULL,
-            PRIMARY KEY (service_id, agent_id)
-        )"""
-    )
+    db = ctx.marketplace.storage.db
     await db.execute(
         """INSERT INTO service_ratings (service_id, agent_id, rating, review, created_at)
            VALUES (?, ?, ?, ?, ?)
@@ -223,7 +213,7 @@ async def _get_service_ratings_tool(ctx: AppContext, params: dict[str, Any]) -> 
     service_id = params["service_id"]
     limit = params.get("limit", 20)
 
-    db = ctx.marketplace._storage.db
+    db = ctx.marketplace.storage.db
     await db.execute(
         """CREATE TABLE IF NOT EXISTS service_ratings (
             service_id TEXT NOT NULL,

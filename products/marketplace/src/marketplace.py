@@ -52,6 +52,11 @@ class Marketplace:
         self._storage = storage
         self._trust_provider = trust_provider
 
+    @property
+    def storage(self) -> MarketplaceStorage:
+        """Public accessor for the marketplace storage backend."""
+        return self._storage
+
     async def register_service(self, spec: ServiceCreate) -> Service:
         """Register a new service in the marketplace.
 

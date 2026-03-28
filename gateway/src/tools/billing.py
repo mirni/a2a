@@ -269,14 +269,6 @@ async def _set_budget_cap(ctx: AppContext, params: dict[str, Any]) -> dict[str, 
 
     db = ctx.tracker.storage.db
     await db.execute(
-        """CREATE TABLE IF NOT EXISTS budget_caps (
-            agent_id TEXT PRIMARY KEY,
-            daily_cap REAL,
-            monthly_cap REAL,
-            alert_threshold REAL NOT NULL DEFAULT 0.8
-        )"""
-    )
-    await db.execute(
         """INSERT INTO budget_caps (agent_id, daily_cap, monthly_cap, alert_threshold)
            VALUES (?, ?, ?, ?)
            ON CONFLICT(agent_id) DO UPDATE SET
@@ -301,15 +293,6 @@ async def _get_budget_status(ctx: AppContext, params: dict[str, Any]) -> dict[st
 
     agent_id = params["agent_id"]
     db = ctx.tracker.storage.db
-
-    await db.execute(
-        """CREATE TABLE IF NOT EXISTS budget_caps (
-            agent_id TEXT PRIMARY KEY,
-            daily_cap REAL,
-            monthly_cap REAL,
-            alert_threshold REAL NOT NULL DEFAULT 0.8
-        )"""
-    )
 
     cursor = await db.execute(
         "SELECT * FROM budget_caps WHERE agent_id = ?", (agent_id,)
