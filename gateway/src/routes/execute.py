@@ -64,6 +64,17 @@ async def execute(request: Request) -> JSONResponse:
             501, f"Tool '{tool_name}' is cataloged but not implemented", "not_implemented"
         )
 
+    # --- 1b. Validate required parameters ---
+    input_schema = tool_def.get("input_schema", {})
+    required_params = input_schema.get("required", [])
+    missing = [p for p in required_params if p not in params]
+    if missing:
+        return await error_response(
+            400,
+            f"Missing required parameter(s): {', '.join(missing)}",
+            "missing_parameter",
+        )
+
     # --- 2. Extract + validate API key ---
     raw_key = extract_api_key(request)
     if not raw_key:
@@ -145,11 +156,16 @@ async def execute(request: Request) -> JSONResponse:
             return await handle_product_exception(request, exc)
 
     # --- 6. Dispatch to tool function ---
+    # Record the request in metrics regardless of outcome
+    Metrics.record_request(tool_name)
+
     tool_func = TOOL_REGISTRY[tool_name]
     try:
         result = await tool_func(ctx, params)
     except Exception as exc:
         Metrics.record_error()
+        elapsed_ms = (time.time() - _start_time) * 1000
+        Metrics.record_latency(elapsed_ms)
         return await handle_product_exception(request, exc)
 
     # --- 7. Record usage + charge ---
@@ -166,8 +182,7 @@ async def execute(request: Request) -> JSONResponse:
     except Exception:
         pass  # Usage recording failure should not fail the request
 
-    # --- 8. Record metrics ---
-    Metrics.record_request(tool_name)
+    # --- 8. Record latency ---
     elapsed_ms = (time.time() - _start_time) * 1000
     Metrics.record_latency(elapsed_ms)
 

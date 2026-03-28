@@ -14,6 +14,7 @@ from gateway.src.routes.execute import routes as execute_routes
 from gateway.src.routes.health import routes as health_routes
 from gateway.src.routes.pricing import routes as pricing_routes
 from gateway.src.signing import signing_key_handler
+from gateway.src.stripe_checkout import routes as checkout_routes
 from gateway.src.swagger import swagger_ui_handler
 
 
@@ -60,6 +61,9 @@ def create_app() -> Starlette:
     all_routes.append(Route("/v1/metrics", metrics_handler, methods=["GET"]))
     all_routes.append(Route("/v1/signing-key", signing_key_handler, methods=["GET"]))
     all_routes.append(Route("/docs", swagger_ui_handler, methods=["GET"]))
+
+    # Stripe Checkout (fiat on-ramp)
+    all_routes.extend(checkout_routes)
 
     # Backward-compatibility redirects
     all_routes.extend(_redirect_routes)

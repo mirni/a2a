@@ -1034,3 +1034,22 @@ TOOL_REGISTRY: dict[str, ToolFunc] = {
     "check_db_integrity": _check_db_integrity,
     "list_backups": _list_backups,
 }
+
+
+# ---------------------------------------------------------------------------
+# MCP Connector proxy tools — dynamically registered at startup
+# ---------------------------------------------------------------------------
+
+
+def register_mcp_tools(proxy_manager) -> None:
+    """Register proxy tool functions for all MCP connector tools."""
+    from gateway.src.mcp_proxy import _TOOL_MAP
+
+    for tool_name in _TOOL_MAP:
+        # Capture tool_name in closure
+        def _make_handler(tn: str):
+            async def _handler(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+                return await ctx.mcp_proxy.call_tool(tn, params)
+            return _handler
+
+        TOOL_REGISTRY[tool_name] = _make_handler(tool_name)

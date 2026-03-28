@@ -84,6 +84,7 @@ class AppContext:
     scheduler: object | None = None
     health_monitor: HealthMonitor | None = None
     signing_manager: SigningManager | None = None
+    mcp_proxy: object | None = None
 
 
 @asynccontextmanager
@@ -186,6 +187,18 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     # --- Signing Manager ---
     signing_manager = SigningManager()
 
+    # --- MCP Proxy (connector tools) ---
+    mcp_proxy = None
+    try:
+        from gateway.src.mcp_proxy import MCPProxyManager
+        from gateway.src.tools import register_mcp_tools
+
+        mcp_proxy = MCPProxyManager()
+        register_mcp_tools(mcp_proxy)
+        logger.info("MCP connector proxy initialized (tools registered, lazy-start)")
+    except Exception:
+        logger.warning("MCP proxy not available", exc_info=True)
+
     # Store on app.state
     ctx = AppContext(
         tracker=tracker,
@@ -202,6 +215,7 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
         scheduler=scheduler,
         health_monitor=health_monitor,
         signing_manager=signing_manager,
+        mcp_proxy=mcp_proxy,
     )
     app.state.ctx = ctx
     app.state.signing_manager = signing_manager
@@ -209,6 +223,9 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     yield
 
     # --- Shutdown ---
+    if mcp_proxy:
+        await mcp_proxy.close()
+
     # Cancel background tasks
     health_monitor_task.cancel()
     try:

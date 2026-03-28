@@ -1201,3 +1201,274 @@ deploy.sh updated:
 ### Prompt
 
 > Work on TODO list items: P1 bugs first, then items 1 (fiat on-ramp), 2 (route connectors — use proxy to MCP stdio + Stripe's @stripe/mcp), 3 (TypeScript SDK), and provide instructions for hosted sandbox (6).
+
+### Response — TODO Implementation (5 items completed)
+
+**124 gateway tests passing. Catalog expanded from 56 to 85 tools.**
+
+#### P1 Bug Fixes
+
+**BUG-1 FIXED: Parameter validation on /v1/execute**
+- Added validation in `execute.py` checking `params` against `input_schema.required` before dispatch
+- Returns 400 with `missing_parameter` error code and lists all missing parameter names
+- 5 new tests in `gateway/tests/test_param_validation.py` (all passing)
+
+**BUG-2 FIXED: Prometheus metrics always zero**
+- Root cause: `Metrics.record_request()` was called only after successful tool dispatch
+- Fix: Moved recording before dispatch so ALL requests are counted; added `record_latency()` on error paths
+
+#### Item 1: Fiat On-Ramp via Stripe Checkout
+
+Created `gateway/src/stripe_checkout.py`:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/checkout` | POST | Create Stripe Checkout session for credit purchase |
+| `/v1/stripe-webhook` | POST | Handle `checkout.session.completed` → deposit credits |
+
+**Credit packages:**
+| Package | Credits | Price |
+|---------|---------|-------|
+| starter | 1,000 | $10 |
+| growth | 5,000 | $45 |
+| scale | 25,000 | $200 |
+| enterprise | 100,000 | $750 |
+
+Features: HMAC-SHA256 webhook signature verification, custom credit amounts (min 100), automatic wallet creation on payment.
+
+#### Item 2: Route Connectors Through Gateway (MCP Proxy)
+
+Created `gateway/src/mcp_proxy.py` — manages MCP stdio subprocesses and proxies tool calls:
+
+| Component | Description |
+|-----------|-------------|
+| `MCPConnection` | JSON-RPC over stdio, handshake, request/response routing |
+| `MCPProxyManager` | Lazy-start connectors on first use, connection pooling |
+
+**Connector architecture:**
+- **Stripe**: Spawns `npx -y @stripe/mcp@latest --tools=all` (official Stripe MCP server)
+- **GitHub**: Spawns `python -m src.server` from `products/connectors/github/`
+- **PostgreSQL**: Spawns `python -m src.server` from `products/connectors/postgres/`
+
+**29 new connector tools added to catalog (85 total):**
+
+| Connector | Tools | Pricing |
+|-----------|-------|---------|
+| Stripe (13) | list_customers, create_customer, list_products, create_product, list_prices, create_price, create_payment_link, list_invoices, create_invoice, list_subscriptions, cancel_subscription, create_refund, retrieve_balance | $0.01/call |
+| GitHub (10) | list_repos, get_repo, list_issues, create_issue, list_pull_requests, get_pull_request, create_pull_request, list_commits, get_file_contents, search_code | $0.005/call |
+| PostgreSQL (6) | pg_query, pg_execute, pg_list_tables, pg_describe_table, pg_explain_query, pg_list_schemas | $0.01/call |
+
+Dynamic handler registration via `register_mcp_tools()` — creates proxy handlers that forward calls through `MCPProxyManager`.
+
+#### Item 3: TypeScript/JavaScript SDK
+
+Created `sdk-ts/` — zero-dependency TypeScript SDK using native `fetch` (Node 18+):
+
+| File | Description |
+|------|-------------|
+| `src/client.ts` | `A2AClient` class — all endpoints + convenience methods |
+| `src/errors.ts` | Typed exceptions mapped from HTTP status codes |
+| `src/types.ts` | TypeScript interfaces for all response types |
+| `src/index.ts` | Package entry point with all exports |
+| `package.json` | `@a2a/sdk` v0.1.0, TypeScript 5.4 |
+| `tsconfig.json` | ES2022 target, strict mode, declaration files |
+
+**Features:**
+- Automatic retry with exponential backoff for 429/5xx
+- Pricing cache with configurable TTL
+- Typed errors: `AuthenticationError`, `InsufficientBalanceError`, `RateLimitError`, etc.
+- 20+ convenience methods: `getBalance`, `deposit`, `createPaymentIntent`, `searchServices`, `getTrustScore`, `registerAgent`, `sendMessage`, `checkout`, etc.
+- Compiles clean, builds to `dist/` with `.d.ts` type declarations
+
+```typescript
+import { A2AClient } from "@a2a/sdk";
+
+const client = new A2AClient({
+  baseUrl: "https://api.greenhelix.net",
+  apiKey: "ak_pro_...",
+});
+
+const health = await client.health();
+const balance = await client.getBalance("my-agent");
+const matches = await client.bestMatch("code review bot", { budget: 10 });
+```
+
+#### Item 6: Hosted Sandbox Setup Instructions
+
+##### Option A: Subdomain on Existing Server (Recommended)
+
+The simplest approach — run a second gateway instance on the same VPS with isolated databases:
+
+```bash
+# 1. Create sandbox data directory
+mkdir -p /var/lib/a2a-sandbox
+
+# 2. Create sandbox .env
+cat > /opt/a2a/.env.sandbox << 'EOF'
+HOST=127.0.0.1
+PORT=8001
+A2A_DATA_DIR=/var/lib/a2a-sandbox
+BILLING_DSN=sqlite:////var/lib/a2a-sandbox/billing.db
+PAYWALL_DSN=sqlite:////var/lib/a2a-sandbox/paywall.db
+PAYMENTS_DSN=sqlite:////var/lib/a2a-sandbox/payments.db
+MARKETPLACE_DSN=sqlite:////var/lib/a2a-sandbox/marketplace.db
+TRUST_DSN=sqlite:////var/lib/a2a-sandbox/trust.db
+IDENTITY_DSN=sqlite:////var/lib/a2a-sandbox/identity.db
+EVENT_BUS_DSN=sqlite:////var/lib/a2a-sandbox/events.db
+WEBHOOK_DSN=sqlite:////var/lib/a2a-sandbox/webhooks.db
+MESSAGING_DSN=sqlite:////var/lib/a2a-sandbox/messaging.db
+DISPUTE_DSN=sqlite:////var/lib/a2a-sandbox/disputes.db
+# Sandbox: use Stripe test keys, no real connectors
+STRIPE_API_KEY=sk_test_...
+EOF
+
+# 3. Create systemd service for sandbox
+cat > /etc/systemd/system/a2a-sandbox.service << 'EOF'
+[Unit]
+Description=A2A Commerce Gateway (Sandbox)
+After=network.target
+
+[Service]
+Type=exec
+User=a2a
+Group=a2a
+WorkingDirectory=/opt/a2a
+EnvironmentFile=/opt/a2a/.env.sandbox
+ExecStart=/opt/a2a/venv/bin/python -m uvicorn gateway.main:app \
+    --host 127.0.0.1 --port 8001 --workers 1 --log-level info
+Restart=always
+RestartSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/a2a-sandbox /var/log/a2a
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable a2a-sandbox
+systemctl start a2a-sandbox
+
+# 4. Add nginx server block for sandbox subdomain
+cat > /etc/nginx/sites-available/sandbox << 'NGXEOF'
+server {
+    listen 80;
+    server_name sandbox.greenhelix.net;
+
+    location / {
+        proxy_pass http://127.0.0.1:8001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+NGXEOF
+ln -sf /etc/nginx/sites-available/sandbox /etc/nginx/sites-enabled/
+nginx -t && systemctl reload nginx
+
+# 5. Point DNS: sandbox.greenhelix.net → server IP
+# 6. Enable HTTPS:
+certbot --nginx -d sandbox.greenhelix.net
+
+# 7. Create sandbox free-tier keys (pre-provisioned for instant onboarding)
+cd /opt/a2a && venv/bin/python -c "
+import asyncio
+async def main():
+    import gateway.src.bootstrap
+    from paywall_src.storage import PaywallStorage
+    from paywall_src.keys import KeyManager
+    from billing_src.tracker import UsageTracker
+    s = PaywallStorage('sqlite:////var/lib/a2a-sandbox/paywall.db')
+    await s.connect()
+    km = KeyManager(s)
+    t = UsageTracker('sqlite:////var/lib/a2a-sandbox/billing.db')
+    await t.connect()
+    for i in range(5):
+        await t.wallet.create(f'sandbox-agent-{i}', initial_balance=10000.0)
+        info = await km.create_key(f'sandbox-agent-{i}', tier='free')
+        print(f'Agent {i}: {info[\"key\"]}')
+    await s.close()
+    await t.close()
+asyncio.run(main())
+"
+```
+
+**Sandbox behavior:**
+- Completely isolated databases (no cross-contamination with production)
+- Free-tier keys with 10,000 credits each (enough for ~10K tool calls)
+- Stripe test mode (no real charges)
+- Daily auto-reset (optional — add cron to wipe + recreate sandbox DBs)
+- Same API surface as production (85 tools)
+
+##### Option B: Docker Sandbox (Alternative)
+
+```bash
+# Use existing docker-compose.yml with sandbox overrides
+docker compose -f docker-compose.yml -f docker-compose.sandbox.yml up -d
+```
+
+Where `docker-compose.sandbox.yml` overrides port to 8001 and mounts a separate data volume.
+
+---
+
+### New Files Created
+
+- `gateway/src/stripe_checkout.py` — Stripe Checkout integration (237 lines)
+- `gateway/src/mcp_proxy.py` — MCP connector proxy (296 lines)
+- `gateway/tests/test_param_validation.py` — 5 parameter validation tests
+- `sdk-ts/src/client.ts` — TypeScript SDK client (282 lines)
+- `sdk-ts/src/errors.ts` — Typed exceptions (81 lines)
+- `sdk-ts/src/types.ts` — TypeScript interfaces (66 lines)
+- `sdk-ts/src/index.ts` — Package exports
+- `sdk-ts/package.json` — npm package config
+- `sdk-ts/tsconfig.json` — TypeScript config
+
+### Files Modified
+
+- `gateway/src/routes/execute.py` — Parameter validation + metrics fixes
+- `gateway/src/tools.py` — `register_mcp_tools()` for connector proxy
+- `gateway/src/lifespan.py` — MCPProxyManager init/shutdown, `mcp_proxy` in AppContext
+- `gateway/src/app.py` — Checkout routes added
+- `gateway/src/catalog.json` — 29 connector tools (85 total)
+
+### Test Summary
+
+```
+gateway     124 passed  (+5 from param validation)
+────────────────────────────────
+All existing module tests unchanged and passing.
+```
+
+### Tool Catalog Summary (85 tools)
+
+| Service | Tools | Count |
+|---------|-------|-------|
+| billing | 7 | 7 |
+| payments | 14 | 14 |
+| identity | 9 | 9 |
+| marketplace | 4 | 4 |
+| trust | 5 | 5 |
+| messaging | 3 | 3 |
+| disputes | 3 | 3 |
+| events | 2 | 2 |
+| webhooks | 3 | 3 |
+| paywall | 2 | 2 |
+| admin | 4 | 4 |
+| **stripe** | **13** | **13 (NEW)** |
+| **github** | **10** | **10 (NEW)** |
+| **postgres** | **6** | **6 (NEW)** |
+
+### Updated TODO List
+
+- [x] ~~Parameter validation on /v1/execute~~ (BUG-1 FIXED)
+- [x] ~~Fix Prometheus metrics~~ (BUG-2 FIXED)
+- [x] ~~Fiat on-ramp (Stripe Checkout)~~ (DONE)
+- [x] ~~Route connectors through gateway~~ (DONE — 29 tools via MCP proxy)
+- [x] ~~TypeScript/JavaScript SDK~~ (DONE — `sdk-ts/`)
+- [x] ~~Hosted sandbox instructions~~ (DONE — see above)
+- [ ] **PostgreSQL migration** — DSN abstraction ready
+- [ ] **Bulletproofs range proofs** — Rust FFI needed

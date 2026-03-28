@@ -6,18 +6,29 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string", "description": "The agent identifier"}
+        "agent_id": {
+          "type": "string",
+          "description": "The agent identifier"
+        }
       },
-      "required": ["agent_id"]
+      "required": [
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "balance": {"type": "number"}
+        "balance": {
+          "type": "number"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 200},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   },
   {
@@ -27,21 +38,39 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string", "description": "The agent identifier"},
-        "since": {"type": "number", "description": "Unix timestamp to query from (optional)"}
+        "agent_id": {
+          "type": "string",
+          "description": "The agent identifier"
+        },
+        "since": {
+          "type": "number",
+          "description": "Unix timestamp to query from (optional)"
+        }
       },
-      "required": ["agent_id"]
+      "required": [
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "total_cost": {"type": "number"},
-        "total_calls": {"type": "integer"},
-        "total_tokens": {"type": "integer"}
+        "total_cost": {
+          "type": "number"
+        },
+        "total_calls": {
+          "type": "integer"
+        },
+        "total_tokens": {
+          "type": "integer"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 500},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
     "tier_required": "free"
   },
   {
@@ -51,20 +80,37 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string"},
-        "amount": {"type": "number", "description": "Amount to deposit"},
-        "description": {"type": "string", "description": "Optional description"}
+        "agent_id": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount to deposit"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description"
+        }
       },
-      "required": ["agent_id", "amount"]
+      "required": [
+        "agent_id",
+        "amount"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "new_balance": {"type": "number"}
+        "new_balance": {
+          "type": "number"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 300},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "free"
   },
   {
@@ -74,24 +120,51 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "payer": {"type": "string"},
-        "payee": {"type": "string"},
-        "amount": {"type": "number"},
-        "description": {"type": "string"},
-        "idempotency_key": {"type": "string"}
+        "payer": {
+          "type": "string"
+        },
+        "payee": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "description": {
+          "type": "string"
+        },
+        "idempotency_key": {
+          "type": "string"
+        }
       },
-      "required": ["payer", "payee", "amount"]
+      "required": [
+        "payer",
+        "payee",
+        "amount"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string"},
-        "status": {"type": "string"},
-        "amount": {"type": "number"}
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        }
       }
     },
-    "pricing": {"model": "percentage", "percentage": 2.0, "min_fee": 0.01, "max_fee": 5.0},
-    "sla": {"max_latency_ms": 500},
+    "pricing": {
+      "model": "percentage",
+      "percentage": 2.0,
+      "min_fee": 0.01,
+      "max_fee": 5.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
     "tier_required": "free"
   },
   {
@@ -101,20 +174,34 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "intent_id": {"type": "string"}
+        "intent_id": {
+          "type": "string"
+        }
       },
-      "required": ["intent_id"]
+      "required": [
+        "intent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string"},
-        "status": {"type": "string"},
-        "amount": {"type": "number"}
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 500},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
     "tier_required": "free"
   },
   {
@@ -124,24 +211,51 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "payer": {"type": "string"},
-        "payee": {"type": "string"},
-        "amount": {"type": "number"},
-        "description": {"type": "string"},
-        "timeout_hours": {"type": "number"}
+        "payer": {
+          "type": "string"
+        },
+        "payee": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "description": {
+          "type": "string"
+        },
+        "timeout_hours": {
+          "type": "number"
+        }
       },
-      "required": ["payer", "payee", "amount"]
+      "required": [
+        "payer",
+        "payee",
+        "amount"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string"},
-        "status": {"type": "string"},
-        "amount": {"type": "number"}
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        }
       }
     },
-    "pricing": {"model": "percentage", "percentage": 1.5, "min_fee": 0.01, "max_fee": 10.0},
-    "sla": {"max_latency_ms": 500},
+    "pricing": {
+      "model": "percentage",
+      "percentage": 1.5,
+      "min_fee": 0.01,
+      "max_fee": 10.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
     "tier_required": "pro"
   },
   {
@@ -151,20 +265,34 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "escrow_id": {"type": "string"}
+        "escrow_id": {
+          "type": "string"
+        }
       },
-      "required": ["escrow_id"]
+      "required": [
+        "escrow_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string"},
-        "status": {"type": "string"},
-        "amount": {"type": "number"}
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 500},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
     "tier_required": "pro"
   },
   {
@@ -174,11 +302,26 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "query": {"type": "string", "description": "Search query"},
-        "category": {"type": "string"},
-        "tags": {"type": "array", "items": {"type": "string"}},
-        "max_cost": {"type": "number"},
-        "limit": {"type": "integer", "default": 20}
+        "query": {
+          "type": "string",
+          "description": "Search query"
+        },
+        "category": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "max_cost": {
+          "type": "number"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 20
+        }
       }
     },
     "output_schema": {
@@ -186,15 +329,27 @@
       "items": {
         "type": "object",
         "properties": {
-          "id": {"type": "string"},
-          "name": {"type": "string"},
-          "description": {"type": "string"},
-          "pricing": {"type": "object"}
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "pricing": {
+            "type": "object"
+          }
         }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 300},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "free"
   },
   {
@@ -204,27 +359,58 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "query": {"type": "string"},
-        "budget": {"type": "number"},
-        "min_trust_score": {"type": "number"},
-        "prefer": {"type": "string", "enum": ["cost", "trust", "latency"]},
-        "limit": {"type": "integer", "default": 5}
+        "query": {
+          "type": "string"
+        },
+        "budget": {
+          "type": "number"
+        },
+        "min_trust_score": {
+          "type": "number"
+        },
+        "prefer": {
+          "type": "string",
+          "enum": [
+            "cost",
+            "trust",
+            "latency"
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "default": 5
+        }
       },
-      "required": ["query"]
+      "required": [
+        "query"
+      ]
     },
     "output_schema": {
       "type": "array",
       "items": {
         "type": "object",
         "properties": {
-          "service": {"type": "object"},
-          "rank_score": {"type": "number"},
-          "match_reasons": {"type": "array", "items": {"type": "string"}}
+          "service": {
+            "type": "object"
+          },
+          "rank_score": {
+            "type": "number"
+          },
+          "match_reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       }
     },
-    "pricing": {"per_call": 0.1},
-    "sla": {"max_latency_ms": 500},
+    "pricing": {
+      "per_call": 0.1
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
     "tier_required": "free"
   },
   {
@@ -234,33 +420,72 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "provider_id": {"type": "string"},
-        "name": {"type": "string"},
-        "description": {"type": "string"},
-        "category": {"type": "string"},
-        "tools": {"type": "array", "items": {"type": "string"}},
-        "tags": {"type": "array", "items": {"type": "string"}},
-        "endpoint": {"type": "string"},
+        "provider_id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "endpoint": {
+          "type": "string"
+        },
         "pricing": {
           "type": "object",
           "properties": {
-            "model": {"type": "string"},
-            "cost": {"type": "number"}
+            "model": {
+              "type": "string"
+            },
+            "cost": {
+              "type": "number"
+            }
           }
         }
       },
-      "required": ["provider_id", "name", "description", "category"]
+      "required": [
+        "provider_id",
+        "name",
+        "description",
+        "category"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string"},
-        "name": {"type": "string"},
-        "status": {"type": "string"}
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 500},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
     "tier_required": "pro"
   },
   {
@@ -270,24 +495,53 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "server_id": {"type": "string"},
-        "window": {"type": "string", "enum": ["24h", "7d", "30d"], "default": "24h"},
-        "recompute": {"type": "boolean", "default": false}
+        "server_id": {
+          "type": "string"
+        },
+        "window": {
+          "type": "string",
+          "enum": [
+            "24h",
+            "7d",
+            "30d"
+          ],
+          "default": "24h"
+        },
+        "recompute": {
+          "type": "boolean",
+          "default": false
+        }
       },
-      "required": ["server_id"]
+      "required": [
+        "server_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "server_id": {"type": "string"},
-        "composite_score": {"type": "number"},
-        "reliability_score": {"type": "number"},
-        "security_score": {"type": "number"},
-        "confidence": {"type": "number"}
+        "server_id": {
+          "type": "string"
+        },
+        "composite_score": {
+          "type": "number"
+        },
+        "reliability_score": {
+          "type": "number"
+        },
+        "security_score": {
+          "type": "number"
+        },
+        "confidence": {
+          "type": "number"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 300},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "free"
   },
   {
@@ -297,9 +551,16 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "name_contains": {"type": "string"},
-        "min_score": {"type": "number"},
-        "limit": {"type": "integer", "default": 100}
+        "name_contains": {
+          "type": "string"
+        },
+        "min_score": {
+          "type": "number"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100
+        }
       }
     },
     "output_schema": {
@@ -307,14 +568,24 @@
       "items": {
         "type": "object",
         "properties": {
-          "id": {"type": "string"},
-          "name": {"type": "string"},
-          "url": {"type": "string"}
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
         }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 300},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "free"
   },
   {
@@ -324,11 +595,21 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string"},
-        "limit": {"type": "integer", "default": 100},
-        "offset": {"type": "integer", "default": 0}
+        "agent_id": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0
+        }
       },
-      "required": ["agent_id"]
+      "required": [
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "array",
@@ -336,8 +617,12 @@
         "type": "object"
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 500},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
     "tier_required": "free"
   },
   {
@@ -347,18 +632,29 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "server_id": {"type": "string", "description": "The server identifier to delete"}
+        "server_id": {
+          "type": "string",
+          "description": "The server identifier to delete"
+        }
       },
-      "required": ["server_id"]
+      "required": [
+        "server_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "deleted": {"type": "boolean"}
+        "deleted": {
+          "type": "boolean"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 300},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "pro"
   },
   {
@@ -368,23 +664,46 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "server_id": {"type": "string", "description": "The server identifier to update"},
-        "name": {"type": "string", "description": "New server name (optional)"},
-        "url": {"type": "string", "description": "New server URL (optional)"}
+        "server_id": {
+          "type": "string",
+          "description": "The server identifier to update"
+        },
+        "name": {
+          "type": "string",
+          "description": "New server name (optional)"
+        },
+        "url": {
+          "type": "string",
+          "description": "New server URL (optional)"
+        }
       },
-      "required": ["server_id"]
+      "required": [
+        "server_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string"},
-        "name": {"type": "string"},
-        "url": {"type": "string"},
-        "transport_type": {"type": "string"}
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "transport_type": {
+          "type": "string"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 300},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "pro"
   },
   {
@@ -394,18 +713,34 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "since": {"type": "number", "description": "Unix timestamp to query from (optional)"},
-        "limit": {"type": "integer", "default": 100, "description": "Maximum number of entries"}
+        "since": {
+          "type": "number",
+          "description": "Unix timestamp to query from (optional)"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100,
+          "description": "Maximum number of entries"
+        }
       }
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "entries": {"type": "array", "items": {"type": "object"}}
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 500},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
     "tier_required": "pro"
   },
   {
@@ -415,20 +750,38 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "event_type": {"type": "string", "description": "Dot-separated event type (e.g. trust.score_drop)"},
-        "source": {"type": "string", "description": "Product that originated the event"},
-        "payload": {"type": "object", "description": "Arbitrary event payload"}
+        "event_type": {
+          "type": "string",
+          "description": "Dot-separated event type (e.g. trust.score_drop)"
+        },
+        "source": {
+          "type": "string",
+          "description": "Product that originated the event"
+        },
+        "payload": {
+          "type": "object",
+          "description": "Arbitrary event payload"
+        }
       },
-      "required": ["event_type", "source"]
+      "required": [
+        "event_type",
+        "source"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "event_id": {"type": "integer"}
+        "event_id": {
+          "type": "integer"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 200},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   },
   {
@@ -438,9 +791,20 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "event_type": {"type": "string", "description": "Filter by event type (optional)"},
-        "since_id": {"type": "integer", "description": "Return events after this ID (default 0)", "default": 0},
-        "limit": {"type": "integer", "description": "Maximum events to return", "default": 100}
+        "event_type": {
+          "type": "string",
+          "description": "Filter by event type (optional)"
+        },
+        "since_id": {
+          "type": "integer",
+          "description": "Return events after this ID (default 0)",
+          "default": 0
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum events to return",
+          "default": 100
+        }
       }
     },
     "output_schema": {
@@ -451,19 +815,35 @@
           "items": {
             "type": "object",
             "properties": {
-              "id": {"type": "integer"},
-              "event_type": {"type": "string"},
-              "source": {"type": "string"},
-              "payload": {"type": "object"},
-              "integrity_hash": {"type": "string"},
-              "created_at": {"type": "string"}
+              "id": {
+                "type": "integer"
+              },
+              "event_type": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "payload": {
+                "type": "object"
+              },
+              "integrity_hash": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string"
+              }
             }
           }
         }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 200},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   },
   {
@@ -473,26 +853,64 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string", "description": "The agent registering the webhook"},
-        "url": {"type": "string", "description": "The URL to receive webhook POST requests"},
-        "event_types": {"type": "array", "items": {"type": "string"}, "description": "Event types to subscribe to (e.g. billing.deposit)"},
-        "secret": {"type": "string", "description": "Shared secret for HMAC-SHA3 signature verification"}
+        "agent_id": {
+          "type": "string",
+          "description": "The agent registering the webhook"
+        },
+        "url": {
+          "type": "string",
+          "description": "The URL to receive webhook POST requests"
+        },
+        "event_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Event types to subscribe to (e.g. billing.deposit)"
+        },
+        "secret": {
+          "type": "string",
+          "description": "Shared secret for HMAC-SHA3 signature verification"
+        }
       },
-      "required": ["agent_id", "url", "event_types"]
+      "required": [
+        "agent_id",
+        "url",
+        "event_types"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string"},
-        "agent_id": {"type": "string"},
-        "url": {"type": "string"},
-        "event_types": {"type": "array", "items": {"type": "string"}},
-        "created_at": {"type": "number"},
-        "active": {"type": "boolean"}
+        "id": {
+          "type": "string"
+        },
+        "agent_id": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "event_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "created_at": {
+          "type": "number"
+        },
+        "active": {
+          "type": "boolean"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 300},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "pro"
   },
   {
@@ -502,18 +920,32 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string", "description": "The agent whose webhooks to list"}
+        "agent_id": {
+          "type": "string",
+          "description": "The agent whose webhooks to list"
+        }
       },
-      "required": ["agent_id"]
+      "required": [
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "webhooks": {"type": "array", "items": {"type": "object"}}
+        "webhooks": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 200},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "pro"
   },
   {
@@ -523,18 +955,29 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "webhook_id": {"type": "string", "description": "The webhook ID to delete"}
+        "webhook_id": {
+          "type": "string",
+          "description": "The webhook ID to delete"
+        }
       },
-      "required": ["webhook_id"]
+      "required": [
+        "webhook_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "deleted": {"type": "boolean"}
+        "deleted": {
+          "type": "boolean"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 200},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "pro"
   },
   {
@@ -548,15 +991,29 @@
     "output_schema": {
       "type": "object",
       "properties": {
-        "processed": {"type": "integer"},
-        "succeeded": {"type": "integer"},
-        "failed": {"type": "integer"},
-        "suspended": {"type": "integer"},
-        "expired_escrows": {"type": "integer"}
+        "processed": {
+          "type": "integer"
+        },
+        "succeeded": {
+          "type": "integer"
+        },
+        "failed": {
+          "type": "integer"
+        },
+        "suspended": {
+          "type": "integer"
+        },
+        "expired_escrows": {
+          "type": "integer"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 5000},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
     "tier_required": "pro"
   },
   {
@@ -566,21 +1023,39 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string", "description": "Unique agent identifier"},
-        "public_key": {"type": "string", "description": "Optional Ed25519 public key hex. Auto-generated if omitted."}
+        "agent_id": {
+          "type": "string",
+          "description": "Unique agent identifier"
+        },
+        "public_key": {
+          "type": "string",
+          "description": "Optional Ed25519 public key hex. Auto-generated if omitted."
+        }
       },
-      "required": ["agent_id"]
+      "required": [
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string"},
-        "public_key": {"type": "string"},
-        "created_at": {"type": "number"}
+        "agent_id": {
+          "type": "string"
+        },
+        "public_key": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "number"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 300},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "free"
   },
   {
@@ -590,20 +1065,39 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string", "description": "The agent who claims to have signed"},
-        "message": {"type": "string", "description": "The original message (string)"},
-        "signature": {"type": "string", "description": "Ed25519 signature hex"}
+        "agent_id": {
+          "type": "string",
+          "description": "The agent who claims to have signed"
+        },
+        "message": {
+          "type": "string",
+          "description": "The original message (string)"
+        },
+        "signature": {
+          "type": "string",
+          "description": "Ed25519 signature hex"
+        }
       },
-      "required": ["agent_id", "message", "signature"]
+      "required": [
+        "agent_id",
+        "message",
+        "signature"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "valid": {"type": "boolean"}
+        "valid": {
+          "type": "boolean"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 200},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   },
   {
@@ -613,25 +1107,57 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string", "description": "The agent submitting metrics"},
-        "metrics": {"type": "object", "description": "Dict of metric_name -> value (e.g. {\"sharpe_30d\": 2.35})"},
-        "data_source": {"type": "string", "description": "One of: self_reported, exchange_api, platform_verified", "default": "self_reported"}
+        "agent_id": {
+          "type": "string",
+          "description": "The agent submitting metrics"
+        },
+        "metrics": {
+          "type": "object",
+          "description": "Dict of metric_name -> value (e.g. {\"sharpe_30d\": 2.35})"
+        },
+        "data_source": {
+          "type": "string",
+          "description": "One of: self_reported, exchange_api, platform_verified",
+          "default": "self_reported"
+        }
       },
-      "required": ["agent_id", "metrics"]
+      "required": [
+        "agent_id",
+        "metrics"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string"},
-        "commitment_hashes": {"type": "array", "items": {"type": "string"}},
-        "verified_at": {"type": "number"},
-        "valid_until": {"type": "number"},
-        "data_source": {"type": "string"},
-        "signature": {"type": "string"}
+        "agent_id": {
+          "type": "string"
+        },
+        "commitment_hashes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "verified_at": {
+          "type": "number"
+        },
+        "valid_until": {
+          "type": "number"
+        },
+        "data_source": {
+          "type": "string"
+        },
+        "signature": {
+          "type": "string"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 500},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
     "tier_required": "pro"
   },
   {
@@ -641,22 +1167,41 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string", "description": "The agent identifier"}
+        "agent_id": {
+          "type": "string",
+          "description": "The agent identifier"
+        }
       },
-      "required": ["agent_id"]
+      "required": [
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string"},
-        "public_key": {"type": "string"},
-        "created_at": {"type": "number"},
-        "org_id": {"type": "string"},
-        "found": {"type": "boolean"}
+        "agent_id": {
+          "type": "string"
+        },
+        "public_key": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "number"
+        },
+        "org_id": {
+          "type": "string"
+        },
+        "found": {
+          "type": "boolean"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 200},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   },
   {
@@ -666,9 +1211,14 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string", "description": "The agent identifier"}
+        "agent_id": {
+          "type": "string",
+          "description": "The agent identifier"
+        }
       },
-      "required": ["agent_id"]
+      "required": [
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
@@ -678,18 +1228,32 @@
           "items": {
             "type": "object",
             "properties": {
-              "agent_id": {"type": "string"},
-              "metric_name": {"type": "string"},
-              "claim_type": {"type": "string"},
-              "bound_value": {"type": "number"},
-              "valid_until": {"type": "number"}
+              "agent_id": {
+                "type": "string"
+              },
+              "metric_name": {
+                "type": "string"
+              },
+              "claim_type": {
+                "type": "string"
+              },
+              "bound_value": {
+                "type": "number"
+              },
+              "valid_until": {
+                "type": "number"
+              }
             }
           }
         }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 200},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   },
   {
@@ -699,24 +1263,47 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string", "description": "The agent identifier"}
+        "agent_id": {
+          "type": "string",
+          "description": "The agent identifier"
+        }
       },
-      "required": ["agent_id"]
+      "required": [
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string"},
-        "payment_reliability": {"type": "number"},
-        "dispute_rate": {"type": "number"},
-        "transaction_volume_score": {"type": "number"},
-        "composite_score": {"type": "number"},
-        "confidence": {"type": "number"},
-        "found": {"type": "boolean"}
+        "agent_id": {
+          "type": "string"
+        },
+        "payment_reliability": {
+          "type": "number"
+        },
+        "dispute_rate": {
+          "type": "number"
+        },
+        "transaction_volume_score": {
+          "type": "number"
+        },
+        "composite_score": {
+          "type": "number"
+        },
+        "confidence": {
+          "type": "number"
+        },
+        "found": {
+          "type": "boolean"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 200},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   },
   {
@@ -726,26 +1313,64 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "payer": {"type": "string", "description": "Agent paying the subscription"},
-        "payee": {"type": "string", "description": "Agent receiving payments"},
-        "amount": {"type": "number", "description": "Amount per interval"},
-        "interval": {"type": "string", "enum": ["hourly", "daily", "weekly", "monthly"]},
-        "description": {"type": "string"}
+        "payer": {
+          "type": "string",
+          "description": "Agent paying the subscription"
+        },
+        "payee": {
+          "type": "string",
+          "description": "Agent receiving payments"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount per interval"
+        },
+        "interval": {
+          "type": "string",
+          "enum": [
+            "hourly",
+            "daily",
+            "weekly",
+            "monthly"
+          ]
+        },
+        "description": {
+          "type": "string"
+        }
       },
-      "required": ["payer", "payee", "amount", "interval"]
+      "required": [
+        "payer",
+        "payee",
+        "amount",
+        "interval"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string"},
-        "status": {"type": "string"},
-        "amount": {"type": "number"},
-        "interval": {"type": "string"},
-        "next_charge_at": {"type": "number"}
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "interval": {
+          "type": "string"
+        },
+        "next_charge_at": {
+          "type": "number"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 500},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
     "tier_required": "pro"
   },
   {
@@ -755,20 +1380,35 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "subscription_id": {"type": "string"},
-        "cancelled_by": {"type": "string", "description": "Agent requesting cancellation"}
+        "subscription_id": {
+          "type": "string"
+        },
+        "cancelled_by": {
+          "type": "string",
+          "description": "Agent requesting cancellation"
+        }
       },
-      "required": ["subscription_id"]
+      "required": [
+        "subscription_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string"},
-        "status": {"type": "string"}
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 300},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "pro"
   },
   {
@@ -778,26 +1418,52 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "subscription_id": {"type": "string"}
+        "subscription_id": {
+          "type": "string"
+        }
       },
-      "required": ["subscription_id"]
+      "required": [
+        "subscription_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string"},
-        "payer": {"type": "string"},
-        "payee": {"type": "string"},
-        "amount": {"type": "number"},
-        "interval": {"type": "string"},
-        "status": {"type": "string"},
-        "next_charge_at": {"type": "number"},
-        "charge_count": {"type": "integer"},
-        "created_at": {"type": "number"}
+        "id": {
+          "type": "string"
+        },
+        "payer": {
+          "type": "string"
+        },
+        "payee": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "interval": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "next_charge_at": {
+          "type": "number"
+        },
+        "charge_count": {
+          "type": "integer"
+        },
+        "created_at": {
+          "type": "number"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 200},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "pro"
   },
   {
@@ -807,20 +1473,41 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string", "description": "Filter by agent (payer or payee)"},
-        "status": {"type": "string", "description": "Filter by status (active, cancelled, suspended)"},
-        "limit": {"type": "integer", "default": 100},
-        "offset": {"type": "integer", "default": 0}
+        "agent_id": {
+          "type": "string",
+          "description": "Filter by agent (payer or payee)"
+        },
+        "status": {
+          "type": "string",
+          "description": "Filter by status (active, cancelled, suspended)"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0
+        }
       }
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "subscriptions": {"type": "array", "items": {"type": "object"}}
+        "subscriptions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 300},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "pro"
   },
   {
@@ -830,19 +1517,31 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "subscription_id": {"type": "string"}
+        "subscription_id": {
+          "type": "string"
+        }
       },
-      "required": ["subscription_id"]
+      "required": [
+        "subscription_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string"},
-        "status": {"type": "string"}
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 300},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "pro"
   },
   {
@@ -852,21 +1551,40 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string", "description": "Agent identifier for the new wallet"},
-        "initial_balance": {"type": "number", "description": "Starting balance (default 0)", "default": 0}
+        "agent_id": {
+          "type": "string",
+          "description": "Agent identifier for the new wallet"
+        },
+        "initial_balance": {
+          "type": "number",
+          "description": "Starting balance (default 0)",
+          "default": 0
+        }
       },
-      "required": ["agent_id"]
+      "required": [
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string"},
-        "balance": {"type": "number"},
-        "created_at": {"type": "number"}
+        "agent_id": {
+          "type": "string"
+        },
+        "balance": {
+          "type": "number"
+        },
+        "created_at": {
+          "type": "number"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 300},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "free"
   },
   {
@@ -876,20 +1594,37 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string"},
-        "amount": {"type": "number", "description": "Amount to withdraw"},
-        "description": {"type": "string", "description": "Reason for withdrawal"}
+        "agent_id": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount to withdraw"
+        },
+        "description": {
+          "type": "string",
+          "description": "Reason for withdrawal"
+        }
       },
-      "required": ["agent_id", "amount"]
+      "required": [
+        "agent_id",
+        "amount"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "new_balance": {"type": "number"}
+        "new_balance": {
+          "type": "number"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 300},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "free"
   },
   {
@@ -899,12 +1634,26 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "metric_name": {"type": "string", "description": "Metric to search (sharpe_30d, max_drawdown_30d, etc.)"},
-        "min_value": {"type": "number", "description": "Minimum bound value (for higher-is-better metrics)"},
-        "max_value": {"type": "number", "description": "Maximum bound value (for lower-is-better metrics)"},
-        "limit": {"type": "integer", "default": 50}
+        "metric_name": {
+          "type": "string",
+          "description": "Metric to search (sharpe_30d, max_drawdown_30d, etc.)"
+        },
+        "min_value": {
+          "type": "number",
+          "description": "Minimum bound value (for higher-is-better metrics)"
+        },
+        "max_value": {
+          "type": "number",
+          "description": "Maximum bound value (for lower-is-better metrics)"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 50
+        }
       },
-      "required": ["metric_name"]
+      "required": [
+        "metric_name"
+      ]
     },
     "output_schema": {
       "type": "object",
@@ -914,18 +1663,32 @@
           "items": {
             "type": "object",
             "properties": {
-              "agent_id": {"type": "string"},
-              "metric_name": {"type": "string"},
-              "claim_type": {"type": "string"},
-              "bound_value": {"type": "number"},
-              "valid_until": {"type": "number"}
+              "agent_id": {
+                "type": "string"
+              },
+              "metric_name": {
+                "type": "string"
+              },
+              "claim_type": {
+                "type": "string"
+              },
+              "bound_value": {
+                "type": "number"
+              },
+              "valid_until": {
+                "type": "number"
+              }
             }
           }
         }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 300},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "pro"
   },
   {
@@ -935,27 +1698,64 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "payer": {"type": "string"},
-        "payee": {"type": "string"},
-        "amount": {"type": "number"},
-        "metric_name": {"type": "string", "description": "Metric to gate on (e.g. sharpe_30d)"},
-        "threshold": {"type": "number", "description": "Value the metric must meet"},
-        "description": {"type": "string"}
+        "payer": {
+          "type": "string"
+        },
+        "payee": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "metric_name": {
+          "type": "string",
+          "description": "Metric to gate on (e.g. sharpe_30d)"
+        },
+        "threshold": {
+          "type": "number",
+          "description": "Value the metric must meet"
+        },
+        "description": {
+          "type": "string"
+        }
       },
-      "required": ["payer", "payee", "amount", "metric_name", "threshold"]
+      "required": [
+        "payer",
+        "payee",
+        "amount",
+        "metric_name",
+        "threshold"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "escrow_id": {"type": "string"},
-        "status": {"type": "string"},
-        "amount": {"type": "number"},
-        "metric_name": {"type": "string"},
-        "threshold": {"type": "number"}
+        "escrow_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "metric_name": {
+          "type": "string"
+        },
+        "threshold": {
+          "type": "number"
+        }
       }
     },
-    "pricing": {"model": "percentage", "percentage": 1.5, "min_fee": 0.01, "max_fee": 10.0},
-    "sla": {"max_latency_ms": 500},
+    "pricing": {
+      "model": "percentage",
+      "percentage": 1.5,
+      "min_fee": 0.01,
+      "max_fee": 10.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
     "tier_required": "pro"
   },
   {
@@ -965,20 +1765,34 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "escrow_id": {"type": "string"}
+        "escrow_id": {
+          "type": "string"
+        }
       },
-      "required": ["escrow_id"]
+      "required": [
+        "escrow_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "released": {"type": "boolean"},
-        "settlement_id": {"type": "string"},
-        "reason": {"type": "string"}
+        "released": {
+          "type": "boolean"
+        },
+        "settlement_id": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 500},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
     "tier_required": "pro"
   },
   {
@@ -988,22 +1802,42 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "escrow_id": {"type": "string"},
-        "opener": {"type": "string", "description": "Agent opening the dispute"},
-        "reason": {"type": "string"}
+        "escrow_id": {
+          "type": "string"
+        },
+        "opener": {
+          "type": "string",
+          "description": "Agent opening the dispute"
+        },
+        "reason": {
+          "type": "string"
+        }
       },
-      "required": ["escrow_id", "opener"]
+      "required": [
+        "escrow_id",
+        "opener"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string"},
-        "escrow_id": {"type": "string"},
-        "status": {"type": "string"}
+        "id": {
+          "type": "string"
+        },
+        "escrow_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 500},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
     "tier_required": "pro"
   },
   {
@@ -1013,21 +1847,39 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "dispute_id": {"type": "string"},
-        "respondent": {"type": "string"},
-        "response": {"type": "string"}
+        "dispute_id": {
+          "type": "string"
+        },
+        "respondent": {
+          "type": "string"
+        },
+        "response": {
+          "type": "string"
+        }
       },
-      "required": ["dispute_id", "respondent", "response"]
+      "required": [
+        "dispute_id",
+        "respondent",
+        "response"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string"},
-        "status": {"type": "string"}
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 300},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "pro"
   },
   {
@@ -1037,23 +1889,49 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "dispute_id": {"type": "string"},
-        "resolution": {"type": "string", "enum": ["refund", "release"]},
-        "resolved_by": {"type": "string"},
-        "notes": {"type": "string"}
+        "dispute_id": {
+          "type": "string"
+        },
+        "resolution": {
+          "type": "string",
+          "enum": [
+            "refund",
+            "release"
+          ]
+        },
+        "resolved_by": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        }
       },
-      "required": ["dispute_id", "resolution", "resolved_by"]
+      "required": [
+        "dispute_id",
+        "resolution",
+        "resolved_by"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string"},
-        "status": {"type": "string"},
-        "resolution": {"type": "string"}
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "resolution": {
+          "type": "string"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 500},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
     "tier_required": "pro"
   },
   {
@@ -1063,21 +1941,38 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "current_key": {"type": "string", "description": "The API key to rotate"}
+        "current_key": {
+          "type": "string",
+          "description": "The API key to rotate"
+        }
       },
-      "required": ["current_key"]
+      "required": [
+        "current_key"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "new_key": {"type": "string"},
-        "tier": {"type": "string"},
-        "agent_id": {"type": "string"},
-        "revoked": {"type": "boolean"}
+        "new_key": {
+          "type": "string"
+        },
+        "tier": {
+          "type": "string"
+        },
+        "agent_id": {
+          "type": "string"
+        },
+        "revoked": {
+          "type": "boolean"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 300},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "free"
   },
   {
@@ -1087,22 +1982,40 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string"}
+        "agent_id": {
+          "type": "string"
+        }
       },
-      "required": ["agent_id"]
+      "required": [
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "merkle_root": {"type": "string"},
-        "leaf_count": {"type": "integer"},
-        "period_start": {"type": "number"},
-        "period_end": {"type": "number"},
-        "chain_id": {"type": "integer"}
+        "merkle_root": {
+          "type": "string"
+        },
+        "leaf_count": {
+          "type": "integer"
+        },
+        "period_start": {
+          "type": "number"
+        },
+        "period_end": {
+          "type": "number"
+        },
+        "chain_id": {
+          "type": "integer"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 500},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
     "tier_required": "pro"
   },
   {
@@ -1112,19 +2025,35 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string"},
-        "limit": {"type": "integer", "default": 10}
+        "agent_id": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 10
+        }
       },
-      "required": ["agent_id"]
+      "required": [
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "chains": {"type": "array", "items": {"type": "object"}}
+        "chains": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 300},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "pro"
   },
   {
@@ -1134,26 +2063,62 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "sender": {"type": "string"},
-        "recipient": {"type": "string"},
-        "message_type": {"type": "string", "enum": ["text", "price_negotiation", "task_specification", "counter_offer", "accept", "reject"]},
-        "subject": {"type": "string"},
-        "body": {"type": "string"},
-        "thread_id": {"type": "string"}
+        "sender": {
+          "type": "string"
+        },
+        "recipient": {
+          "type": "string"
+        },
+        "message_type": {
+          "type": "string",
+          "enum": [
+            "text",
+            "price_negotiation",
+            "task_specification",
+            "counter_offer",
+            "accept",
+            "reject"
+          ]
+        },
+        "subject": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "thread_id": {
+          "type": "string"
+        }
       },
-      "required": ["sender", "recipient", "message_type"]
+      "required": [
+        "sender",
+        "recipient",
+        "message_type"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string"},
-        "sender": {"type": "string"},
-        "recipient": {"type": "string"},
-        "thread_id": {"type": "string"}
+        "id": {
+          "type": "string"
+        },
+        "sender": {
+          "type": "string"
+        },
+        "recipient": {
+          "type": "string"
+        },
+        "thread_id": {
+          "type": "string"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 200},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   },
   {
@@ -1163,20 +2128,38 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string"},
-        "thread_id": {"type": "string"},
-        "limit": {"type": "integer", "default": 50}
+        "agent_id": {
+          "type": "string"
+        },
+        "thread_id": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 50
+        }
       },
-      "required": ["agent_id"]
+      "required": [
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "messages": {"type": "array", "items": {"type": "object"}}
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 200},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   },
   {
@@ -1186,25 +2169,52 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "initiator": {"type": "string"},
-        "responder": {"type": "string"},
-        "amount": {"type": "number"},
-        "service_id": {"type": "string"},
-        "expires_hours": {"type": "number", "default": 24}
+        "initiator": {
+          "type": "string"
+        },
+        "responder": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "service_id": {
+          "type": "string"
+        },
+        "expires_hours": {
+          "type": "number",
+          "default": 24
+        }
       },
-      "required": ["initiator", "responder", "amount"]
+      "required": [
+        "initiator",
+        "responder",
+        "amount"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "negotiation_id": {"type": "string"},
-        "thread_id": {"type": "string"},
-        "status": {"type": "string"},
-        "proposed_amount": {"type": "number"}
+        "negotiation_id": {
+          "type": "string"
+        },
+        "thread_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "proposed_amount": {
+          "type": "number"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 300},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "free"
   },
   {
@@ -1214,22 +2224,41 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "server_id": {"type": "string"},
-        "claimed_uptime": {"type": "number", "description": "Claimed uptime percentage (e.g. 99.5)"}
+        "server_id": {
+          "type": "string"
+        },
+        "claimed_uptime": {
+          "type": "number",
+          "description": "Claimed uptime percentage (e.g. 99.5)"
+        }
       },
-      "required": ["server_id"]
+      "required": [
+        "server_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "compliant": {"type": "boolean"},
-        "actual_uptime": {"type": "number"},
-        "violation_pct": {"type": "number"},
-        "confidence": {"type": "number"}
+        "compliant": {
+          "type": "boolean"
+        },
+        "actual_uptime": {
+          "type": "number"
+        },
+        "violation_pct": {
+          "type": "number"
+        },
+        "confidence": {
+          "type": "number"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 300},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "pro"
   },
   {
@@ -1239,20 +2268,41 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "tags": {"type": "array", "items": {"type": "string"}},
-        "max_cost": {"type": "number"},
-        "min_trust_score": {"type": "number"},
-        "limit": {"type": "integer", "default": 50}
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "max_cost": {
+          "type": "number"
+        },
+        "min_trust_score": {
+          "type": "number"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 50
+        }
       }
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "strategies": {"type": "array", "items": {"type": "object"}}
+        "strategies": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 300},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "free"
   },
   {
@@ -1262,21 +2312,38 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string"},
-        "since": {"type": "number", "description": "Unix timestamp to query from"}
+        "agent_id": {
+          "type": "string"
+        },
+        "since": {
+          "type": "number",
+          "description": "Unix timestamp to query from"
+        }
       },
-      "required": ["agent_id"]
+      "required": [
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "total_calls": {"type": "integer"},
-        "total_cost": {"type": "number"},
-        "total_tokens": {"type": "integer"}
+        "total_calls": {
+          "type": "integer"
+        },
+        "total_cost": {
+          "type": "number"
+        },
+        "total_tokens": {
+          "type": "integer"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 300},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "free"
   },
   {
@@ -1286,20 +2353,35 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string"},
-        "limit": {"type": "integer", "default": 50}
+        "agent_id": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 50
+        }
       },
-      "required": ["agent_id"]
+      "required": [
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "total_revenue": {"type": "number"},
-        "payment_count": {"type": "integer"}
+        "total_revenue": {
+          "type": "number"
+        },
+        "payment_count": {
+          "type": "integer"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 500},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
     "tier_required": "free"
   },
   {
@@ -1309,32 +2391,63 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "payer": {"type": "string"},
-        "amount": {"type": "number"},
+        "payer": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
         "splits": {
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
-              "payee": {"type": "string"},
-              "percentage": {"type": "number"}
+              "payee": {
+                "type": "string"
+              },
+              "percentage": {
+                "type": "number"
+              }
             },
-            "required": ["payee", "percentage"]
+            "required": [
+              "payee",
+              "percentage"
+            ]
           }
         },
-        "description": {"type": "string"}
+        "description": {
+          "type": "string"
+        }
       },
-      "required": ["payer", "amount", "splits"]
+      "required": [
+        "payer",
+        "amount",
+        "splits"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "status": {"type": "string"},
-        "settlements": {"type": "array", "items": {"type": "object"}}
+        "status": {
+          "type": "string"
+        },
+        "settlements": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
       }
     },
-    "pricing": {"model": "percentage", "percentage": 2.0, "min_fee": 0.01, "max_fee": 5.0},
-    "sla": {"max_latency_ms": 500},
+    "pricing": {
+      "model": "percentage",
+      "percentage": 2.0,
+      "min_fee": 0.01,
+      "max_fee": 5.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
     "tier_required": "pro"
   },
   {
@@ -1344,22 +2457,42 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "database": {"type": "string", "description": "Logical database name (billing, payments, etc.)"},
-        "encrypt": {"type": "boolean", "description": "Whether to encrypt the backup"}
+        "database": {
+          "type": "string",
+          "description": "Logical database name (billing, payments, etc.)"
+        },
+        "encrypt": {
+          "type": "boolean",
+          "description": "Whether to encrypt the backup"
+        }
       },
-      "required": ["database"]
+      "required": [
+        "database"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "path": {"type": "string"},
-        "size_bytes": {"type": "integer"},
-        "created_at": {"type": "string"},
-        "key": {"type": "string"}
+        "path": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": "integer"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 5000},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
     "tier_required": "pro"
   },
   {
@@ -1369,22 +2502,44 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "database": {"type": "string", "description": "Logical database name to restore into"},
-        "backup_path": {"type": "string", "description": "Path to the backup file"},
-        "key": {"type": "string", "description": "Decryption key if backup is encrypted"}
+        "database": {
+          "type": "string",
+          "description": "Logical database name to restore into"
+        },
+        "backup_path": {
+          "type": "string",
+          "description": "Path to the backup file"
+        },
+        "key": {
+          "type": "string",
+          "description": "Decryption key if backup is encrypted"
+        }
       },
-      "required": ["database", "backup_path"]
+      "required": [
+        "database",
+        "backup_path"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "path": {"type": "string"},
-        "size_bytes": {"type": "integer"},
-        "restored_at": {"type": "string"}
+        "path": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": "integer"
+        },
+        "restored_at": {
+          "type": "string"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 5000},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
     "tier_required": "pro"
   },
   {
@@ -1394,21 +2549,38 @@
     "input_schema": {
       "type": "object",
       "properties": {
-        "database": {"type": "string", "description": "Logical database name to check"}
+        "database": {
+          "type": "string",
+          "description": "Logical database name to check"
+        }
       },
-      "required": ["database"]
+      "required": [
+        "database"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "ok": {"type": "boolean"},
-        "details": {"type": "string"},
-        "page_count": {"type": "integer"},
-        "freelist_count": {"type": "integer"}
+        "ok": {
+          "type": "boolean"
+        },
+        "details": {
+          "type": "string"
+        },
+        "page_count": {
+          "type": "integer"
+        },
+        "freelist_count": {
+          "type": "integer"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 2000},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 2000
+    },
     "tier_required": "pro"
   },
   {
@@ -1427,16 +2599,868 @@
           "items": {
             "type": "object",
             "properties": {
-              "filename": {"type": "string"},
-              "path": {"type": "string"},
-              "size_bytes": {"type": "integer"}
+              "filename": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "size_bytes": {
+                "type": "integer"
+              }
             }
           }
         }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 500},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "stripe_list_customers",
+    "description": "List Stripe customers.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "default": 10
+        }
+      },
+      "required": []
+    },
+    "service": "stripe",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.01
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "stripe_create_customer",
+    "description": "Create a Stripe customer.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "email"
+      ]
+    },
+    "service": "stripe",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.01
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "stripe_list_products",
+    "description": "List Stripe products.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "default": 10
+        }
+      },
+      "required": []
+    },
+    "service": "stripe",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.01
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "stripe_create_product",
+    "description": "Create a Stripe product.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "service": "stripe",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.01
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "stripe_list_prices",
+    "description": "List Stripe prices.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "default": 10
+        }
+      },
+      "required": []
+    },
+    "service": "stripe",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.01
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "stripe_create_price",
+    "description": "Create a Stripe price.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "product": {
+          "type": "string"
+        },
+        "unit_amount": {
+          "type": "integer"
+        },
+        "currency": {
+          "type": "string",
+          "default": "usd"
+        }
+      },
+      "required": [
+        "product",
+        "unit_amount"
+      ]
+    },
+    "service": "stripe",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.01
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "stripe_create_payment_link",
+    "description": "Create a Stripe payment link.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "price": {
+          "type": "string"
+        },
+        "quantity": {
+          "type": "integer",
+          "default": 1
+        }
+      },
+      "required": [
+        "price"
+      ]
+    },
+    "service": "stripe",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.01
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "stripe_list_invoices",
+    "description": "List Stripe invoices.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "default": 10
+        }
+      },
+      "required": []
+    },
+    "service": "stripe",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.01
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "stripe_create_invoice",
+    "description": "Create a Stripe invoice.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "customer": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "customer"
+      ]
+    },
+    "service": "stripe",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.01
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "stripe_list_subscriptions",
+    "description": "List Stripe subscriptions.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "default": 10
+        }
+      },
+      "required": []
+    },
+    "service": "stripe",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.01
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "stripe_cancel_subscription",
+    "description": "Cancel a Stripe subscription.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "subscription_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "subscription_id"
+      ]
+    },
+    "service": "stripe",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.01
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "stripe_create_refund",
+    "description": "Create a Stripe refund.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "payment_intent": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "payment_intent"
+      ]
+    },
+    "service": "stripe",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.01
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "stripe_retrieve_balance",
+    "description": "Retrieve Stripe account balance.",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    },
+    "service": "stripe",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.01
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "github_list_repos",
+    "description": "List GitHub repositories.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "default": "all"
+        }
+      },
+      "required": []
+    },
+    "service": "github",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.005
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "github_get_repo",
+    "description": "Get GitHub repository metadata.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string"
+        },
+        "repo": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo"
+      ]
+    },
+    "service": "github",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.005
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "github_list_issues",
+    "description": "List issues in a repository.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string",
+          "default": "open"
+        }
+      },
+      "required": [
+        "owner",
+        "repo"
+      ]
+    },
+    "service": "github",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.005
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "github_create_issue",
+    "description": "Create an issue in a repository.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "title"
+      ]
+    },
+    "service": "github",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.005
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "github_list_pull_requests",
+    "description": "List pull requests.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string",
+          "default": "open"
+        }
+      },
+      "required": [
+        "owner",
+        "repo"
+      ]
+    },
+    "service": "github",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.005
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "github_get_pull_request",
+    "description": "Get pull request details.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "pull_number": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "pull_number"
+      ]
+    },
+    "service": "github",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.005
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "github_create_pull_request",
+    "description": "Create a pull request.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "head": {
+          "type": "string"
+        },
+        "base": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "title",
+        "head",
+        "base"
+      ]
+    },
+    "service": "github",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.005
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "github_list_commits",
+    "description": "List commits in a repository.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "sha": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo"
+      ]
+    },
+    "service": "github",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.005
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "github_get_file_contents",
+    "description": "Get file contents from a repository.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "path"
+      ]
+    },
+    "service": "github",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.005
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "github_search_code",
+    "description": "Search code across repositories.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "service": "github",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.005
+    },
+    "sla": {
+      "max_latency_ms": 5000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "pg_query",
+    "description": "Execute a read-only SQL query.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "sql": {
+          "type": "string"
+        },
+        "params": {
+          "type": "array"
+        }
+      },
+      "required": [
+        "sql"
+      ]
+    },
+    "service": "postgres",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.01
+    },
+    "sla": {
+      "max_latency_ms": 3000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "pg_execute",
+    "description": "Execute a SQL statement (if write-enabled).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "sql": {
+          "type": "string"
+        },
+        "params": {
+          "type": "array"
+        }
+      },
+      "required": [
+        "sql"
+      ]
+    },
+    "service": "postgres",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.01
+    },
+    "sla": {
+      "max_latency_ms": 3000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "pg_list_tables",
+    "description": "List tables in the database.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "type": "string",
+          "default": "public"
+        }
+      },
+      "required": []
+    },
+    "service": "postgres",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.01
+    },
+    "sla": {
+      "max_latency_ms": 3000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "pg_describe_table",
+    "description": "Describe a table's columns and types.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "table": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string",
+          "default": "public"
+        }
+      },
+      "required": [
+        "table"
+      ]
+    },
+    "service": "postgres",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.01
+    },
+    "sla": {
+      "max_latency_ms": 3000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "pg_explain_query",
+    "description": "EXPLAIN a SQL query plan.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "sql": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sql"
+      ]
+    },
+    "service": "postgres",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.01
+    },
+    "sla": {
+      "max_latency_ms": 3000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "pg_list_schemas",
+    "description": "List schemas in the database.",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    },
+    "service": "postgres",
+    "output_schema": {
+      "type": "object"
+    },
+    "pricing": {
+      "per_call": 0.01
+    },
+    "sla": {
+      "max_latency_ms": 3000
+    },
     "tier_required": "pro"
   }
 ]
