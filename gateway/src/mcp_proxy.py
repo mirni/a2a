@@ -212,18 +212,19 @@ class MCPProxyManager:
         return await conn.call_tool(mcp_tool_name, params)
 
     async def _ensure_connection(self, connector: str) -> MCPConnection:
-        """Get or create an MCP connection for the given connector."""
-        if connector in self._connections:
-            conn = self._connections[connector]
-            if conn.process.returncode is None:
-                return conn
-            # Process died, remove it
-            del self._connections[connector]
+        """Get or create an MCP connection for the given connector.
 
+        Entire check-and-start is inside the lock to prevent race conditions
+        where two coroutines could both see a dead process and both start
+        a replacement.
+        """
         async with self._locks[connector]:
-            # Double-check after acquiring lock
             if connector in self._connections:
-                return self._connections[connector]
+                conn = self._connections[connector]
+                if conn.process.returncode is None:
+                    return conn
+                # Process died, remove it
+                del self._connections[connector]
 
             conn = await self._start_connector(connector)
             self._connections[connector] = conn
@@ -255,7 +256,7 @@ class MCPProxyManager:
             npx, "-y", "@stripe/mcp@latest", "--tools=all",
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
             env=env,
         )
         logger.info("Started Stripe MCP server (pid=%d)", process.pid)
@@ -279,7 +280,7 @@ class MCPProxyManager:
             python, "-m", "src.server",
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
             cwd=connector_dir,
             env=os.environ.copy(),
         )
