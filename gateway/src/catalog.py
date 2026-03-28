@@ -44,6 +44,25 @@ def tool_count() -> int:
     return len(_load())
 
 
+def validate_catalog(registry: dict[str, Any]) -> None:
+    """Log warnings for catalog/registry mismatches.
+
+    - Catalog tools without implementation
+    - Registry tools without catalog entry
+    """
+    import logging
+
+    _logger = logging.getLogger("a2a.catalog")
+    catalog_names = {t["name"] for t in _load()}
+    registry_names = set(registry.keys())
+    missing = catalog_names - registry_names
+    if missing:
+        _logger.warning("Catalog tools without implementation: %s", missing)
+    extra = registry_names - catalog_names
+    if extra:
+        _logger.warning("Registry tools without catalog entry: %s", extra)
+
+
 def reset() -> None:
     """Reset cached catalog (useful for testing)."""
     global _CATALOG

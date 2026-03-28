@@ -210,6 +210,12 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     except Exception:
         logger.warning("MCP proxy not available", exc_info=True)
 
+    # --- Catalog validation ---
+    from gateway.src.catalog import validate_catalog
+    from gateway.src.tools import TOOL_REGISTRY
+
+    validate_catalog(TOOL_REGISTRY)
+
     # Store on app.state
     ctx = AppContext(
         tracker=tracker,

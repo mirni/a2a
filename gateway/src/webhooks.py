@@ -226,20 +226,24 @@ class WebhookManager:
             delay = _BASE_DELAY * (_EXPONENTIAL_BASE ** (attempts - 1))
             next_retry_at = now + delay
 
-        await self._db.execute(
-            """
-            UPDATE webhook_deliveries
-               SET status          = ?,
-                   attempts        = ?,
-                   last_attempt_at = ?,
-                   next_retry_at   = ?,
-                   response_code   = ?,
-                   response_body   = ?
-             WHERE id = ?
-            """,
-            (new_status, attempts, now, next_retry_at, status_code, body, delivery_id),
-        )
-        await self._db.commit()
+        try:
+            await self._db.execute(
+                """
+                UPDATE webhook_deliveries
+                   SET status          = ?,
+                       attempts        = ?,
+                       last_attempt_at = ?,
+                       next_retry_at   = ?,
+                       response_code   = ?,
+                       response_body   = ?
+                 WHERE id = ?
+                """,
+                (new_status, attempts, now, next_retry_at, status_code, body, delivery_id),
+            )
+            await self._db.commit()
+        except Exception:
+            await self._db.rollback()
+            raise
 
     # ------------------------------------------------------------------
     # Retries
