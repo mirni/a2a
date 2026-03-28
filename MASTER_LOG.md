@@ -1472,3 +1472,79 @@ All existing module tests unchanged and passing.
 - [x] ~~Hosted sandbox instructions~~ (DONE — see above)
 - [ ] **PostgreSQL migration** — DSN abstraction ready
 - [ ] **Bulletproofs range proofs** — Rust FFI needed
+
+---
+
+## Session 6 — 2026-03-28: Debian Package + Deployment Refactoring
+
+### Prompt
+
+> Implement the following plan: Debian Package + Deployment Refactoring
+>
+> Context: The 728-line monolithic `deploy.sh` handles everything from apt packages to certbot SSL. Refactor into modular scripts, create a `a2a-server` Debian package (v0.1.0) for easy install/upgrade, replace certbot/Let's Encrypt with Cloudflare Origin Server certificates (Full Strict), install scripts at `/usr/local/bin/`, make everything idempotent, never overwrite `.env` if it exists. Infrastructure code is exempt from TDD.
+
+### Response
+
+**Monolithic deploy.sh refactored into 5 modular scripts + Debian package. Zero certbot references remain.**
+
+#### New Files Created
+
+| File | Purpose | Lines |
+|------|---------|-------|
+| `scripts/common.bash` | Shared config, logging, APT/SSL/git/nginx helpers (already existed) | 131 |
+| `scripts/create_user.sh` | System user `a2a` + directory creation (idempotent) | 42 |
+| `scripts/deploy_a2a-gateway.sh` | Gateway: venv, deps, .env, systemd, nginx, admin key, backup cron | 256 |
+| `scripts/deploy_website.sh` | Static website + nginx (skips if no `A2A_WWW_DOMAIN`) | 112 |
+| `scripts/deploy_a2a.sh` | Main orchestrator — replaces monolithic deploy.sh | 180 |
+| `packaging/control` | Debian package metadata (v0.1.0, Architecture: all) | 11 |
+| `packaging/postinst` | Runs `deploy_a2a.sh` with `A2A_SKIP_GIT=1` on install/upgrade | 16 |
+| `packaging/prerm` | Stops/disables a2a-gateway service on remove | 17 |
+| `packaging/build-deb.sh` | Builds `a2a-server_0.1.0_all.deb` from repo | 108 |
+
+#### Files Modified
+
+| File | Change |
+|------|--------|
+| `deploy.sh` | Replaced 728-line monolith with 14-line thin wrapper to `scripts/deploy_a2a.sh` |
+
+#### Architecture
+
+```
+deploy.sh (backward-compat wrapper)
+  └──▶ scripts/deploy_a2a.sh (orchestrator)
+         ├── scripts/common.bash (sourced by all)
+         ├── scripts/create_user.sh
+         ├── scripts/deploy_a2a-gateway.sh
+         └── scripts/deploy_website.sh
+
+packaging/build-deb.sh
+  └── Builds a2a-server_0.1.0_all.deb (220K)
+        ├── /opt/a2a/ — application code (gateway, products, sdk, website, server)
+        ├── /opt/a2a/scripts/ — deployment scripts
+        └── /usr/local/bin/ — symlinks to scripts
+```
+
+#### Key Design Decisions
+
+1. **Cloudflare Origin SSL (no certbot)**: All nginx configs dynamically switch between HTTPS (if `/etc/ssl/cloudflare/origin.pem` + `origin-key.pem` exist) and HTTP-only fallback. Zero certbot/letsencrypt/acme-challenge references in new scripts.
+
+2. **Idempotency guarantees**:
+   - User creation: `if ! id a2a`
+   - Directories: `mkdir -p`
+   - `.env`: `if [[ ! -f "$ENV_FILE" ]]` — never overwritten on upgrade
+   - Systemd: always rewritten + `daemon-reload`
+   - Nginx: always rewritten + `nginx -t && reload`
+   - Admin key: created only on first install (checks for `billing.db`)
+   - Service: `systemctl restart` on every deploy
+
+3. **Deb package flow**: `apt install a2a-server` → copies code to `/opt/a2a/` + symlinks scripts to `/usr/local/bin/` → `postinst` calls `deploy_a2a.sh` with `A2A_SKIP_GIT=1` (code already installed from deb, skip git clone).
+
+4. **Script sourcing**: All scripts use `source "$(dirname "${BASH_SOURCE[0]}")/common.bash"` — works from both `/opt/a2a/scripts/` and `/usr/local/bin/` (via symlink).
+
+#### Verification Results
+
+- Build: `a2a-server_0.1.0_all.deb` builds cleanly (220K, no warnings)
+- Symlinks: all 5 scripts linked to `/usr/local/bin/` in deb
+- No certbot: zero references in `scripts/`
+- SSL: Cloudflare Origin cert paths in gateway and website nginx configs
+- `.env` protection: confirmed guard in `deploy_a2a-gateway.sh`

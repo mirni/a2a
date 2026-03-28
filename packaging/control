@@ -1,0 +1,11 @@
+Package: a2a-server
+Version: 0.1.0
+Architecture: all
+Depends: python3 (>= 3.12), nginx, sqlite3, git, curl, ufw
+Maintainer: A2A Team <team@greenhelix.net>
+Section: web
+Priority: optional
+Description: A2A Commerce Gateway — agent-to-agent commerce platform
+ Full-stack commerce gateway for agent-to-agent transactions.
+ Includes billing, payments, paywall, marketplace, identity,
+ messaging, trust, and reputation modules.

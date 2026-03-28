@@ -1,0 +1,18 @@
+#!/bin/bash
+set -e
+
+case "$1" in
+    configure)
+        # Code is already installed from the deb — skip git clone/pull
+        export A2A_SKIP_GIT=1
+        /usr/local/bin/deploy_a2a.sh
+        ;;
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+    *)
+        echo "postinst called with unknown argument '$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0
