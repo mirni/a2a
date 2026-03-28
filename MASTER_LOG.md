@@ -1177,3 +1177,27 @@ All 3 connectors are fully implemented MCP servers. Wiring them through the gate
 | **Revenue** | BLOCKED | No fiat on-ramp — credits exist but can't be purchased with real money |
 
 **Overall: Platform is functionally complete and live. The two blocking items for revenue are the fiat on-ramp (Stripe Checkout integration) and wiring the 3 connectors as billable gateway tools.**
+
+---
+
+### Session 5 (cont.) — Company Website
+
+### Prompt
+
+> Generate a Minimum Viable Website for "Green Helix Consulting, LLC" with static content, email support@greenhelix.net. www.greenhelix.net and greenhelix.net for humans. Update deploy.sh.
+
+### Response
+
+Created `website/index.html` — single-file static page (dark theme, responsive, no dependencies):
+- Header with nav, hero section, 6-card services grid (Identity, Payments, Trust, Marketplace, Consulting, Integrations)
+- API banner linking to `api.greenhelix.net/v1/health`
+- Contact section with `support@greenhelix.net`, footer with copyright
+
+deploy.sh updated:
+- `A2A_WWW_DOMAIN` env var (e.g. `greenhelix.net`)
+- Step 7a: copies `website/` to `/var/www/$WWW_DOMAIN`, creates separate nginx server block for `$WWW_DOMAIN` + `www.$WWW_DOMAIN`
+- Final instructions include DNS records and certbot command for website domain
+
+### Prompt
+
+> Work on TODO list items: P1 bugs first, then items 1 (fiat on-ramp), 2 (route connectors — use proxy to MCP stdio + Stripe's @stripe/mcp), 3 (TypeScript SDK), and provide instructions for hosted sandbox (6).
