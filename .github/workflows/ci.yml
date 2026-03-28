@@ -53,48 +53,35 @@ jobs:
             "pytest-cov>=5.0"
           pip install -e sdk/ || pip install sdk/
 
-      - name: Run gateway tests
-        run: PYTHONPATH=. python -m pytest gateway/tests/ -x -q --tb=short
+      - name: Test server health
+        run: ./check_server.sh
 
-      - name: Run billing tests
-        run: |
-          cd products/billing
-          PYTHONPATH=../../:. python -m pytest tests/ -x -q --tb=short
+      - name: Test gateway
+        run: scripts/run_tests.sh gateway
 
-      - name: Run paywall tests
-        run: |
-          cd products/paywall
-          PYTHONPATH=../../:. python -m pytest tests/ -x -q --tb=short
+      - name: Test billing
+        run: scripts/run_tests.sh products/billing
 
-      - name: Run payments tests
-        run: |
-          cd products/payments
-          PYTHONPATH=../../:. python -m pytest tests/ -x -q --tb=short
+      - name: Test paywall
+        run: scripts/run_tests.sh products/paywall
 
-      - name: Run marketplace tests
-        run: |
-          cd products/marketplace
-          PYTHONPATH=../../:. python -m pytest tests/ -x -q --tb=short
+      - name: Test payments
+        run: scripts/run_tests.sh products/payments
 
-      - name: Run trust tests
-        run: |
-          cd products/trust
-          PYTHONPATH=../../:. python -m pytest tests/ -x -q --tb=short
+      - name: Test marketplace
+        run: scripts/run_tests.sh products/marketplace
 
-      - name: Run shared tests
-        run: |
-          cd products/shared
-          PYTHONPATH=../../:. python -m pytest tests/ -x -q --tb=short
+      - name: Test trust
+        run: scripts/run_tests.sh products/trust
 
-      - name: Run identity tests
-        run: |
-          cd products/identity
-          PYTHONPATH=../../:. python -m pytest tests/ -x -q --tb=short
+      - name: Test shared
+        run: scripts/run_tests.sh products/shared
 
-      - name: Run SDK tests
-        run: |
-          cd sdk
-          PYTHONPATH=../../:. python -m pytest tests/ -x -q --tb=short
+      - name: Test identity
+        run: scripts/run_tests.sh products/identity
+
+      - name: Test SDK
+        run: scripts/run_tests.sh sdk
 
   docker-build:
     runs-on: ubuntu-latest
