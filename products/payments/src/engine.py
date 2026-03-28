@@ -173,6 +173,62 @@ class PaymentEngine:
         intent.updated_at = time.time()
         return intent
 
+    async def partial_capture(self, intent_id: str, amount: float) -> tuple[Settlement, float]:
+        """Partially capture a pending intent.
+
+        Validates amount <= intent.amount, creates a settlement for the
+        partial amount, and updates (or voids) the intent.
+        """
+        intent_data = await self.storage.get_intent(intent_id)
+        if intent_data is None:
+            raise IntentNotFoundError(f"Intent {intent_id} not found")
+
+        intent = PaymentIntent(**intent_data)
+        if intent.status != IntentStatus.PENDING:
+            raise InvalidStateError(
+                f"Cannot capture intent in state '{intent.status.value}'; must be 'pending'"
+            )
+
+        if amount <= 0:
+            raise PaymentError("Amount must be positive")
+        if amount > intent.amount:
+            raise PaymentError(
+                f"Capture amount {amount} exceeds intent amount {intent.amount}"
+            )
+
+        # Transfer the partial amount
+        await self.wallet.withdraw(
+            intent.payer, amount,
+            description=f"partial_capture:{intent.id}",
+        )
+        await self.wallet.deposit(
+            intent.payee, amount,
+            description=f"partial_capture:{intent.id}",
+        )
+
+        # Create settlement for the partial amount
+        settlement = Settlement(
+            payer=intent.payer,
+            payee=intent.payee,
+            amount=amount,
+            source_type="intent",
+            source_id=intent.id,
+            description=intent.description,
+        )
+        await self.storage.insert_settlement(settlement.model_dump())
+
+        remaining = round(intent.amount - amount, 2)
+        if remaining <= 0:
+            # Fully captured - mark as settled
+            await self.storage.update_intent_status(
+                intent.id, IntentStatus.SETTLED.value, settlement_id=settlement.id
+            )
+        else:
+            # Update the intent with the remaining amount
+            await self.storage.update_intent_amount(intent.id, remaining)
+
+        return settlement, remaining
+
     async def get_intent(self, intent_id: str) -> PaymentIntent:
         """Retrieve a payment intent by ID."""
         data = await self.storage.get_intent(intent_id)

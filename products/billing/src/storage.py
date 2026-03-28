@@ -66,6 +66,13 @@ CREATE TABLE IF NOT EXISTS billing_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_events_undelivered ON billing_events(delivered, created_at);
+
+CREATE TABLE IF NOT EXISTS budget_caps (
+    agent_id        TEXT PRIMARY KEY,
+    daily_cap       REAL,
+    monthly_cap     REAL,
+    alert_threshold REAL NOT NULL DEFAULT 0.8
+);
 """
 
 

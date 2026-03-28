@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import time
 from typing import Any
 
@@ -14,6 +15,17 @@ from gateway.src.catalog import get_tool
 from gateway.src.errors import error_response, handle_product_exception
 from gateway.src.middleware import Metrics
 from gateway.src.tools import TOOL_REGISTRY
+
+
+def _rate_limit_headers(limit: int, rate_count: int, window_seconds: float = 3600.0) -> dict[str, str]:
+    """Build X-RateLimit-* headers."""
+    remaining = max(0, limit - rate_count)
+    reset = max(1, math.ceil(window_seconds - (time.time() % window_seconds)))
+    return {
+        "X-RateLimit-Limit": str(limit),
+        "X-RateLimit-Remaining": str(remaining),
+        "X-RateLimit-Reset": str(reset),
+    }
 
 
 def calculate_tool_cost(pricing: dict[str, Any], params: dict[str, Any]) -> float:
@@ -43,25 +55,25 @@ async def execute(request: Request) -> JSONResponse:
     try:
         body: dict[str, Any] = await request.json()
     except Exception:
-        return await error_response(400, "Invalid JSON body", "bad_request")
+        return await error_response(400, "Invalid JSON body", "bad_request", request=request)
 
     if not isinstance(body, dict):
-        return await error_response(400, "Request body must be a JSON object", "bad_request")
+        return await error_response(400, "Request body must be a JSON object", "bad_request", request=request)
 
     tool_name = body.get("tool")
     params = body.get("params", {})
 
     if not tool_name:
-        return await error_response(400, "Missing 'tool' field", "bad_request")
+        return await error_response(400, "Missing 'tool' field", "bad_request", request=request)
 
     # --- 1. Look up tool in catalog ---
     tool_def = get_tool(tool_name)
     if tool_def is None:
-        return await error_response(400, f"Unknown tool: {tool_name}", "unknown_tool")
+        return await error_response(400, f"Unknown tool: {tool_name}", "unknown_tool", request=request)
 
     if tool_name not in TOOL_REGISTRY:
         return await error_response(
-            501, f"Tool '{tool_name}' is cataloged but not implemented", "not_implemented"
+            501, f"Tool '{tool_name}' is cataloged but not implemented", "not_implemented", request=request
         )
 
     # --- 1b. Validate required parameters ---
@@ -73,12 +85,13 @@ async def execute(request: Request) -> JSONResponse:
             400,
             f"Missing required parameter(s): {', '.join(missing)}",
             "missing_parameter",
+            request=request,
         )
 
     # --- 2. Extract + validate API key ---
     raw_key = extract_api_key(request)
     if not raw_key:
-        return await error_response(401, "Missing API key", "missing_key")
+        return await error_response(401, "Missing API key", "missing_key", request=request)
 
     ctx = request.app.state.ctx
 
@@ -99,6 +112,7 @@ async def execute(request: Request) -> JSONResponse:
             403,
             f"Tier '{agent_tier}' cannot access tool '{tool_name}' (requires '{required_tier}')",
             "insufficient_tier",
+            request=request,
         )
 
     # --- 4. Check rate limit (sliding window) ---
@@ -106,6 +120,7 @@ async def execute(request: Request) -> JSONResponse:
 
     tier_config = get_tier_config(agent_tier)
     window_key = "gateway"
+    rate_count = 0
     try:
         # Global sliding window check (1 hour)
         rate_count = await ctx.paywall_storage.get_sliding_window_count(
@@ -118,11 +133,15 @@ async def execute(request: Request) -> JSONResponse:
             )
             burst_limit = tier_config.rate_limit_per_hour // 60 + tier_config.burst_allowance
             if burst_count >= burst_limit:
-                return await error_response(
+                rl_headers = _rate_limit_headers(tier_config.rate_limit_per_hour, rate_count)
+                resp = await error_response(
                     429,
                     f"Rate limit exceeded: {rate_count}/{tier_config.rate_limit_per_hour} per hour",
                     "rate_limit_exceeded",
+                    request=request,
                 )
+                resp.headers.update(rl_headers)
+                return resp
 
         # Per-tool rate limit check (if defined in catalog)
         tool_rate_limit = tool_def.get("rate_limit_per_hour")
@@ -131,11 +150,15 @@ async def execute(request: Request) -> JSONResponse:
                 agent_id, tool_name, window_seconds=3600.0
             )
             if tool_rate_count >= tool_rate_limit:
-                return await error_response(
+                rl_headers = _rate_limit_headers(tier_config.rate_limit_per_hour, rate_count)
+                resp = await error_response(
                     429,
                     f"Per-tool rate limit exceeded for '{tool_name}': {tool_rate_count}/{tool_rate_limit} per hour",
                     "rate_limit_exceeded",
+                    request=request,
                 )
+                resp.headers.update(rl_headers)
+                return resp
     except Exception:
         pass  # If rate counting fails, allow the request
 
@@ -150,10 +173,22 @@ async def execute(request: Request) -> JSONResponse:
                     402,
                     f"Insufficient balance: {balance} < {cost} credits required",
                     "insufficient_balance",
+                    request=request,
                 )
         except Exception as exc:
             # WalletNotFoundError → 402
             return await handle_product_exception(request, exc)
+
+    # --- 5b. Tool-specific authorization checks ---
+    if tool_name == "create_api_key":
+        requested_agent = params.get("agent_id", "")
+        if requested_agent != agent_id and agent_tier != "admin":
+            return await error_response(
+                403,
+                f"Cannot create API key for agent '{requested_agent}' (you are '{agent_id}')",
+                "forbidden",
+                request=request,
+            )
 
     # --- 6. Dispatch to tool function ---
     # Record the request in metrics regardless of outcome
@@ -188,9 +223,19 @@ async def execute(request: Request) -> JSONResponse:
 
     # --- 9. Return result ---
     headers: dict[str, str] = {}
-    correlation_id = getattr(request.state, "correlation_id", None)
+    correlation_id = getattr(request.state, "correlation_id", None) or ""
     if correlation_id:
         headers["X-Request-ID"] = correlation_id
+
+    # Add rate limit headers
+    headers.update(_rate_limit_headers(tier_config.rate_limit_per_hour, rate_count))
+
+    response_body: dict[str, Any] = {
+        "success": True,
+        "result": result,
+        "charged": cost,
+        "request_id": correlation_id,
+    }
 
     # Sign response if signing manager available
     signing_manager = getattr(request.app.state, "signing_manager", None)
@@ -201,10 +246,7 @@ async def execute(request: Request) -> JSONResponse:
         body_bytes = _json.dumps({"success": True, "result": result, "charged": cost}).encode()
         headers.update(sign_response(signing_manager, body_bytes))
 
-    return JSONResponse(
-        {"success": True, "result": result, "charged": cost},
-        headers=headers,
-    )
+    return JSONResponse(response_body, headers=headers)
 
 
 routes = [Route("/v1/execute", execute, methods=["POST"])]

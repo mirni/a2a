@@ -191,6 +191,16 @@ class PaymentStorage:
             )
         await self.db.commit()
 
+    async def update_intent_amount(
+        self, intent_id: str, amount: float
+    ) -> None:
+        now = time.time()
+        await self.db.execute(
+            "UPDATE payment_intents SET amount = ?, updated_at = ? WHERE id = ?",
+            (amount, now, intent_id),
+        )
+        await self.db.commit()
+
     async def list_intents(
         self,
         agent_id: str | None = None,

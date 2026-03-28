@@ -271,6 +271,31 @@ class WebhookManager:
             await self._send(webhook, delivery_id, event)
 
     # ------------------------------------------------------------------
+    # Delivery history
+    # ------------------------------------------------------------------
+
+    async def get_delivery_history(
+        self, webhook_id: str, limit: int = 50
+    ) -> list[dict]:
+        """Return delivery history for a webhook, most recent first."""
+        assert self._db is not None, "call connect() first"
+
+        cursor = await self._db.execute(
+            """
+            SELECT id, webhook_id, event_type, payload, status, attempts,
+                   last_attempt_at, next_retry_at, response_code, response_body,
+                   created_at
+              FROM webhook_deliveries
+             WHERE webhook_id = ?
+             ORDER BY created_at DESC
+             LIMIT ?
+            """,
+            (webhook_id, limit),
+        )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+
+    # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 

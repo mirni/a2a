@@ -114,6 +114,65 @@
     "tier_required": "free"
   },
   {
+    "name": "get_transactions",
+    "service": "billing",
+    "description": "Get the transaction ledger for an agent (deposits, withdrawals, charges).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "description": "The agent identifier"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100,
+          "description": "Maximum number of transactions to return"
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "description": "Offset for pagination"
+        }
+      },
+      "required": [
+        "agent_id"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "transactions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tx_type": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "number"
+              },
+              "description": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
+    "tier_required": "free"
+  },
+  {
     "name": "create_intent",
     "service": "payments",
     "description": "Create a payment intent between two agents.",
@@ -205,6 +264,52 @@
     "tier_required": "free"
   },
   {
+    "name": "partial_capture",
+    "service": "payments",
+    "description": "Partially capture a pending payment intent for a specified amount.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "intent_id": {
+          "type": "string",
+          "description": "The payment intent ID to partially capture"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount to capture (must be <= intent amount)"
+        }
+      },
+      "required": [
+        "intent_id",
+        "amount"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "remaining_amount": {
+          "type": "number"
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
+    "tier_required": "pro"
+  },
+  {
     "name": "create_escrow",
     "service": "payments",
     "description": "Create an escrow between two agents. Funds are held from payer immediately.",
@@ -294,6 +399,82 @@
       "max_latency_ms": 500
     },
     "tier_required": "pro"
+  },
+  {
+    "name": "cancel_escrow",
+    "service": "payments",
+    "description": "Cancel a held escrow and refund the payer.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "escrow_id": {
+          "type": "string",
+          "description": "The escrow identifier to cancel"
+        }
+      },
+      "required": [
+        "escrow_id"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
+    "tier_required": "free"
+  },
+  {
+    "name": "refund_intent",
+    "service": "payments",
+    "description": "Refund a payment intent: voids if pending, reverse-transfers if settled.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "intent_id": {
+          "type": "string",
+          "description": "The intent identifier to refund"
+        }
+      },
+      "required": [
+        "intent_id"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
+    "tier_required": "free"
   },
   {
     "name": "search_services",
@@ -487,6 +668,153 @@
       "max_latency_ms": 500
     },
     "tier_required": "pro"
+  },
+  {
+    "name": "get_service",
+    "service": "marketplace",
+    "description": "Get a marketplace service by its ID.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "type": "string",
+          "description": "The service identifier"
+        }
+      },
+      "required": [
+        "service_id"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
+    "tier_required": "free"
+  },
+  {
+    "name": "update_service",
+    "service": "marketplace",
+    "description": "Update fields on an existing marketplace service.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "type": "string",
+          "description": "The service identifier to update"
+        },
+        "name": {
+          "type": "string",
+          "description": "New service name"
+        },
+        "description": {
+          "type": "string",
+          "description": "New service description"
+        },
+        "category": {
+          "type": "string",
+          "description": "New category"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "New tags list"
+        },
+        "endpoint": {
+          "type": "string",
+          "description": "New endpoint URL"
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Arbitrary metadata"
+        }
+      },
+      "required": [
+        "service_id"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
+    "tier_required": "free"
+  },
+  {
+    "name": "deactivate_service",
+    "service": "marketplace",
+    "description": "Deactivate a marketplace service listing.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "type": "string",
+          "description": "The service identifier to deactivate"
+        }
+      },
+      "required": [
+        "service_id"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
+    "tier_required": "free"
   },
   {
     "name": "get_trust_score",
@@ -977,6 +1305,46 @@
     },
     "sla": {
       "max_latency_ms": 200
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "get_webhook_deliveries",
+    "service": "webhooks",
+    "description": "Get delivery history for a webhook endpoint.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "webhook_id": {
+          "type": "string",
+          "description": "The webhook ID to query deliveries for"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 50,
+          "description": "Maximum number of deliveries to return"
+        }
+      },
+      "required": [
+        "webhook_id"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "deliveries": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
     },
     "tier_required": "pro"
   },
@@ -3462,5 +3830,499 @@
       "max_latency_ms": 3000
     },
     "tier_required": "pro"
+  },
+  {
+    "name": "get_metrics_timeseries",
+    "service": "billing",
+    "description": "Get per-agent usage metrics bucketed by hour or day.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "description": "The agent identifier"
+        },
+        "interval": {
+          "type": "string",
+          "enum": ["hour", "day"],
+          "description": "Time bucket interval"
+        },
+        "since": {
+          "type": "number",
+          "description": "Unix timestamp to query from (optional)"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 24,
+          "description": "Max number of buckets to return"
+        }
+      },
+      "required": ["agent_id", "interval"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "buckets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "timestamp": { "type": "number" },
+              "calls": { "type": "integer" },
+              "cost": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "pricing": { "per_call": 0.0 },
+    "sla": { "max_latency_ms": 500 },
+    "tier_required": "free"
+  },
+  {
+    "name": "get_agent_leaderboard",
+    "service": "billing",
+    "description": "Rank agents by total spend, calls, or trust score.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "metric": {
+          "type": "string",
+          "enum": ["spend", "calls", "trust_score"],
+          "description": "Metric to rank by"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 10,
+          "description": "Max entries to return"
+        }
+      },
+      "required": ["metric"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "leaderboard": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "rank": { "type": "integer" },
+              "agent_id": { "type": "string" },
+              "value": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "pricing": { "per_call": 0.0 },
+    "sla": { "max_latency_ms": 500 },
+    "tier_required": "free"
+  },
+  {
+    "name": "register_event_schema",
+    "service": "event_bus",
+    "description": "Register a JSON schema for an event type in the event bus.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "event_type": {
+          "type": "string",
+          "description": "The event type identifier"
+        },
+        "schema": {
+          "type": "object",
+          "description": "JSON schema object for the event payload"
+        }
+      },
+      "required": ["event_type", "schema"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "event_type": { "type": "string" },
+        "registered": { "type": "boolean" }
+      }
+    },
+    "pricing": { "per_call": 0.0 },
+    "sla": { "max_latency_ms": 300 },
+    "tier_required": "free"
+  },
+  {
+    "name": "get_event_schema",
+    "service": "event_bus",
+    "description": "Retrieve the registered JSON schema for an event type.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "event_type": {
+          "type": "string",
+          "description": "The event type identifier"
+        }
+      },
+      "required": ["event_type"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "event_type": { "type": "string" },
+        "schema": { "type": "object" },
+        "found": { "type": "boolean" }
+      }
+    },
+    "pricing": { "per_call": 0.0 },
+    "sla": { "max_latency_ms": 200 },
+    "tier_required": "free"
+  },
+  {
+    "name": "test_webhook",
+    "service": "webhooks",
+    "description": "Send a test ping event to a registered webhook and return the delivery result.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "webhook_id": {
+          "type": "string",
+          "description": "The webhook ID to send a test ping to"
+        }
+      },
+      "required": ["webhook_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "delivery_id": { "type": "integer" },
+        "status": { "type": "string" },
+        "response_code": { "type": "integer" }
+      }
+    },
+    "pricing": { "per_call": 0.0 },
+    "sla": { "max_latency_ms": 10000 },
+    "tier_required": "free"
+  },
+  {
+    "name": "create_api_key",
+    "service": "paywall",
+    "description": "Create a new API key for yourself (self-service). Only same-agent or admin can create.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "description": "Agent to create the key for"
+        },
+        "tier": {
+          "type": "string",
+          "description": "Tier for the new key (defaults to current tier)"
+        }
+      },
+      "required": ["agent_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "key": { "type": "string" },
+        "agent_id": { "type": "string" },
+        "tier": { "type": "string" },
+        "created_at": { "type": "number" }
+      }
+    },
+    "pricing": { "per_call": 0.0 },
+    "sla": { "max_latency_ms": 300 },
+    "tier_required": "free"
+  },
+  {
+    "name": "get_volume_discount",
+    "service": "billing",
+    "description": "Calculate discounted price based on historical usage volume.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "description": "The agent identifier"
+        },
+        "tool_name": {
+          "type": "string",
+          "description": "The tool to check volume discount for"
+        },
+        "quantity": {
+          "type": "integer",
+          "description": "Number of calls to price"
+        }
+      },
+      "required": ["agent_id", "tool_name", "quantity"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": { "type": "string" },
+        "tool_name": { "type": "string" },
+        "historical_calls": { "type": "integer" },
+        "discount_pct": { "type": "number" },
+        "unit_price": { "type": "number" },
+        "discounted_price": { "type": "number" }
+      }
+    },
+    "pricing": { "per_call": 0.0 },
+    "sla": { "max_latency_ms": 200 },
+    "tier_required": "free"
+  },
+  {
+    "name": "estimate_cost",
+    "service": "billing",
+    "description": "Calculate projected cost of N calls to a specific tool without executing them.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "tool_name": {
+          "type": "string",
+          "description": "The tool to estimate cost for"
+        },
+        "quantity": {
+          "type": "integer",
+          "description": "Number of calls to estimate"
+        },
+        "agent_id": {
+          "type": "string",
+          "description": "Optional agent ID for volume discount"
+        }
+      },
+      "required": ["tool_name", "quantity"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "tool_name": { "type": "string" },
+        "quantity": { "type": "integer" },
+        "unit_price": { "type": "number" },
+        "discount_pct": { "type": "number" },
+        "total_cost": { "type": "number" }
+      }
+    },
+    "pricing": { "per_call": 0.0 },
+    "sla": { "max_latency_ms": 200 },
+    "tier_required": "free"
+  },
+  {
+    "name": "rate_service",
+    "service": "marketplace",
+    "description": "Rate a marketplace service (1-5). One rating per agent per service (upsert).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "type": "string",
+          "description": "The service to rate"
+        },
+        "agent_id": {
+          "type": "string",
+          "description": "The agent providing the rating"
+        },
+        "rating": {
+          "type": "integer",
+          "description": "Rating from 1 to 5"
+        },
+        "review": {
+          "type": "string",
+          "description": "Optional review text"
+        }
+      },
+      "required": ["service_id", "agent_id", "rating"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "service_id": { "type": "string" },
+        "agent_id": { "type": "string" },
+        "rating": { "type": "integer" }
+      }
+    },
+    "pricing": { "per_call": 0.0 },
+    "sla": { "max_latency_ms": 300 },
+    "tier_required": "free"
+  },
+  {
+    "name": "get_service_ratings",
+    "service": "marketplace",
+    "description": "Get ratings and reviews for a marketplace service.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "type": "string",
+          "description": "The service to get ratings for"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of ratings to return (default 20)"
+        }
+      },
+      "required": ["service_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "average_rating": { "type": "number" },
+        "count": { "type": "integer" },
+        "ratings": { "type": "array" }
+      }
+    },
+    "pricing": { "per_call": 0.0 },
+    "sla": { "max_latency_ms": 200 },
+    "tier_required": "free"
+  },
+  {
+    "name": "set_budget_cap",
+    "service": "billing",
+    "description": "Set daily/monthly spending caps and alert thresholds for an agent.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "description": "The agent to set caps for"
+        },
+        "daily_cap": {
+          "type": "number",
+          "description": "Daily spending cap in credits"
+        },
+        "monthly_cap": {
+          "type": "number",
+          "description": "Monthly spending cap in credits"
+        },
+        "alert_threshold": {
+          "type": "number",
+          "description": "Fraction (0-1) at which to trigger alert (default 0.8)"
+        }
+      },
+      "required": ["agent_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": { "type": "string" },
+        "daily_cap": { "type": "number" },
+        "monthly_cap": { "type": "number" },
+        "alert_threshold": { "type": "number" }
+      }
+    },
+    "pricing": { "per_call": 0.0 },
+    "sla": { "max_latency_ms": 200 },
+    "tier_required": "free"
+  },
+  {
+    "name": "get_budget_status",
+    "service": "billing",
+    "description": "Get current spending vs budget caps and alert status for an agent.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "description": "The agent to check budget status for"
+        }
+      },
+      "required": ["agent_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": { "type": "string" },
+        "daily_spend": { "type": "number" },
+        "daily_cap": { "type": "number" },
+        "daily_pct": { "type": "number" },
+        "monthly_spend": { "type": "number" },
+        "monthly_cap": { "type": "number" },
+        "monthly_pct": { "type": "number" },
+        "alert_triggered": { "type": "boolean" },
+        "cap_exceeded": { "type": "boolean" }
+      }
+    },
+    "pricing": { "per_call": 0.0 },
+    "sla": { "max_latency_ms": 200 },
+    "tier_required": "free"
+  },
+  {
+    "name": "create_org",
+    "service": "identity",
+    "description": "Create a new organization.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "org_name": {
+          "type": "string",
+          "description": "Name of the organization"
+        }
+      },
+      "required": ["org_name"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "org_id": { "type": "string" },
+        "name": { "type": "string" },
+        "created_at": { "type": "number" }
+      }
+    },
+    "pricing": { "per_call": 0.0 },
+    "sla": { "max_latency_ms": 200 },
+    "tier_required": "free"
+  },
+  {
+    "name": "get_org",
+    "service": "identity",
+    "description": "Get organization details and members.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "org_id": {
+          "type": "string",
+          "description": "The organization ID"
+        }
+      },
+      "required": ["org_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "org_id": { "type": "string" },
+        "name": { "type": "string" },
+        "created_at": { "type": "number" },
+        "members": { "type": "array" }
+      }
+    },
+    "pricing": { "per_call": 0.0 },
+    "sla": { "max_latency_ms": 200 },
+    "tier_required": "free"
+  },
+  {
+    "name": "add_agent_to_org",
+    "service": "identity",
+    "description": "Add an agent to an organization.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "org_id": {
+          "type": "string",
+          "description": "The organization ID"
+        },
+        "agent_id": {
+          "type": "string",
+          "description": "The agent to add"
+        }
+      },
+      "required": ["org_id", "agent_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": { "type": "string" },
+        "org_id": { "type": "string" }
+      }
+    },
+    "pricing": { "per_call": 0.0 },
+    "sla": { "max_latency_ms": 200 },
+    "tier_required": "free"
   }
 ]

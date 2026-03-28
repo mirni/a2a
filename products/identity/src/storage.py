@@ -113,6 +113,12 @@ CREATE TABLE IF NOT EXISTS commitment_secrets (
 );
 
 CREATE INDEX IF NOT EXISTS idx_secret_agent_metric ON commitment_secrets(agent_id, metric_name);
+
+CREATE TABLE IF NOT EXISTS orgs (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    created_at REAL NOT NULL
+);
 """
 
 

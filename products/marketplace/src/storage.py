@@ -83,6 +83,19 @@ class MarketplaceStorage:
             CREATE INDEX IF NOT EXISTS idx_services_status ON services(status);
             CREATE INDEX IF NOT EXISTS idx_service_tags_tag ON service_tags(tag);
             CREATE INDEX IF NOT EXISTS idx_service_tools_name ON service_tools(tool_name);
+
+            CREATE TABLE IF NOT EXISTS service_ratings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                service_id TEXT NOT NULL,
+                agent_id TEXT NOT NULL,
+                rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
+                review TEXT NOT NULL DEFAULT '',
+                created_at REAL NOT NULL,
+                UNIQUE(service_id, agent_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_ratings_service ON service_ratings(service_id);
+            CREATE INDEX IF NOT EXISTS idx_ratings_agent ON service_ratings(agent_id);
         """)
 
     def _generate_id(self) -> str:

@@ -15,3 +15,10 @@ You must follow a strict Test-Driven Development (TDD) cycle for all new feature
 - **Verification:** Run the full test suite again to ensure the refactor didn't break anything.
 
 Infrastructure code is exempt from this rule.
+
+## General coding guidelines:
+* Keep functions small and "pure". Follow Single Responsibility Principle. Prefer "Pure Functions" (functions that don't change state) for your transaction calculation logic.
+
+
+# Append all prompts and outputs into MASTER_LOG.md
+* Both human prompt and claude terminal output should be appended.
