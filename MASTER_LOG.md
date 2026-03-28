@@ -981,3 +981,199 @@ export TAILSCALE_AUTHKEY="tskey-auth-..."
 export A2A_DOMAIN="api.greenhelix.net"
 curl -fsSL https://raw.githubusercontent.com/you/repo/main/deploy.sh | bash
 ```
+
+### Prompt (Session 4, continued)
+
+> Fix deploy.sh failure: `fatal: could not read Username for 'https://github.com'` — private repo authentication in cloud-init (no stdin).
+
+### Response — GITHUB_PAT Support
+
+Added `GITHUB_PAT` env var support. When set, injects PAT as `x-access-token` in clone URL. Post-clone, strips the PAT from `.git/config` so it's never persisted on disk.
+
+```bash
+# Usage:
+sudo GITHUB_PAT=ghp_... TAILSCALE_AUTHKEY=tskey-auth-... ./deploy.sh
+```
+
+### Prompt (Session 4, continued)
+
+> Generate check_server.sh — ad-hoc smoke test script for manual server verification from local machine.
+
+### Response
+
+Created `check_server.sh` (19 checks):
+- 9 public endpoint tests (health, pricing, openapi, metrics, signing-key, redirect)
+- 2 auth enforcement tests (no key → 401, bad key → 401)
+- 6 authenticated tool execution tests (get_balance, usage_summary, search_services, trust_score, db_integrity, unknown tool)
+- 2 TLS tests (handshake, cert expiry > 7 days)
+
+Usage: `API_KEY=ak_... ./check_server.sh [https://api.greenhelix.net]`
+
+### Prompt (Session 4, continued)
+
+> Add server/.bashrc support in repo, deploy.sh copies it to /root/.bashrc with marker-based merge.
+
+### Response
+
+Created `server/.bashrc` with colored PS1, systemd aliases (`ss`, `sr`, `gw`, `gwr`, `gwl`), quick-check aliases (`health`, `metrics`, `pricing`), DB tools (`dbs`, `dbsize`), and functions (`a2a_exec`, `gwgrep`, `backup_all`). deploy.sh Step 5a installs it via managed block (`A2A SERVER CONFIG BEGIN/END`) — idempotent on re-deploy.
+
+---
+
+## Session 5 — 2026-03-28: QA Lead Audit — Production Server Verification
+
+### Prompt
+
+> Assume role of QA Lead. Verify server API endpoints, GitHub and Stripe tokens are setup, server is live, services accessible. Create TODO list for skipped services. Prepare concise summary.
+
+### Response
+
+#### Server Status: LIVE at https://api.greenhelix.net
+
+**Health:** `{"status":"ok","version":"0.1.0","tools":56}`
+
+---
+
+### 1. API Endpoint Verification (20 tests)
+
+| # | Test | Status | Notes |
+|---|------|--------|-------|
+| 1 | GET /v1/health | PASS | status=ok, version=0.1.0, tools=56 |
+| 2 | GET /v1/pricing | PASS | 56 tools, 11 services, 5 with non-zero pricing |
+| 3 | GET /v1/openapi.json | PASS | OpenAPI 3.1.0, all schemas present |
+| 4 | GET /v1/metrics | PASS | Prometheus format (see BUG-2 below) |
+| 5 | GET /v1/signing-key | PASS | HMAC-SHA3-256, 64-char hex key |
+| 6 | GET /health redirect | PASS | 301 → /v1/health |
+| 7 | get_balance (admin) | PASS | balance=100,000 credits |
+| 8 | get_usage_summary | PASS | 13 total calls tracked |
+| 9 | search_services | PASS | Empty results (fresh marketplace) |
+| 10 | check_db_integrity (billing) | PASS | ok=true, 14 pages |
+| 11 | check_db_integrity (identity) | PASS | ok=true, 24 pages |
+| 12 | check_db_integrity (payments) | PASS | ok=true, 25 pages |
+| 13 | register_agent | PASS | Ed25519 keypair generated |
+| 14 | publish_event | PASS | event_id=1 |
+| 15 | send_message | FAIL | 500 KeyError — see BUG-1 |
+| 16 | create_wallet | PASS | balance=100, timestamps valid |
+| 17 | No API key → 401 | PASS | Clear error code |
+| 18 | Bad API key → 401 | PASS | Format validation before lookup |
+| 19 | Unknown tool → 400 | PASS | Specific error message |
+| 20 | Missing required param | FAIL | 500 KeyError — see BUG-1 |
+
+**Result: 18/20 PASS (90%)**
+
+---
+
+### 2. Bugs Found
+
+**BUG-1 (HIGH): Missing parameter validation — 500 instead of 400**
+- Affects ALL tools with required parameters
+- Missing/wrong params trigger unhandled `KeyError` → generic 500
+- Expected: 400 with `"Missing required parameter: X"`
+- Fix: Validate `params` against `input_schema.required` before dispatching to tool handler
+
+**BUG-2 (LOW): Prometheus metrics always zero**
+- `a2a_requests_total`, `a2a_errors_total`, `a2a_request_duration_ms` all read 0
+- Server has processed 13+ calls (verified via get_usage_summary)
+- Likely cause: metrics middleware not wired into request pipeline, or per-worker counter isolation
+
+---
+
+### 3. External API Token Status
+
+| Service | Token Present | Token Valid | Wired to Gateway | Status |
+|---------|:---:|:---:|:---:|--------|
+| **GitHub** | Yes (fine-grained PAT) | Yes — user `iflo2claw`, 5000/5000 rate limit | No (standalone MCP) | Ready for integration |
+| **Stripe** | Yes (`rk_test_` restricted key) | Yes — test mode, $0.00 balance | No (standalone MCP) | Ready for integration |
+| **PostgreSQL** | Placeholder only | N/A | No (standalone MCP) | Not configured |
+
+**Key finding:** All 3 connectors (GitHub, Stripe, PostgreSQL) are fully implemented standalone MCP servers under `products/connectors/` but **none are routed through the gateway**. The gateway's 56 tools operate entirely on internal SQLite-backed services.
+
+---
+
+### 4. TLS & Infrastructure
+
+| Check | Status |
+|-------|--------|
+| HTTPS (TLS 1.3) | PASS |
+| Certificate valid > 7 days | PASS (Let's Encrypt) |
+| Tailscale SSH | ACTIVE |
+| UFW firewall | ACTIVE |
+| fail2ban (port 2222) | ACTIVE |
+
+---
+
+### 5. Catalog Completeness
+
+**56 tools across 11 services — all implemented, all tested.**
+
+| Service | Tools | Tier |
+|---------|-------|------|
+| billing | 7 | free |
+| payments | 14 | free/pro |
+| identity | 9 | free |
+| marketplace | 4 | free/pro |
+| trust | 5 | free |
+| messaging | 3 | free |
+| disputes | 3 | pro |
+| events | 2 | free |
+| webhooks | 3 | pro |
+| paywall | 2 | pro |
+| admin | 4 | pro |
+
+**Pricing models active:**
+- `create_intent` / `create_split_intent`: 2% (min $0.01, max $5.00)
+- `create_escrow` / `create_performance_escrow`: 1.5% (min $0.01, max $10.00)
+- `best_match`: $0.10/call
+
+---
+
+### 6. TODO List — Services Pending Implementation
+
+#### P0 — Revenue Enablers (Blocked on Production)
+
+| # | Item | Status | Blocker | Effort |
+|---|------|--------|---------|--------|
+| 1 | **Fiat on-ramp (Stripe Checkout)** | NOT STARTED | Need live Stripe key (`sk_live_`), webhook endpoint for payment confirmation | M |
+| 2 | **Route connectors through gateway** | NOT STARTED | Architectural decision: embed in-process or proxy to MCP stdio servers | L |
+| 3 | **TypeScript/JavaScript SDK** | NOT STARTED | Separate npm package, port Python SDK | L |
+
+#### P1 — Bugs to Fix
+
+| # | Item | Severity | Effort |
+|---|------|----------|--------|
+| 4 | **Parameter validation on /v1/execute** | HIGH | Validate `params` against `input_schema.required` before dispatch. Prevents all 500 KeyErrors. | S |
+| 5 | **Fix Prometheus metrics** | LOW | Wire metrics middleware into actual request pipeline or fix per-worker counter isolation. | S |
+
+#### P2 — Infrastructure
+
+| # | Item | Status | Effort |
+|---|------|--------|--------|
+| 6 | **Hosted sandbox** (`sandbox.greenhelix.net`) | NOT STARTED | S |
+| 7 | **PostgreSQL migration** | NOT STARTED (DSN abstraction ready) | L |
+| 8 | **Bulletproofs range proofs** | NOT STARTED (Rust FFI needed) | XL |
+
+#### P3 — Connector Integration (Ready to Wire)
+
+All 3 connectors are fully implemented MCP servers. Wiring them through the gateway adds 23 billable tools:
+
+| Connector | Tools | LOC | Status |
+|-----------|-------|-----|--------|
+| **Stripe** | 7 (payments, subscriptions, refunds) | 779 | Implemented, needs gateway routing |
+| **GitHub** | 10 (repos, issues, PRs, commits, search) | 1,538 | Implemented, needs gateway routing |
+| **PostgreSQL** | 6 (query, schema, tables) | 744 | Implemented, needs gateway routing + real credentials |
+
+---
+
+### 7. Production Readiness Summary
+
+| Dimension | Status | Notes |
+|-----------|--------|-------|
+| **Core platform** | READY | 56 tools, 1,136 tests, all passing |
+| **Security** | READY | Ed25519, SHA3-256, WAL, Tailscale, TLS, rate limiting |
+| **Deployment** | READY | deploy.sh + Docker + CI/CD |
+| **External tokens** | PARTIAL | GitHub valid, Stripe test-mode only, PostgreSQL placeholder |
+| **Connectors** | NOT WIRED | 23 additional tools ready but not routed through gateway |
+| **Input validation** | NEEDS FIX | BUG-1: missing params → 500 instead of 400 |
+| **Observability** | PARTIAL | Structured logs working, Prometheus metrics broken |
+| **Revenue** | BLOCKED | No fiat on-ramp — credits exist but can't be purchased with real money |
+
+**Overall: Platform is functionally complete and live. The two blocking items for revenue are the fiat on-ramp (Stripe Checkout integration) and wiring the 3 connectors as billable gateway tools.**

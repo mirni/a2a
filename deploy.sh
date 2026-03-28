@@ -268,6 +268,30 @@ chown -R "$A2A_USER:$A2A_GROUP" /var/log/a2a
 chmod 750 "$DATA_DIR"
 
 # ---------------------------------------------------------------------------
+# Step 5a: Install server shell config for root
+# ---------------------------------------------------------------------------
+
+BASHRC_SRC="$INSTALL_DIR/server/.bashrc"
+BASHRC_DST="/root/.bashrc"
+BASHRC_MARKER="# --- A2A SERVER CONFIG ---"
+
+if [[ -f "$BASHRC_SRC" ]]; then
+    log "Installing server shell config to $BASHRC_DST..."
+    if [[ -f "$BASHRC_DST" ]] && grep -qF "$BASHRC_MARKER" "$BASHRC_DST"; then
+        # Replace existing managed block
+        sed -i "/$BASHRC_MARKER BEGIN/,/$BASHRC_MARKER END/d" "$BASHRC_DST"
+    fi
+    {
+        echo "$BASHRC_MARKER BEGIN"
+        cat "$BASHRC_SRC"
+        echo "$BASHRC_MARKER END"
+    } >> "$BASHRC_DST"
+    log "Shell config installed (source ~/.bashrc to activate)"
+else
+    warn "server/.bashrc not found in repo, skipping shell config"
+fi
+
+# ---------------------------------------------------------------------------
 # Step 6: Create systemd service
 # ---------------------------------------------------------------------------
 
