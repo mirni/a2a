@@ -234,10 +234,22 @@ class MessageStorage:
             return None
         return self._row_to_negotiation_dict(row)
 
+    _NEGOTIATION_COLUMNS = frozenset({
+        "current_amount", "status", "counter_party_id",
+        "expires_at", "updated_at", "metadata",
+    })
+
     async def update_negotiation(self, negotiation_id: str, updates: dict) -> None:
-        """Update specific fields of a negotiation."""
+        """Update specific fields of a negotiation.
+
+        Only columns in _NEGOTIATION_COLUMNS are allowed to prevent SQL injection
+        via dynamic column names.
+        """
         self._require_db()
         updates["updated_at"] = time.time()
+        invalid = set(updates.keys()) - self._NEGOTIATION_COLUMNS
+        if invalid:
+            raise ValueError(f"Invalid negotiation columns: {invalid}")
         set_clauses = ", ".join(f"{k} = ?" for k in updates)
         values = list(updates.values()) + [negotiation_id]
         await self._db.execute(

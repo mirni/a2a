@@ -198,11 +198,15 @@ async def batch(request: Request) -> JSONResponse:
         # Record usage
         tool_pricing = tool_def.get("pricing", {})
         cost = calculate_tool_cost(tool_pricing, params)
+        batch_corr = getattr(request.state, "correlation_id", None) or ""
+        batch_idx = len(results) - 1
+        batch_idem = f"{batch_corr}:{batch_idx}:{tool_name}" if batch_corr else None
         try:
             await ctx.tracker.storage.record_usage(
                 agent_id=agent_id,
                 function=tool_name,
                 cost=cost,
+                idempotency_key=batch_idem,
             )
             if cost > 0:
                 await ctx.tracker.wallet.charge(agent_id, cost, description=f"gateway:batch:{tool_name}")

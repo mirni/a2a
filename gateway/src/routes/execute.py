@@ -215,11 +215,14 @@ async def execute(request: Request) -> JSONResponse:
         return await handle_product_exception(request, exc)
 
     # --- 7. Record usage + charge ---
+    correlation_id = getattr(request.state, "correlation_id", None) or ""
+    idem_key = f"{correlation_id}:{tool_name}" if correlation_id else None
     try:
         await ctx.tracker.storage.record_usage(
             agent_id=agent_id,
             function=tool_name,
             cost=cost,
+            idempotency_key=idem_key,
         )
         if cost > 0:
             await ctx.tracker.wallet.charge(agent_id, cost, description=f"gateway:{tool_name}")
@@ -234,7 +237,6 @@ async def execute(request: Request) -> JSONResponse:
 
     # --- 9. Return result ---
     headers: dict[str, str] = {}
-    correlation_id = getattr(request.state, "correlation_id", None) or ""
     if correlation_id:
         headers["X-Request-ID"] = correlation_id
 

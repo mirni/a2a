@@ -30,13 +30,14 @@ CREATE TABLE IF NOT EXISTS wallets (
 );
 
 CREATE TABLE IF NOT EXISTS usage_records (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    agent_id   TEXT NOT NULL,
-    function   TEXT NOT NULL,
-    cost       REAL NOT NULL,
-    tokens     INTEGER NOT NULL DEFAULT 0,
-    metadata   TEXT,
-    created_at REAL NOT NULL
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_id        TEXT NOT NULL,
+    function        TEXT NOT NULL,
+    cost            REAL NOT NULL,
+    tokens          INTEGER NOT NULL DEFAULT 0,
+    metadata        TEXT,
+    created_at      REAL NOT NULL,
+    idempotency_key TEXT UNIQUE
 );
 
 CREATE INDEX IF NOT EXISTS idx_usage_agent   ON usage_records(agent_id);
@@ -219,12 +220,22 @@ CREATE TABLE IF NOT EXISTS budget_caps (
         cost: float,
         tokens: int = 0,
         metadata: dict[str, Any] | None = None,
+        idempotency_key: str | None = None,
     ) -> int:
         now = time.time()
+        if idempotency_key is not None:
+            # Skip if this idempotency key was already recorded
+            cursor = await self.db.execute(
+                "SELECT id FROM usage_records WHERE idempotency_key = ?",
+                (idempotency_key,),
+            )
+            existing = await cursor.fetchone()
+            if existing is not None:
+                return existing[0]
         cursor = await self.db.execute(
-            "INSERT INTO usage_records (agent_id, function, cost, tokens, metadata, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (agent_id, function, cost, tokens, json.dumps(metadata) if metadata else None, now),
+            "INSERT INTO usage_records (agent_id, function, cost, tokens, metadata, created_at, idempotency_key) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (agent_id, function, cost, tokens, json.dumps(metadata) if metadata else None, now, idempotency_key),
         )
         await self.db.commit()
         return cursor.lastrowid  # type: ignore[return-value]
