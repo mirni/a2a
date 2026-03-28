@@ -122,24 +122,24 @@ async def batch(request: Request) -> JSONResponse:
 
     for call in calls:
         if not isinstance(call, dict):
-            results.append({"success": False, "error": "Each call must be a JSON object"})
+            results.append({"success": False, "error": {"code": "bad_request", "message": "Each call must be a JSON object"}})
             continue
 
         tool_name = call.get("tool")
         params = call.get("params", {})
 
         if not tool_name:
-            results.append({"success": False, "error": "Missing 'tool' field in call"})
+            results.append({"success": False, "error": {"code": "bad_request", "message": "Missing 'tool' field in call"}})
             continue
 
         # Look up tool in catalog
         tool_def = get_tool(tool_name)
         if tool_def is None:
-            results.append({"success": False, "error": f"Unknown tool: {tool_name}"})
+            results.append({"success": False, "error": {"code": "unknown_tool", "message": f"Unknown tool: {tool_name}"}})
             continue
 
         if tool_name not in TOOL_REGISTRY:
-            results.append({"success": False, "error": f"Tool '{tool_name}' is not implemented"})
+            results.append({"success": False, "error": {"code": "not_implemented", "message": f"Tool '{tool_name}' is not implemented"}})
             continue
 
         # Check required parameters
@@ -149,7 +149,7 @@ async def batch(request: Request) -> JSONResponse:
         if missing:
             results.append({
                 "success": False,
-                "error": f"Missing required parameter(s): {', '.join(missing)}",
+                "error": {"code": "missing_parameter", "message": f"Missing required parameter(s): {', '.join(missing)}"},
             })
             continue
 
@@ -158,7 +158,7 @@ async def batch(request: Request) -> JSONResponse:
         if not tier_has_access(agent_tier, required_tier):
             results.append({
                 "success": False,
-                "error": f"Tier '{agent_tier}' cannot access tool '{tool_name}'",
+                "error": {"code": "insufficient_tier", "message": f"Tier '{agent_tier}' cannot access tool '{tool_name}'"},
             })
             continue
 
@@ -172,12 +172,12 @@ async def batch(request: Request) -> JSONResponse:
                 if tool_rate_count >= tool_rate_limit:
                     results.append({
                         "success": False,
-                        "error": f"Per-tool rate limit exceeded for '{tool_name}': {tool_rate_count}/{tool_rate_limit} per hour",
+                        "error": {"code": "rate_limit_exceeded", "message": f"Per-tool rate limit exceeded for '{tool_name}': {tool_rate_count}/{tool_rate_limit} per hour"},
                     })
                     continue
             except (RuntimeError, OSError):
                 logger.error("Per-tool rate limit check failed for %s/%s", agent_id, tool_name, exc_info=True)
-                results.append({"success": False, "error": "Rate limit service unavailable"})
+                results.append({"success": False, "error": {"code": "service_error", "message": "Rate limit service unavailable"}})
                 continue
 
         # Dispatch to tool function
@@ -190,7 +190,7 @@ async def batch(request: Request) -> JSONResponse:
             results.append({"success": True, "result": result})
         except Exception as exc:
             Metrics.record_error()
-            results.append({"success": False, "error": str(exc)})
+            results.append({"success": False, "error": {"code": "execution_error", "message": str(exc)}})
         finally:
             elapsed_ms = (time.time() - _start) * 1000
             Metrics.record_latency(elapsed_ms)

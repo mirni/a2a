@@ -54,7 +54,7 @@ async def handle_product_exception(request: Request, exc: Exception) -> JSONResp
         # Validation
         "ValidationError": (400, "validation_error"),
         "InvalidMetricError": (400, "invalid_metric"),
-        "ValueError": (400, "bad_request"),
+        # "ValueError" removed — use ToolValidationError for tool input errors
         # Tool-level errors
         "ToolValidationError": (400, "validation_error"),
         "ToolNotFoundError": (404, "not_found"),

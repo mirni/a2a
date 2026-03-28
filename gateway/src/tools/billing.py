@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from gateway.src.lifespan import AppContext
+from gateway.src.tool_errors import ToolNotFoundError, ToolValidationError
 
 
 async def _get_balance(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
@@ -65,8 +66,6 @@ async def _get_metrics_timeseries(ctx: AppContext, params: dict[str, Any]) -> di
     interval = params["interval"]  # "hour" or "day"
     since = params.get("since")
     limit = params.get("limit", 24)
-
-    from gateway.src.tool_errors import ToolValidationError
 
     _VALID_INTERVALS = {"hour", "day"}
     if interval not in _VALID_INTERVALS:
@@ -159,7 +158,7 @@ async def _get_agent_leaderboard(ctx: AppContext, params: dict[str, Any]) -> dic
         except (RuntimeError, OSError, AttributeError):
             leaderboard = []
     else:
-        raise ValueError(f"Unknown metric: {metric}")
+        raise ToolValidationError(f"Unknown metric: {metric}")
 
     return {"leaderboard": leaderboard}
 
@@ -229,7 +228,6 @@ async def _estimate_cost(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
         pricing = tool_def.get("pricing", {})
         unit_price = float(pricing.get("per_call", 0.0))
     else:
-        from gateway.src.tool_errors import ToolNotFoundError
         raise ToolNotFoundError(f"Tool not found: {tool_name}")
 
     discount_pct = 0

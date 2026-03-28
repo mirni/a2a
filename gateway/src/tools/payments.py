@@ -265,9 +265,11 @@ async def _create_split_intent(ctx: AppContext, params: dict[str, Any]) -> dict[
     splits = params["splits"]
     description = params.get("description", "")
 
+    from gateway.src.tool_errors import ToolValidationError
+
     total_pct = sum(s["percentage"] for s in splits)
     if abs(total_pct - 100) > 0.01:
-        raise ValueError(f"Split percentages must sum to 100, got {total_pct}")
+        raise ToolValidationError(f"Split percentages must sum to 100, got {total_pct}")
 
     await ctx.tracker.wallet.withdraw(payer, amount, description=f"split:{description}")
 

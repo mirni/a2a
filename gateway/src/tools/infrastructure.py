@@ -214,7 +214,8 @@ def _resolve_db_path(db_name: str) -> str:
 
     env_var = _DB_DSN_MAP.get(db_name)
     if not env_var:
-        raise ValueError(f"Unknown database: {db_name}")
+        from gateway.src.tool_errors import ToolValidationError
+        raise ToolValidationError(f"Unknown database: {db_name}")
     dsn = os.environ.get(env_var, "")
     if not dsn:
         raise ValueError(f"DSN not configured for {db_name} (env: {env_var})")
