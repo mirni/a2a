@@ -93,7 +93,7 @@ async def batch(request: Request) -> JSONResponse:
 
     if not x402_agent_id:
         # --- Global rate limit check (sliding window) ---
-        from paywall_src.tiers import get_tier_config, tier_has_access
+        from paywall_src.tiers import get_tier_config
 
         tier_config = get_tier_config(agent_tier)
         window_key = "gateway"
@@ -138,24 +138,39 @@ async def batch(request: Request) -> JSONResponse:
 
     for call in calls:
         if not isinstance(call, dict):
-            results.append({"success": False, "error": {"code": "bad_request", "message": "Each call must be a JSON object"}})
+            results.append({
+                "success": False,
+                "error": {"code": "bad_request", "message": "Each call must be a JSON object"},
+            })
             continue
 
         tool_name = call.get("tool")
         params = call.get("params", {})
 
         if not tool_name:
-            results.append({"success": False, "error": {"code": "bad_request", "message": "Missing 'tool' field in call"}})
+            results.append({
+                "success": False,
+                "error": {"code": "bad_request", "message": "Missing 'tool' field in call"},
+            })
             continue
 
         # Look up tool in catalog
         tool_def = get_tool(tool_name)
         if tool_def is None:
-            results.append({"success": False, "error": {"code": "unknown_tool", "message": f"Unknown tool: {tool_name}"}})
+            results.append({
+                "success": False,
+                "error": {"code": "unknown_tool", "message": f"Unknown tool: {tool_name}"},
+            })
             continue
 
         if tool_name not in TOOL_REGISTRY:
-            results.append({"success": False, "error": {"code": "not_implemented", "message": f"Tool '{tool_name}' is not implemented"}})
+            results.append({
+                "success": False,
+                "error": {
+                    "code": "not_implemented",
+                    "message": f"Tool '{tool_name}' is not implemented",
+                },
+            })
             continue
 
         # Check required parameters
@@ -165,18 +180,25 @@ async def batch(request: Request) -> JSONResponse:
         if missing:
             results.append({
                 "success": False,
-                "error": {"code": "missing_parameter", "message": f"Missing required parameter(s): {', '.join(missing)}"},
+                "error": {
+                    "code": "missing_parameter",
+                    "message": f"Missing required parameter(s): {', '.join(missing)}",
+                },
             })
             continue
 
         # Check tier access (skip for x402)
         if not x402_agent_id:
             from paywall_src.tiers import tier_has_access as _tier_check
+
             required_tier = tool_def.get("tier_required", "free")
             if not _tier_check(agent_tier, required_tier):
                 results.append({
                     "success": False,
-                    "error": {"code": "insufficient_tier", "message": f"Tier '{agent_tier}' cannot access tool '{tool_name}'"},
+                    "error": {
+                        "code": "insufficient_tier",
+                        "message": f"Tier '{agent_tier}' cannot access '{tool_name}'",
+                    },
                 })
                 continue
 
@@ -188,14 +210,24 @@ async def batch(request: Request) -> JSONResponse:
                         agent_id, tool_name, window_seconds=3600.0
                     )
                     if tool_rate_count >= tool_rate_limit:
+                        msg = (
+                            f"Per-tool rate limit exceeded for '{tool_name}': "
+                            f"{tool_rate_count}/{tool_rate_limit} per hour"
+                        )
                         results.append({
                             "success": False,
-                            "error": {"code": "rate_limit_exceeded", "message": f"Per-tool rate limit exceeded for '{tool_name}': {tool_rate_count}/{tool_rate_limit} per hour"},
+                            "error": {"code": "rate_limit_exceeded", "message": msg},
                         })
                         continue
                 except (RuntimeError, OSError):
-                    logger.error("Per-tool rate limit check failed for %s/%s", agent_id, tool_name, exc_info=True)
-                    results.append({"success": False, "error": {"code": "service_error", "message": "Rate limit service unavailable"}})
+                    logger.error(
+                        "Per-tool rate limit check failed for %s/%s",
+                        agent_id, tool_name, exc_info=True,
+                    )
+                    results.append({
+                        "success": False,
+                        "error": {"code": "service_error", "message": "Rate limit service unavailable"},
+                    })
                     continue
 
         # Dispatch to tool function

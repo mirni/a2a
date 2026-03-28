@@ -59,7 +59,6 @@ async def x402_app(tmp_data_dir, monkeypatch):
     monkeypatch.setenv("X402_ENABLED", "true")
     monkeypatch.setenv("X402_MERCHANT_ADDRESS", "0xTestMerchant")
 
-    import httpx
     from gateway.src.app import create_app
     from gateway.src.lifespan import lifespan
 

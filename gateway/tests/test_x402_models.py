@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import time
-
 import pytest
 from pydantic import ValidationError
 
+from gateway.src.tool_errors import X402ReplayError, X402VerificationError
 from gateway.src.x402 import (
     USDC_CONTRACTS,
     X402Authorization,
@@ -14,7 +13,6 @@ from gateway.src.x402 import (
     X402PaymentProof,
     X402PaymentRequired,
 )
-from gateway.src.tool_errors import X402ReplayError, X402VerificationError
 
 
 class TestX402Authorization:
@@ -138,8 +136,7 @@ class TestX402Exceptions:
 
     def test_exception_mapping(self):
         """X402 exceptions map to 402 in the error handler."""
-        from gateway.src.errors import handle_product_exception
 
         # Verify the mapping dict inside handle_product_exception
-        assert "X402VerificationError" == type(X402VerificationError("x")).__name__
-        assert "X402ReplayError" == type(X402ReplayError("x")).__name__
+        assert type(X402VerificationError("x")).__name__ == "X402VerificationError"
+        assert type(X402ReplayError("x")).__name__ == "X402ReplayError"

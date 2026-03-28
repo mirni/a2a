@@ -366,8 +366,9 @@ async def execute(request: Request) -> JSONResponse:
     # Sign response if signing manager available
     signing_manager = getattr(request.app.state, "signing_manager", None)
     if signing_manager:
-        from gateway.src.signing import sign_response
         import json as _json
+
+        from gateway.src.signing import sign_response
 
         body_bytes = _json.dumps({"success": True, "result": result, "charged": cost}).encode()
         headers.update(sign_response(signing_manager, body_bytes))
