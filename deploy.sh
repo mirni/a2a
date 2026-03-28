@@ -90,6 +90,7 @@ _apt_get() {
 # ---------------------------------------------------------------------------
 
 DOMAIN="${A2A_DOMAIN:-a2a.example.com}"
+WWW_DOMAIN="${A2A_WWW_DOMAIN:-}"  # e.g. greenhelix.net — set to enable website
 BRANCH="${A2A_BRANCH:-main}"
 GITHUB_PAT="${GITHUB_PAT:-}"
 
@@ -400,6 +401,66 @@ rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
 
 # ---------------------------------------------------------------------------
+# Step 7a: Deploy company website (if WWW_DOMAIN is set)
+# ---------------------------------------------------------------------------
+
+if [[ -n "$WWW_DOMAIN" ]]; then
+    WEBSITE_ROOT="/var/www/${WWW_DOMAIN}"
+    log "Deploying company website to $WEBSITE_ROOT..."
+
+    mkdir -p "$WEBSITE_ROOT"
+    if [[ -d "$INSTALL_DIR/website" ]]; then
+        cp -r "$INSTALL_DIR/website/"* "$WEBSITE_ROOT/"
+        chown -R www-data:www-data "$WEBSITE_ROOT"
+    else
+        warn "website/ directory not found in repo, creating placeholder"
+        echo "<h1>$WWW_DOMAIN</h1>" > "$WEBSITE_ROOT/index.html"
+        chown -R www-data:www-data "$WEBSITE_ROOT"
+    fi
+
+    cat > /etc/nginx/sites-available/website << WEBEOF
+# Company website — static files
+# After DNS is pointed here, run:
+#   sudo certbot --nginx -d $WWW_DOMAIN -d www.$WWW_DOMAIN
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name $WWW_DOMAIN www.$WWW_DOMAIN;
+
+    root $WEBSITE_ROOT;
+    index index.html;
+
+    # Let's Encrypt challenge
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    location / {
+        try_files \$uri \$uri/ =404;
+    }
+
+    # Cache static assets
+    location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg|woff2?)$ {
+        expires 7d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+}
+WEBEOF
+
+    ln -sf /etc/nginx/sites-available/website /etc/nginx/sites-enabled/website
+    nginx -t && systemctl reload nginx
+    log "Website deployed at http://$WWW_DOMAIN"
+else
+    log "No WWW_DOMAIN set, skipping website deployment"
+fi
+
+# ---------------------------------------------------------------------------
 # Step 8a: Install and configure Tailscale
 # ---------------------------------------------------------------------------
 
@@ -575,6 +636,9 @@ echo -e "${GREEN} A2A Commerce Platform — Deployment Complete${NC}"
 echo "============================================================================="
 echo ""
 echo "  Gateway:    http://$DOMAIN (HTTP — HTTPS after certbot)"
+if [[ -n "$WWW_DOMAIN" ]]; then
+echo "  Website:    http://$WWW_DOMAIN (HTTP — HTTPS after certbot)"
+fi
 echo "  Data dir:   $DATA_DIR"
 echo "  Logs:       journalctl -u a2a-gateway -f"
 echo "  Config:     $ENV_FILE"
@@ -603,10 +667,19 @@ echo "==========================================================================
 echo -e "${YELLOW} REQUIRED NEXT STEPS:${NC}"
 echo "============================================================================="
 echo ""
-echo "  1. POINT DNS: Create an A record for $DOMAIN -> $(curl -s4 ifconfig.me 2>/dev/null || echo '<this-server-ip>')"
+SERVER_IP=$(curl -s4 ifconfig.me 2>/dev/null || echo '<this-server-ip>')
+echo "  1. POINT DNS: Create A records -> $SERVER_IP"
+echo "       $DOMAIN -> $SERVER_IP"
+if [[ -n "$WWW_DOMAIN" ]]; then
+echo "       $WWW_DOMAIN -> $SERVER_IP"
+echo "       www.$WWW_DOMAIN -> $SERVER_IP"
+fi
 echo ""
 echo "  2. ENABLE HTTPS (after DNS propagates):"
-echo "     sudo certbot --nginx -d $DOMAIN"
+echo "     certbot --nginx -d $DOMAIN"
+if [[ -n "$WWW_DOMAIN" ]]; then
+echo "     certbot --nginx -d $WWW_DOMAIN -d www.$WWW_DOMAIN"
+fi
 echo ""
 echo "  3. CONFIGURE SECRETS:"
 echo "     sudo nano $ENV_FILE"
