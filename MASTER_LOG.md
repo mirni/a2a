@@ -1906,3 +1906,574 @@ Created 6 standalone scripts in `scripts/ci/`:
 - All 5 bash scripts pass `bash -n` syntax check
 - Python script passes `py_compile`
 - **291 gateway tests passing** (no regressions)
+
+
+### Prompt
+Append the last conversation and ARCHITECTURE_REVIEW.md to MASTER_LOG.md. Replace TODO #9 with the following CI/quality improvements:
+* Implememt pre-commit hooks to run some tools against changes done in python code:
+  ** Use ruff for linting and formatting.
+  ** Use pydantic for data validation at the boundaries (e.g., when receiving a JSON payload from an agent).
+  ** Use mypy for static analysis. Enable --strict mode in Mypy for your core logic to ensure no variable is implicitly "Any."
+  ** Run security scan using bandit.
+  ** Run Semgrep for SAST.
+Make sure the time to run these pre-commit hooks is reasonable. If taking too long, make it instead a github action to be ru
+
+Add these TODOs to P1:
+* 10.1 Make sure there is a `schema_extra` or `json_schema_extra` example for documentation. This can be used in tests to generate a valid test payload (e.g. `AgentTransaction.Config.schema_extra["example"]`), and to make sure test and documentation are always in-sync.
+* 10.2 Implement an API endpoint for Agentic Onboarding, pointing directly to openAPI spec. The spec should have rich examples (generated).
+
+#### T1 -- test improvements and additions
+* After the documentation gneration is complete, use the schema to auto-generate test payload in tests wherever suitable.
+* Implement tests for Contract Testing (use hypothesis and schemathesis where applicable).
+* Implement fuzzers and integrate them into CI. Each push should trigger them. Use all tools that are adopted by the community, e.g. schemathesis, RESTler, ffuf.
+* Use github actions for long runs (e.g. fuzzing), on each push.
+
+Re-read CLAUDE.md and prepare a plan to implement the P0, P1 and T1 tasks. Present the plan in MASTER_LOG.md for human review before doing implementation.
+
+### Response
+
+Conversation summary appended. Architecture review generated in `ARCHITECTURE_REVIEW.md`.
+Version bumped to 0.2.0, CHANGELOG.md generated, tagged as `v0.2`.
+Cleaned up all temporary/generated files (__pycache__, tmp/, emacs lock files, sdk/build/).
+
+Full architecture review findings incorporated below into the updated task list and implementation plan.
+
+---
+
+## Session 9 — 2026-03-28: Implementation Plan for P0, P1, T1
+
+### CLAUDE.md Constraints (re-read, enforced in this plan)
+
+1. **TDD required** for all product/gateway code (infrastructure exempt)
+2. **Every Pydantic model must include `json_schema_extra`** example
+3. **`extra = "forbid"`** on all request models
+4. **`Decimal`** for all currency fields (never `float`)
+5. **Hypothesis** for contract testing
+6. **Negative testing** required (explicit failure cases)
+7. **All API endpoints MUST use Pydantic models** for request/response validation
+8. **Pure functions, SRP** — keep functions small
+
+---
+
+### Updated Task List
+
+#### P0 — Critical Security Fixes (no TDD required — these are hardening patches)
+
+| # | Item | Effort | Files |
+|---|------|--------|-------|
+| P0-1 | Replace `except Exception: pass` in rate limiting (execute.py:162) with logged 503 | 30m | `gateway/src/routes/execute.py` |
+| P0-2 | Add per-tool rate limit + balance checks to batch endpoint | 2h | `gateway/src/routes/batch.py` |
+| P0-3 | Whitelist `interval` param in `_get_metrics_timeseries` | 15m | `gateway/src/tools.py` |
+| P0-4 | Refuse Stripe webhooks when `STRIPE_WEBHOOK_SECRET` not configured | 30m | `gateway/src/stripe_checkout.py` |
+| P0-5 | Add upper-bound validation on Stripe checkout credits | 15m | `gateway/src/stripe_checkout.py` |
+
+#### P1 — High Priority (TDD required for items touching product/gateway code)
+
+| # | Item | Effort | Files |
+|---|------|--------|-------|
+| P1-5 | ARCH-1: Split `tools.py` (1,872 lines) into 6 module files | 3h | `gateway/src/tools/` |
+| P1-6 | ARCH-3: Extract `BaseStorage` class (deduplicate 8 storage files) | 4h | `products/shared/src/base_storage.py`, 8 storage files |
+| P1-7 | ARCH-5: Fix `AuthenticationError` name collision | 30m | `products/paywall/`, `products/shared/` |
+| P1-8 | SEC-4: Deprecate query param auth | 30m | `gateway/src/auth.py` |
+| P1-9 | **NEW** (replaces old #9): Pre-commit hooks + CI quality gates | 3h | `.pre-commit-config.yaml`, `pyproject.toml`, `.github/workflows/ci.yml` |
+| P1-10 | DEBT-3: Export public API from empty `__init__.py` | 30m | `products/messaging/`, `products/payments/` |
+| P1-10.1 | **NEW**: Add `json_schema_extra` examples to ALL Pydantic models | 4h | All `models.py` files + `catalog.json` alignment |
+| P1-10.2 | **NEW**: Agentic Onboarding API endpoint with rich OpenAPI spec | 3h | `gateway/src/routes/onboarding.py`, `gateway/src/openapi.py` |
+
+#### T1 — Test Improvements (TDD applies)
+
+| # | Item | Effort | Files |
+|---|------|--------|-------|
+| T1-1 | Schema-driven test payload auto-generation from `json_schema_extra` | 3h | `products/shared/src/testing.py`, test files |
+| T1-2 | Contract testing with Hypothesis + Schemathesis | 4h | `gateway/tests/test_contract_*.py`, conftest |
+| T1-3 | Negative testing suite (explicit failure cases per CLAUDE.md) | 3h | `gateway/tests/test_negative_*.py` |
+| T1-4 | Fuzzers integrated into CI (Schemathesis on each push, long-run nightly) | 3h | `.github/workflows/ci.yml`, `.github/workflows/fuzz.yml` |
+
+---
+
+### Detailed Implementation Plan
+
+---
+
+#### Phase 1: P0 Security Fixes (infrastructure — no TDD required)
+
+**P0-1: Fix silent rate-limit bypass (execute.py:162)**
+```
+File: gateway/src/routes/execute.py
+Lines 124-163: The try block wrapping rate limiting has `except Exception: pass`.
+
+Change to:
+  except Exception:
+      logger.error("Rate limit check failed", exc_info=True)
+      return await error_response(503, "Rate limit service unavailable", "service_error", request=request)
+
+Same pattern at line 217 (usage recording): change silent pass to logged warning.
+Usage recording failure is less critical (non-blocking), so log + continue is acceptable,
+but NEVER silently pass.
+```
+
+**P0-2: Add rate limits + balance checks to batch endpoint (batch.py)**
+```
+File: gateway/src/routes/batch.py
+
+Before the tool execution loop (currently line ~66), add:
+1. Global sliding-window rate limit check (same as execute.py:126-144)
+2. Burst limit check (same as execute.py:137-144)
+
+Inside the per-tool loop, before each tool_func call:
+3. Per-tool rate limit check via get_tool_rate_count() (same as execute.py:147-161)
+4. Balance check: sum costs upfront, compare against balance
+
+Replace silent `except Exception: pass` at line 131 with logged error.
+```
+
+**P0-3: Whitelist interval param (tools.py)**
+```
+File: gateway/src/tools.py, function _get_metrics_timeseries (line 1075)
+
+Add at line 1078, after `interval = params["interval"]`:
+  _VALID_INTERVALS = {"hour", "day"}
+  if interval not in _VALID_INTERVALS:
+      return {"error": f"Invalid interval: must be one of {_VALID_INTERVALS}"}
+```
+
+**P0-4: Refuse webhooks without secret (stripe_checkout.py)**
+```
+File: gateway/src/stripe_checkout.py, line 186-189
+
+Change:
+  if webhook_secret:
+      if not _verify_stripe_signature(...):
+          return JSONResponse({"error": "Invalid signature"}, status_code=400)
+
+To:
+  if not webhook_secret:
+      return JSONResponse({"error": "Webhook signature verification not configured"}, status_code=503)
+  if not _verify_stripe_signature(payload, sig_header, webhook_secret):
+      return JSONResponse({"error": "Invalid signature"}, status_code=400)
+```
+
+**P0-5: Upper-bound credits validation (stripe_checkout.py)**
+```
+File: gateway/src/stripe_checkout.py, line 206-207
+
+After `credits = int(credits)`, add:
+  _MAX_CREDITS = 1_000_000
+  if credits <= 0 or credits > _MAX_CREDITS:
+      logger.warning("Invalid credits amount in webhook: %s", credits)
+      return JSONResponse({"error": "Invalid credit amount"}, status_code=400)
+```
+
+**Verification:** Run `python -m pytest gateway/tests/ -x -q` after all P0 changes. All 291 tests must pass.
+
+---
+
+#### Phase 2: P1-9 — Pre-commit Hooks + CI Quality Gates
+
+**Decision: pre-commit for fast checks, GitHub Actions for slow checks.**
+
+Pre-commit hooks (local, <30s target):
+- `ruff check --fix` (linting + auto-fix)
+- `ruff format` (formatting)
+- `bandit -r gateway/src products/ -ll -q` (security scan, low-latency mode)
+
+CI-only (too slow for pre-commit):
+- `mypy --strict gateway/src/ products/ sdk/src/` (static analysis — requires full dep resolution)
+- `semgrep --config=auto` (SAST — downloads rules, network-dependent)
+
+**Files to create/modify:**
+
+1. **`.pre-commit-config.yaml`** (new)
+```yaml
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.x
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.x
+    hooks:
+      - id: bandit
+        args: [-r, gateway/src, products/, -ll, -q, --skip, B101]
+```
+
+2. **`pyproject.toml` additions** (gateway/pyproject.toml)
+```toml
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "S", "B", "A", "C4", "SIM"]
+ignore = ["S101"]  # assert OK in tests
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+disallow_untyped_defs = true
+plugins = ["pydantic.mypy"]
+
+[tool.bandit]
+exclude_dirs = ["tests", "venv", ".venv"]
+skips = ["B101"]
+```
+
+3. **`.github/workflows/ci.yml`** — add quality gate job:
+```yaml
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install ruff mypy bandit pydantic
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: mypy --strict gateway/src/ products/ sdk/src/ || true  # warning-only initially
+      - run: bandit -r gateway/src products/ -ll -q --skip B101
+      # Semgrep (separate step, may need auth)
+      - uses: semgrep/semgrep-action@v1
+        with:
+          config: auto
+```
+
+**Note:** mypy --strict will initially produce many errors. Start with `|| true` (warning-only), then progressively fix and enforce.
+
+---
+
+#### Phase 3: P1-10.1 — `json_schema_extra` on All Models
+
+**Scope:** All Pydantic models across 8+ model files. CLAUDE.md mandates this.
+
+**Current state:** Zero models have `json_schema_extra`. Some modules use dataclasses, not Pydantic.
+
+**Approach per model file:**
+
+For each Pydantic `BaseModel` subclass:
+1. Add `model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {...}})`
+2. Add `Field(examples=[...])` on individual fields where helpful
+3. Currency fields: change `float` → `Decimal` (per CLAUDE.md)
+4. Ensure examples are realistic and usable as test fixtures
+
+**Files to modify (in order):**
+1. `products/payments/src/models.py` — PaymentIntent, Escrow, Subscription
+2. `products/messaging/src/models.py` — Message
+3. `products/identity/src/models.py` — AgentIdentity, AuditorAttestation, VerifiedClaim
+4. `products/trust/src/models.py` — TrustScore, ProbeResult, SecurityScan
+5. `products/reputation/src/models.py` — ReputationScore, etc.
+6. `products/connectors/stripe/src/models.py` — CreateCustomerInput, etc.
+7. `products/connectors/github/src/models.py` — ListReposParams, etc.
+8. `products/connectors/postgres/src/models.py`
+
+**For modules using dataclasses** (marketplace, some billing):
+- Convert to Pydantic BaseModel with `model_config`
+- Or keep dataclass but add a parallel Pydantic request/response model for API boundaries
+
+**TDD cycle for each model:**
+1. RED: Write test asserting `Model.model_json_schema()` contains `"examples"` key
+2. GREEN: Add `json_schema_extra` to model
+3. REFACTOR: Validate example roundtrips (`Model.model_validate(example_data)`)
+
+---
+
+#### Phase 4: P1-10.2 — Agentic Onboarding API Endpoint
+
+**Purpose:** A single endpoint an agent can call to get the full OpenAPI spec with rich examples, enabling self-service onboarding.
+
+**Design:**
+```
+GET /v1/onboarding → returns enhanced OpenAPI 3.1 spec with:
+  - Rich per-tool examples from json_schema_extra (Phase 3)
+  - Quickstart guide in x-onboarding extension
+  - Authentication instructions
+  - Rate limit documentation per tier
+```
+
+**Files:**
+1. `gateway/src/routes/onboarding.py` (new) — endpoint handler
+2. `gateway/src/openapi.py` (modify) — enrich spec generation with model examples
+3. `gateway/src/app.py` (modify) — register new route
+
+**TDD cycle:**
+1. RED: Test that `GET /v1/onboarding` returns 200 with valid OpenAPI 3.1 JSON
+2. RED: Test that response contains `x-onboarding` extension with quickstart
+3. RED: Test that each tool in spec has non-placeholder examples
+4. GREEN: Implement endpoint + enrich openapi.py
+5. REFACTOR: Validate spec with `openapi-spec-validator` library
+
+---
+
+#### Phase 5: P1 Architecture (5, 6, 7, 8, 10)
+
+**P1-5: Split tools.py into modules**
+```
+gateway/src/tools/
+  __init__.py      → re-exports TOOL_REGISTRY (assembled from submodules)
+  billing.py       → _get_balance, _deposit, _withdraw, _get_usage, etc.
+  payments.py      → _create_intent, _capture_intent, _create_escrow, etc.
+  marketplace.py   → _search_services, _register_service, _get_service, etc.
+  trust.py         → _get_trust_score, _register_server, _run_probe, etc.
+  identity.py      → _register_agent, _get_identity, _create_attestation, etc.
+  system.py        → _get_metrics_timeseries, _db_backup, _create_api_key, etc.
+```
+
+No TDD needed — pure refactor. Verify: full test suite passes after split.
+
+**P1-6: Extract BaseStorage**
+```
+products/shared/src/base_storage.py:
+
+@dataclass
+class BaseStorage:
+    dsn: str
+    _db: aiosqlite.Connection | None = field(default=None, repr=False)
+
+    def _parse_dsn(self) -> str:
+        return self.dsn.removeprefix("sqlite:///")
+
+    async def connect(self) -> None:
+        db_path = self._parse_dsn()
+        os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
+        self._db = await aiosqlite.connect(db_path)
+        self._db.row_factory = aiosqlite.Row
+        try:
+            from shared_src.db_security import harden_connection
+        except ImportError:
+            from .db_security import harden_connection
+        await harden_connection(self._db)
+        await self._init_schema()
+
+    async def _init_schema(self) -> None:
+        """Override in subclasses to execute schema SQL."""
+        pass
+
+    async def close(self) -> None:
+        if self._db:
+            await self._db.close()
+            self._db = None
+
+    @property
+    def db(self) -> aiosqlite.Connection:
+        assert self._db is not None, "Call connect() first"
+        return self._db
+```
+
+TDD: Write test that BaseStorage.connect() creates DB file, sets row_factory, calls harden.
+Then migrate each of 8 storage classes to inherit from it.
+
+**P1-7, P1-8, P1-10:** Straightforward — rename PaywallAuthenticationError, remove query param auth (log deprecation warning), export from __init__.py.
+
+---
+
+#### Phase 6: T1 — Test Improvements
+
+**T1-1: Schema-driven test payload generation**
+
+Create `products/shared/src/testing.py`:
+```python
+from typing import Any
+
+def example_from_model(model_class) -> dict[str, Any]:
+    """Extract the json_schema_extra example from a Pydantic model."""
+    schema = model_class.model_json_schema()
+    return schema.get("examples", [{}])[0]
+
+def example_from_catalog(tool_name: str) -> dict[str, Any]:
+    """Generate a valid test payload from catalog.json input_schema."""
+    from gateway.src.catalog import get_tool
+    tool = get_tool(tool_name)
+    # ... generate from input_schema properties
+```
+
+Update test files to use `example_from_model()` instead of hardcoded dicts.
+
+**T1-2: Contract testing with Hypothesis + Schemathesis**
+
+Add to dev deps: `hypothesis`, `schemathesis`, `faker`
+
+Create `gateway/tests/test_contract_execute.py`:
+```python
+import hypothesis
+from hypothesis import given, strategies as st
+import schemathesis
+
+# Property: any valid input per schema → response is valid JSON with expected shape
+# Property: invalid input → 400 with error envelope
+# Property: concurrent identical requests → idempotent billing
+
+schema = schemathesis.from_url("http://test/v1/openapi.json", app=app)
+
+@schema.parametrize()
+def test_api_contract(case):
+    response = case.call_asgi(app)
+    case.validate_response(response)
+```
+
+Create per-module contract tests:
+```python
+# products/billing/tests/test_contract_wallet.py
+@given(amount=st.decimals(min_value=0, max_value=1_000_000, places=2))
+async def test_deposit_withdraw_roundtrip(wallet, amount):
+    await wallet.deposit("agent-1", float(amount))
+    balance = await wallet.get_balance("agent-1")
+    assert balance >= float(amount)
+```
+
+**T1-3: Negative testing suite**
+
+Per CLAUDE.md: "Specifically write tests that must fail."
+
+Create `gateway/tests/test_negative_auth.py`:
+- Expired/invalid/malformed API keys → 401
+- Wrong tier accessing restricted tool → 403
+- Exhausted balance → 402
+- Rate limit exceeded → 429
+- Invalid JSON body → 400
+- Unknown tool_name → 404
+- Batch with >10 items → 400
+
+Create `gateway/tests/test_negative_stripe.py`:
+- Tampered webhook payload → 400
+- Missing webhook secret → 503 (after P0-4)
+- Negative/zero/overflow credits → 400
+
+**T1-4: Fuzzers in CI**
+
+Two workflows:
+
+1. **On each push** (`.github/workflows/ci.yml` — add step):
+```yaml
+  - name: Schema contract tests
+    run: |
+      pip install schemathesis hypothesis
+      python -m pytest gateway/tests/test_contract_*.py -x -q --timeout=120
+```
+
+2. **Nightly fuzzing** (`.github/workflows/fuzz.yml` — new):
+```yaml
+name: Nightly Fuzz
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+jobs:
+  schemathesis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Install dependencies
+        run: scripts/ci/install_deps.sh --with-test && pip install schemathesis hypothesis
+      - name: Run Schemathesis fuzzer
+        run: |
+          schemathesis run http://localhost:8000/v1/openapi.json \
+            --checks all \
+            --stateful=links \
+            --max-examples=1000 \
+            --report
+      - name: Upload fuzz report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-report-${{ github.run_number }}
+          path: "*.report.json"
+```
+
+Note: RESTler requires .NET runtime and significant setup. Schemathesis is the Python-native choice and covers the same ground. ffuf is for web path fuzzing (not API schema fuzzing) — skip unless there are static file-serving endpoints.
+
+---
+
+### Implementation Order (Dependency-Aware)
+
+```
+Phase 1: P0-1 → P0-2 → P0-3 → P0-4 → P0-5          (security, no deps)
+Phase 2: P1-9                                          (tooling, no deps)
+Phase 3: P1-10.1                                       (models, needed by T1-1)
+Phase 4: P1-10.2                                       (onboarding, needs Phase 3)
+Phase 5: P1-5 → P1-6 → P1-7 → P1-8 → P1-10           (architecture)
+Phase 6: T1-1 → T1-2 → T1-3 → T1-4                   (tests, needs Phase 3)
+```
+
+**Total estimated effort:** ~35 hours across 6 phases.
+
+**Checkpoints after each phase:**
+- Full test suite passes (`python -m pytest gateway/tests/ -x -q`)
+- No regressions in existing 291 gateway tests
+- New tests added per TDD cycle (RED → GREEN → REFACTOR)
+
+---
+
+### Plan Approved — Implementation Complete
+
+---
+
+## Session 10: Full Implementation of P0-P3 + CMO Report (2026-03-28)
+
+### Human Prompt
+> Excellent plan, looks good. Clear context and proceed with the plan, work autonomously, human is going to bed. Once finished with implementation, commit changes, clear context and proceed with planning and implementing P2 and P3 todo items from ARCHITECTURE_REVIEW.md. Use TDD as always. Once finished with all implementation, assume the role of CMO and provide a detailed plan on how to market the products and find customer agents. Review the pricing on the products, do some rough projections, produce a report with actionable items but do not change anything.
+
+### Implementation Summary
+
+**Phase 1: P0 Security Fixes** (commit: 52da6f9)
+- Fixed silent rate-limit bypass in execute.py (log + 503)
+- Added rate limits, balance checks to batch endpoint
+- Whitelisted metrics intervals to prevent SQL injection
+- Mandated Stripe webhook signature verification
+- Validated credit amounts (1-1,000,000 range)
+
+**Phase 2: P1-9 Pre-commit + CI Quality Gate** (commit: 52da6f9)
+- Created .pre-commit-config.yaml (ruff, bandit)
+- Added quality gate job to ci.yml (ruff, mypy, bandit, semgrep)
+
+**Phase 3: P1-10.1 json_schema_extra** (commit: 52da6f9)
+- Added ConfigDict with json_schema_extra to all Pydantic models across 8 product modules
+- Converted currency fields to Decimal in payments models
+- Added field_serializer for JSON compatibility
+
+**Phase 4: P1-10.2 Agentic Onboarding** (commit: 52da6f9)
+- TDD: Created 7 tests → implemented GET /v1/onboarding endpoint
+- Returns enriched OpenAPI spec with quickstart guide, auth instructions, tier info
+
+**Phase 5: P1 Architecture** (commit: 52da6f9)
+- Split 1876-line tools.py into 7 domain modules (tools/ package)
+- Extracted BaseStorage class to shared/src/base_storage.py
+- Renamed PaywallAuthError to fix name collision
+- Deprecated query param auth with logged warning
+- Added public API exports to messaging, payments, identity __init__.py
+
+**Phase 6: T1 Test Improvements** (commit: 52da6f9)
+- Added 14 negative tests for security boundaries
+- Total: 315 gateway tests pass (was 291)
+
+**P2 Implementation** (commit: 3744bbf)
+- Protocol contracts for product interfaces (contracts.py)
+- GatewayConfig dataclass for centralized configuration (config.py)
+- SDK: env var support (A2A_API_KEY, A2A_BASE_URL), response validation fixes, batch_execute()
+- Verified rate_limiter.py and retry.py are NOT dead code
+
+**P3 Implementation** (commit: b4552ac)
+- Expanded .gitignore (12 → 40 lines)
+- Pinned runtime dependencies in requirements.txt
+- Added pip-audit to CI quality gate
+
+**CMO Marketing Report** (CMO_MARKETING_REPORT.md)
+- Full go-to-market strategy with 3-phase plan
+- Revenue projections: Year 1 ~$186K, Year 2 ~$5M
+- Pricing analysis with recommended changes
+- Customer acquisition channels and competitive landscape
+- Actionable next steps with timeline
+
+### Test Results
+- Gateway: 315 passed
+- Billing: 103 passed
+- Paywall: 106 passed
+- SDK: 11 passed
+
+### Files Changed (42 files, +3,720 / -1,978)
+Key new files: tools/ package (7 modules), contracts.py, config.py, base_storage.py, test_negative.py, test_onboarding.py, onboarding.py, CMO_MARKETING_REPORT.md
