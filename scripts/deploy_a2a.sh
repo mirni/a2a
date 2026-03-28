@@ -15,6 +15,7 @@
 #   GITHUB_PAT          — GitHub PAT for private repo access
 #   TAILSCALE_AUTHKEY   — Tailscale auth key (optional)
 #   A2A_SKIP_GIT        — set to 1 to skip git clone/pull (used by deb postinst)
+#   A2A_SKIP_APT        — set to 1 to skip apt install (used by deb postinst)
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -36,18 +37,22 @@ trap 'echo "FAILED at line $LINENO (exit code $?)" | tee -a /var/log/a2a-deploy.
 log "Starting A2A Commerce Platform deployment on $(lsb_release -ds 2>/dev/null || echo 'Ubuntu')"
 
 # ---------------------------------------------------------------------------
-# Step 1: System packages
+# Step 1: System packages (skip when called from deb postinst — dpkg holds lock)
 # ---------------------------------------------------------------------------
 
-log "Updating system packages..."
-export DEBIAN_FRONTEND=noninteractive
-_apt_get update -qq
-_apt_get upgrade -y -qq
+if [[ "${A2A_SKIP_APT:-0}" != "1" ]]; then
+    log "Updating system packages..."
+    export DEBIAN_FRONTEND=noninteractive
+    _apt_get update -qq
+    _apt_get upgrade -y -qq
 
-log "Installing system dependencies..."
-_apt_get install -y -qq \
-    python3.12 python3.12-venv python3.12-dev python3-pip \
-    nginx sqlite3 git curl ufw
+    log "Installing system dependencies..."
+    _apt_get install -y -qq \
+        python3.12 python3.12-venv python3.12-dev python3-pip \
+        nginx sqlite3 git curl ufw
+else
+    log "A2A_SKIP_APT=1 — skipping apt (dependencies satisfied via deb Depends:)"
+fi
 
 # ---------------------------------------------------------------------------
 # Step 2: Create user and directories
