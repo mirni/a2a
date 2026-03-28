@@ -80,7 +80,7 @@ def make_marketplace_suspend_handler(marketplace: Any):
                         svc.id,
                         server_id,
                     )
-        except Exception:
+        except (RuntimeError, LookupError):
             logger.exception(
                 "Failed to suspend services for provider %s", server_id
             )
@@ -135,7 +135,7 @@ def make_billing_webhook_handler(webhook_manager: Any = None):
         if webhook_manager is not None:
             try:
                 await webhook_manager.deliver(event)
-            except Exception:
+            except (RuntimeError, OSError):
                 logger.exception("Failed to deliver webhook for event %s", event.get("id"))
 
     return billing_webhook_handler

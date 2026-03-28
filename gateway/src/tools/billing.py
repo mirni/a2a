@@ -154,7 +154,7 @@ async def _get_agent_leaderboard(ctx: AppContext, params: dict[str, Any]) -> dic
                 {"rank": i + 1, "agent_id": row[0], "value": round(row[1], 6)}
                 for i, row in enumerate(rows)
             ]
-        except Exception:
+        except (RuntimeError, OSError, AttributeError):
             leaderboard = []
     else:
         raise ValueError(f"Unknown metric: {metric}")

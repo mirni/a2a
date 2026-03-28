@@ -163,7 +163,7 @@ class MCPConnection:
                             future.set_result(msg.get("result", {}))
             except asyncio.CancelledError:
                 break
-            except Exception:
+            except (OSError, json.JSONDecodeError):
                 logger.exception("Error in MCP read loop")
                 break
 

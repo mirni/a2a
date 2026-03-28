@@ -65,6 +65,6 @@ class HealthMonitor:
         while True:
             try:
                 await self.check_services()
-            except Exception:
+            except Exception:  # Intentionally broad — monitor must never die
                 logger.exception("Unexpected error during health check cycle")
             await asyncio.sleep(self.interval)

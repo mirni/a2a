@@ -57,7 +57,7 @@ async def execute(request: Request) -> JSONResponse:
     # --- Parse body ---
     try:
         body: dict[str, Any] = await request.json()
-    except Exception:
+    except (ValueError, TypeError):
         return await error_response(400, "Invalid JSON body", "bad_request", request=request)
 
     if not isinstance(body, dict):
@@ -162,7 +162,7 @@ async def execute(request: Request) -> JSONResponse:
                 )
                 resp.headers.update(rl_headers)
                 return resp
-    except Exception:
+    except (RuntimeError, OSError):
         logger.error("Rate limit check failed for agent %s", agent_id, exc_info=True)
         return await error_response(
             503, "Rate limit service unavailable", "service_error", request=request
@@ -220,7 +220,7 @@ async def execute(request: Request) -> JSONResponse:
             await ctx.tracker.wallet.charge(agent_id, cost, description=f"gateway:{tool_name}")
         # Record rate event for sliding window tracking
         await ctx.paywall_storage.record_rate_event(agent_id, window_key, tool_name)
-    except Exception:
+    except (RuntimeError, OSError):
         logger.warning("Usage recording failed for agent %s, tool %s", agent_id, tool_name, exc_info=True)
 
     # --- 8. Record latency ---
