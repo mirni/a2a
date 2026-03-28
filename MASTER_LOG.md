@@ -2477,3 +2477,334 @@ Phase 6: T1-1 → T1-2 → T1-3 → T1-4                   (tests, needs Phase 3
 
 ### Files Changed (42 files, +3,720 / -1,978)
 Key new files: tools/ package (7 modules), contracts.py, config.py, base_storage.py, test_negative.py, test_onboarding.py, onboarding.py, CMO_MARKETING_REPORT.md
+
+
+### Prompt
+Create an archive for old reports and move all reports and old TODOs in there. Keep MASTER_LOG.md in the root and live. Ignore the .md files in the archive location. Now assume role of sr software architect, do a thorough review of current implementation and produce a detailed report with actionable items, directly in MASTER_LOG.md to avoid creating new .md fies.
+
+### Actions Taken
+- Created `archive/` directory
+- Moved 12 report/TODO files: ARCHITECTURE_REVIEW.md, BUSINESS_PLAN.md, CMO_ANALYSIS.md, CMO_MARKETING_REPORT.md, CUSTOMER_AGENT_FEEDBACK.md, DEPLOYMENT.md, MARKET_RESEARCH.md, NEXT_STEPS.md, OVERNIGHT_REPORT.md, OVERNIGHT_REPORT_20260327.md, PLAYBOOK.md, next_tmrw.md
+- Added `archive/*.md` to .gitignore
+- Root now contains only: MASTER_LOG.md, CLAUDE.md, README.md, CHANGELOG.md
+- Cleaned up editor temp files (#MASTER_LOG.md#, .#MASTER_LOG.md)
+
+---
+
+## Session 11: Senior Software Architect Review (2026-03-28)
+
+# A2A Commerce Platform — Architecture Review
+
+**Reviewer:** Sr. Software Architect (automated deep review)
+**Date:** 2026-03-28
+**Scope:** Full codebase — gateway, 8 product modules, SDK, 3 connectors, CI/CD, Docker, tools package
+**Codebase:** ~5,800 LOC gateway, ~1,930 LOC tools package, 8 product modules, 315+ gateway tests, 730+ total tests
+
+---
+
+## Executive Summary
+
+The platform has a **solid async foundation** with good separation of concerns, comprehensive test coverage (730+ tests, ~1:1 test-to-source ratio), and proper security primitives (parameterized SQL, SHA-3 key hashing, Ed25519 signing). However, the review uncovered **6 critical**, **12 high**, **15 medium**, and **8 low** severity issues across error handling, input validation, encapsulation, CI enforcement, and billing integrity.
+
+**Overall Grade: B-** — Strong foundation, but not production-ready without addressing critical items.
+
+**Estimated effort to production-ready:** 12-18 developer-days.
+
+---
+
+## CRITICAL Issues (6)
+
+### C-1. Bare `except Exception` Clauses Swallow Errors
+**Files:** execute.py:165, batch.py:87, mcp_proxy.py:165, health_monitor.py:68, event_handlers.py:83, billing tools
+**Issue:** Multiple handlers catch `Exception` broadly and return generic 503/500 errors. No differentiation between recoverable (timeout) and unrecoverable (config error) failures. One instance in billing tools (`billing.py:157`) silently sets `leaderboard = []` on any exception.
+**Risk:** Silent production failures, impossible to debug, masks database/config errors as transient.
+**Fix:** Catch specific exceptions (asyncio.TimeoutError, aiosqlite.OperationalError) separately. Log unknown exceptions at ERROR with exc_info. Never swallow exceptions silently.
+
+### C-2. Assert Statements Used for Runtime Validation
+**Files:** webhooks.py (6 instances), disputes.py (4 instances), infrastructure tools
+**Issue:** `assert self._db is not None` used for production validation. Assertions are stripped by `python -O`.
+**Risk:** Silent None-dereference crashes in optimized production builds.
+**Fix:** Replace all `assert` with explicit `if not x: raise RuntimeError(...)`.
+
+### C-3. Tools Layer Accesses Private Attributes Directly
+**Files:** infrastructure.py (accesses `ctx.event_bus._db`, `wm._db`, `wm._row_to_webhook`, `wm._insert_delivery`, `wm._send`), marketplace.py (accesses `ctx.marketplace._storage.db`)
+**Count:** 12 instances across 2 files.
+**Risk:** Tight coupling to internal implementation. Any refactor of EventBus or WebhookManager internals breaks the tools layer silently.
+**Fix:** Add public methods: `EventBus.get_events()`, `WebhookManager.test_webhook()`, `Marketplace.rate_service()`. Remove all `_private` access from tools.
+
+### C-4. Repeated Inline Table Creation in Tools
+**Files:** billing.py (2×budget_caps), identity.py (3×orgs), infrastructure.py (2×event_schemas), marketplace.py (2×service_ratings)
+**Count:** 9 instances of `CREATE TABLE IF NOT EXISTS` scattered across tool functions.
+**Risk:** Schema drift if definitions diverge. Unmaintainable. Schema changes require editing multiple locations.
+**Fix:** Extract to `gateway/src/tools/_schema.py` with `ensure_*_table()` functions called once at startup.
+
+### C-5. Inconsistent Error Handling in Tools Layer
+**Files:** All 8 tool modules, 79 functions total.
+**Issue:** Three conflicting patterns: (a) return `{"error": "..."}` dict, (b) raise `ValueError`, (c) silently catch and return empty. Callers can't reliably distinguish success from failure.
+**Risk:** Unpredictable API behavior. Error dict responses pass through as "successful" 200 responses.
+**Fix:** Establish standard: validation errors → raise `ToolValidationError`, operational errors → raise `ToolOperationalError`. Never return error dicts from tools.
+
+### C-6. No Cost Validation Allows Negative Charges
+**Files:** execute.py:173, batch.py:107
+**Issue:** `cost = calculate_tool_cost(...)` is checked for `> 0` but never validated as non-negative. A pricing bug returning negative cost silently credits the user.
+**Risk:** Billing integrity violation. Revenue loss if pricing model has bugs.
+**Fix:** Add `if cost < 0: raise ValueError("Negative cost from pricing model")` before balance check.
+
+---
+
+## HIGH Issues (12)
+
+### H-1. MCP Proxy Subprocess Resource Leaks
+**File:** mcp_proxy.py:231-288
+**Issue:** No timeout on `create_subprocess_exec()` or `conn.start()`. stderr pipe never read (fills kernel buffer). No memory limits on spawned processes.
+**Fix:** Wrap in `asyncio.wait_for(..., timeout=30.0)`. Kill process on timeout. Redirect stderr to DEVNULL or logger.
+
+### H-2. Double-Check Locking Race in MCP Proxy
+**File:** mcp_proxy.py:213-229
+**Issue:** First check `if connector in self._connections` is unsynchronized. Connection could die between check and return.
+**Fix:** Move all checks inside `async with self._locks[connector]:` block.
+
+### H-3. No Idempotency Key for Billing Charges
+**File:** execute.py:212-222
+**Issue:** If charge succeeds but response fails to deliver, retry causes double billing. No idempotency key passed to `record_usage()` or `wallet.charge()`.
+**Fix:** Accept `Idempotency-Key` header. Pass through to billing layer with UNIQUE constraint.
+
+### H-4. Missing Input Validation Across All 79 Tool Functions
+**Files:** All tool modules, ~200+ unchecked `params["key"]` accesses.
+**Issue:** No format validation on agent_id, service_id, webhook_id. No bounds checking on amounts, quantities, ratings. KeyError on missing params gives unhelpful 500.
+**Fix:** Create `gateway/src/tools/_validate.py` with `validate_param(params, key, type, required, min, max)`. Apply systematically.
+
+### H-5. Overly Broad Exception Mapping in errors.py
+**File:** errors.py:28-64
+**Issue:** Catches base `ValueError` and maps to 400. Internal config errors (`ValueError: Connection string malformed`) get reported as client validation errors.
+**Fix:** Remove generic `ValueError`/`Exception` from mapping. Map only product-specific exceptions. Log unmapped exceptions at ERROR before returning 500.
+
+### H-6. SDK Only Covers 20 of 75 Gateway Tools
+**File:** sdk/src/a2a_client/client.py
+**Issue:** Typed convenience methods exist for only 20 tools. All GitHub (8), Stripe (12), PostgreSQL (4), infrastructure (15), dispute (10), organizational (16) tools require generic `execute()`.
+**Impact:** Poor developer experience. No type safety for most tools.
+**Fix:** Add typed wrappers for top 20 most-used tools. Generate remaining from catalog.json schema.
+
+### H-7. Connector API Keys Default to Empty String
+**Files:** GitHub connector line 174, Stripe connector line 31, PostgreSQL connector
+**Issue:** `os.environ.get("GITHUB_TOKEN", "")` defaults to empty string. No validation at init. Fails at first API call with confusing error.
+**Fix:** Validate key presence in `__init__`. Raise `ConfigurationError` immediately if missing.
+
+### H-8. CI Ignores Type Checking Failures
+**File:** .github/workflows/ci.yml:38
+**Issue:** `mypy --strict ... || true` — mypy failures don't block merge. Type checking is advisory only.
+**Fix:** Remove `|| true`. Fix existing mypy errors or add targeted `# type: ignore` comments.
+
+### H-9. No Test Coverage Enforcement in CI
+**File:** .github/workflows/ci.yml
+**Issue:** pytest-cov installed but never invoked. No coverage thresholds. No coverage reporting.
+**Fix:** Add `--cov --cov-fail-under=80` to test runs. Upload coverage artifacts.
+
+### H-10. Business Logic Leaked into Tools Layer
+**Files:** billing.py (discount tier calculation, budget alert logic), trust.py (SLA compliance calculation), identity.py (org member queries with raw SQL)
+**Issue:** Pricing policy, SLA logic, and schema knowledge embedded in tools layer instead of product services.
+**Fix:** Move to dedicated service modules. Tools should be thin wrappers calling service methods.
+
+### H-11. Messaging Storage Has No Column Whitelist
+**File:** products/messaging/src/storage.py:235-240
+**Issue:** `update_negotiation()` builds SET clause from dict keys without whitelist. If caller passes arbitrary keys, SQL column injection possible.
+**Fix:** Add `_ALLOWED_COLUMNS = {"status", "current_amount", ...}` validation before building query. Same pattern exists in trust, marketplace, reputation storage — fix all 5 instances.
+
+### H-12. Identity Payment Signals Stored In-Memory Only
+**File:** products/identity/src/api.py:364-369
+**Issue:** `_payment_signals` is a plain dict. Lost on process restart.
+**Fix:** Persist to `payment_signals` table or integrate with attestations table.
+
+---
+
+## MEDIUM Issues (15)
+
+### M-1. Synchronous JSON Parsing in Async Context
+**Files:** mcp_proxy.py:99, webhooks.py:94, stripe_checkout.py:96
+**Issue:** `json.loads()` blocks event loop for large payloads (catalog.json is 92KB).
+**Fix:** Use `await asyncio.get_event_loop().run_in_executor(None, json.loads, text)` for large payloads.
+
+### M-2. Hardcoded Magic Numbers in Tools
+**Files:** All tool modules, 20+ instances.
+**Examples:** 3600 (hour), 86400 (day), 0.8 (alert threshold), 100 (page size), 99.0 (default SLA uptime), discount tiers (15/10/5%).
+**Fix:** Extract to `gateway/src/tools/_constants.py` or use GatewayConfig.
+
+### M-3. Health Monitor Nukes Trust Score to Zero
+**File:** health_monitor.py:52-59
+**Issue:** Single failed health check sets `composite_score: 0`. Too aggressive — transient glitch suspends provider.
+**Fix:** Apply incremental penalty (e.g., -20 per failure) instead of immediate zero.
+
+### M-4. No Timeout on Webhook Delivery
+**File:** webhooks.py:186-202
+**Issue:** httpx timeout covers individual ops but not total delivery. Slow DNS + slow server can block delivery task.
+**Fix:** Wrap in `async with asyncio.timeout(15.0):` for total operation timeout.
+
+### M-5. Database Transactions Not Rolled Back on Exception
+**Files:** webhooks.py:223-236, disputes.py:81-86
+**Issue:** If exception after `execute()` but before `commit()`, transaction stays open, locks DB.
+**Fix:** Add `try/except` with `await self._db.rollback()` on failure.
+
+### M-6. Payments Use Float for Currency
+**Files:** products/payments/src/engine.py, storage.py
+**Issue:** `float` used for monetary amounts. Rounding errors in partial captures and splits.
+**Fix:** Use `Decimal` consistently. Models already define Decimal fields but engine uses float internally.
+
+### M-7. Event Bus Silently Swallows Handler Exceptions
+**File:** products/shared/src/event_bus.py
+**Issue:** `asyncio.gather(..., return_exceptions=True)` catches all handler exceptions without logging.
+**Fix:** Iterate results, log exceptions via `logger.exception()`.
+
+### M-8. Docker SDK Installation Suppresses Errors
+**File:** Dockerfile:62
+**Issue:** `pip install -e sdk/ 2>/dev/null || pip install sdk/` — stderr suppressed. Real installation errors invisible.
+**Fix:** Remove `2>/dev/null`. Fail immediately on error.
+
+### M-9. SQLite Only in Production Docker
+**File:** Dockerfile, docker-compose.yml
+**Issue:** All 9 services use file-based SQLite. Single writer at a time. Not suitable for concurrent write-heavy workloads.
+**Fix:** Document PostgreSQL configuration path. Add docker-compose profile for PostgreSQL.
+
+### M-10. Stripe Checkout Missing Origin Validation
+**File:** stripe_checkout.py:74-100
+**Issue:** POST `/v1/checkout` accepts requests without Origin/Referer validation. Combined with deprecated query param auth, enables CSRF.
+**Fix:** Enforce `Authorization: Bearer` header only. Remove query param auth entirely (currently deprecated).
+
+### M-11. No Rate Limit on Signing Key Endpoint
+**File:** signing.py:155-163
+**Issue:** `/v1/signing-key` exposes public key without authentication or rate limiting.
+**Fix:** Require valid API key. Add rate limiting.
+
+### M-12. Tool Registry Not Validated Against Catalog at Startup
+**Files:** execute.py, tools/__init__.py, catalog.json
+**Issue:** TOOL_REGISTRY and catalog.json can drift. A tool in catalog but not in registry returns 501 at runtime.
+**Fix:** Add startup validation: `catalog_tools - registry_tools` must be empty.
+
+### M-13. Messaging Module Sparse Test Coverage
+**File:** products/messaging/tests/ (only 2 test files)
+**Issue:** Compared to other modules (4-6 test files each), messaging has minimal coverage. No edge case tests, no authorization tests.
+**Fix:** Add test_api_edges.py, test_negotiation_lifecycle.py.
+
+### M-14. Inconsistent Error Response Format
+**Files:** errors.py:9-20, batch.py:125-126
+**Issue:** Execute endpoint returns `{"error": {"code": ..., "message": ...}}`. Batch endpoint sometimes returns `{"error": "string"}`.
+**Fix:** Standardize all error responses to include `code` and `message` fields.
+
+### M-15. Security Scan Results Not Blocking CI
+**File:** ci.yml:41-50
+**Issue:** bandit skips B101, semgrep has `continue-on-error: true`, pip-audit has `|| true`. Security findings are advisory only.
+**Fix:** Make bandit and pip-audit blocking. Add semgrep failure threshold.
+
+---
+
+## LOW Issues (8)
+
+### L-1. Function-Level Imports in Tools
+7 instances of `import time as _time`, `import json as _json` inside functions instead of module-level. Inconsistent and undocumented.
+
+### L-2. No Cascade Delete on Agent Removal
+Billing and identity tables lack FK CASCADE. Orphaned records accumulate when agents are deleted.
+
+### L-3. Missing Pagination on Webhook Delivery History
+webhooks.py `get_delivery_history()` lacks offset parameter. Can't page through large result sets.
+
+### L-4. Health Endpoint Missing Request ID
+`/v1/health` doesn't return `request_id` or set `X-Request-ID` header unlike all other endpoints.
+
+### L-5. Payment History Uses Python-Side Merge Instead of SQL UNION
+payments/storage.py fetches from 4 tables separately then merges in Python. Should use `UNION ALL`.
+
+### L-6. Metrics Singleton Has No Reset Mechanism
+middleware.py `Metrics` class uses class-level variables shared across workers. No reset between deployments.
+
+### L-7. SDK Retry Can Return Undefined Variable
+client.py:118 — `return resp` at end of retry loop may reference undefined variable if all attempts raise exceptions before assigning `resp`.
+
+### L-8. Reputation Module Underutilized
+Only referenced by `get_agent_reputation` tool. 150-byte pyproject.toml. Consider merging into identity module.
+
+---
+
+## Strengths to Preserve
+
+1. **Parameterized SQL everywhere** — No SQL injection vectors in parameterized paths
+2. **Async-native** — Proper async/await throughout, no blocking calls in hot paths
+3. **Test coverage** — 730+ tests, ~1:1 source-to-test ratio, edge case suites
+4. **Security primitives** — SHA-3 key hashing, Ed25519 signing, db_security hardening
+5. **Clean module boundaries** — Products are independently testable with own pyproject.toml
+6. **Audit logging** — Context-var correlation, sensitive field redaction
+7. **Retry/rate-limit** — Token bucket + exponential backoff in shared library
+8. **Crypto** — Ed25519, SHA-3-256, Merkle trees correctly implemented
+
+---
+
+## Prioritized Action Plan
+
+### Phase 1: Critical Fixes (Week 1-2, ~5 days)
+
+| ID | Action | Files | Effort |
+|----|--------|-------|--------|
+| C-1 | Replace bare `except Exception` with specific catches | 6 files | 4h |
+| C-2 | Replace `assert` with explicit `if/raise` | 2 files | 2h |
+| C-3 | Add public methods to EventBus/WebhookManager, remove `_private` access from tools | 3 files | 4h |
+| C-4 | Extract table creation to `_schema.py` | 5 files | 3h |
+| C-5 | Standardize tool error handling (ToolValidationError/ToolOperationalError) | 8 files | 6h |
+| C-6 | Add negative cost validation | 2 files | 1h |
+| H-3 | Add idempotency key support to billing | 3 files | 4h |
+| H-11 | Add column whitelists to all dynamic UPDATE queries | 5 files | 3h |
+
+### Phase 2: High-Priority Fixes (Week 2-3, ~5 days)
+
+| ID | Action | Files | Effort |
+|----|--------|-------|--------|
+| H-1 | Add timeouts to MCP subprocess management | 1 file | 3h |
+| H-2 | Fix double-check locking race | 1 file | 1h |
+| H-4 | Create input validation layer for tools | 9 files | 8h |
+| H-5 | Narrow exception mapping in errors.py | 1 file | 2h |
+| H-7 | Validate connector API keys at init | 3 files | 2h |
+| H-8 | Make mypy blocking in CI | 1 file + type fixes | 4h |
+| H-9 | Enable coverage enforcement | 1 file | 2h |
+| H-10 | Move business logic from tools to services | 4 files | 6h |
+
+### Phase 3: Medium-Priority Hardening (Week 3-4, ~4 days)
+
+| ID | Action | Files | Effort |
+|----|--------|-------|--------|
+| M-2 | Extract hardcoded values to constants/config | 8 files | 3h |
+| M-3 | Implement gradual trust score degradation | 1 file | 2h |
+| M-5 | Add transaction rollback on exception | 2 files | 2h |
+| M-6 | Migrate payment amounts to Decimal | 3 files | 4h |
+| M-7 | Add event handler exception logging | 1 file | 1h |
+| M-10 | Remove query param auth entirely | 1 file | 1h |
+| M-12 | Add catalog/registry validation at startup | 2 files | 2h |
+| M-13 | Expand messaging test coverage | 2 new files | 4h |
+| M-14 | Standardize error response format | 2 files | 2h |
+| M-15 | Make security scans blocking in CI | 1 file | 1h |
+
+### Phase 4: Polish (Week 4+, ~3 days)
+
+| ID | Action | Effort |
+|----|--------|--------|
+| H-6 | Add typed SDK wrappers for top 20 tools | 6h |
+| H-12 | Persist identity payment signals | 3h |
+| M-8/M-9 | Docker hardening (fix SDK install, document PG path) | 3h |
+| L-1 through L-8 | Low-severity cleanup | 8h |
+
+---
+
+## Metrics Summary
+
+| Metric | Current | Target |
+|--------|---------|--------|
+| Total tests | 730+ | 800+ (after M-13, H-4) |
+| Gateway tests | 315 | 340+ |
+| Critical issues | 6 | 0 |
+| High issues | 12 | 0 |
+| Coverage enforcement | None | 80% minimum |
+| Mypy strictness | Advisory | Blocking |
+| Security scans | Advisory | Blocking |
+| Tool input validation | ~0% | 100% |
+| Error handling consistency | ~40% | 100% |
+
+---
+
+*Review complete. All findings are based on static analysis of the current codebase. No code changes made.*

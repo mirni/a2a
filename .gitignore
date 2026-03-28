@@ -45,3 +45,6 @@ Thumbs.db
 *.sqlite3
 *.log
 tmp/
+
+# Archived reports
+archive/*.md
