@@ -50,11 +50,12 @@ class HealthMonitor:
                         exc,
                     )
                     await self.event_bus.publish(
-                        "trust.score_updated",
+                        "trust.health_check_failed",
                         source="health_monitor",
                         payload={
                             "server_id": service.provider_id,
-                            "composite_score": 0,
+                            "penalty": 20.0,
+                            "reason": str(exc),
                         },
                     )
 

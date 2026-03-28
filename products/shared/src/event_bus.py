@@ -20,7 +20,11 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+import logging
+
 import aiosqlite
+
+logger = logging.getLogger("a2a.event_bus")
 
 
 @dataclass
@@ -328,7 +332,10 @@ class EventBus:
             tasks.append(sub_info["handler"](event))
 
         if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for r in results:
+                if isinstance(r, Exception):
+                    logger.error("Event handler failed: %s", r, exc_info=r)
 
     @staticmethod
     def _row_to_dict(row: aiosqlite.Row) -> dict:
