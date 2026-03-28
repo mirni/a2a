@@ -27,9 +27,9 @@ A2A_USER="a2a"
 A2A_GROUP="a2a"
 PORT=8000
 
-SSL_DIR="/etc/ssl/cloudflare"
-SSL_CERT="$SSL_DIR/origin.pem"
-SSL_KEY="$SSL_DIR/origin-key.pem"
+SSL_DIR="/etc/ssl"
+SSL_CERT="$SSL_DIR/certs/greenhelix.pem"
+SSL_KEY="$SSL_DIR/private/greenhelix.key"
 
 BACKUP_DIR="/var/backups/a2a"
 
