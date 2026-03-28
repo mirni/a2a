@@ -4,15 +4,24 @@
   "description": "TypeScript SDK for the A2A Commerce Gateway",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "test": "node --test dist/test/*.test.js",
     "prepublishOnly": "npm run build"
   },
-  "keywords": ["a2a", "agent", "commerce", "gateway", "sdk"],
+  "keywords": [
+    "a2a",
+    "agent",
+    "commerce",
+    "gateway",
+    "sdk"
+  ],
   "license": "MIT",
   "devDependencies": {
+    "@types/node": "^25.5.0",
     "typescript": "^5.4"
   },
   "engines": {
