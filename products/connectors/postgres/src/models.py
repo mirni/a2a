@@ -1,10 +1,24 @@
 """Pydantic models for PostgreSQL connector input validation."""
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class QueryParams(BaseModel):
     """Parameters for read-only SELECT queries."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "sql": "SELECT id, name, email FROM users WHERE active = $1 LIMIT $2",
+                    "params": [True, 50],
+                    "timeout_seconds": 10.0,
+                    "max_rows": 500,
+                }
+            ]
+        },
+    )
 
     sql: str = Field(..., description="SQL SELECT query with $1, $2, ... parameter placeholders")
     params: list = Field(default_factory=list, description="Query parameters (positional)")
@@ -31,6 +45,19 @@ class QueryParams(BaseModel):
 
 class ExecuteParams(BaseModel):
     """Parameters for write operations (INSERT/UPDATE/DELETE)."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "sql": "INSERT INTO users (name, email) VALUES ($1, $2)",
+                    "params": ["Alice Smith", "alice@example.com"],
+                    "timeout_seconds": 15.0,
+                }
+            ]
+        },
+    )
 
     sql: str = Field(..., description="SQL statement with $1, $2, ... parameter placeholders")
     params: list = Field(default_factory=list, description="Query parameters (positional)")
@@ -60,11 +87,34 @@ class ExecuteParams(BaseModel):
 class ListTablesParams(BaseModel):
     """Parameters for listing tables."""
 
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "schema_name": "public",
+                }
+            ]
+        },
+    )
+
     schema_name: str = Field(default="public", description="Schema to list tables from")
 
 
 class DescribeTableParams(BaseModel):
     """Parameters for describing a table."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "table_name": "users",
+                    "schema_name": "public",
+                }
+            ]
+        },
+    )
 
     table_name: str = Field(..., description="Table name")
     schema_name: str = Field(default="public", description="Schema name")
@@ -80,6 +130,19 @@ class DescribeTableParams(BaseModel):
 class ExplainQueryParams(BaseModel):
     """Parameters for EXPLAIN ANALYZE."""
 
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "sql": "SELECT * FROM orders WHERE created_at > $1",
+                    "params": ["2025-01-01"],
+                    "analyze": True,
+                }
+            ]
+        },
+    )
+
     sql: str = Field(..., description="SQL query to explain")
     params: list = Field(default_factory=list, description="Query parameters")
     analyze: bool = Field(default=False, description="Run EXPLAIN ANALYZE (actually executes query)")
@@ -88,11 +151,37 @@ class ExplainQueryParams(BaseModel):
 class ListSchemasParams(BaseModel):
     """Parameters for listing schemas (no params needed but keeping consistent)."""
 
-    pass
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {}
+            ]
+        },
+    )
 
 
 class ConnectionConfig(BaseModel):
     """Database connection configuration."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "host": "db.example.com",
+                    "port": 5432,
+                    "database": "myapp_production",
+                    "user": "app_reader",
+                    "password": "s3cur3pa55",
+                    "min_pool_size": 2,
+                    "max_pool_size": 10,
+                    "ssl": True,
+                    "read_only": True,
+                }
+            ]
+        },
+    )
 
     host: str = Field(default="localhost")
     port: int = Field(default=5432, gt=0, le=65535)

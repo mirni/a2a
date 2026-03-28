@@ -6,7 +6,7 @@ import time
 import uuid
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MessageType(str, Enum):
@@ -19,6 +19,23 @@ class MessageType(str, Enum):
 
 
 class Message(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "sender": "agent-alice-001",
+                    "recipient": "agent-bob-002",
+                    "message_type": "price_negotiation",
+                    "subject": "API integration quote",
+                    "body": "Proposing $150 for the REST API integration task.",
+                    "metadata": {"urgency": "high"},
+                    "thread_id": "thread-7a3f",
+                }
+            ]
+        },
+    )
+
     id: str = Field(default_factory=lambda: uuid.uuid4().hex)
     sender: str
     recipient: str

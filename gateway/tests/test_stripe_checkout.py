@@ -235,6 +235,8 @@ class TestCreateCheckout:
 class TestStripeWebhook:
     """Tests for the webhook handler."""
 
+    _WEBHOOK_SECRET = "whsec_test_secret_for_webhook"
+
     def _checkout_completed_event(self, agent_id: str, credits: int) -> dict:
         return {
             "type": "checkout.session.completed",
@@ -249,15 +251,31 @@ class TestStripeWebhook:
             },
         }
 
-    async def test_webhook_deposits_credits(self, client, app):
+    def _sign_payload(self, payload: bytes, secret: str | None = None) -> str:
+        """Generate a valid stripe-signature header for the given payload."""
+        s = secret or self._WEBHOOK_SECRET
+        ts = str(int(time.time()))
+        signed = f"{ts}.".encode() + payload
+        sig = hmac.new(s.encode(), signed, hashlib.sha256).hexdigest()
+        return f"t={ts},v1={sig}"
+
+    def _signed_headers(self, payload: bytes, secret: str | None = None) -> dict:
+        return {
+            "Content-Type": "application/json",
+            "stripe-signature": self._sign_payload(payload, secret),
+        }
+
+    async def test_webhook_deposits_credits(self, client, app, monkeypatch):
+        monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", self._WEBHOOK_SECRET)
         ctx = app.state.ctx
         await ctx.tracker.wallet.create("webhook-agent", initial_balance=0.0)
 
         event = self._checkout_completed_event("webhook-agent", 5000)
+        payload = json.dumps(event).encode()
         resp = await client.post(
             "/v1/stripe-webhook",
-            content=json.dumps(event).encode(),
-            headers={"Content-Type": "application/json"},
+            content=payload,
+            headers=self._signed_headers(payload),
         )
 
         assert resp.status_code == 200
@@ -266,12 +284,14 @@ class TestStripeWebhook:
         balance = await ctx.tracker.wallet.get_balance("webhook-agent")
         assert balance == 5000.0
 
-    async def test_webhook_creates_wallet_if_missing(self, client, app):
+    async def test_webhook_creates_wallet_if_missing(self, client, app, monkeypatch):
+        monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", self._WEBHOOK_SECRET)
         event = self._checkout_completed_event("new-webhook-agent", 1000)
+        payload = json.dumps(event).encode()
         resp = await client.post(
             "/v1/stripe-webhook",
-            content=json.dumps(event).encode(),
-            headers={"Content-Type": "application/json"},
+            content=payload,
+            headers=self._signed_headers(payload),
         )
 
         assert resp.status_code == 200
@@ -280,35 +300,53 @@ class TestStripeWebhook:
         balance = await ctx.tracker.wallet.get_balance("new-webhook-agent")
         assert balance == 1000.0
 
-    async def test_webhook_invalid_json(self, client):
-        resp = await client.post(
-            "/v1/stripe-webhook",
-            content=b"not json at all",
-            headers={"Content-Type": "application/json"},
-        )
-        assert resp.status_code == 400
-        assert "Invalid JSON" in resp.json()["error"]
-
-    async def test_webhook_ignores_non_checkout_events(self, client, app):
-        event = {"type": "invoice.paid", "data": {"object": {}}}
+    async def test_webhook_refuses_without_secret(self, client, monkeypatch):
+        """When STRIPE_WEBHOOK_SECRET is not set, refuse all webhooks."""
+        monkeypatch.delenv("STRIPE_WEBHOOK_SECRET", raising=False)
+        event = {"type": "checkout.session.completed", "data": {"object": {}}}
         resp = await client.post(
             "/v1/stripe-webhook",
             content=json.dumps(event).encode(),
             headers={"Content-Type": "application/json"},
+        )
+        assert resp.status_code == 503
+        assert "not configured" in resp.json()["error"]
+
+    async def test_webhook_invalid_json(self, client, monkeypatch):
+        monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", self._WEBHOOK_SECRET)
+        payload = b"not json at all"
+        resp = await client.post(
+            "/v1/stripe-webhook",
+            content=payload,
+            headers=self._signed_headers(payload),
+        )
+        assert resp.status_code == 400
+        assert "Invalid JSON" in resp.json()["error"]
+
+    async def test_webhook_ignores_non_checkout_events(self, client, app, monkeypatch):
+        monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", self._WEBHOOK_SECRET)
+        event = {"type": "invoice.paid", "data": {"object": {}}}
+        payload = json.dumps(event).encode()
+        resp = await client.post(
+            "/v1/stripe-webhook",
+            content=payload,
+            headers=self._signed_headers(payload),
         )
         # Should acknowledge but not deposit
         assert resp.status_code == 200
         assert resp.json()["received"] is True
 
-    async def test_webhook_missing_metadata_no_crash(self, client):
+    async def test_webhook_missing_metadata_no_crash(self, client, monkeypatch):
+        monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", self._WEBHOOK_SECRET)
         event = {
             "type": "checkout.session.completed",
             "data": {"object": {"id": "cs_test", "metadata": {}}},
         }
+        payload = json.dumps(event).encode()
         resp = await client.post(
             "/v1/stripe-webhook",
-            content=json.dumps(event).encode(),
-            headers={"Content-Type": "application/json"},
+            content=payload,
+            headers=self._signed_headers(payload),
         )
         assert resp.status_code == 200
 
@@ -351,3 +389,29 @@ class TestStripeWebhook:
 
         balance = await app.state.ctx.tracker.wallet.get_balance("sig-agent")
         assert balance == 500.0
+
+    async def test_webhook_rejects_excessive_credits(self, client, app, monkeypatch):
+        """Credits above 1,000,000 should be rejected."""
+        monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", self._WEBHOOK_SECRET)
+        await app.state.ctx.tracker.wallet.create("greedy-agent", initial_balance=0.0)
+        event = self._checkout_completed_event("greedy-agent", 2_000_000)
+        payload = json.dumps(event).encode()
+        resp = await client.post(
+            "/v1/stripe-webhook",
+            content=payload,
+            headers=self._signed_headers(payload),
+        )
+        assert resp.status_code == 400
+        assert "Credit amount" in resp.json()["error"]
+
+    async def test_webhook_rejects_zero_credits(self, client, app, monkeypatch):
+        """Zero credits should be rejected."""
+        monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", self._WEBHOOK_SECRET)
+        event = self._checkout_completed_event("zero-agent", 0)
+        payload = json.dumps(event).encode()
+        resp = await client.post(
+            "/v1/stripe-webhook",
+            content=payload,
+            headers=self._signed_headers(payload),
+        )
+        assert resp.status_code == 400

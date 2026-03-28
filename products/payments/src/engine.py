@@ -129,12 +129,13 @@ class PaymentEngine:
             )
 
         # Transfer funds: withdraw from payer, deposit to payee
+        amount = float(intent.amount)
         await self.wallet.withdraw(
-            intent.payer, intent.amount,
+            intent.payer, amount,
             description=f"payment:{intent.id}",
         )
         await self.wallet.deposit(
-            intent.payee, intent.amount,
+            intent.payee, amount,
             description=f"payment:{intent.id}",
         )
 
@@ -191,9 +192,10 @@ class PaymentEngine:
 
         if amount <= 0:
             raise PaymentError("Amount must be positive")
-        if amount > intent.amount:
+        intent_amount_f = float(intent.amount)
+        if amount > intent_amount_f:
             raise PaymentError(
-                f"Capture amount {amount} exceeds intent amount {intent.amount}"
+                f"Capture amount {amount} exceeds intent amount {intent_amount_f}"
             )
 
         # Transfer the partial amount
@@ -217,7 +219,7 @@ class PaymentEngine:
         )
         await self.storage.insert_settlement(settlement.model_dump())
 
-        remaining = round(intent.amount - amount, 2)
+        remaining = round(intent_amount_f - amount, 2)
         if remaining <= 0:
             # Fully captured - mark as settled
             await self.storage.update_intent_status(
@@ -290,8 +292,9 @@ class PaymentEngine:
             )
 
         # Deposit to payee
+        escrow_amount = float(escrow.amount)
         await self.wallet.deposit(
-            escrow.payee, escrow.amount,
+            escrow.payee, escrow_amount,
             description=f"escrow_release:{escrow.id}",
         )
 
@@ -327,7 +330,7 @@ class PaymentEngine:
 
         # Return funds to payer
         await self.wallet.deposit(
-            escrow.payer, escrow.amount,
+            escrow.payer, float(escrow.amount),
             description=f"escrow_refund:{escrow.id}",
         )
 
@@ -350,7 +353,7 @@ class PaymentEngine:
 
         # Return funds to payer
         await self.wallet.deposit(
-            escrow.payer, escrow.amount,
+            escrow.payer, float(escrow.amount),
             description=f"escrow_expired:{escrow.id}",
         )
 
@@ -495,9 +498,10 @@ class PaymentEngine:
             )
 
         # Attempt to transfer funds
+        sub_amount = float(sub.amount)
         try:
             await self.wallet.withdraw(
-                sub.payer, sub.amount,
+                sub.payer, sub_amount,
                 description=f"subscription:{sub.id}",
             )
         except InsufficientCreditsError:
@@ -508,7 +512,7 @@ class PaymentEngine:
             raise
 
         await self.wallet.deposit(
-            sub.payee, sub.amount,
+            sub.payee, sub_amount,
             description=f"subscription:{sub.id}",
         )
 

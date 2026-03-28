@@ -16,6 +16,7 @@ from gateway.src.routes.health import routes as health_routes
 from gateway.src.routes.pricing import routes as pricing_routes
 from gateway.src.signing import signing_key_handler
 from gateway.src.routes.sse import routes as sse_routes
+from gateway.src.routes.onboarding import routes as onboarding_routes
 from gateway.src.stripe_checkout import routes as checkout_routes
 from gateway.src.swagger import swagger_ui_handler
 
@@ -67,6 +68,9 @@ def create_app() -> Starlette:
 
     # SSE streaming
     all_routes.extend(sse_routes)
+
+    # Agentic Onboarding
+    all_routes.extend(onboarding_routes)
 
     # Stripe Checkout (fiat on-ramp)
     all_routes.extend(checkout_routes)

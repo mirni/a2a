@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 import time
 from typing import Any
@@ -15,6 +16,8 @@ from gateway.src.catalog import get_tool
 from gateway.src.errors import error_response, handle_product_exception
 from gateway.src.middleware import Metrics
 from gateway.src.tools import TOOL_REGISTRY
+
+logger = logging.getLogger("a2a.execute")
 
 
 def _rate_limit_headers(limit: int, rate_count: int, window_seconds: float = 3600.0) -> dict[str, str]:
@@ -160,7 +163,10 @@ async def execute(request: Request) -> JSONResponse:
                 resp.headers.update(rl_headers)
                 return resp
     except Exception:
-        pass  # If rate counting fails, allow the request
+        logger.error("Rate limit check failed for agent %s", agent_id, exc_info=True)
+        return await error_response(
+            503, "Rate limit service unavailable", "service_error", request=request
+        )
 
     # --- 5. Check balance if tool costs credits ---
     tool_pricing = tool_def.get("pricing", {})
@@ -215,7 +221,7 @@ async def execute(request: Request) -> JSONResponse:
         # Record rate event for sliding window tracking
         await ctx.paywall_storage.record_rate_event(agent_id, window_key, tool_name)
     except Exception:
-        pass  # Usage recording failure should not fail the request
+        logger.warning("Usage recording failed for agent %s, tool %s", agent_id, tool_name, exc_info=True)
 
     # --- 8. Record latency ---
     elapsed_ms = (time.time() - _start_time) * 1000

@@ -12,7 +12,7 @@ import pytest
 
 from src.keys import InvalidKeyError, KeyManager
 from src.middleware import (
-    AuthenticationError,
+    PaywallAuthError,
     InsufficientBalanceError,
     PaywallMiddleware,
     RateLimitError,
@@ -77,7 +77,7 @@ class TestGatedApiKeyParam:
         async def my_tool(api_key: str):
             return {"status": "ok"}
 
-        with pytest.raises(AuthenticationError):
+        with pytest.raises(PaywallAuthError):
             await my_tool(api_key="a2a_free_this_key_does_not_exist")
 
 
@@ -158,14 +158,14 @@ class TestRevokedKey:
         async def my_tool(api_key: str):
             return {"ok": True}
 
-        with pytest.raises(AuthenticationError, match="revoked"):
+        with pytest.raises(PaywallAuthError, match="revoked"):
             await my_tool(api_key=raw_key)
 
     async def test_revoked_key_via_agent_id_param(
         self, middleware: PaywallMiddleware, key_manager: KeyManager
     ):
         """When using agent_id_param, middleware looks up keys for that agent.
-        If all keys are revoked, it should fail with AuthenticationError."""
+        If all keys are revoked, it should fail with PaywallAuthError."""
         created = await key_manager.create_key(agent_id="agent-rev2", tier="free")
         await key_manager.revoke_key(created["key"])
 
@@ -173,7 +173,7 @@ class TestRevokedKey:
         async def my_tool(agent_id: str):
             return {"ok": True}
 
-        with pytest.raises(AuthenticationError, match="No valid API key"):
+        with pytest.raises(PaywallAuthError, match="No valid API key"):
             await my_tool(agent_id="agent-rev2")
 
 

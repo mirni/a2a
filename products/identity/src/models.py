@@ -9,11 +9,25 @@ All timestamps are Unix floats (time.time()).
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class AgentIdentity(BaseModel):
     """Cryptographic identity for an agent (Ed25519 key pair)."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "agent_id": "agent-7f3a2b",
+                    "public_key": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa3f4a18446b7e8c3042b58",
+                    "created_at": 1711612800.0,
+                    "org_id": "acme-capital",
+                }
+            ]
+        }
+    )
+
     agent_id: str
     public_key: str  # Ed25519 public key hex
     created_at: float
@@ -25,6 +39,22 @@ class MetricCommitment(BaseModel):
 
     commitment_hash = SHA3-256(value_scaled_bytes || blinding_factor || metric_name)
     """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "agent_id": "agent-7f3a2b",
+                    "metric_name": "sharpe_30d",
+                    "commitment_hash": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
+                    "timestamp": 1711612800.0,
+                    "window_days": 30,
+                }
+            ]
+        },
+    )
+
     agent_id: str
     metric_name: str  # e.g. "sharpe_30d", "max_drawdown_30d", "aum"
     commitment_hash: str  # SHA3-256 hex digest
@@ -34,6 +64,28 @@ class MetricCommitment(BaseModel):
 
 class AuditorAttestation(BaseModel):
     """Platform auditor's Ed25519 signature over a set of metric commitments."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "agent_id": "agent-7f3a2b",
+                    "auditor_id": "platform_auditor_v1",
+                    "commitment_hashes": [
+                        "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
+                        "b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3",
+                    ],
+                    "verified_at": 1711612800.0,
+                    "valid_until": 1712217600.0,
+                    "data_source": "exchange_api",
+                    "signature": "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b",
+                    "version": "1.0",
+                    "algorithm": "ed25519-sha3-256",
+                }
+            ]
+        }
+    )
+
     agent_id: str
     auditor_id: str = "platform_auditor_v1"
     commitment_hashes: list[str]  # Which commitments are attested
@@ -50,6 +102,23 @@ class VerifiedClaim(BaseModel):
 
     Example: Sharpe >= 2.0 over 30 days.
     """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "agent_id": "agent-7f3a2b",
+                    "metric_name": "sharpe_30d",
+                    "claim_type": "gte",
+                    "bound_value": 2.0,
+                    "attestation_signature": "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b",
+                    "valid_until": 1712217600.0,
+                }
+            ]
+        },
+    )
+
     agent_id: str
     metric_name: str
     claim_type: str  # "gte" (>=) or "lte" (<=)
@@ -60,6 +129,23 @@ class VerifiedClaim(BaseModel):
 
 class RegistrationResult(BaseModel):
     """Result of agent registration — includes private key if auto-generated."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "identity": {
+                        "agent_id": "agent-7f3a2b",
+                        "public_key": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa3f4a18446b7e8c3042b58",
+                        "created_at": 1711612800.0,
+                        "org_id": "acme-capital",
+                    },
+                    "private_key": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+                }
+            ]
+        }
+    )
+
     identity: AgentIdentity
     private_key: str | None = None  # Only set when keypair is auto-generated
 
@@ -83,6 +169,32 @@ class RegistrationResult(BaseModel):
 
 class MetricSubmissionResult(BaseModel):
     """Result of metric submission — attestation + blinding factors."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "attestation": {
+                        "agent_id": "agent-7f3a2b",
+                        "auditor_id": "platform_auditor_v1",
+                        "commitment_hashes": [
+                            "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
+                        ],
+                        "verified_at": 1711612800.0,
+                        "valid_until": 1712217600.0,
+                        "data_source": "exchange_api",
+                        "signature": "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b",
+                        "version": "1.0",
+                        "algorithm": "ed25519-sha3-256",
+                    },
+                    "blinding_factors": {
+                        "sharpe_30d": "c4f2e8a1b3d5f7e9a0b2c4d6e8f0a1b3c5d7e9f1a2b4c6d8e0f2a3b5c7d9e1f3",
+                    },
+                }
+            ]
+        }
+    )
+
     attestation: AuditorAttestation
     blinding_factors: dict[str, str]  # metric_name -> blinding_factor_hex
 
@@ -114,6 +226,23 @@ class MetricSubmissionResult(BaseModel):
 
 class AgentReputation(BaseModel):
     """Composite reputation for an agent (consumer-side trust)."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "agent_id": "agent-7f3a2b",
+                    "timestamp": 1711612800.0,
+                    "payment_reliability": 92.5,
+                    "data_source_quality": 87.3,
+                    "transaction_volume_score": 75.0,
+                    "composite_score": 84.9,
+                    "confidence": 0.82,
+                }
+            ]
+        }
+    )
+
     agent_id: str
     timestamp: float
     payment_reliability: float = Field(default=0.0, ge=0.0, le=100.0)

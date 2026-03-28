@@ -183,11 +183,13 @@ async def stripe_webhook(request: Request) -> JSONResponse:
     sig_header = request.headers.get("stripe-signature", "")
     webhook_secret = _webhook_secret()
 
-    # Verify signature if webhook secret is configured
-    if webhook_secret:
-        if not _verify_stripe_signature(payload, sig_header, webhook_secret):
-            logger.warning("Invalid Stripe webhook signature")
-            return JSONResponse({"error": "Invalid signature"}, status_code=400)
+    # Verify signature — mandatory; refuse if secret not configured
+    if not webhook_secret:
+        logger.error("STRIPE_WEBHOOK_SECRET not configured — refusing webhook")
+        return JSONResponse({"error": "Webhook signature verification not configured"}, status_code=503)
+    if not _verify_stripe_signature(payload, sig_header, webhook_secret):
+        logger.warning("Invalid Stripe webhook signature")
+        return JSONResponse({"error": "Invalid signature"}, status_code=400)
 
     try:
         event = json.loads(payload)
@@ -203,8 +205,16 @@ async def stripe_webhook(request: Request) -> JSONResponse:
         agent_id = metadata.get("agent_id")
         credits = metadata.get("credits")
 
+        _MAX_CREDITS = 1_000_000
         if agent_id and credits:
-            credits = int(credits)
+            try:
+                credits = int(credits)
+            except (ValueError, TypeError):
+                logger.warning("Invalid credits value in webhook metadata: %s", credits)
+                return JSONResponse({"error": "Invalid credit amount"}, status_code=400)
+            if credits <= 0 or credits > _MAX_CREDITS:
+                logger.warning("Credits out of range in webhook: %s", credits)
+                return JSONResponse({"error": f"Credit amount must be 1-{_MAX_CREDITS}"}, status_code=400)
             ctx = request.app.state.ctx
 
             try:

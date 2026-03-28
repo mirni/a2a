@@ -6,7 +6,7 @@ rate limits, and wallet-based billing.
 
 from .keys import InvalidKeyError, KeyManager
 from .middleware import (
-    AuthenticationError,
+    PaywallAuthError,
     InsufficientBalanceError,
     PaywallError,
     PaywallMiddleware,
@@ -18,7 +18,7 @@ from .tiers import TIER_CONFIGS, TierConfig, TierName, get_tier_config, tier_has
 from .usage_api import UsageAPI
 
 __all__ = [
-    "AuthenticationError",
+    "PaywallAuthError",
     "TIER_CONFIGS",
     "InsufficientBalanceError",
     "InvalidKeyError",

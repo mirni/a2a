@@ -9,7 +9,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TransportType(str, Enum):
@@ -20,6 +20,23 @@ class TransportType(str, Enum):
 
 class Server(BaseModel):
     """A registered MCP server."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "srv-weather-01",
+                    "name": "Weather Forecast Service",
+                    "url": "https://weather.mcp.example.com",
+                    "transport_type": "http",
+                    "registered_at": 1711612800.0,
+                    "last_probed_at": 1711699200.0,
+                }
+            ]
+        },
+    )
+
     id: str
     name: str
     url: str
@@ -30,6 +47,24 @@ class Server(BaseModel):
 
 class ProbeResult(BaseModel):
     """Result of a single health probe against an MCP server."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "server_id": "srv-weather-01",
+                    "timestamp": 1711699200.0,
+                    "latency_ms": 42.5,
+                    "status_code": 200,
+                    "error": None,
+                    "tools_count": 5,
+                    "tools_documented": 4,
+                }
+            ]
+        },
+    )
+
     server_id: str
     timestamp: float
     latency_ms: float
@@ -41,6 +76,23 @@ class ProbeResult(BaseModel):
 
 class SecurityScan(BaseModel):
     """Result of a security scan against an MCP server."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "server_id": "srv-weather-01",
+                    "timestamp": 1711699200.0,
+                    "tls_enabled": True,
+                    "auth_required": True,
+                    "input_validation_score": 85.0,
+                    "cve_count": 0,
+                }
+            ]
+        },
+    )
+
     server_id: str
     timestamp: float
     tls_enabled: bool = False
@@ -58,6 +110,26 @@ class Window(str, Enum):
 
 class TrustScore(BaseModel):
     """Computed trust score for a server over a time window."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "server_id": "srv-weather-01",
+                    "timestamp": 1711699200.0,
+                    "window": "24h",
+                    "reliability_score": 92.5,
+                    "security_score": 85.0,
+                    "documentation_score": 80.0,
+                    "responsiveness_score": 95.0,
+                    "composite_score": 88.6,
+                    "confidence": 0.87,
+                }
+            ]
+        },
+    )
+
     server_id: str
     timestamp: float
     window: Window = Window.H24

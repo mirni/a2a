@@ -7,11 +7,16 @@ schema auto-created on connect. All access via aiosqlite.
 from __future__ import annotations
 
 import json
+import sqlite3
 import time
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Any
 
 import aiosqlite
+
+# Register Decimal adapter so SQLite can bind Decimal values as floats
+sqlite3.register_adapter(Decimal, lambda d: float(d))
 
 # ---------------------------------------------------------------------------
 # Schema

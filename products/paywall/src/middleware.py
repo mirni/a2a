@@ -41,7 +41,7 @@ class PaywallError(Exception):
         super().__init__(message)
 
 
-class AuthenticationError(PaywallError):
+class PaywallAuthError(PaywallError):
     """Raised when API key validation fails."""
 
     def __init__(self, agent_id: str, reason: str = "Invalid API key") -> None:
@@ -177,7 +177,7 @@ class PaywallMiddleware:
                             allowed=False,
                             reason=e.reason,
                         )
-                        raise AuthenticationError(agent_id, e.reason) from e
+                        raise PaywallAuthError(agent_id, e.reason) from e
                     agent_id = record["agent_id"]
                     agent_tier = record["tier"]
                 else:
@@ -207,7 +207,7 @@ class PaywallMiddleware:
                         allowed=False,
                         reason="No valid API key found",
                     )
-                    raise AuthenticationError(agent_id, "No valid API key found")
+                    raise PaywallAuthError(agent_id, "No valid API key found")
 
                 # Step 2: Check tier access
                 if not tier_has_access(agent_tier, tier):

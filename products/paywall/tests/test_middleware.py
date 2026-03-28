@@ -6,7 +6,7 @@ import pytest
 
 from src.keys import KeyManager
 from src.middleware import (
-    AuthenticationError,
+    PaywallAuthError,
     InsufficientBalanceError,
     PaywallMiddleware,
     RateLimitError,
@@ -77,7 +77,7 @@ class TestAuthenticationCheck:
         async def my_tool(agent_id: str):
             return {"ok": True}
 
-        with pytest.raises(AuthenticationError, match="No valid API key"):
+        with pytest.raises(PaywallAuthError, match="No valid API key"):
             await my_tool(agent_id="unknown-agent")
 
     async def test_revoked_key_agent_fails(
@@ -90,7 +90,7 @@ class TestAuthenticationCheck:
         async def my_tool(agent_id: str):
             return {"ok": True}
 
-        with pytest.raises(AuthenticationError, match="No valid API key"):
+        with pytest.raises(PaywallAuthError, match="No valid API key"):
             await my_tool(agent_id="agent-1")
 
     async def test_api_key_param_mode(
@@ -110,7 +110,7 @@ class TestAuthenticationCheck:
         async def my_tool(api_key: str):
             return {"ok": True}
 
-        with pytest.raises(AuthenticationError):
+        with pytest.raises(PaywallAuthError):
             await my_tool(api_key="a2a_pro_invalid_key_here1234")
 
 
@@ -368,7 +368,7 @@ class TestAuditLogging:
         async def my_tool(agent_id: str):
             return {"ok": True}
 
-        with pytest.raises(AuthenticationError):
+        with pytest.raises(PaywallAuthError):
             await my_tool(agent_id="unknown-agent")
 
         logs = await paywall_storage.get_audit_log("unknown-agent")

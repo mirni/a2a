@@ -7,16 +7,20 @@ from __future__ import annotations
 
 import json
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
-import aiosqlite
+try:
+    from shared_src.base_storage import BaseStorage
+except ImportError:
+    from src.base_storage import BaseStorage
 
-# ---------------------------------------------------------------------------
-# Schema
-# ---------------------------------------------------------------------------
 
-_SCHEMA = """
+@dataclass
+class StorageBackend(BaseStorage):
+    """Async SQLite storage backend for all billing data."""
+
+    _SCHEMA: str = """
 CREATE TABLE IF NOT EXISTS wallets (
     agent_id   TEXT PRIMARY KEY,
     balance    REAL NOT NULL DEFAULT 0.0,
@@ -74,40 +78,6 @@ CREATE TABLE IF NOT EXISTS budget_caps (
     alert_threshold REAL NOT NULL DEFAULT 0.8
 );
 """
-
-
-@dataclass
-class StorageBackend:
-    """Async SQLite storage backend for all billing data."""
-
-    dsn: str
-    _db: aiosqlite.Connection | None = field(default=None, init=False, repr=False)
-
-    async def connect(self) -> None:
-        """Open the database connection and ensure schema exists."""
-        try:
-            from shared_src.db_security import harden_connection
-        except ImportError:
-            from src.db_security import harden_connection
-
-        db_path = self.dsn.replace("sqlite:///", "")
-        self._db = await aiosqlite.connect(db_path)
-        self._db.row_factory = aiosqlite.Row
-        await harden_connection(self._db)
-        await self._db.executescript(_SCHEMA)
-        await self._db.commit()
-
-    async def close(self) -> None:
-        """Close the database connection."""
-        if self._db:
-            await self._db.close()
-            self._db = None
-
-    @property
-    def db(self) -> aiosqlite.Connection:
-        if self._db is None:
-            raise RuntimeError("StorageBackend not connected. Call connect() first.")
-        return self._db
 
     # -----------------------------------------------------------------------
     # Wallet operations
