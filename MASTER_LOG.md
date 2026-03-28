@@ -2936,3 +2936,72 @@ All 13 steps implemented across 13 commits. **871 tests passing** (up from 730+ 
 | Mypy strictness | Advisory | Blocking |
 | Security scans | Advisory | Blocking |
 | Error handling consistency | ~40% | ~95% |
+
+
+## Prompt
+Implement the x402 protocol to support internet-native, machine-to-machine crypto/stablecoin payments. The goal is to allow agents to access our endpoints by providing a signed payment receipt in the HTTP headers.
+
+### Requirements:
+* Protocol Compliance: Implement the standard x402 handshake:
+  ** If a request lacks payment, return HTTP 402 Payment Required.
+  ** Include the PAYMENT-REQUIRED header with the price, currency (USDC), and your merchant wallet address.
+  ** Support the PAYMENT-SIGNATURE (or X-PAYMENT) header for incoming payment proofs.
+
+### Architecture:
+* Use the Coinbase x402 Facilitator (or equivalent) to verify on-chain settlement for Base and Polygon.
+* Create a new Pydantic model X402PaymentProof with extra = "forbid" and a json_schema_extra example.
+
+### Security:
+* Integrate with our existing .env structure with a new variable to access wallet
+* Ensure the validation logic prevents "Replay Attacks" (using the request_id or nonce).
+
+### Response — Session 13: x402 Protocol Implementation
+
+Implemented the full x402 internet-native crypto payments protocol across 7 TDD steps.
+
+#### What was built
+
+1. **Pydantic Models** (`gateway/src/x402.py`): `X402Authorization`, `X402Payload`, `X402PaymentProof`, `X402PaymentRequired` — all `extra="forbid"` with `json_schema_extra` examples. `X402Authorization.from_address` uses `Field(alias="from")` for EIP-3009 compatibility.
+
+2. **X402Verifier** (`gateway/src/x402.py`): Local validation (recipient, value, expiry, network, nonce replay) + facilitator verify/settle via httpx. In-memory nonce set for replay prevention.
+
+3. **Exceptions** (`gateway/src/tool_errors.py`): `X402VerificationError(Exception)`, `X402ReplayError(X402VerificationError)` → mapped to HTTP 402 in `errors.py`.
+
+4. **Config** (`gateway/src/config.py`): 4 new fields — `x402_enabled`, `x402_merchant_address`, `x402_facilitator_url`, `x402_supported_networks`. USDC contract addresses for Base and Polygon as constants.
+
+5. **Lifespan Wiring** (`gateway/src/lifespan.py`): `x402_verifier` added to `AppContext`, initialized when `X402_ENABLED=true`. `x402_nonces` table created at startup.
+
+6. **Execute Route** (`gateway/src/routes/execute.py`): `_try_x402_payment()` helper — when no API key is present and x402 is enabled: returns 402 with `PAYMENT-REQUIRED` header if no `X-PAYMENT`, otherwise validates proof locally → verifies with facilitator → returns wallet address as agent_id. Tier/rate-limit/balance checks skipped for x402 payments.
+
+7. **Batch Route** (`gateway/src/routes/batch.py`): Same x402 fallback — single payment covers entire batch cost.
+
+8. **Settlement** (execute + batch): After tool execution, fire-and-forget `settle_with_facilitator()`, publish `x402.payment_settled` event, record usage with wallet address as agent_id. Settlement failure doesn't break the response.
+
+#### Files Summary
+
+| File | Action |
+|------|--------|
+| `gateway/src/x402.py` | CREATE — Models + X402Verifier + USDC constants |
+| `gateway/src/tool_errors.py` | MODIFY — +2 exception classes |
+| `gateway/src/errors.py` | MODIFY — +2 error mappings |
+| `gateway/src/config.py` | MODIFY — +4 config fields |
+| `gateway/src/lifespan.py` | MODIFY — x402_verifier in AppContext + lifespan |
+| `gateway/src/tools/_schemas.py` | MODIFY — x402_nonces table |
+| `gateway/src/routes/execute.py` | MODIFY — x402 fallback auth path |
+| `gateway/src/routes/batch.py` | MODIFY — x402 fallback auth path |
+| `.env.example` | MODIFY — x402 env vars |
+| `gateway/tests/test_x402_models.py` | CREATE — 14 tests |
+| `gateway/tests/test_x402_verifier.py` | CREATE — 13 tests |
+| `gateway/tests/test_x402_execute.py` | CREATE — 8 tests |
+| `gateway/tests/test_x402_batch.py` | CREATE — 3 tests |
+| `gateway/tests/test_x402_settlement.py` | CREATE — 3 tests |
+| `gateway/tests/test_x402_lifespan.py` | CREATE — 3 tests |
+
+#### Test Results
+
+```
+Gateway tests: 367 passed (323 original + 44 new x402 tests)
+Regressions:   0
+```
+
+---

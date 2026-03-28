@@ -65,6 +65,9 @@ async def handle_product_exception(request: Request, exc: Exception) -> JSONResp
         "SubscriptionStateError": (409, "invalid_state"),
         # Payment engine base error
         "PaymentError": (400, "payment_error"),
+        # x402 protocol
+        "X402VerificationError": (402, "payment_verification_failed"),
+        "X402ReplayError": (402, "payment_replay_detected"),
     }
 
     if exc_type in mapping:

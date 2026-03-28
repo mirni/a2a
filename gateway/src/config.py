@@ -49,6 +49,12 @@ class GatewayConfig:
         1000: 15,
     })
 
+    # --- x402 Protocol ---
+    x402_enabled: bool = False
+    x402_merchant_address: str = ""
+    x402_facilitator_url: str = "https://x402.org/facilitator"
+    x402_supported_networks: str = "base,polygon"
+
     # --- Stripe checkout ---
     stripe_timeout: float = 15.0
 
@@ -73,4 +79,10 @@ class GatewayConfig:
             mcp_process_timeout=float(os.environ.get("A2A_MCP_TIMEOUT", "30.0")),
             health_check_interval=int(os.environ.get("A2A_HEALTH_INTERVAL", "300")),
             scheduler_interval=int(os.environ.get("A2A_SCHEDULER_INTERVAL", "300")),
+            x402_enabled=os.environ.get("X402_ENABLED", "").lower() in ("1", "true", "yes"),
+            x402_merchant_address=os.environ.get("X402_MERCHANT_ADDRESS", ""),
+            x402_facilitator_url=os.environ.get(
+                "X402_FACILITATOR_URL", "https://x402.org/facilitator"
+            ),
+            x402_supported_networks=os.environ.get("X402_SUPPORTED_NETWORKS", "base,polygon"),
         )

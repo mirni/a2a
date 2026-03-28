@@ -85,6 +85,7 @@ class AppContext:
     health_monitor: HealthMonitor | None = None
     signing_manager: SigningManager | None = None
     mcp_proxy: object | None = None
+    x402_verifier: object | None = None
 
 
 @asynccontextmanager
@@ -170,11 +171,13 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
         ensure_budget_caps_table,
         ensure_event_schemas_table,
         ensure_service_ratings_table,
+        ensure_x402_nonces_table,
     )
 
     await ensure_budget_caps_table(tracker.storage.db)
     await ensure_service_ratings_table(marketplace_storage.db)
     await ensure_event_schemas_table(event_bus.db)
+    await ensure_x402_nonces_table(tracker.storage.db)
 
     # --- Subscription Scheduler ---
     scheduler = None
@@ -210,6 +213,25 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     except Exception:
         logger.warning("MCP proxy not available", exc_info=True)
 
+    # --- x402 Protocol ---
+    from gateway.src.config import GatewayConfig
+    from gateway.src.x402 import USDC_CONTRACTS, X402Verifier
+
+    x402_verifier = None
+    config = GatewayConfig.from_env()
+    if config.x402_enabled and config.x402_merchant_address:
+        networks = {
+            n.strip(): USDC_CONTRACTS[n.strip()]
+            for n in config.x402_supported_networks.split(",")
+            if n.strip() in USDC_CONTRACTS
+        }
+        x402_verifier = X402Verifier(
+            merchant_address=config.x402_merchant_address,
+            facilitator_url=config.x402_facilitator_url,
+            supported_networks=networks,
+        )
+        logger.info("x402 payment protocol enabled (merchant=%s)", config.x402_merchant_address)
+
     # --- Catalog validation ---
     from gateway.src.catalog import validate_catalog
     from gateway.src.tools import TOOL_REGISTRY
@@ -233,6 +255,7 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
         health_monitor=health_monitor,
         signing_manager=signing_manager,
         mcp_proxy=mcp_proxy,
+        x402_verifier=x402_verifier,
     )
     app.state.ctx = ctx
     app.state.signing_manager = signing_manager

@@ -37,6 +37,17 @@ async def ensure_service_ratings_table(db: aiosqlite.Connection) -> None:
     await db.commit()
 
 
+async def ensure_x402_nonces_table(db: aiosqlite.Connection) -> None:
+    """Create the x402_nonces table if it doesn't exist."""
+    await db.execute(
+        """CREATE TABLE IF NOT EXISTS x402_nonces (
+            nonce TEXT PRIMARY KEY,
+            used_at REAL NOT NULL
+        )"""
+    )
+    await db.commit()
+
+
 async def ensure_event_schemas_table(db: aiosqlite.Connection) -> None:
     """Create the event_schemas table if it doesn't exist."""
     await db.execute(

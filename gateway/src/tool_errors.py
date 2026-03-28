@@ -17,3 +17,11 @@ class ToolNotFoundError(LookupError):
 
 class NegativeCostError(ValueError):
     """Raised when cost calculation produces a negative value (maps to 500)."""
+
+
+class X402VerificationError(Exception):
+    """Raised when x402 payment proof fails verification (maps to 402)."""
+
+
+class X402ReplayError(X402VerificationError):
+    """Raised when x402 payment nonce has already been used (maps to 402)."""
