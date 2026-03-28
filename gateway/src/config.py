@@ -40,6 +40,15 @@ class GatewayConfig:
     # --- Metrics middleware ---
     max_latency_samples: int = 1000
 
+    # --- Tool defaults ---
+    default_page_limit: int = 100
+    budget_alert_threshold: float = 0.8
+    volume_discount_tiers: dict[int, int] = field(default_factory=lambda: {
+        100: 5,
+        500: 10,
+        1000: 15,
+    })
+
     # --- Stripe checkout ---
     stripe_timeout: float = 15.0
 

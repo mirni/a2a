@@ -102,14 +102,13 @@ async def test_execute_x_api_key_header(client, api_key):
 
 
 @pytest.mark.asyncio
-async def test_execute_api_key_query_param(client, api_key):
-    """API key via query parameter should also work."""
+async def test_execute_api_key_query_param_rejected(client, api_key):
+    """Query parameter auth was removed — should return 401."""
     resp = await client.post(
         f"/v1/execute?api_key={api_key}",
         json={"tool": "get_balance", "params": {"agent_id": "test-agent"}},
     )
-    assert resp.status_code == 200
-    assert resp.json()["success"] is True
+    assert resp.status_code == 401
 
 
 @pytest.mark.asyncio
