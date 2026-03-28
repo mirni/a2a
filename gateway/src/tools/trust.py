@@ -73,21 +73,7 @@ async def _update_server(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
 
 async def _check_sla_compliance(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     """Check if a server meets its claimed SLA based on trust probe data."""
-    server_id = params["server_id"]
-    claimed_uptime = float(params.get("claimed_uptime", 99.0))
-
-    from trust_src.models import Window
-    score = await ctx.trust_api.get_score(server_id=server_id, window=Window("24h"))
-
-    actual_uptime = score.reliability_score
-    compliant = actual_uptime >= claimed_uptime
-    violation_pct = max(0.0, claimed_uptime - actual_uptime) if not compliant else 0.0
-
-    return {
-        "server_id": server_id,
-        "claimed_uptime": claimed_uptime,
-        "actual_uptime": round(actual_uptime, 2),
-        "compliant": compliant,
-        "violation_pct": round(violation_pct, 2),
-        "confidence": score.confidence,
-    }
+    return await ctx.trust_api.check_sla_compliance(
+        server_id=params["server_id"],
+        claimed_uptime=float(params.get("claimed_uptime", 99.0)),
+    )

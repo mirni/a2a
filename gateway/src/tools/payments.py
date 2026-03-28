@@ -260,6 +260,8 @@ async def _create_split_intent(ctx: AppContext, params: dict[str, Any]) -> dict[
 
     Splits must sum to 100%. Withdraws full amount from payer, deposits to each payee.
     """
+    from decimal import Decimal
+
     payer = params["payer"]
     amount = float(params["amount"])
     splits = params["splits"]
@@ -276,7 +278,7 @@ async def _create_split_intent(ctx: AppContext, params: dict[str, Any]) -> dict[
     settlements = []
     for split in splits:
         payee = split["payee"]
-        share = round(amount * split["percentage"] / 100.0, 2)
+        share = float(Decimal(str(amount)) * Decimal(str(split["percentage"])) / Decimal("100"))
         await ctx.tracker.wallet.deposit(payee, share, description=f"split_from:{payer}")
         settlements.append({"payee": payee, "amount": share, "percentage": split["percentage"]})
 

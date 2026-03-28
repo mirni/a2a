@@ -169,14 +169,13 @@ async def _get_agent_leaderboard(ctx: AppContext, params: dict[str, Any]) -> dic
 
 
 def _get_discount_tier(call_count: int) -> int:
-    """Return discount percentage based on historical call count."""
-    if call_count >= 1000:
-        return 15
-    if call_count >= 500:
-        return 10
-    if call_count >= 100:
-        return 5
-    return 0
+    """Return discount percentage based on historical call count.
+
+    Delegates to the billing product pricing module.
+    """
+    from billing_src.pricing import get_discount_tier
+
+    return get_discount_tier(call_count)
 
 
 async def _get_volume_discount(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:

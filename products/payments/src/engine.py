@@ -9,6 +9,7 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any
 
 from payments.models import (
@@ -219,7 +220,7 @@ class PaymentEngine:
         )
         await self.storage.insert_settlement(settlement.model_dump())
 
-        remaining = round(intent_amount_f - amount, 2)
+        remaining = float(Decimal(str(intent_amount_f)) - Decimal(str(amount)))
         if remaining <= 0:
             # Fully captured - mark as settled
             await self.storage.update_intent_status(

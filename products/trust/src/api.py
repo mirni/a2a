@@ -180,6 +180,34 @@ class TrustAPI:
             raise ServerNotFoundError(f"Server not found: {server_id}")
         return updated
 
+    async def check_sla_compliance(
+        self,
+        server_id: str,
+        claimed_uptime: float = 99.0,
+    ) -> dict:
+        """Check if a server meets its claimed SLA based on trust probe data.
+
+        Args:
+            server_id: Server identifier.
+            claimed_uptime: The uptime percentage the server claims to provide.
+
+        Returns:
+            Dict with compliance details.
+        """
+        score = await self.get_score(server_id=server_id, window=Window.H24)
+        actual_uptime = score.reliability_score
+        compliant = actual_uptime >= claimed_uptime
+        violation_pct = max(0.0, claimed_uptime - actual_uptime) if not compliant else 0.0
+
+        return {
+            "server_id": server_id,
+            "claimed_uptime": claimed_uptime,
+            "actual_uptime": round(actual_uptime, 2),
+            "compliant": compliant,
+            "violation_pct": round(violation_pct, 2),
+            "confidence": score.confidence,
+        }
+
     async def list_servers(self) -> list[Server]:
         """List all registered servers."""
         return await self.storage.list_servers()
