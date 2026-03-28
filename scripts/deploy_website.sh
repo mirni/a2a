@@ -2,7 +2,7 @@
 # =============================================================================
 # A2A Commerce Platform — Website deployment
 # Deploys static website files and configures nginx.
-# Skips entirely if A2A_WWW_DOMAIN is not set.
+# Skips if A2A_WWW_DOMAIN is explicitly set to empty.
 # =============================================================================
 
 source "$(dirname "${BASH_SOURCE[0]}")/common.bash"

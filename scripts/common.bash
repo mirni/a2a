@@ -15,8 +15,8 @@ set -euo pipefail
 # Configuration (override via environment variables)
 # ---------------------------------------------------------------------------
 
-DOMAIN="${A2A_DOMAIN:-a2a.example.com}"
-WWW_DOMAIN="${A2A_WWW_DOMAIN:-}"
+DOMAIN="${A2A_DOMAIN:-api.greenhelix.net}"
+WWW_DOMAIN="${A2A_WWW_DOMAIN:-greenhelix.net}"
 BRANCH="${A2A_BRANCH:-main}"
 GITHUB_PAT="${GITHUB_PAT:-}"
 TAILSCALE_AUTHKEY="${TAILSCALE_AUTHKEY:-}"

@@ -9,8 +9,8 @@
 #   sudo A2A_SKIP_GIT=1 ./deploy_a2a.sh                      # skip git (deb)
 #
 # Environment variables:
-#   A2A_DOMAIN          — gateway domain (default: a2a.example.com)
-#   A2A_WWW_DOMAIN      — website domain (optional, enables website deploy)
+#   A2A_DOMAIN          — gateway domain (default: api.greenhelix.net)
+#   A2A_WWW_DOMAIN      — website domain (default: greenhelix.net, set to "" to skip)
 #   A2A_BRANCH          — git branch (default: main)
 #   GITHUB_PAT          — GitHub PAT for private repo access
 #   TAILSCALE_AUTHKEY   — Tailscale auth key (optional)
