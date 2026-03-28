@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "a2a-shared"
-version = "0.1.0"
+version = "0.2.0"
 description = "Shared utilities for A2A commerce products"
 requires-python = ">=3.12"
 dependencies = [

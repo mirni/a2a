@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "a2a-identity"
-version = "0.1.0"
+version = "0.2.0"
 description = "Agent Identity system with Ed25519 keys and metric commitments"
 requires-python = ">=3.12"
 dependencies = [
