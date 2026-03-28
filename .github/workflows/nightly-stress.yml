@@ -1,0 +1,98 @@
+# =============================================================================
+# A2A Commerce Platform — Nightly Stress Test
+# =============================================================================
+# Runs every night at 03:00 UTC and on manual dispatch.
+# Spins up a local gateway, provisions test agents, and hammers the API.
+# =============================================================================
+
+name: Nightly Stress Test
+
+on:
+  schedule:
+    - cron: "0 3 * * *"  # Every day at 03:00 UTC
+  workflow_dispatch:
+    inputs:
+      customers:
+        description: "Number of concurrent customers"
+        required: false
+        default: "20"
+        type: string
+      duration:
+        description: "Test duration in seconds"
+        required: false
+        default: "60"
+        type: string
+      base_url:
+        description: "Target URL (leave empty for local server)"
+        required: false
+        default: ""
+        type: string
+
+jobs:
+  stress-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-stress-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-stress-
+
+      - name: Install dependencies
+        run: scripts/ci/install_deps.sh
+
+      - name: Start local gateway
+        if: ${{ !inputs.base_url }}
+        run: scripts/ci/start_gateway.sh
+
+      - name: Provision admin key
+        if: ${{ !inputs.base_url }}
+        run: |
+          ADMIN_KEY=$(python scripts/ci/provision_admin_key.py --data-dir "$A2A_DATA_DIR")
+          echo "STRESS_ADMIN_KEY=$ADMIN_KEY" >> $GITHUB_ENV
+          echo "Admin key provisioned"
+
+      - name: Run stress test
+        env:
+          STRESS_BASE_URL: ${{ inputs.base_url || 'http://localhost:8000' }}
+          STRESS_CUSTOMERS: ${{ inputs.customers || '20' }}
+          STRESS_DURATION: ${{ inputs.duration || '60' }}
+          STRESS_RAMP_UP: "10"
+          STRESS_ADMIN_KEY: ${{ env.STRESS_ADMIN_KEY || secrets.STRESS_ADMIN_KEY || '' }}
+          STRESS_REPORT_PATH: stress_test_report.md
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          python scripts/stress_test.py \
+            --base-url "$STRESS_BASE_URL" \
+            --customers "$STRESS_CUSTOMERS" \
+            --duration "$STRESS_DURATION" \
+            --ramp-up "$STRESS_RAMP_UP" \
+            --admin-key "$STRESS_ADMIN_KEY"
+
+      - name: Upload stress test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stress-test-report-${{ github.run_number }}
+          path: stress_test_report.md
+          retention-days: 30
+
+      - name: Stop local gateway
+        if: always() && env.SERVER_PID
+        run: scripts/ci/stop_gateway.sh
+
+      - name: Post summary to job
+        if: always()
+        run: scripts/ci/post_summary.sh stress_test_report.md "Stress Test Results"

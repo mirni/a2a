@@ -1741,3 +1741,168 @@ Cross-referenced all 40+ items from CUSTOMER_AGENT_FEEDBACK.md against current c
 **Regressions:** None. All 1,048 pre-existing tests still pass.
 
 ---
+
+## Session 4 — 2026-03-28: Customer Agent Evaluation + Stress Test
+
+### Prompt 1
+> I updated the live server at api.greenhelix.net. Assume a role of a customer agent again, let it explore the products on the server and gather feedback, focusing on usability, features, documentation, etc. Produce a report with actionable todo items.
+
+### BetaBot-v1 Customer Agent Evaluation Report
+
+**Evaluator:** BetaBot-v1 (automated customer agent)
+**Target:** `api.greenhelix.net` (A2A Commerce Gateway v0.1.0)
+**Method:** 56 tool calls probing all endpoints, auth flows, error handling, docs, website
+
+#### Server Status
+- Health: **UP** — 200 OK, 108 tools, v0.1.0
+- Cloudflare-fronted (Denver POP), ~220ms TTFB typical
+- **Intermittent 5s latency spikes** (~20% of requests) — cold-start/connection-pool issue behind Cloudflare
+
+#### Endpoints Discovered
+| Endpoint | Status | Auth | Documented |
+|----------|--------|------|------------|
+| `/v1/health` | 200 | No | Yes |
+| `/v1/pricing` | 200 | No | Yes |
+| `/v1/pricing/{tool}` | 200 | No | Yes |
+| `/v1/execute` | 200 | Yes | Yes |
+| `/v1/batch` | 200 | Yes | **No** |
+| `/v1/events/stream` | 200 | Yes | **No** |
+| `/v1/openapi.json` | 200 | No | Yes |
+| `/v1/metrics` | 200 | No | Yes |
+| `/docs` | 200 | No | Yes |
+
+#### Tool Catalog
+- **108 tools** across 15 services (47 free-tier, 61 pro-tier)
+- 74 tools at $0.00/call, 29 at fixed per-call rates, 5 with percentage-based fees
+- Rich metadata: input/output schemas, pricing, SLA, tier_required — excellent for LLM consumption
+
+#### Authentication
+- `X-Api-Key` header with `a2a_` prefix required
+- `Authorization: Bearer` format NOT accepted (returns "Invalid key format")
+- Correct validation hierarchy: missing → invalid format → key not found
+
+#### Key Findings
+- **No self-service onboarding** — `create_api_key` requires auth, no public registration endpoint
+- **OpenAPI spec has zero security schemes** — no mention of X-Api-Key
+- **ErrorResponse schema mismatch** — spec says `{error, detail}`, reality is `{success, error: {code, message}, request_id}`
+- **No CORS support** — OPTIONS returns 405, blocks browser-based agents
+- **No rate limit headers** observed
+- **Website says "56 tools, 11 services"** — stale (actual: 108 tools, 15 services)
+- **Bare domain `greenhelix.net` does not resolve** — only `www.greenhelix.net` works
+
+#### Developer Experience Rating: 5/10
+The catalog/schema system is excellent for agent consumption. But missing self-service onboarding, no auth documentation, and undocumented endpoints significantly hamper usability.
+
+#### Actionable TODO Items (20 items, by priority)
+
+**CRITICAL (Blocks adoption)**
+1. Implement self-service API key provisioning (`POST /v1/register`)
+2. Document authentication in OpenAPI spec (securitySchemes for X-Api-Key)
+3. Fix 5-second latency spikes (origin cold-start behind Cloudflare)
+
+**HIGH (Significantly impacts usability)**
+4. Add getting-started guide / quickstart
+5. Document `/v1/batch` and `/v1/events/stream` in OpenAPI spec
+6. Fix ErrorResponse schema mismatch in OpenAPI
+7. Add CORS headers + OPTIONS preflight handling
+8. Fix bare domain DNS (`greenhelix.net` → `www.greenhelix.net`)
+
+**MEDIUM (Polish and correctness)**
+9. Add security headers (HSTS, X-Content-Type-Options, X-Frame-Options)
+10. Unify error codes (`invalid_key` used for both format and not-found)
+11. Standardize request_id format (UUID-v4 vs hex inconsistency)
+12. Add request_id to all error responses (missing from pricing 404)
+13. Update website tool count (56 → 108)
+14. Add rate limiting with X-RateLimit headers
+15. Link to API docs from website
+
+**LOW (Nice to have)**
+16. Add root endpoint (`/` → redirect to `/docs`)
+17. Add timestamp to health response (in schema but not returned)
+18. Populate Prometheus metrics (all counters at 0)
+19. Support `Authorization: Bearer` in addition to `X-Api-Key`
+20. Add pagination/filtering to pricing catalog (56KB response)
+
+---
+
+### Prompt 2
+> Assume role of Quality Lead. Implement a stress test that can be run on demand and spawn a large number of test customers hitting the APIs to see what is the performance like, and where are the limits. Make this test run as GitHub action every night as a nightly job.
+
+### Stress Test Implementation
+
+#### Files Created
+- **`scripts/stress_test.py`** — Comprehensive stress test suite
+- **`.github/workflows/nightly-stress.yml`** — Nightly GitHub Actions workflow
+
+#### Stress Test Features
+- Configurable concurrent customer agents (default: 20)
+- Weighted workload distribution across 11 tool types (get_balance 30%, search 10%, etc.)
+- Staggered ramp-up period to avoid thundering herd
+- Connection pooling via `httpx.Limits`
+- Batch endpoint stress testing (`/v1/batch`)
+- Health baseline measurement before load
+- Latency percentiles (p50/p95/p99), throughput (req/s), error rate tracking
+- Per-tool breakdown in markdown report
+- Pass/fail thresholds: error rate <5%, P95 <5s, P99 <10s, throughput >5 req/s
+- Graceful handling of unauthenticated mode (401s treated as PASS without admin key)
+
+#### GitHub Actions Workflow
+- **Schedule:** Daily at 03:00 UTC (`cron: "0 3 * * *"`)
+- **Manual dispatch:** Configurable customers, duration, base_url
+- **Pipeline:** Checkout → Python 3.12 → Install deps → Start local gateway → Provision admin key → Run stress test → Upload report artifact (30-day retention) → Post summary
+- Admin key provisioned as `enterprise` tier with 999,999 balance
+
+#### Smoke Test Results (local, 10 customers, 15s)
+| Metric | Value |
+|--------|-------|
+| Total requests | 1,058 |
+| Throughput | **68.0 req/s** |
+| Avg latency | **4ms** |
+| P95 latency | **6ms** |
+| P99 latency | **8ms** |
+| Per-customer rate | 6.8 req/s |
+| Batch requests | 30 |
+
+#### Bug Fixed During Implementation
+- `httpx.LocalProtocolError` on empty Bearer token — now skips Authorization header when no API key provided
+- Tier name in workflow: `admin` → `enterprise` (valid tiers: free/starter/pro/enterprise)
+
+#### Test Suite Status
+- **291 gateway tests passing** (no regressions)
+
+---
+
+## Session 8 — 2026-03-28: Extract Inline CI Code into Standalone Scripts
+
+### Prompt
+
+> Extract inline bash and Python code from GitHub Actions workflows (ci.yml, nightly-stress.yml) into standalone scripts under `scripts/ci/`. Separate pipeline definition (YAML) from implementation (scripts) so they can vary independently. Deduplicate shared code (install deps appears in both workflows identically).
+
+### Response
+
+Created 6 standalone scripts in `scripts/ci/`:
+
+| Script | Purpose |
+|--------|---------|
+| `install_deps.sh` | Shared dep installer with `--with-test` flag; deduplicates identical blocks from both workflows |
+| `docker_build_verify.sh` | Build Docker image + health-check with `trap cleanup EXIT` |
+| `start_gateway.sh` | Start uvicorn, health-check loop with crash detection, export PID/dir to `$GITHUB_ENV` or stdout |
+| `provision_admin_key.py` | Proper `argparse` CLI to provision admin API key (replaces 25-line inline Python-in-bash) |
+| `stop_gateway.sh` | Kill gateway + cleanup temp dir, never fails (`set +e`) |
+| `post_summary.sh` | Write markdown report to `$GITHUB_STEP_SUMMARY` or stdout |
+
+#### Workflow changes
+
+- **ci.yml:** 101 → 68 lines. Dep install → 1-line script call, Docker build+verify merged into single script call.
+- **nightly-stress.yml:** 159 → 91 lines. 5 inline blocks replaced with script calls.
+
+#### Design decisions
+- All scripts resolve `REPO_ROOT` from `${BASH_SOURCE[0]}` for portability
+- `start_gateway.sh` configurable via env vars (`GATEWAY_HOST`, `GATEWAY_PORT`, `GATEWAY_MAX_WAIT`)
+- `stop_gateway.sh` and `post_summary.sh` use `set +e` — safe for `if: always()` steps
+- `provision_admin_key.py` reads `$A2A_DATA_DIR` as default for `--data-dir`
+
+#### Verification
+- All 5 bash scripts pass `bash -n` syntax check
+- Python script passes `py_compile`
+- **291 gateway tests passing** (no regressions)
