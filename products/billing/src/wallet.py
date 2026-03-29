@@ -113,6 +113,7 @@ class Wallet:
             agent_id,
             {"amount": amount, "new_balance": new_balance},
         )
+        new_balance = await self._maybe_auto_reload(agent_id, new_balance)
         return new_balance
 
     async def charge(self, agent_id: str, amount: float, description: str = "") -> float:
@@ -132,6 +133,7 @@ class Wallet:
             available = current["balance"] if current else 0.0
             raise InsufficientCreditsError(agent_id, amount, available)
         await self.storage.record_transaction(agent_id, -amount, "charge", description)
+        new_balance = await self._maybe_auto_reload(agent_id, new_balance)
         return new_balance
 
     async def get_transactions(self, agent_id: str, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
@@ -140,3 +142,47 @@ class Wallet:
         if wallet is None:
             raise WalletNotFoundError(agent_id)
         return await self.storage.get_transactions(agent_id, limit, offset)
+
+    # -----------------------------------------------------------------------
+    # Auto-reload
+    # -----------------------------------------------------------------------
+
+    async def enable_auto_reload(
+        self, agent_id: str, threshold: float, reload_amount: float
+    ) -> None:
+        """Enable auto-reload: when balance drops below threshold, add reload_amount."""
+        await self.storage.set_auto_reload(agent_id, threshold, reload_amount, enabled=True)
+
+    async def disable_auto_reload(self, agent_id: str) -> None:
+        """Disable auto-reload for an agent."""
+        config = await self.storage.get_auto_reload(agent_id)
+        if config is not None:
+            await self.storage.set_auto_reload(
+                agent_id, config["threshold"], config["reload_amount"], enabled=False
+            )
+
+    async def get_auto_reload_config(self, agent_id: str) -> dict[str, Any] | None:
+        """Return auto-reload config for an agent, or None if not configured."""
+        return await self.storage.get_auto_reload(agent_id)
+
+    async def _maybe_auto_reload(self, agent_id: str, current_balance: float) -> float:
+        """Check if auto-reload should trigger, and if so, add credits."""
+        config = await self.storage.get_auto_reload(agent_id)
+        if config is None or not config["enabled"]:
+            return current_balance
+        if current_balance >= config["threshold"]:
+            return current_balance
+
+        reload_amount = config["reload_amount"]
+        success, new_balance = await self.storage.atomic_credit(agent_id, reload_amount)
+        if success:
+            await self.storage.record_transaction(
+                agent_id, reload_amount, "auto_reload", "Auto-reload triggered"
+            )
+            await self.storage.emit_event(
+                "wallet.auto_reload",
+                agent_id,
+                {"amount": reload_amount, "new_balance": new_balance, "trigger_balance": current_balance},
+            )
+            return new_balance
+        return current_balance

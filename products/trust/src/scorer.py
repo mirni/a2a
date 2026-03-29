@@ -17,6 +17,7 @@ import time
 from dataclasses import dataclass
 
 from .models import WEIGHTS, ProbeResult, SecurityScan, TrustScore, Window
+from .storage import StorageBackend
 
 # Time thresholds in seconds
 ONE_HOUR = 3600

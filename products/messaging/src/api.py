@@ -96,6 +96,7 @@ class MessagingAPI:
         )
 
         neg = await self._storage.get_negotiation(neg_id)
+        assert neg is not None
         return neg
 
     async def counter_offer(
@@ -132,7 +133,9 @@ class MessagingAPI:
             thread_id=neg["thread_id"],
         )
 
-        return await self._storage.get_negotiation(negotiation_id)
+        result = await self._storage.get_negotiation(negotiation_id)
+        assert result is not None
+        return result
 
     async def accept_negotiation(
         self,
@@ -166,7 +169,9 @@ class MessagingAPI:
             thread_id=neg["thread_id"],
         )
 
-        return await self._storage.get_negotiation(negotiation_id)
+        result = await self._storage.get_negotiation(negotiation_id)
+        assert result is not None
+        return result
 
     async def reject_negotiation(
         self,
@@ -200,7 +205,9 @@ class MessagingAPI:
             thread_id=neg["thread_id"],
         )
 
-        return await self._storage.get_negotiation(negotiation_id)
+        result = await self._storage.get_negotiation(negotiation_id)
+        assert result is not None
+        return result
 
     # ------------------------------------------------------------------
     # Internal helpers

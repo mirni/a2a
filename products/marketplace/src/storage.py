@@ -96,6 +96,17 @@ class MarketplaceStorage:
 
             CREATE INDEX IF NOT EXISTS idx_ratings_service ON service_ratings(service_id);
             CREATE INDEX IF NOT EXISTS idx_ratings_agent ON service_ratings(agent_id);
+
+            CREATE TABLE IF NOT EXISTS suggestions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                agent_id TEXT NOT NULL,
+                category TEXT NOT NULL DEFAULT 'general',
+                message TEXT NOT NULL,
+                created_at REAL NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_suggestions_category ON suggestions(category);
+            CREATE INDEX IF NOT EXISTS idx_suggestions_created ON suggestions(created_at);
         """)
 
     def _generate_id(self) -> str:
@@ -354,6 +365,73 @@ class MarketplaceStorage:
         cursor = await self.db.execute("SELECT COUNT(*) as cnt FROM services WHERE status = ?", (status,))
         row = await cursor.fetchone()
         return row["cnt"] if row else 0
+
+    async def add_rating(
+        self, service_id: str, agent_id: str, rating: int, review: str = ""
+    ) -> None:
+        """Add or update a rating for a service."""
+        import time
+
+        await self.db.execute(
+            "INSERT INTO service_ratings (service_id, agent_id, rating, review, created_at) "
+            "VALUES (?, ?, ?, ?, ?) "
+            "ON CONFLICT(service_id, agent_id) DO UPDATE SET rating = ?, review = ?, created_at = ?",
+            (service_id, agent_id, rating, review, time.time(), rating, review, time.time()),
+        )
+        await self.db.commit()
+
+    async def get_ratings(
+        self, service_id: str, limit: int = 20
+    ) -> dict[str, Any]:
+        """Get ratings summary and list for a service."""
+        cursor = await self.db.execute(
+            "SELECT AVG(rating) as avg_rating, COUNT(*) as cnt "
+            "FROM service_ratings WHERE service_id = ?",
+            (service_id,),
+        )
+        row = await cursor.fetchone()
+        avg_rating = round(row["avg_rating"], 2) if row["avg_rating"] is not None else 0.0
+        count = row["cnt"] if row else 0
+
+        cursor2 = await self.db.execute(
+            "SELECT agent_id, rating, review, created_at FROM service_ratings "
+            "WHERE service_id = ? ORDER BY created_at DESC LIMIT ?",
+            (service_id, limit),
+        )
+        rows = await cursor2.fetchall()
+        ratings = [dict(r) for r in rows]
+        return {"average_rating": avg_rating, "count": count, "ratings": ratings}
+
+    async def insert_suggestion(
+        self, agent_id: str, category: str, message: str
+    ) -> int:
+        """Insert a platform suggestion. Returns the suggestion ID."""
+        import time
+
+        cursor = await self.db.execute(
+            "INSERT INTO suggestions (agent_id, category, message, created_at) VALUES (?, ?, ?, ?)",
+            (agent_id, category, message, time.time()),
+        )
+        await self.db.commit()
+        assert cursor.lastrowid is not None
+        return cursor.lastrowid
+
+    async def get_suggestions(
+        self,
+        category: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """Get suggestions, optionally filtered by category."""
+        query = "SELECT * FROM suggestions WHERE 1=1"
+        params: list[Any] = []
+        if category is not None:
+            query += " AND category = ?"
+            params.append(category)
+        query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+        cursor = await self.db.execute(query, params)
+        return [dict(r) for r in await cursor.fetchall()]
 
     async def _enrich_service(self, svc: dict[str, Any]) -> dict[str, Any]:
         """Add tools and tags to a service dict."""

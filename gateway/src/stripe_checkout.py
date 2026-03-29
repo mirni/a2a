@@ -31,7 +31,7 @@ CREDITS_PER_DOLLAR = int(os.environ.get("A2A_CREDITS_PER_DOLLAR", "100"))
 _processed_sessions: set[str] = set()
 
 # Preset credit packages
-PACKAGES = {
+PACKAGES: dict[str, dict[str, int | str]] = {
     "starter": {"credits": 1_000, "price_cents": 1000, "label": "1,000 credits"},
     "growth": {"credits": 5_000, "price_cents": 4500, "label": "5,000 credits"},
     "scale": {"credits": 25_000, "price_cents": 20000, "label": "25,000 credits"},
@@ -107,14 +107,14 @@ async def create_checkout(request: Request) -> JSONResponse:
                 f"Unknown package: {package_name}. Options: {', '.join(PACKAGES.keys())}",
                 "bad_request",
             )
-        credits = pkg["credits"]
-        price_cents = pkg["price_cents"]
-        label = pkg["label"]
+        credits = int(pkg["credits"])
+        price_cents = int(pkg["price_cents"])
+        label = str(pkg["label"])
     else:
-        credits = body.get("credits")
-        if not credits or not isinstance(credits, (int, float)) or credits < 100:
+        raw_credits = body.get("credits")
+        if not raw_credits or not isinstance(raw_credits, (int, float)) or raw_credits < 100:
             return await error_response(400, "Specify 'package' or 'credits' (minimum 100)", "bad_request")
-        credits = int(credits)
+        credits = int(raw_credits)
         price_cents = int(credits / CREDITS_PER_DOLLAR * 100)
         label = f"{credits:,} credits"
 

@@ -18,6 +18,7 @@ from .models import (
     MetricCommitment,
     MetricSubmissionResult,
     RegistrationResult,
+    SubIdentity,
     VerifiedClaim,
 )
 from .storage import IdentityStorage
@@ -464,6 +465,78 @@ class IdentityAPI:
             "period_end": period_end,
             "chain_id": chain_id,
         }
+
+    # ------------------------------------------------------------------
+    # Sub-identity management
+    # ------------------------------------------------------------------
+
+    async def create_sub_identity(
+        self,
+        parent_agent_id: str,
+        role_name: str,
+        public_key: str | None = None,
+        metadata: dict | None = None,
+    ) -> SubIdentity:
+        """Create a sub-identity (persona/role) for a parent agent.
+
+        Args:
+            parent_agent_id: The parent agent who owns this sub-identity.
+            role_name: Role name for the sub-identity.
+            public_key: Optional Ed25519 public key hex. Auto-generated if None.
+            metadata: Optional metadata dict.
+
+        Returns:
+            SubIdentity with generated sub_identity_id and keypair.
+
+        Raises:
+            AgentNotFoundError: If parent agent is not registered.
+            ValueError: If role_name already exists for this parent.
+        """
+        parent = await self.storage.get_identity(parent_agent_id)
+        if parent is None:
+            raise AgentNotFoundError(f"Agent not found: {parent_agent_id}")
+
+        # Check for duplicate role
+        existing = await self.storage.list_sub_identities(parent_agent_id)
+        for sub in existing:
+            if sub["role_name"] == role_name:
+                raise ValueError(f"Sub-identity with role '{role_name}' already exists for {parent_agent_id}")
+
+        if public_key is None:
+            _priv, public_key = AgentCrypto.generate_keypair()
+
+        sub_id = f"sub-{parent_agent_id}-{role_name}"
+        await self.storage.store_sub_identity(
+            sub_identity_id=sub_id,
+            parent_agent_id=parent_agent_id,
+            role_name=role_name,
+            public_key=public_key,
+            metadata=metadata,
+        )
+        return SubIdentity(
+            sub_identity_id=sub_id,
+            parent_agent_id=parent_agent_id,
+            role_name=role_name,
+            public_key=public_key,
+            created_at=time.time(),
+            metadata=metadata or {},
+        )
+
+    async def get_sub_identity(self, sub_identity_id: str) -> SubIdentity | None:
+        """Get a sub-identity by its ID."""
+        row = await self.storage.get_sub_identity(sub_identity_id)
+        if row is None:
+            return None
+        return SubIdentity(**row)
+
+    async def list_sub_identities(self, parent_agent_id: str) -> list[SubIdentity]:
+        """List all sub-identities for a parent agent."""
+        rows = await self.storage.list_sub_identities(parent_agent_id)
+        return [SubIdentity(**r) for r in rows]
+
+    async def delete_sub_identity(self, sub_identity_id: str) -> None:
+        """Delete a sub-identity. No-op if not found."""
+        await self.storage.delete_sub_identity(sub_identity_id)
 
     # ------------------------------------------------------------------
     # TODO-14: Configurable metrics

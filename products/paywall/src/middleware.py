@@ -180,9 +180,9 @@ class PaywallMiddleware:
                     agent_tier = record["tier"]
                 else:
                     # Extract from param
-                    agent_id = kwargs.get(agent_id_param)
+                    agent_id = str(kwargs.get(agent_id_param)) if agent_id_param in kwargs else None
                     if agent_id is None and args:
-                        agent_id = args[0]
+                        agent_id = str(args[0])
                     if agent_id is None:
                         raise PaywallError(
                             "Cannot determine agent_id",

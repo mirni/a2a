@@ -10,6 +10,7 @@ import logging
 import ssl
 import time
 from dataclasses import dataclass, field
+from typing import Any
 
 import httpx
 
@@ -47,7 +48,7 @@ def analyze_security_headers(headers: httpx.Headers) -> SecurityHeaders:
     Returns:
         SecurityHeaders with boolean flags and a composite score.
     """
-    result = {}
+    result: dict[str, Any] = {}
     found = 0
     for header_name, attr_name in SECURITY_HEADERS.items():
         present = header_name in headers

@@ -257,3 +257,57 @@ async def _get_service_ratings_tool(ctx: AppContext, params: dict[str, Any]) -> 
         "count": count,
         "ratings": ratings,
     }
+
+
+# ---------------------------------------------------------------------------
+# Agent Search/Discovery (by capabilities)
+# ---------------------------------------------------------------------------
+
+
+async def _search_agents(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    """Search for agents by capability keywords.
+
+    Searches across service names, descriptions, tools, tags, and categories.
+    Groups results by provider (agent).
+    """
+    query = params["query"].lower()
+    limit = params.get("limit", 20)
+
+    db = ctx.marketplace.storage.db
+
+    # Search across services for the query term
+    cursor = await db.execute(
+        """
+        SELECT DISTINCT s.provider_id, s.id, s.name, s.description, s.category
+        FROM services s
+        LEFT JOIN service_tools st ON s.id = st.service_id
+        LEFT JOIN service_tags stg ON s.id = stg.service_id
+        WHERE s.status = 'active'
+          AND (
+            LOWER(s.name) LIKE ?
+            OR LOWER(s.description) LIKE ?
+            OR LOWER(s.category) LIKE ?
+            OR LOWER(st.tool_name) LIKE ?
+            OR LOWER(stg.tag) LIKE ?
+          )
+        ORDER BY s.provider_id, s.name
+        """,
+        tuple(f"%{query}%" for _ in range(5)),
+    )
+    rows = await cursor.fetchall()
+
+    # Group by provider_id (agent)
+    agents_map: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        pid = row["provider_id"]
+        if pid not in agents_map:
+            agents_map[pid] = {"agent_id": pid, "services": []}
+        agents_map[pid]["services"].append({
+            "service_id": row["id"],
+            "name": row["name"],
+            "description": row["description"],
+            "category": row["category"],
+        })
+
+    agents = list(agents_map.values())[:limit]
+    return {"agents": agents}

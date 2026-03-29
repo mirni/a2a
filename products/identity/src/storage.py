@@ -119,6 +119,18 @@ CREATE TABLE IF NOT EXISTS orgs (
     name       TEXT NOT NULL,
     created_at REAL NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS sub_identities (
+    sub_identity_id  TEXT PRIMARY KEY,
+    parent_agent_id  TEXT NOT NULL,
+    role_name        TEXT NOT NULL,
+    public_key       TEXT NOT NULL,
+    created_at       REAL NOT NULL,
+    metadata         TEXT NOT NULL DEFAULT '{}',
+    UNIQUE(parent_agent_id, role_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sub_identity_parent ON sub_identities(parent_agent_id);
 """
 
 
@@ -649,3 +661,56 @@ class IdentityStorage:
             }
             for r in rows
         ]
+
+    # -------------------------------------------------------------------
+    # Sub-identities
+    # -------------------------------------------------------------------
+
+    async def store_sub_identity(
+        self,
+        sub_identity_id: str,
+        parent_agent_id: str,
+        role_name: str,
+        public_key: str,
+        metadata: dict | None = None,
+    ) -> None:
+        """Store a new sub-identity."""
+        await self.db.execute(
+            "INSERT INTO sub_identities (sub_identity_id, parent_agent_id, role_name, public_key, created_at, metadata) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (sub_identity_id, parent_agent_id, role_name, public_key, time.time(), json.dumps(metadata or {})),
+        )
+        await self.db.commit()
+
+    async def get_sub_identity(self, sub_identity_id: str) -> dict[str, Any] | None:
+        """Get a sub-identity by ID."""
+        cursor = await self.db.execute(
+            "SELECT * FROM sub_identities WHERE sub_identity_id = ?", (sub_identity_id,)
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        d = dict(row)
+        d["metadata"] = json.loads(d["metadata"])
+        return d
+
+    async def list_sub_identities(self, parent_agent_id: str) -> list[dict[str, Any]]:
+        """List all sub-identities for a parent agent."""
+        cursor = await self.db.execute(
+            "SELECT * FROM sub_identities WHERE parent_agent_id = ? ORDER BY created_at",
+            (parent_agent_id,),
+        )
+        rows = await cursor.fetchall()
+        results = []
+        for r in rows:
+            d = dict(r)
+            d["metadata"] = json.loads(d["metadata"])
+            results.append(d)
+        return results
+
+    async def delete_sub_identity(self, sub_identity_id: str) -> None:
+        """Delete a sub-identity."""
+        await self.db.execute(
+            "DELETE FROM sub_identities WHERE sub_identity_id = ?", (sub_identity_id,)
+        )
+        await self.db.commit()

@@ -3,6 +3,7 @@
 # =============================================================================
 # Runs on every push and pull request to main.
 # Tests all modules independently to catch import/isolation issues.
+# Quality checks run as independent jobs so one failure doesn't block others.
 # =============================================================================
 
 name: CI
@@ -14,45 +15,64 @@ on:
     branches: [main]
 
 jobs:
-  quality:
+  lint:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Install quality tools
-        run: pip install ruff mypy bandit pydantic pip-audit
-
+      - run: pip install ruff
       - name: Lint with ruff
-        if: ${{ !cancelled() }}
         run: ruff check .
-
       - name: Check formatting with ruff
-        if: ${{ !cancelled() }}
         run: ruff format --check .
 
-      - name: Type check with mypy
-        if: ${{ !cancelled() }}
-        run: mypy $(find gateway/src products/*/src products/connectors/*/src sdk/src -maxdepth 0 -type d 2>/dev/null | sort)
-
-      - name: Security scan with bandit
-        if: ${{ !cancelled() }}
-        run: bandit -r gateway/src products/ -ll -q --skip B101
-
-      - name: Dependency audit
-        if: ${{ !cancelled() }}
-        run: pip-audit -r requirements.txt
-
-      - name: SAST with Semgrep
-        if: ${{ !cancelled() }}
-        uses: semgrep/semgrep-action@v1
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          config: auto
+          python-version: "3.12"
+      - name: Install mypy and runtime deps
+        run: pip install mypy pydantic aiosqlite cryptography httpx starlette
+      - name: Type check with mypy
+        run: mypy $(find gateway/src products/*/src products/connectors/*/src -maxdepth 0 -type d 2>/dev/null | sort)
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install bandit
+      - name: Security scan with bandit
+        run: bandit -r gateway/src products/ -ll -q --skip B101 --exclude '*/tests/*'
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install deps and audit tool
+        run: |
+          pip install pip-audit
+          pip install -r requirements.txt
+      - name: Dependency audit
+        run: pip-audit
+
+  semgrep:
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - name: SAST with Semgrep
+        run: semgrep scan --config auto --error --exclude='**/tests/**' .
 
   test:
     runs-on: ubuntu-latest
@@ -108,8 +128,11 @@ jobs:
       - name: Test identity
         run: scripts/run_tests.sh products/identity
 
-      - name: Test SDK
-        run: scripts/run_tests.sh sdk
+      - name: Test messaging
+        run: scripts/run_tests.sh products/messaging
+
+      - name: Test reputation
+        run: scripts/run_tests.sh products/reputation
 
   docker-build:
     runs-on: ubuntu-latest

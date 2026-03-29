@@ -87,6 +87,13 @@ CREATE TABLE IF NOT EXISTS budget_caps (
     monthly_cap     INTEGER,
     alert_threshold REAL NOT NULL DEFAULT 0.8
 );
+
+CREATE TABLE IF NOT EXISTS auto_reload_config (
+    agent_id       TEXT PRIMARY KEY,
+    threshold      INTEGER NOT NULL,
+    reload_amount  INTEGER NOT NULL,
+    enabled        INTEGER NOT NULL DEFAULT 1
+);
 """
 
     _MIGRATIONS: tuple[Migration, ...] = (
@@ -114,6 +121,16 @@ CREATE TABLE IF NOT EXISTS budget_caps (
             "WHERE daily_cap IS NOT NULL AND (typeof(daily_cap) = 'real' OR (daily_cap > 0 AND daily_cap < 100000000));\n"
             "UPDATE budget_caps SET monthly_cap = CAST(ROUND(monthly_cap * 100000000) AS INTEGER) "
             "WHERE monthly_cap IS NOT NULL AND (typeof(monthly_cap) = 'real' OR (monthly_cap > 0 AND monthly_cap < 100000000));",
+        ),
+        Migration(
+            3,
+            "add auto_reload_config table",
+            "CREATE TABLE IF NOT EXISTS auto_reload_config (\n"
+            "    agent_id       TEXT PRIMARY KEY,\n"
+            "    threshold      INTEGER NOT NULL,\n"
+            "    reload_amount  INTEGER NOT NULL,\n"
+            "    enabled        INTEGER NOT NULL DEFAULT 1\n"
+            ");",
         ),
     )
 
@@ -360,6 +377,45 @@ CREATE TABLE IF NOT EXISTS budget_caps (
         await self.db.commit()
 
     # -----------------------------------------------------------------------
+    # Budget caps
+    # -----------------------------------------------------------------------
+
+    async def set_budget_cap(
+        self,
+        agent_id: str,
+        daily_cap: float | None = None,
+        monthly_cap: float | None = None,
+        alert_threshold: float = 0.8,
+    ) -> None:
+        daily_atomic = self._to_atomic(daily_cap) if daily_cap is not None else None
+        monthly_atomic = self._to_atomic(monthly_cap) if monthly_cap is not None else None
+        await self.db.execute(
+            "INSERT INTO budget_caps (agent_id, daily_cap, monthly_cap, alert_threshold) "
+            "VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(agent_id) DO UPDATE SET "
+            "daily_cap = excluded.daily_cap, monthly_cap = excluded.monthly_cap, "
+            "alert_threshold = excluded.alert_threshold",
+            (agent_id, daily_atomic, monthly_atomic, alert_threshold),
+        )
+        await self.db.commit()
+
+    async def get_budget_cap(self, agent_id: str) -> dict[str, Any] | None:
+        cursor = await self.db.execute(
+            "SELECT * FROM budget_caps WHERE agent_id = ?", (agent_id,)
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        d = dict(row)
+        d["daily_cap"] = self._from_atomic(d["daily_cap"]) if d["daily_cap"] is not None else None
+        d["monthly_cap"] = self._from_atomic(d["monthly_cap"]) if d["monthly_cap"] is not None else None
+        return d
+
+    async def delete_budget_cap(self, agent_id: str) -> None:
+        await self.db.execute("DELETE FROM budget_caps WHERE agent_id = ?", (agent_id,))
+        await self.db.commit()
+
+    # -----------------------------------------------------------------------
     # Rate-limit check helpers
     # -----------------------------------------------------------------------
 
@@ -421,3 +477,35 @@ CREATE TABLE IF NOT EXISTS budget_caps (
             d["payload"] = json.loads(d["payload"])
             results.append(d)
         return results
+
+    # -----------------------------------------------------------------------
+    # Auto-reload config
+    # -----------------------------------------------------------------------
+
+    async def set_auto_reload(
+        self, agent_id: str, threshold: float, reload_amount: float, enabled: bool = True
+    ) -> None:
+        await self.db.execute(
+            """INSERT INTO auto_reload_config (agent_id, threshold, reload_amount, enabled)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(agent_id) DO UPDATE SET
+                 threshold = excluded.threshold,
+                 reload_amount = excluded.reload_amount,
+                 enabled = excluded.enabled""",
+            (agent_id, self._to_atomic(threshold), self._to_atomic(reload_amount), int(enabled)),
+        )
+        await self.db.commit()
+
+    async def get_auto_reload(self, agent_id: str) -> dict[str, Any] | None:
+        cursor = await self.db.execute(
+            "SELECT * FROM auto_reload_config WHERE agent_id = ?", (agent_id,)
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        return {
+            "agent_id": row["agent_id"],
+            "threshold": self._from_atomic(row["threshold"]),
+            "reload_amount": self._from_atomic(row["reload_amount"]),
+            "enabled": bool(row["enabled"]),
+        }

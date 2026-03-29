@@ -534,6 +534,53 @@
     "tier_required": "free"
   },
   {
+    "name": "search_agents",
+    "service": "marketplace",
+    "description": "Search for agents by capability keywords. Searches service names, descriptions, tools, tags, and categories.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search keyword for capabilities"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 20
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "agents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "agent_id": {
+                "type": "string"
+              },
+              "services": {
+                "type": "array"
+              }
+            }
+          }
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
+    "tier_required": "free"
+  },
+  {
     "name": "best_match",
     "service": "marketplace",
     "description": "Find the best matching services for a query with ranking.",
@@ -3844,7 +3891,10 @@
         },
         "interval": {
           "type": "string",
-          "enum": ["hour", "day"],
+          "enum": [
+            "hour",
+            "day"
+          ],
           "description": "Time bucket interval"
         },
         "since": {
@@ -3857,7 +3907,10 @@
           "description": "Max number of buckets to return"
         }
       },
-      "required": ["agent_id", "interval"]
+      "required": [
+        "agent_id",
+        "interval"
+      ]
     },
     "output_schema": {
       "type": "object",
@@ -3867,16 +3920,26 @@
           "items": {
             "type": "object",
             "properties": {
-              "timestamp": { "type": "number" },
-              "calls": { "type": "integer" },
-              "cost": { "type": "number" }
+              "timestamp": {
+                "type": "number"
+              },
+              "calls": {
+                "type": "integer"
+              },
+              "cost": {
+                "type": "number"
+              }
             }
           }
         }
       }
     },
-    "pricing": { "per_call": 0.0 },
-    "sla": { "max_latency_ms": 500 },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
     "tier_required": "free"
   },
   {
@@ -3888,7 +3951,11 @@
       "properties": {
         "metric": {
           "type": "string",
-          "enum": ["spend", "calls", "trust_score"],
+          "enum": [
+            "spend",
+            "calls",
+            "trust_score"
+          ],
           "description": "Metric to rank by"
         },
         "limit": {
@@ -3897,7 +3964,9 @@
           "description": "Max entries to return"
         }
       },
-      "required": ["metric"]
+      "required": [
+        "metric"
+      ]
     },
     "output_schema": {
       "type": "object",
@@ -3907,16 +3976,26 @@
           "items": {
             "type": "object",
             "properties": {
-              "rank": { "type": "integer" },
-              "agent_id": { "type": "string" },
-              "value": { "type": "number" }
+              "rank": {
+                "type": "integer"
+              },
+              "agent_id": {
+                "type": "string"
+              },
+              "value": {
+                "type": "number"
+              }
             }
           }
         }
       }
     },
-    "pricing": { "per_call": 0.0 },
-    "sla": { "max_latency_ms": 500 },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
     "tier_required": "free"
   },
   {
@@ -3935,17 +4014,28 @@
           "description": "JSON schema object for the event payload"
         }
       },
-      "required": ["event_type", "schema"]
+      "required": [
+        "event_type",
+        "schema"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "event_type": { "type": "string" },
-        "registered": { "type": "boolean" }
+        "event_type": {
+          "type": "string"
+        },
+        "registered": {
+          "type": "boolean"
+        }
       }
     },
-    "pricing": { "per_call": 0.0 },
-    "sla": { "max_latency_ms": 300 },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "free"
   },
   {
@@ -3960,18 +4050,30 @@
           "description": "The event type identifier"
         }
       },
-      "required": ["event_type"]
+      "required": [
+        "event_type"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "event_type": { "type": "string" },
-        "schema": { "type": "object" },
-        "found": { "type": "boolean" }
+        "event_type": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "object"
+        },
+        "found": {
+          "type": "boolean"
+        }
       }
     },
-    "pricing": { "per_call": 0.0 },
-    "sla": { "max_latency_ms": 200 },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   },
   {
@@ -3986,18 +4088,30 @@
           "description": "The webhook ID to send a test ping to"
         }
       },
-      "required": ["webhook_id"]
+      "required": [
+        "webhook_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "delivery_id": { "type": "integer" },
-        "status": { "type": "string" },
-        "response_code": { "type": "integer" }
+        "delivery_id": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string"
+        },
+        "response_code": {
+          "type": "integer"
+        }
       }
     },
-    "pricing": { "per_call": 0.0 },
-    "sla": { "max_latency_ms": 10000 },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 10000
+    },
     "tier_required": "free"
   },
   {
@@ -4016,19 +4130,33 @@
           "description": "Tier for the new key (defaults to current tier)"
         }
       },
-      "required": ["agent_id"]
+      "required": [
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "key": { "type": "string" },
-        "agent_id": { "type": "string" },
-        "tier": { "type": "string" },
-        "created_at": { "type": "number" }
+        "key": {
+          "type": "string"
+        },
+        "agent_id": {
+          "type": "string"
+        },
+        "tier": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "number"
+        }
       }
     },
-    "pricing": { "per_call": 0.0 },
-    "sla": { "max_latency_ms": 300 },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "free"
   },
   {
@@ -4051,21 +4179,41 @@
           "description": "Number of calls to price"
         }
       },
-      "required": ["agent_id", "tool_name", "quantity"]
+      "required": [
+        "agent_id",
+        "tool_name",
+        "quantity"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "agent_id": { "type": "string" },
-        "tool_name": { "type": "string" },
-        "historical_calls": { "type": "integer" },
-        "discount_pct": { "type": "number" },
-        "unit_price": { "type": "number" },
-        "discounted_price": { "type": "number" }
+        "agent_id": {
+          "type": "string"
+        },
+        "tool_name": {
+          "type": "string"
+        },
+        "historical_calls": {
+          "type": "integer"
+        },
+        "discount_pct": {
+          "type": "number"
+        },
+        "unit_price": {
+          "type": "number"
+        },
+        "discounted_price": {
+          "type": "number"
+        }
       }
     },
-    "pricing": { "per_call": 0.0 },
-    "sla": { "max_latency_ms": 200 },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   },
   {
@@ -4088,20 +4236,37 @@
           "description": "Optional agent ID for volume discount"
         }
       },
-      "required": ["tool_name", "quantity"]
+      "required": [
+        "tool_name",
+        "quantity"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "tool_name": { "type": "string" },
-        "quantity": { "type": "integer" },
-        "unit_price": { "type": "number" },
-        "discount_pct": { "type": "number" },
-        "total_cost": { "type": "number" }
+        "tool_name": {
+          "type": "string"
+        },
+        "quantity": {
+          "type": "integer"
+        },
+        "unit_price": {
+          "type": "number"
+        },
+        "discount_pct": {
+          "type": "number"
+        },
+        "total_cost": {
+          "type": "number"
+        }
       }
     },
-    "pricing": { "per_call": 0.0 },
-    "sla": { "max_latency_ms": 200 },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   },
   {
@@ -4128,18 +4293,32 @@
           "description": "Optional review text"
         }
       },
-      "required": ["service_id", "agent_id", "rating"]
+      "required": [
+        "service_id",
+        "agent_id",
+        "rating"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "service_id": { "type": "string" },
-        "agent_id": { "type": "string" },
-        "rating": { "type": "integer" }
+        "service_id": {
+          "type": "string"
+        },
+        "agent_id": {
+          "type": "string"
+        },
+        "rating": {
+          "type": "integer"
+        }
       }
     },
-    "pricing": { "per_call": 0.0 },
-    "sla": { "max_latency_ms": 300 },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "free"
   },
   {
@@ -4158,18 +4337,30 @@
           "description": "Maximum number of ratings to return (default 20)"
         }
       },
-      "required": ["service_id"]
+      "required": [
+        "service_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "average_rating": { "type": "number" },
-        "count": { "type": "integer" },
-        "ratings": { "type": "array" }
+        "average_rating": {
+          "type": "number"
+        },
+        "count": {
+          "type": "integer"
+        },
+        "ratings": {
+          "type": "array"
+        }
       }
     },
-    "pricing": { "per_call": 0.0 },
-    "sla": { "max_latency_ms": 200 },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   },
   {
@@ -4196,19 +4387,33 @@
           "description": "Fraction (0-1) at which to trigger alert (default 0.8)"
         }
       },
-      "required": ["agent_id"]
+      "required": [
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "agent_id": { "type": "string" },
-        "daily_cap": { "type": "number" },
-        "monthly_cap": { "type": "number" },
-        "alert_threshold": { "type": "number" }
+        "agent_id": {
+          "type": "string"
+        },
+        "daily_cap": {
+          "type": "number"
+        },
+        "monthly_cap": {
+          "type": "number"
+        },
+        "alert_threshold": {
+          "type": "number"
+        }
       }
     },
-    "pricing": { "per_call": 0.0 },
-    "sla": { "max_latency_ms": 200 },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   },
   {
@@ -4223,24 +4428,48 @@
           "description": "The agent to check budget status for"
         }
       },
-      "required": ["agent_id"]
+      "required": [
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "agent_id": { "type": "string" },
-        "daily_spend": { "type": "number" },
-        "daily_cap": { "type": "number" },
-        "daily_pct": { "type": "number" },
-        "monthly_spend": { "type": "number" },
-        "monthly_cap": { "type": "number" },
-        "monthly_pct": { "type": "number" },
-        "alert_triggered": { "type": "boolean" },
-        "cap_exceeded": { "type": "boolean" }
+        "agent_id": {
+          "type": "string"
+        },
+        "daily_spend": {
+          "type": "number"
+        },
+        "daily_cap": {
+          "type": "number"
+        },
+        "daily_pct": {
+          "type": "number"
+        },
+        "monthly_spend": {
+          "type": "number"
+        },
+        "monthly_cap": {
+          "type": "number"
+        },
+        "monthly_pct": {
+          "type": "number"
+        },
+        "alert_triggered": {
+          "type": "boolean"
+        },
+        "cap_exceeded": {
+          "type": "boolean"
+        }
       }
     },
-    "pricing": { "per_call": 0.0 },
-    "sla": { "max_latency_ms": 200 },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   },
   {
@@ -4255,18 +4484,30 @@
           "description": "Name of the organization"
         }
       },
-      "required": ["org_name"]
+      "required": [
+        "org_name"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "org_id": { "type": "string" },
-        "name": { "type": "string" },
-        "created_at": { "type": "number" }
+        "org_id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "number"
+        }
       }
     },
-    "pricing": { "per_call": 0.0 },
-    "sla": { "max_latency_ms": 200 },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   },
   {
@@ -4281,19 +4522,33 @@
           "description": "The organization ID"
         }
       },
-      "required": ["org_id"]
+      "required": [
+        "org_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "org_id": { "type": "string" },
-        "name": { "type": "string" },
-        "created_at": { "type": "number" },
-        "members": { "type": "array" }
+        "org_id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "number"
+        },
+        "members": {
+          "type": "array"
+        }
       }
     },
-    "pricing": { "per_call": 0.0 },
-    "sla": { "max_latency_ms": 200 },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   },
   {
@@ -4312,17 +4567,28 @@
           "description": "The agent to add"
         }
       },
-      "required": ["org_id", "agent_id"]
+      "required": [
+        "org_id",
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "agent_id": { "type": "string" },
-        "org_id": { "type": "string" }
+        "agent_id": {
+          "type": "string"
+        },
+        "org_id": {
+          "type": "string"
+        }
       }
     },
-    "pricing": { "per_call": 0.0 },
-    "sla": { "max_latency_ms": 200 },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   }
 ]

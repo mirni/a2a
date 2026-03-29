@@ -87,7 +87,7 @@ def _is_sensitive_key(key: str) -> bool:
 
 def _sanitize_params(params: dict[str, Any]) -> dict[str, Any]:
     """Remove sensitive values from parameters before logging."""
-    sanitized = {}
+    sanitized: dict[str, Any] = {}
     for key, value in params.items():
         if _is_sensitive_key(key):
             sanitized[key] = "[REDACTED]"

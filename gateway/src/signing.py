@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import logging
 import os
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +19,9 @@ logger = logging.getLogger(__name__)
 # Attempt to import dilithium; set a module-level flag so the class knows
 # which path to take without re-trying the import on every instantiation.
 # ---------------------------------------------------------------------------
-_dilithium_mod = None
+_dilithium_mod: Any = None
 try:
-    import dilithium as _dilithium_mod  # type: ignore[import-untyped]
+    import dilithium as _dilithium_mod  # type: ignore[import-untyped,no-redef]
 except ImportError:
     _dilithium_mod = None
 
@@ -96,7 +97,7 @@ class SigningManager:
         if self._is_dilithium():
             try:
                 pk_bytes: bytes = (
-                    self._dilithium_pk if isinstance(self._dilithium_pk, bytes) else bytes(self._dilithium_pk)  # type: ignore[arg-type]
+                    self._dilithium_pk if isinstance(self._dilithium_pk, bytes) else bytes(self._dilithium_pk)  # type: ignore[arg-type,call-overload]
                 )
                 return pk_bytes.hex()
             except Exception:
@@ -137,7 +138,7 @@ class SigningManager:
 # ---------------------------------------------------------------------------
 
 
-async def signing_key_handler(request) -> JSONResponse:  # noqa: ANN001
+async def signing_key_handler(request: Any) -> Any:
     """Return the public key and algorithm used by the active SigningManager.
 
     Expects ``request.app.state.signing_manager`` to be a :class:`SigningManager`.

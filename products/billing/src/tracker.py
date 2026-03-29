@@ -119,7 +119,7 @@ class UsageTracker:
                 # Extract tokens if configured
                 tokens = 0
                 if tokens_param and tokens_param in kwargs:
-                    tokens = int(kwargs[tokens_param])
+                    tokens = int(str(kwargs[tokens_param]))
 
                 # Policy checks
                 await self._policies.check_all(str(agent_id), cost)

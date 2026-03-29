@@ -68,9 +68,13 @@ class SubscriptionScheduler:
         expired = await self.engine.process_expired_escrows()
         result.expired_escrows = len(expired)
 
-        # 2. Process due subscriptions
+        # 2. Process due subscriptions (skip plan subscriptions — handled by PlanManager)
         due_subs = await self.engine.storage.get_due_subscriptions(now)
         for sub_data in due_subs:
+            metadata = sub_data.get("metadata") or {}
+            if metadata.get("type") == "plan_subscription":
+                continue
+
             sub_id = sub_data["id"]
             result.processed += 1
 

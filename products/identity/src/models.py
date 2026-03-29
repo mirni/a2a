@@ -252,6 +252,32 @@ class AgentReputation(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
+class SubIdentity(BaseModel):
+    """A sub-identity (persona/role) for an agent."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "sub_identity_id": "sub-agent7f3a2b-analyzer",
+                    "parent_agent_id": "agent-7f3a2b",
+                    "role_name": "data-analyzer",
+                    "public_key": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa3f4a18446b7e8c3042b58",
+                    "created_at": 1711612800.0,
+                    "metadata": {"department": "data"},
+                }
+            ]
+        }
+    )
+
+    sub_identity_id: str
+    parent_agent_id: str
+    role_name: str
+    public_key: str
+    created_at: float
+    metadata: dict = Field(default_factory=dict)
+
+
 # Supported metric names for trading bot attestation
 SUPPORTED_METRICS = {
     "sharpe_30d",

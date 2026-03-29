@@ -65,6 +65,7 @@ from gateway.src.tools.marketplace import (
     _list_strategies,
     _rate_service_tool,
     _register_service,
+    _search_agents,
     _search_services,
     _update_service,
 )
@@ -130,6 +131,7 @@ TOOL_REGISTRY: dict[str, ToolFunc] = {
     "list_subscriptions": _list_subscriptions,
     "reactivate_subscription": _reactivate_subscription,
     # Marketplace
+    "search_agents": _search_agents,
     "search_services": _search_services,
     "best_match": _best_match,
     "register_service": _register_service,

@@ -148,6 +148,30 @@ async def _get_agent_leaderboard(ctx: AppContext, params: dict[str, Any]) -> dic
             leaderboard = [{"rank": i + 1, "agent_id": row[0], "value": round(row[1], 6)} for i, row in enumerate(rows)]
         except (RuntimeError, OSError, AttributeError):
             leaderboard = []
+    elif metric == "revenue":
+        scale = 100_000_000  # atomic units per credit
+        db = ctx.payment_engine.storage.db
+        cursor = await db.execute(
+            "SELECT payee AS agent_id, CAST(SUM(amount) AS REAL) / ? AS value "
+            "FROM settlements GROUP BY payee ORDER BY value DESC LIMIT ?",
+            (scale, limit),
+        )
+        rows = await cursor.fetchall()
+        leaderboard = [{"rank": i + 1, "agent_id": row[0], "value": round(row[1], 6)} for i, row in enumerate(rows)]
+    elif metric == "rating":
+        try:
+            db = ctx.marketplace.storage.db
+            cursor = await db.execute(
+                "SELECT s.provider_id AS agent_id, AVG(r.rating) AS value "
+                "FROM service_ratings r "
+                "JOIN services s ON r.service_id = s.id "
+                "GROUP BY s.provider_id ORDER BY value DESC LIMIT ?",
+                (limit,),
+            )
+            rows = await cursor.fetchall()
+            leaderboard = [{"rank": i + 1, "agent_id": row[0], "value": round(row[1], 6)} for i, row in enumerate(rows)]
+        except (RuntimeError, OSError, AttributeError):
+            leaderboard = []
     else:
         raise ToolValidationError(f"Unknown metric: {metric}")
 

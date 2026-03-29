@@ -133,6 +133,79 @@ class TestAgentLeaderboard:
             assert "agent_id" in entry
             assert "value" in entry
 
+    async def test_leaderboard_by_revenue(self, client, api_key, app):
+        """Should rank agents by total revenue (payee in settlements)."""
+        ctx = app.state.ctx
+        # Create wallets for two agents
+        await ctx.tracker.wallet.create("rev-seller-a", initial_balance=0.0, signup_bonus=False)
+        await ctx.tracker.wallet.create("rev-seller-b", initial_balance=0.0, signup_bonus=False)
+        await ctx.tracker.wallet.create("rev-buyer", initial_balance=10000.0, signup_bonus=False)
+
+        # Create settlements via payment intents
+        for _i in range(3):
+            intent = await ctx.payment_engine.create_intent(
+                payer="rev-buyer", payee="rev-seller-a", amount=100.0,
+            )
+            await ctx.payment_engine.capture(intent.id)
+        intent = await ctx.payment_engine.create_intent(
+            payer="rev-buyer", payee="rev-seller-b", amount=500.0,
+        )
+        await ctx.payment_engine.capture(intent.id)
+
+        resp = await client.post(
+            "/v1/execute",
+            json={"tool": "get_agent_leaderboard", "params": {"metric": "revenue"}},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        lb = data["result"]["leaderboard"]
+        # rev-seller-b has 500, rev-seller-a has 300
+        seller_a = [e for e in lb if e["agent_id"] == "rev-seller-a"]
+        seller_b = [e for e in lb if e["agent_id"] == "rev-seller-b"]
+        assert seller_b and seller_a
+        assert seller_b[0]["rank"] < seller_a[0]["rank"]
+        assert seller_b[0]["value"] == 500.0
+        assert seller_a[0]["value"] == 300.0
+
+    async def test_leaderboard_by_rating(self, client, api_key, app):
+        """Should rank agents by average service rating."""
+        from marketplace_src.models import ServiceCreate
+
+        ctx = app.state.ctx
+        mkt = ctx.marketplace
+
+        # Register services for two providers
+        svc_a = await mkt.register_service(ServiceCreate(
+            provider_id="rated-a", name="Service A",
+            description="A service", category="general",
+        ))
+        svc_b = await mkt.register_service(ServiceCreate(
+            provider_id="rated-b", name="Service B",
+            description="B service", category="general",
+        ))
+
+        # Rate them: rated-a gets avg 3.0, rated-b gets avg 4.5
+        await mkt.rate_service(svc_a.id, "reviewer-1", 2)
+        await mkt.rate_service(svc_a.id, "reviewer-2", 4)
+        await mkt.rate_service(svc_b.id, "reviewer-1", 4)
+        await mkt.rate_service(svc_b.id, "reviewer-2", 5)
+
+        resp = await client.post(
+            "/v1/execute",
+            json={"tool": "get_agent_leaderboard", "params": {"metric": "rating"}},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        lb = data["result"]["leaderboard"]
+        rated_a = [e for e in lb if e["agent_id"] == "rated-a"]
+        rated_b = [e for e in lb if e["agent_id"] == "rated-b"]
+        assert rated_b and rated_a
+        assert rated_b[0]["rank"] < rated_a[0]["rank"]
+        assert rated_b[0]["value"] == 4.5
+        assert rated_a[0]["value"] == 3.0
+
     async def test_missing_metric_param(self, client, api_key):
         """Should fail when metric param is missing."""
         resp = await client.post(
