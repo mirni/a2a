@@ -400,9 +400,7 @@ CREATE TABLE IF NOT EXISTS auto_reload_config (
         await self.db.commit()
 
     async def get_budget_cap(self, agent_id: str) -> dict[str, Any] | None:
-        cursor = await self.db.execute(
-            "SELECT * FROM budget_caps WHERE agent_id = ?", (agent_id,)
-        )
+        cursor = await self.db.execute("SELECT * FROM budget_caps WHERE agent_id = ?", (agent_id,))
         row = await cursor.fetchone()
         if row is None:
             return None
@@ -497,9 +495,7 @@ CREATE TABLE IF NOT EXISTS auto_reload_config (
         await self.db.commit()
 
     async def get_auto_reload(self, agent_id: str) -> dict[str, Any] | None:
-        cursor = await self.db.execute(
-            "SELECT * FROM auto_reload_config WHERE agent_id = ?", (agent_id,)
-        )
+        cursor = await self.db.execute("SELECT * FROM auto_reload_config WHERE agent_id = ?", (agent_id,))
         row = await cursor.fetchone()
         if row is None:
             return None

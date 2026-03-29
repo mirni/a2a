@@ -26,10 +26,7 @@ class BudgetCapExceededError(Exception):
         self.cap_type = cap_type
         self.current_spend = current_spend
         self.cap = cap
-        super().__init__(
-            f"Agent {agent_id}: {cap_type} budget cap exceeded. "
-            f"Spend: {current_spend}, Cap: {cap}"
-        )
+        super().__init__(f"Agent {agent_id}: {cap_type} budget cap exceeded. Spend: {current_spend}, Cap: {cap}")
 
 
 @dataclass

@@ -684,9 +684,7 @@ class IdentityStorage:
 
     async def get_sub_identity(self, sub_identity_id: str) -> dict[str, Any] | None:
         """Get a sub-identity by ID."""
-        cursor = await self.db.execute(
-            "SELECT * FROM sub_identities WHERE sub_identity_id = ?", (sub_identity_id,)
-        )
+        cursor = await self.db.execute("SELECT * FROM sub_identities WHERE sub_identity_id = ?", (sub_identity_id,))
         row = await cursor.fetchone()
         if row is None:
             return None
@@ -710,7 +708,5 @@ class IdentityStorage:
 
     async def delete_sub_identity(self, sub_identity_id: str) -> None:
         """Delete a sub-identity."""
-        await self.db.execute(
-            "DELETE FROM sub_identities WHERE sub_identity_id = ?", (sub_identity_id,)
-        )
+        await self.db.execute("DELETE FROM sub_identities WHERE sub_identity_id = ?", (sub_identity_id,))
         await self.db.commit()

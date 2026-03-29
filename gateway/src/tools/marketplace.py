@@ -302,12 +302,14 @@ async def _search_agents(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
         pid = row["provider_id"]
         if pid not in agents_map:
             agents_map[pid] = {"agent_id": pid, "services": []}
-        agents_map[pid]["services"].append({
-            "service_id": row["id"],
-            "name": row["name"],
-            "description": row["description"],
-            "category": row["category"],
-        })
+        agents_map[pid]["services"].append(
+            {
+                "service_id": row["id"],
+                "name": row["name"],
+                "description": row["description"],
+                "category": row["category"],
+            }
+        )
 
     agents = list(agents_map.values())[:limit]
     return {"agents": agents}

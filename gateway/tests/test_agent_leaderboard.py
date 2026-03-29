@@ -144,11 +144,15 @@ class TestAgentLeaderboard:
         # Create settlements via payment intents
         for _i in range(3):
             intent = await ctx.payment_engine.create_intent(
-                payer="rev-buyer", payee="rev-seller-a", amount=100.0,
+                payer="rev-buyer",
+                payee="rev-seller-a",
+                amount=100.0,
             )
             await ctx.payment_engine.capture(intent.id)
         intent = await ctx.payment_engine.create_intent(
-            payer="rev-buyer", payee="rev-seller-b", amount=500.0,
+            payer="rev-buyer",
+            payee="rev-seller-b",
+            amount=500.0,
         )
         await ctx.payment_engine.capture(intent.id)
 
@@ -176,14 +180,22 @@ class TestAgentLeaderboard:
         mkt = ctx.marketplace
 
         # Register services for two providers
-        svc_a = await mkt.register_service(ServiceCreate(
-            provider_id="rated-a", name="Service A",
-            description="A service", category="general",
-        ))
-        svc_b = await mkt.register_service(ServiceCreate(
-            provider_id="rated-b", name="Service B",
-            description="B service", category="general",
-        ))
+        svc_a = await mkt.register_service(
+            ServiceCreate(
+                provider_id="rated-a",
+                name="Service A",
+                description="A service",
+                category="general",
+            )
+        )
+        svc_b = await mkt.register_service(
+            ServiceCreate(
+                provider_id="rated-b",
+                name="Service B",
+                description="B service",
+                category="general",
+            )
+        )
 
         # Rate them: rated-a gets avg 3.0, rated-b gets avg 4.5
         await mkt.rate_service(svc_a.id, "reviewer-1", 2)

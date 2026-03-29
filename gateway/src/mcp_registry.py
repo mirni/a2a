@@ -109,10 +109,7 @@ class MCPRegistry:
 
     def save(self, path: str) -> None:
         """Save registry to a JSON file."""
-        data = {
-            name: cfg.model_dump()
-            for name, cfg in self._connectors.items()
-        }
+        data = {name: cfg.model_dump() for name, cfg in self._connectors.items()}
         with open(path, "w") as f:
             json.dump(data, f, indent=2)
 
@@ -132,57 +129,63 @@ class MCPRegistry:
     def create_default(cls) -> MCPRegistry:
         """Create registry with the built-in connectors (stripe, github, postgres)."""
         registry = cls()
-        registry.register(ConnectorConfig(
-            name="stripe",
-            prefix="stripe",
-            connector_type="npx",
-            env_vars={"STRIPE_API_KEY": "required"},
-            tools=[
-                "stripe_list_customers",
-                "stripe_create_customer",
-                "stripe_list_products",
-                "stripe_create_product",
-                "stripe_list_prices",
-                "stripe_create_price",
-                "stripe_create_payment_link",
-                "stripe_list_invoices",
-                "stripe_create_invoice",
-                "stripe_list_subscriptions",
-                "stripe_cancel_subscription",
-                "stripe_create_refund",
-                "stripe_retrieve_balance",
-            ],
-        ))
-        registry.register(ConnectorConfig(
-            name="github",
-            prefix="github",
-            connector_type="python",
-            env_vars={"GITHUB_TOKEN": "required"},
-            tools=[
-                "github_list_repos",
-                "github_get_repo",
-                "github_list_issues",
-                "github_create_issue",
-                "github_list_pull_requests",
-                "github_get_pull_request",
-                "github_create_pull_request",
-                "github_list_commits",
-                "github_get_file_contents",
-                "github_search_code",
-            ],
-        ))
-        registry.register(ConnectorConfig(
-            name="postgres",
-            prefix="pg",
-            connector_type="python",
-            env_vars={"POSTGRES_DSN": "required"},
-            tools=[
-                "pg_query",
-                "pg_execute",
-                "pg_list_tables",
-                "pg_describe_table",
-                "pg_explain_query",
-                "pg_list_schemas",
-            ],
-        ))
+        registry.register(
+            ConnectorConfig(
+                name="stripe",
+                prefix="stripe",
+                connector_type="npx",
+                env_vars={"STRIPE_API_KEY": "required"},
+                tools=[
+                    "stripe_list_customers",
+                    "stripe_create_customer",
+                    "stripe_list_products",
+                    "stripe_create_product",
+                    "stripe_list_prices",
+                    "stripe_create_price",
+                    "stripe_create_payment_link",
+                    "stripe_list_invoices",
+                    "stripe_create_invoice",
+                    "stripe_list_subscriptions",
+                    "stripe_cancel_subscription",
+                    "stripe_create_refund",
+                    "stripe_retrieve_balance",
+                ],
+            )
+        )
+        registry.register(
+            ConnectorConfig(
+                name="github",
+                prefix="github",
+                connector_type="python",
+                env_vars={"GITHUB_TOKEN": "required"},
+                tools=[
+                    "github_list_repos",
+                    "github_get_repo",
+                    "github_list_issues",
+                    "github_create_issue",
+                    "github_list_pull_requests",
+                    "github_get_pull_request",
+                    "github_create_pull_request",
+                    "github_list_commits",
+                    "github_get_file_contents",
+                    "github_search_code",
+                ],
+            )
+        )
+        registry.register(
+            ConnectorConfig(
+                name="postgres",
+                prefix="pg",
+                connector_type="python",
+                env_vars={"POSTGRES_DSN": "required"},
+                tools=[
+                    "pg_query",
+                    "pg_execute",
+                    "pg_list_tables",
+                    "pg_describe_table",
+                    "pg_explain_query",
+                    "pg_list_schemas",
+                ],
+            )
+        )
         return registry

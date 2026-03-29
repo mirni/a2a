@@ -94,9 +94,7 @@ class PlanManager:
         if plan is None:
             raise InvalidPlanError(f"Plan '{plan_id}' not found")
         if plan.get("custom"):
-            raise InvalidPlanError(
-                f"Plan '{plan_id}' is custom-only; contact sales"
-            )
+            raise InvalidPlanError(f"Plan '{plan_id}' is custom-only; contact sales")
 
         # Check for existing active plan
         existing = await self._get_active_subscription(agent_id)
@@ -158,9 +156,7 @@ class PlanManager:
                 agent_id = sub_data["payee"]
                 credits = metadata["credits_per_cycle"]
 
-                await self._grant_credits(
-                    agent_id, credits, f"Plan {metadata['plan_id']} — monthly credits"
-                )
+                await self._grant_credits(agent_id, credits, f"Plan {metadata['plan_id']} — monthly credits")
 
                 # Update subscription timestamps
                 sub = await self.engine.get_subscription(sub_id)
@@ -229,9 +225,7 @@ class PlanManager:
 
     async def _get_active_subscription(self, agent_id: str) -> Subscription | None:
         """Find the active plan subscription for an agent."""
-        subs = await self.engine.storage.list_subscriptions(
-            agent_id=agent_id, status="active"
-        )
+        subs = await self.engine.storage.list_subscriptions(agent_id=agent_id, status="active")
         for s in subs:
             metadata = s.get("metadata") or {}
             if isinstance(metadata, str):

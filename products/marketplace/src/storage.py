@@ -366,9 +366,7 @@ class MarketplaceStorage:
         row = await cursor.fetchone()
         return row["cnt"] if row else 0
 
-    async def add_rating(
-        self, service_id: str, agent_id: str, rating: int, review: str = ""
-    ) -> None:
+    async def add_rating(self, service_id: str, agent_id: str, rating: int, review: str = "") -> None:
         """Add or update a rating for a service."""
         import time
 
@@ -380,13 +378,10 @@ class MarketplaceStorage:
         )
         await self.db.commit()
 
-    async def get_ratings(
-        self, service_id: str, limit: int = 20
-    ) -> dict[str, Any]:
+    async def get_ratings(self, service_id: str, limit: int = 20) -> dict[str, Any]:
         """Get ratings summary and list for a service."""
         cursor = await self.db.execute(
-            "SELECT AVG(rating) as avg_rating, COUNT(*) as cnt "
-            "FROM service_ratings WHERE service_id = ?",
+            "SELECT AVG(rating) as avg_rating, COUNT(*) as cnt FROM service_ratings WHERE service_id = ?",
             (service_id,),
         )
         row = await cursor.fetchone()
@@ -402,9 +397,7 @@ class MarketplaceStorage:
         ratings = [dict(r) for r in rows]
         return {"average_rating": avg_rating, "count": count, "ratings": ratings}
 
-    async def insert_suggestion(
-        self, agent_id: str, category: str, message: str
-    ) -> int:
+    async def insert_suggestion(self, agent_id: str, category: str, message: str) -> int:
         """Insert a platform suggestion. Returns the suggestion ID."""
         import time
 

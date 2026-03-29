@@ -30,6 +30,7 @@ class TestCreateSubIdentity:
 
     async def test_create_with_custom_key(self, api: IdentityAPI):
         from products.identity.src.crypto import AgentCrypto
+
         crypto = AgentCrypto()
         pub, _priv = crypto.generate_keypair()
 
@@ -39,6 +40,7 @@ class TestCreateSubIdentity:
 
     async def test_create_for_nonexistent_parent(self, api: IdentityAPI):
         from products.identity.src.api import AgentNotFoundError
+
         with pytest.raises(AgentNotFoundError):
             await api.create_sub_identity("no-such-agent", "role")
 
@@ -51,7 +53,8 @@ class TestCreateSubIdentity:
     async def test_create_with_metadata(self, api: IdentityAPI):
         await api.register_agent("parent-meta")
         sub = await api.create_sub_identity(
-            "parent-meta", "specialist",
+            "parent-meta",
+            "specialist",
             metadata={"department": "data", "level": "senior"},
         )
         assert sub.metadata["department"] == "data"

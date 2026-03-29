@@ -27,20 +27,24 @@ class TestSearchAgentsByCapability:
     async def test_search_by_tool_name(self, client, api_key, app):
         """Should find agents whose services include a matching tool."""
         ctx = app.state.ctx
-        await ctx.marketplace.register_service(ServiceCreate(
-            provider_id="agent-data",
-            name="Data Pipeline",
-            description="ETL service",
-            category="data",
-            tools=["extract_csv", "transform_json", "load_db"],
-        ))
-        await ctx.marketplace.register_service(ServiceCreate(
-            provider_id="agent-ml",
-            name="ML Inference",
-            description="ML model serving",
-            category="ai",
-            tools=["predict", "classify"],
-        ))
+        await ctx.marketplace.register_service(
+            ServiceCreate(
+                provider_id="agent-data",
+                name="Data Pipeline",
+                description="ETL service",
+                category="data",
+                tools=["extract_csv", "transform_json", "load_db"],
+            )
+        )
+        await ctx.marketplace.register_service(
+            ServiceCreate(
+                provider_id="agent-ml",
+                name="ML Inference",
+                description="ML model serving",
+                category="ai",
+                tools=["predict", "classify"],
+            )
+        )
 
         resp = await client.post(
             "/v1/execute",
@@ -56,12 +60,14 @@ class TestSearchAgentsByCapability:
     async def test_search_by_category(self, client, api_key, app):
         """Should find agents providing services in a given category."""
         ctx = app.state.ctx
-        await ctx.marketplace.register_service(ServiceCreate(
-            provider_id="agent-ai",
-            name="AI Service",
-            description="AI capabilities",
-            category="artificial_intelligence",
-        ))
+        await ctx.marketplace.register_service(
+            ServiceCreate(
+                provider_id="agent-ai",
+                name="AI Service",
+                description="AI capabilities",
+                category="artificial_intelligence",
+            )
+        )
 
         resp = await client.post(
             "/v1/execute",
@@ -75,12 +81,14 @@ class TestSearchAgentsByCapability:
     async def test_search_by_description(self, client, api_key, app):
         """Should match against service description."""
         ctx = app.state.ctx
-        await ctx.marketplace.register_service(ServiceCreate(
-            provider_id="agent-translate",
-            name="Translator",
-            description="Real-time language translation for 50+ languages",
-            category="nlp",
-        ))
+        await ctx.marketplace.register_service(
+            ServiceCreate(
+                provider_id="agent-translate",
+                name="Translator",
+                description="Real-time language translation for 50+ languages",
+                category="nlp",
+            )
+        )
 
         resp = await client.post(
             "/v1/execute",
@@ -95,12 +103,14 @@ class TestSearchAgentsByCapability:
         """Should respect the limit parameter."""
         ctx = app.state.ctx
         for i in range(5):
-            await ctx.marketplace.register_service(ServiceCreate(
-                provider_id=f"agent-search-{i}",
-                name=f"Service {i}",
-                description="Common description for all",
-                category="general",
-            ))
+            await ctx.marketplace.register_service(
+                ServiceCreate(
+                    provider_id=f"agent-search-{i}",
+                    name=f"Service {i}",
+                    description="Common description for all",
+                    category="general",
+                )
+            )
 
         resp = await client.post(
             "/v1/execute",
@@ -114,13 +124,15 @@ class TestSearchAgentsByCapability:
     async def test_search_returns_agent_info(self, client, api_key, app):
         """Each result should include agent_id and services."""
         ctx = app.state.ctx
-        await ctx.marketplace.register_service(ServiceCreate(
-            provider_id="agent-info",
-            name="Info Service",
-            description="A service for info",
-            category="general",
-            tools=["get_info"],
-        ))
+        await ctx.marketplace.register_service(
+            ServiceCreate(
+                provider_id="agent-info",
+                name="Info Service",
+                description="A service for info",
+                category="general",
+                tools=["get_info"],
+            )
+        )
 
         resp = await client.post(
             "/v1/execute",

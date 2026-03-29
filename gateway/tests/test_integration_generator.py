@@ -112,16 +112,20 @@ class TestLangChainGenerator:
     def test_generated_module_has_imports(self):
         from gateway.src.integration_generator import generate_langchain_module
 
-        code = generate_langchain_module([{
-            "name": "test_tool",
-            "service": "test",
-            "description": "A test.",
-            "input_schema": {
-                "type": "object",
-                "properties": {"x": {"type": "string"}},
-                "required": ["x"],
-            },
-        }])
+        code = generate_langchain_module(
+            [
+                {
+                    "name": "test_tool",
+                    "service": "test",
+                    "description": "A test.",
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {"x": {"type": "string"}},
+                        "required": ["x"],
+                    },
+                }
+            ]
+        )
         assert "import" in code
         assert "httpx" in code or "requests" in code
 
@@ -151,16 +155,18 @@ class TestCrewAIGenerator:
     def test_generate_full_module(self):
         from gateway.src.integration_generator import generate_crewai_module
 
-        tools = [{
-            "name": "get_balance",
-            "service": "billing",
-            "description": "Get balance.",
-            "input_schema": {
-                "type": "object",
-                "properties": {"agent_id": {"type": "string"}},
-                "required": ["agent_id"],
-            },
-        }]
+        tools = [
+            {
+                "name": "get_balance",
+                "service": "billing",
+                "description": "Get balance.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"agent_id": {"type": "string"}},
+                    "required": ["agent_id"],
+                },
+            }
+        ]
         code = generate_crewai_module(tools)
         assert "from crewai.tools import BaseTool" in code
         assert "GetBalanceTool" in code

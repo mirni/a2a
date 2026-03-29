@@ -147,9 +147,7 @@ class Wallet:
     # Auto-reload
     # -----------------------------------------------------------------------
 
-    async def enable_auto_reload(
-        self, agent_id: str, threshold: float, reload_amount: float
-    ) -> None:
+    async def enable_auto_reload(self, agent_id: str, threshold: float, reload_amount: float) -> None:
         """Enable auto-reload: when balance drops below threshold, add reload_amount."""
         await self.storage.set_auto_reload(agent_id, threshold, reload_amount, enabled=True)
 
@@ -157,9 +155,7 @@ class Wallet:
         """Disable auto-reload for an agent."""
         config = await self.storage.get_auto_reload(agent_id)
         if config is not None:
-            await self.storage.set_auto_reload(
-                agent_id, config["threshold"], config["reload_amount"], enabled=False
-            )
+            await self.storage.set_auto_reload(agent_id, config["threshold"], config["reload_amount"], enabled=False)
 
     async def get_auto_reload_config(self, agent_id: str) -> dict[str, Any] | None:
         """Return auto-reload config for an agent, or None if not configured."""
@@ -176,9 +172,7 @@ class Wallet:
         reload_amount = config["reload_amount"]
         success, new_balance = await self.storage.atomic_credit(agent_id, reload_amount)
         if success:
-            await self.storage.record_transaction(
-                agent_id, reload_amount, "auto_reload", "Auto-reload triggered"
-            )
+            await self.storage.record_transaction(agent_id, reload_amount, "auto_reload", "Auto-reload triggered")
             await self.storage.emit_event(
                 "wallet.auto_reload",
                 agent_id,

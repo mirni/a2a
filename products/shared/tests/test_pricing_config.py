@@ -106,14 +106,9 @@ class TestStripePackages:
     def test_price_per_credit_decreasing(self, cfg: PricingConfig):
         """Larger packages should offer better per-credit pricing."""
         order = ["starter", "growth", "scale", "enterprise"]
-        ratios = [
-            cfg.stripe_packages[p]["price_cents"] / cfg.stripe_packages[p]["credits"]
-            for p in order
-        ]
+        ratios = [cfg.stripe_packages[p]["price_cents"] / cfg.stripe_packages[p]["credits"] for p in order]
         for i in range(len(ratios) - 1):
-            assert ratios[i] >= ratios[i + 1], (
-                f"Package {order[i+1]} should be cheaper per-credit than {order[i]}"
-            )
+            assert ratios[i] >= ratios[i + 1], f"Package {order[i + 1]} should be cheaper per-credit than {order[i]}"
 
 
 class TestVolumeDiscounts:

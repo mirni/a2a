@@ -16,12 +16,14 @@ class TestRateService:
     """Test service rating via Marketplace.rate_service."""
 
     async def test_rate_service(self, marketplace: Marketplace):
-        svc = await marketplace.register_service(ServiceCreate(
-            provider_id="provider-1",
-            name="Test Service",
-            description="A test service",
-            category="testing",
-        ))
+        svc = await marketplace.register_service(
+            ServiceCreate(
+                provider_id="provider-1",
+                name="Test Service",
+                description="A test service",
+                category="testing",
+            )
+        )
         await marketplace.rate_service(svc.id, "reviewer-1", 5, "Excellent!")
         ratings = await marketplace.get_service_ratings(svc.id)
         assert ratings["count"] == 1
@@ -29,12 +31,14 @@ class TestRateService:
         assert ratings["ratings"][0]["review"] == "Excellent!"
 
     async def test_rate_service_updates_existing(self, marketplace: Marketplace):
-        svc = await marketplace.register_service(ServiceCreate(
-            provider_id="provider-2",
-            name="Update Test",
-            description="Update",
-            category="testing",
-        ))
+        svc = await marketplace.register_service(
+            ServiceCreate(
+                provider_id="provider-2",
+                name="Update Test",
+                description="Update",
+                category="testing",
+            )
+        )
         await marketplace.rate_service(svc.id, "reviewer-1", 3)
         await marketplace.rate_service(svc.id, "reviewer-1", 5)
         ratings = await marketplace.get_service_ratings(svc.id)
@@ -42,12 +46,14 @@ class TestRateService:
         assert ratings["average_rating"] == 5.0
 
     async def test_rate_service_invalid_rating(self, marketplace: Marketplace):
-        svc = await marketplace.register_service(ServiceCreate(
-            provider_id="provider-3",
-            name="Invalid Test",
-            description="Invalid",
-            category="testing",
-        ))
+        svc = await marketplace.register_service(
+            ServiceCreate(
+                provider_id="provider-3",
+                name="Invalid Test",
+                description="Invalid",
+                category="testing",
+            )
+        )
         with pytest.raises(ValueError, match="between 1 and 5"):
             await marketplace.rate_service(svc.id, "reviewer-1", 6)
 

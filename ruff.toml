@@ -34,4 +34,5 @@ ignore = [
 [lint.per-file-ignores]
 "e2e_tests.py" = ["F821"]
 "gateway/src/signing.py" = ["F821"]
+"gateway/src/lifespan.py" = ["I001"]
 "scripts/*" = ["S"]

@@ -51,10 +51,7 @@ class GatewayConfig:
     default_page_limit: int = 100
     budget_alert_threshold: float = _pricing.budget["alert_threshold"]
     volume_discount_tiers: dict[int, int] = field(
-        default_factory=lambda: {
-            d["min_calls"]: d["discount_percent"]
-            for d in _pricing.volume_discounts
-        }
+        default_factory=lambda: {d["min_calls"]: d["discount_percent"] for d in _pricing.volume_discounts}
     )
 
     # --- x402 Protocol ---
@@ -69,8 +66,7 @@ class GatewayConfig:
     # --- Stripe packages (credits, price in cents) — from pricing.json ---
     stripe_packages: dict[str, tuple[int, int]] = field(
         default_factory=lambda: {
-            name: (pkg["credits"], pkg["price_cents"])
-            for name, pkg in _pricing.stripe_packages.items()
+            name: (pkg["credits"], pkg["price_cents"]) for name, pkg in _pricing.stripe_packages.items()
         }
     )
 

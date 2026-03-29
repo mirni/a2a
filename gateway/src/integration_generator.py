@@ -90,7 +90,7 @@ def generate_langchain_tool(tool_def: dict[str, Any]) -> str:
     lines.append("")
 
     lines.append(f"{name}_tool = StructuredTool.from_function(")
-    lines.append(f'    coroutine=_{name}_func,')
+    lines.append(f"    coroutine=_{name}_func,")
     lines.append(f'    name="{name}",')
     lines.append(f'    description="""{desc}""",')
     lines.append(f"    args_schema={input_class},")

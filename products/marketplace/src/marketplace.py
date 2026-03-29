@@ -259,9 +259,7 @@ class Marketplace:
         """Count services with given status."""
         return await self._storage.count_services(status)
 
-    async def rate_service(
-        self, service_id: str, agent_id: str, rating: int, review: str = ""
-    ) -> None:
+    async def rate_service(self, service_id: str, agent_id: str, rating: int, review: str = "") -> None:
         """Rate a service (1-5 stars). Updates if already rated."""
         if not 1 <= rating <= 5:
             raise ValueError("Rating must be between 1 and 5")
@@ -270,15 +268,11 @@ class Marketplace:
             raise ServiceNotFoundError(service_id)
         await self._storage.add_rating(service_id, agent_id, rating, review)
 
-    async def get_service_ratings(
-        self, service_id: str, limit: int = 20
-    ) -> dict[str, Any]:
+    async def get_service_ratings(self, service_id: str, limit: int = 20) -> dict[str, Any]:
         """Get ratings summary and individual ratings for a service."""
         return await self._storage.get_ratings(service_id, limit)
 
-    async def submit_suggestion(
-        self, agent_id: str, category: str, message: str
-    ) -> int:
+    async def submit_suggestion(self, agent_id: str, category: str, message: str) -> int:
         """Submit a platform suggestion/feedback. Returns suggestion ID."""
         return await self._storage.insert_suggestion(agent_id, category, message)
 

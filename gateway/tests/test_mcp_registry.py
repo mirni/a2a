@@ -139,14 +139,20 @@ class TestRegistryToolMap:
         from gateway.src.mcp_registry import ConnectorConfig, MCPRegistry
 
         registry = MCPRegistry()
-        registry.register(ConnectorConfig(
-            name="stripe", prefix="stripe",
-            tools=["stripe_list_customers", "stripe_create_customer"],
-        ))
-        registry.register(ConnectorConfig(
-            name="github", prefix="github",
-            tools=["github_list_repos"],
-        ))
+        registry.register(
+            ConnectorConfig(
+                name="stripe",
+                prefix="stripe",
+                tools=["stripe_list_customers", "stripe_create_customer"],
+            )
+        )
+        registry.register(
+            ConnectorConfig(
+                name="github",
+                prefix="github",
+                tools=["github_list_repos"],
+            )
+        )
         tool_map = registry.build_tool_map()
         assert tool_map["stripe_list_customers"] == ("stripe", "list_customers")
         assert tool_map["stripe_create_customer"] == ("stripe", "create_customer")
@@ -156,12 +162,22 @@ class TestRegistryToolMap:
         from gateway.src.mcp_registry import ConnectorConfig, MCPRegistry
 
         registry = MCPRegistry()
-        registry.register(ConnectorConfig(
-            name="active", prefix="act", tools=["act_foo"], enabled=True,
-        ))
-        registry.register(ConnectorConfig(
-            name="inactive", prefix="inact", tools=["inact_bar"], enabled=False,
-        ))
+        registry.register(
+            ConnectorConfig(
+                name="active",
+                prefix="act",
+                tools=["act_foo"],
+                enabled=True,
+            )
+        )
+        registry.register(
+            ConnectorConfig(
+                name="inactive",
+                prefix="inact",
+                tools=["inact_bar"],
+                enabled=False,
+            )
+        )
         tool_map = registry.build_tool_map()
         assert "act_foo" in tool_map
         assert "inact_bar" not in tool_map
@@ -170,10 +186,13 @@ class TestRegistryToolMap:
         from gateway.src.mcp_registry import ConnectorConfig, MCPRegistry
 
         registry = MCPRegistry()
-        registry.register(ConnectorConfig(
-            name="postgres", prefix="pg",
-            tools=["pg_query", "pg_execute"],
-        ))
+        registry.register(
+            ConnectorConfig(
+                name="postgres",
+                prefix="pg",
+                tools=["pg_query", "pg_execute"],
+            )
+        )
         tool_map = registry.build_tool_map()
         assert tool_map["pg_query"] == ("postgres", "query")
         assert tool_map["pg_execute"] == ("postgres", "execute")
@@ -182,12 +201,20 @@ class TestRegistryToolMap:
         from gateway.src.mcp_registry import ConnectorConfig, MCPRegistry
 
         registry = MCPRegistry()
-        registry.register(ConnectorConfig(
-            name="a", prefix="a", tools=["a_x", "a_y"],
-        ))
-        registry.register(ConnectorConfig(
-            name="b", prefix="b", tools=["b_z"],
-        ))
+        registry.register(
+            ConnectorConfig(
+                name="a",
+                prefix="a",
+                tools=["a_x", "a_y"],
+            )
+        )
+        registry.register(
+            ConnectorConfig(
+                name="b",
+                prefix="b",
+                tools=["b_z"],
+            )
+        )
         all_tools = registry.get_all_tool_names()
         assert set(all_tools) == {"a_x", "a_y", "b_z"}
 
@@ -235,17 +262,23 @@ class TestRegistryPersistence:
         from gateway.src.mcp_registry import ConnectorConfig, MCPRegistry
 
         registry = MCPRegistry()
-        registry.register(ConnectorConfig(
-            name="stripe", prefix="stripe",
-            tools=["stripe_list_customers"],
-            connector_type="npx",
-            env_vars={"STRIPE_API_KEY": "required"},
-        ))
-        registry.register(ConnectorConfig(
-            name="pg", prefix="pg",
-            tools=["pg_query"],
-            connector_type="python",
-        ))
+        registry.register(
+            ConnectorConfig(
+                name="stripe",
+                prefix="stripe",
+                tools=["stripe_list_customers"],
+                connector_type="npx",
+                env_vars={"STRIPE_API_KEY": "required"},
+            )
+        )
+        registry.register(
+            ConnectorConfig(
+                name="pg",
+                prefix="pg",
+                tools=["pg_query"],
+                connector_type="python",
+            )
+        )
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             path = f.name

@@ -77,9 +77,7 @@ class TestProcessDuePlans:
     async def test_process_due_grants_credits(self, plan_mgr, subscriber_wallet, engine):
         sub = await plan_mgr.subscribe("sub-agent", "starter_monthly")
         # Make it due now
-        await engine.storage.update_subscription(
-            sub.id, {"next_charge_at": time.time() - 10}
-        )
+        await engine.storage.update_subscription(sub.id, {"next_charge_at": time.time() - 10})
 
         result = await plan_mgr.process_due()
         assert result.processed == 1
@@ -90,9 +88,7 @@ class TestProcessDuePlans:
 
     async def test_process_due_updates_next_charge(self, plan_mgr, subscriber_wallet, engine):
         sub = await plan_mgr.subscribe("sub-agent", "starter_monthly")
-        await engine.storage.update_subscription(
-            sub.id, {"next_charge_at": time.time() - 10}
-        )
+        await engine.storage.update_subscription(sub.id, {"next_charge_at": time.time() - 10})
 
         await plan_mgr.process_due()
         updated = await engine.get_subscription(sub.id)
@@ -101,9 +97,7 @@ class TestProcessDuePlans:
 
     async def test_process_due_records_transaction(self, plan_mgr, subscriber_wallet, engine):
         sub = await plan_mgr.subscribe("sub-agent", "starter_monthly")
-        await engine.storage.update_subscription(
-            sub.id, {"next_charge_at": time.time() - 10}
-        )
+        await engine.storage.update_subscription(sub.id, {"next_charge_at": time.time() - 10})
 
         await plan_mgr.process_due()
         txns = await subscriber_wallet.storage.get_transactions("sub-agent")
