@@ -80,6 +80,21 @@ CREATE TABLE IF NOT EXISTS budget_caps (
 );
 """
 
+    # Migrations for columns added after initial schema release.
+    # Each entry is idempotent (ALTER TABLE fails silently if column exists).
+    _MIGRATIONS: tuple[str, ...] = (
+        "ALTER TABLE usage_records ADD COLUMN idempotency_key TEXT UNIQUE",
+    )
+
+    async def connect(self) -> None:  # noqa: D102
+        await super().connect()
+        for stmt in self._MIGRATIONS:
+            try:
+                await self.db.execute(stmt)
+                await self.db.commit()
+            except Exception:
+                pass  # Column already exists — expected on fresh databases
+
     # -----------------------------------------------------------------------
     # Wallet operations
     # -----------------------------------------------------------------------
