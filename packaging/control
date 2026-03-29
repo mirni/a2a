@@ -1,5 +1,5 @@
 Package: a2a-server
-Version: 0.1.0
+Version: 0.2.0
 Architecture: all
 Depends: python3 (>= 3.12), nginx, sqlite3, git, curl, ufw
 Maintainer: A2A Team <team@greenhelix.net>

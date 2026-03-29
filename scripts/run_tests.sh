@@ -25,6 +25,16 @@ if ! "$PYTHON" -m pytest --version >/dev/null 2>&1; then
     done
 fi
 
+# If pytest still not found, check common pip-target locations
+if ! "$PYTHON" -m pytest --version >/dev/null 2>&1; then
+    for target_dir in /tmp/pip-target "$REPO_ROOT/.pip-target"; do
+        if PYTHONPATH="${target_dir}${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON" -m pytest --version >/dev/null 2>&1; then
+            export PYTHONPATH="${target_dir}${PYTHONPATH:+:$PYTHONPATH}"
+            break
+        fi
+    done
+fi
+
 # ---------------------------------------------------------------------------
 # --all mode: run every module
 # ---------------------------------------------------------------------------

@@ -13,7 +13,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PKG_NAME="a2a-server"
-PKG_VERSION="0.1.0"
+PKG_VERSION="0.2.0"
 DEB_NAME="${PKG_NAME}_${PKG_VERSION}_all"
 
 echo "[+] Building ${DEB_NAME}.deb..."
