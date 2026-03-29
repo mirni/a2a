@@ -3299,3 +3299,172 @@ PRAGMA cache_size = -2000;       -- Use ~2MB of RAM for cache
     [] P1, P2
     [] D1
 * Output a plan and commence with implementation directly, no human review needed.
+
+---
+
+## Session 16 — Three-Agent Concurrent Report (2026-03-29)
+
+Three agents were spawned concurrently per the prompt above. Their reports follow.
+
+### Agent 1: Sr Systems Architect — Monitoring Dashboard
+
+#### Recommendation: Prometheus + Grafana + Uptime Kuma
+
+The platform already exposes a `/v1/metrics` endpoint in Prometheus format (request count, error count, latency histogram, active connections). This makes Prometheus + Grafana the natural choice.
+
+#### Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Monitoring Stack (runs locally or on a dedicated monitoring VM) │
+│                                                                  │
+│  ┌─────────────┐    ┌─────────────┐    ┌───────────────┐        │
+│  │ Prometheus   │───▶│  Grafana    │    │ Uptime Kuma   │        │
+│  │ (scraper)    │    │ (dashboards)│    │ (uptime/SSL)  │        │
+│  └──────┬───────┘    └─────────────┘    └───────────────┘        │
+│         │ scrape /v1/metrics                                     │
+│         ▼                                                        │
+│  ┌──────────────────────────────────────────────────────┐        │
+│  │  A2A Gateway Server (api.greenhelix.net)              │        │
+│  │  - /v1/metrics (Prometheus format)                    │        │
+│  │  - /v1/health  (deep health check with DB probe)      │        │
+│  │  - systemd service (a2a-server.service)               │        │
+│  └──────────────────────────────────────────────────────┘        │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+#### Why Not Roll Our Own?
+- Grafana + Prometheus: battle-tested, free, extensible, handles multi-server natively
+- Uptime Kuma: lightweight uptime monitor with SSL cert expiry, push notifications
+- Node Exporter: system metrics (CPU, RAM, disk, network) → Prometheus
+
+#### 5-Phase Implementation Plan
+
+| Phase | Work | Priority |
+|-------|------|----------|
+| 1. Core Metrics | Install Prometheus + Node Exporter, configure scraping `/v1/metrics` | HIGH |
+| 2. Dashboards | Grafana dashboards: Gateway KPIs, System Health, Business Metrics | HIGH |
+| 3. Alerts | Prometheus Alertmanager: error rate >5%, latency P99 >2s, disk >80% | HIGH |
+| 4. Uptime | Uptime Kuma for external endpoint monitoring + SSL cert tracking | MEDIUM |
+| 5. Multi-Server | When data layer splits: add scrape targets, per-instance labels | FUTURE |
+
+#### Multi-Server Future-Proofing
+- Prometheus federation: central Prometheus scrapes per-server Prometheus instances
+- Grafana variables: `instance` label for per-server drill-down
+- Data layer separation: add scrape target for DB server Node Exporter
+
+#### Existing Metrics Endpoint Already Exposes
+- `a2a_requests_total` (counter by tool)
+- `a2a_errors_total` (counter)
+- `a2a_latency_seconds` (histogram with buckets: 10/50/100/250/500/1000/2500/5000ms)
+- `a2a_active_connections` (gauge)
+
+---
+
+### Agent 2: Database Expert — WAL/PRAGMA Review
+
+#### Current State
+
+| Setting | Current | Verdict |
+|---------|---------|---------|
+| `journal_mode` | WAL | GOOD — already enabled in `harden_connection()` |
+| `foreign_keys` | ON | GOOD |
+| `synchronous` | FULL (default) | **HIGH — should be NORMAL** |
+| `busy_timeout` | 0 (default) | **CRITICAL — must add** |
+| `cache_size` | -2000 (default) | OK for now |
+
+#### CRITICAL: Missing `busy_timeout`
+
+Without `busy_timeout`, any concurrent write attempt gets an immediate `SQLITE_BUSY` error (no retry). With `--workers 2` in systemd, this is a ticking time bomb.
+
+**Fix**: Add `PRAGMA busy_timeout = 5000;` to `harden_connection()`.
+
+#### HIGH: `synchronous = NORMAL`
+
+With WAL mode, `synchronous = NORMAL` is safe and significantly faster. `FULL` forces an fsync on every commit.
+
+**Fix**: Add `PRAGMA synchronous = NORMAL;` to `harden_connection()`.
+
+#### Workers Recommendation
+
+`--workers 2` with SQLite is counterproductive. SQLite is single-writer — the second worker will hit `SQLITE_BUSY` constantly (especially without `busy_timeout`).
+
+**Recommendation**: Change to `--workers 1` in `a2a-server.service` until migrating to PostgreSQL.
+
+#### DB Scaling Roadmap
+
+| Phase | Action | When |
+|-------|--------|------|
+| 1. PRAGMAs | Add busy_timeout + synchronous=NORMAL | NOW |
+| 2. Workers | `--workers 1` | NOW |
+| 3. Read replicas | Litestream → S3 + read-only replicas | 100+ req/s |
+| 4. PostgreSQL | Migrate billing/payments to PG | Data layer separation |
+| 5. Hybrid | SQLite for config/catalog, PG for transactional data | Multi-server |
+
+#### Strengths
+- WAL + foreign keys already enabled
+- `BaseStorage` pattern with `_DB_TIMEOUT` (added Session 15)
+- Connection hardening centralized in one function
+
+#### Weaknesses
+- 11 separate SQLite databases — connection overhead, no cross-DB transactions
+- No connection pooling (each request opens fresh connection via aiosqlite)
+- Float storage for monetary values (see CRIT-2 from Session 15)
+
+---
+
+### Agent 3: CTO — Implementation Report
+
+#### Items Implemented (TDD, all tests green)
+
+| Item | Description | Status |
+|------|-------------|--------|
+| AD-4 / A-1 | Deep health check: `/v1/health` now probes billing DB with `SELECT 1`, returns `db: ok/error`, status `200/503` | DONE |
+| AD-6 / U-3 | `/v1/pricing/summary` endpoint: groups tools by service with tool counts | DONE |
+| I-3 | Catalog pagination: `?limit=N&offset=M` on `/v1/pricing` | DONE |
+| I-4 | Rate limit headers on `/v1/health`, `/v1/pricing`, `/v1/batch` responses | DONE |
+| Part 3 | Test coverage gaps: all 6 gaps identified in Session 15 were already filled | VERIFIED |
+
+#### Files Changed
+
+| File | Action | Description |
+|------|--------|-------------|
+| `gateway/src/routes/health.py` | MODIFIED | Deep health check with DB probe, rate limit headers |
+| `gateway/src/routes/pricing.py` | MODIFIED | Pagination + `/v1/pricing/summary` endpoint |
+| `gateway/src/routes/batch.py` | MODIFIED | Rate limit headers on batch responses |
+| `gateway/src/rate_limit_headers.py` | CREATED | Shared public rate limit header helper |
+| `gateway/tests/test_health.py` | MODIFIED | +2 tests (DB probe ok, DB probe failure → 503) |
+| `gateway/tests/test_pricing.py` | MODIFIED | +6 tests (pagination: limit, offset, limit+offset, beyond, negative; summary) |
+| `gateway/tests/test_rate_limit_headers.py` | MODIFIED | +3 tests (pricing, health, batch headers) |
+
+#### Items Not Implemented (Out of Scope / Future Work)
+
+| Item | Reason |
+|------|--------|
+| A-2 (Auto-retry on 503) | Client-side concern, not server change |
+| A-3 (Circuit breaker) | Requires infra (Redis/state) not yet available |
+| U-3 bonus (cost calculator) | `/v1/pricing/summary` covers the use case |
+| I-1 (Consistent error format) | Already consistent — `{"error": {"code": ..., "message": ...}}` |
+| I-2 (OpenAPI spec) | Infrastructure task, no TDD possible |
+| P-1, P-2 (Payment UX) | Client-side wallet integration, not server changes |
+| D-1 (API docs site) | Infrastructure task |
+
+### Test Results
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Gateway tests | 372 | 383 (+11) |
+| **Total tests (all modules)** | **1,421** | **1,432** (+11) |
+| Modules passing | 10/10 | 10/10 |
+
+### Remaining Action Items (Prioritized)
+
+| Priority | Item | Description |
+|----------|------|-------------|
+| **CRITICAL** | busy_timeout | Add `PRAGMA busy_timeout = 5000` to `harden_connection()` |
+| **HIGH** | synchronous | Add `PRAGMA synchronous = NORMAL` to `harden_connection()` |
+| **HIGH** | workers | Change `--workers 2` → `--workers 1` in systemd unit |
+| **MEDIUM** | Monitoring | Deploy Prometheus + Grafana (Phase 1-2 from Architect report) |
+| **MEDIUM** | CRIT-2 | INTEGER millicents migration (dedicated session) |
+| **LOW** | OpenAPI | Auto-generate from catalog + route definitions |
+| **LOW** | Docs site | Deploy documentation from existing catalog |

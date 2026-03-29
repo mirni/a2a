@@ -48,3 +48,9 @@ tmp/
 
 # Archived reports
 archive/*.md
+
+# Scratchpad
+next_tmrw.md
+
+# Build artifacts
+*.deb

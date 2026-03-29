@@ -2,16 +2,74 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
+
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from gateway.src.catalog import get_catalog, get_tool
+from gateway.src.rate_limit_headers import public_rate_limit_headers
 
 
 async def pricing_list(request: Request) -> JSONResponse:
-    """Return the full tool catalog."""
-    return JSONResponse({"tools": get_catalog()})
+    """Return the tool catalog with optional pagination.
+
+    Query params:
+        limit (int, optional): Max number of tools to return. Negative values ignored.
+        offset (int, optional): Number of tools to skip. Default 0.
+    """
+    catalog = get_catalog()
+    total = len(catalog)
+
+    # Parse pagination params
+    limit_str = request.query_params.get("limit")
+    offset_str = request.query_params.get("offset")
+
+    offset = max(0, int(offset_str)) if offset_str else 0
+    if limit_str is not None:
+        limit_val = int(limit_str)
+        if limit_val < 0:
+            limit_val = total  # negative → return all
+    else:
+        limit_val = total  # no limit → return all
+
+    tools = catalog[offset : offset + limit_val]
+
+    return JSONResponse(
+        {
+            "tools": tools,
+            "total": total,
+            "limit": limit_val,
+            "offset": offset,
+        },
+        headers=public_rate_limit_headers(),
+    )
+
+
+async def pricing_summary(request: Request) -> JSONResponse:
+    """Return pricing grouped by service for a quick overview."""
+    catalog = get_catalog()
+    by_service: dict[str, list[dict]] = defaultdict(list)
+    for tool in catalog:
+        svc = tool.get("service", "unknown")
+        by_service[svc].append({
+            "name": tool["name"],
+            "description": tool.get("description", ""),
+            "pricing": tool.get("pricing", {}),
+            "tier_required": tool.get("tier_required", "free"),
+        })
+
+    services = []
+    for svc_name in sorted(by_service.keys()):
+        tools = by_service[svc_name]
+        services.append({
+            "service": svc_name,
+            "tool_count": len(tools),
+            "tools": tools,
+        })
+
+    return JSONResponse({"services": services})
 
 
 async def pricing_detail(request: Request) -> JSONResponse:
@@ -28,5 +86,6 @@ async def pricing_detail(request: Request) -> JSONResponse:
 
 routes = [
     Route("/v1/pricing", pricing_list, methods=["GET"]),
+    Route("/v1/pricing/summary", pricing_summary, methods=["GET"]),
     Route("/v1/pricing/{tool}", pricing_detail, methods=["GET"]),
 ]

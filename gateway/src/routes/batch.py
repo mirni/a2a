@@ -14,7 +14,7 @@ from gateway.src.auth import extract_api_key
 from gateway.src.catalog import get_tool
 from gateway.src.errors import error_response, handle_product_exception
 from gateway.src.middleware import Metrics
-from gateway.src.routes.execute import _try_x402_payment, calculate_tool_cost
+from gateway.src.routes.execute import _rate_limit_headers, _try_x402_payment, calculate_tool_cost
 from gateway.src.tools import TOOL_REGISTRY
 
 logger = logging.getLogger("a2a.batch")
@@ -288,6 +288,19 @@ async def batch(request: Request) -> JSONResponse:
     headers: dict[str, str] = {}
     if correlation_id:
         headers["X-Request-ID"] = correlation_id
+
+    # Add rate limit headers (skip for x402)
+    if not x402_agent_id:
+        from paywall_src.tiers import get_tier_config as _get_tier_config
+
+        _tc = _get_tier_config(agent_tier)
+        try:
+            rate_count = await ctx.paywall_storage.get_sliding_window_count(
+                agent_id, "gateway", window_seconds=3600.0
+            )
+        except (RuntimeError, OSError):
+            rate_count = 0
+        headers.update(_rate_limit_headers(_tc.rate_limit_per_hour, rate_count))
 
     return JSONResponse({"results": results}, headers=headers)
 
