@@ -143,7 +143,7 @@ EnvironmentFile=$INSTALL_DIR/.env
 ExecStart=$INSTALL_DIR/venv/bin/python -m uvicorn gateway.main:app \\
     --host 127.0.0.1 \\
     --port $PORT \\
-    --workers 2 \\
+    --workers 1 \\
     --log-level info \\
     --access-log
 Restart=always

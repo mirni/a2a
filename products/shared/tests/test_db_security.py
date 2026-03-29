@@ -74,6 +74,23 @@ class TestHardenConnection:
         await db.close()
 
     @pytest.mark.asyncio
+    async def test_sets_busy_timeout(self, tmp_path):
+        db = await aiosqlite.connect(str(tmp_path / "test.db"))
+        await harden_connection(db)
+        row = await db.execute_fetchall("PRAGMA busy_timeout")
+        assert row[0][0] == 5000
+        await db.close()
+
+    @pytest.mark.asyncio
+    async def test_sets_synchronous_normal(self, tmp_path):
+        db = await aiosqlite.connect(str(tmp_path / "test.db"))
+        await harden_connection(db)
+        row = await db.execute_fetchall("PRAGMA synchronous")
+        # 1 = NORMAL
+        assert row[0][0] == 1
+        await db.close()
+
+    @pytest.mark.asyncio
     async def test_idempotent(self, tmp_path):
         db = await aiosqlite.connect(str(tmp_path / "test.db"))
         await harden_connection(db)

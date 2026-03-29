@@ -117,6 +117,12 @@ class Metrics:
             f"a2a_request_duration_ms_count {count}",
             f"a2a_request_duration_ms_sum {total_ms}",
         ]
+        # Per-tool request counters
+        if cls.requests_by_tool:
+            lines.append("# HELP a2a_requests_by_tool_total Requests per tool")
+            lines.append("# TYPE a2a_requests_by_tool_total counter")
+            for tool_name, tool_count in sorted(cls.requests_by_tool.items()):
+                lines.append(f'a2a_requests_by_tool_total{{tool="{tool_name}"}} {tool_count}')
         return "\n".join(lines) + "\n"
 
 

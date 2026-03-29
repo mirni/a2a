@@ -3468,3 +3468,128 @@ With WAL mode, `synchronous = NORMAL` is safe and significantly faster. `FULL` f
 | **MEDIUM** | CRIT-2 | INTEGER millicents migration (dedicated session) |
 | **LOW** | OpenAPI | Auto-generate from catalog + route definitions |
 | **LOW** | Docs site | Deploy documentation from existing catalog |
+
+---
+
+## Session 17 — DB PRAGMAs + Monitoring Stack (2026-03-29)
+
+### CRITICAL/HIGH Fixes Implemented
+
+#### 1. `PRAGMA busy_timeout = 5000` + `PRAGMA synchronous = NORMAL` (TDD)
+
+**File**: `products/shared/src/db_security.py` — `harden_connection()`
+
+Added two PRAGMAs to every database connection:
+- `busy_timeout=5000`: Wait 5 seconds before returning `SQLITE_BUSY` (was: immediate failure)
+- `synchronous=NORMAL`: Safe with WAL mode, significantly faster than `FULL` (was: default `FULL`)
+
+**Tests**: +2 in `products/shared/tests/test_db_security.py` (25 total, was 23)
+
+**Note**: Python's `sqlite3` module already sets `busy_timeout=5000` via its default `timeout=5.0` parameter, but we now set it explicitly in `harden_connection()` for documentation and robustness.
+
+#### 2. `--workers 2` → `--workers 1`
+
+Changed in both:
+- `scripts/deploy_a2a-gateway.sh` (systemd ExecStart)
+- `Dockerfile` (CMD)
+
+SQLite is single-writer — a second Uvicorn worker doubles `SQLITE_BUSY` contention with zero throughput gain. Revert when migrating to PostgreSQL.
+
+#### 3. Per-tool Prometheus metrics
+
+Enhanced `Metrics.to_prometheus()` in `gateway/src/middleware.py` to export per-tool request counters:
+```
+a2a_requests_by_tool_total{tool="get_balance"} 42
+a2a_requests_by_tool_total{tool="send_payment"} 17
+```
+These were already tracked internally but not exposed in the Prometheus output.
+
+### Monitoring Stack (Prometheus + Grafana + Node Exporter)
+
+Created `monitoring/` directory with a complete Docker Compose monitoring stack.
+
+#### Quick Start
+```bash
+cd monitoring
+docker compose up -d
+# Grafana: http://localhost:3000 (admin/admin)
+# Prometheus: http://localhost:9090
+```
+
+#### Architecture
+```
+┌─────────────────────────────────────────────────────────────┐
+│  monitoring/docker-compose.yml                               │
+│                                                              │
+│  ┌─────────────────┐  ┌──────────────┐  ┌───────────────┐  │
+│  │  Prometheus      │  │  Grafana     │  │ Node Exporter │  │
+│  │  :9090           │  │  :3000       │  │  :9100        │  │
+│  │  - scrape /v1/   │  │  - auto-     │  │  - CPU/RAM/   │  │
+│  │    metrics @10s  │  │    provision │  │    disk/net   │  │
+│  │  - alert rules   │  │  - dashboard │  │               │  │
+│  │  - 30d retention │  │    JSON      │  │               │  │
+│  └────────┬─────────┘  └──────┬───────┘  └───────────────┘  │
+│           │ scrape              │ query                       │
+│           ▼                    ▼                              │
+│  ┌──────────────────────────────────────────────────────┐    │
+│  │  A2A Gateway (host.docker.internal:8000)              │    │
+│  │  - /v1/metrics (Prometheus text format)                │    │
+│  │  - /v1/health  (deep probe with DB check)              │    │
+│  └──────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Files Created
+
+| File | Description |
+|------|-------------|
+| `monitoring/docker-compose.yml` | Prometheus + Grafana + Node Exporter services |
+| `monitoring/prometheus/prometheus.yml` | Scrape config (gateway metrics, health, node-exporter) |
+| `monitoring/prometheus/alerts.yml` | Alert rules (error rate >5%, latency >2s, gateway down, CPU/RAM/disk) |
+| `monitoring/grafana/provisioning/datasources/prometheus.yml` | Auto-provision Prometheus datasource |
+| `monitoring/grafana/provisioning/dashboards/dashboards.yml` | Auto-provision dashboard folder |
+| `monitoring/grafana/dashboards/gateway-overview.json` | Pre-built dashboard with 13 panels |
+
+#### Dashboard Panels
+
+| Row | Panel | Type | Metric |
+|-----|-------|------|--------|
+| Overview | Gateway Status | Stat (up/down) | `up{job="a2a-gateway"}` |
+| Overview | Total Requests | Stat | `a2a_requests_total` |
+| Overview | Total Errors | Stat | `a2a_errors_total` |
+| Overview | Avg Latency | Stat (ms) | `rate(duration_sum) / rate(duration_count)` |
+| Overview | Error Rate | Stat (%) | `rate(errors) / rate(requests)` |
+| Traffic | Request Rate | Time series | `rate(a2a_requests_total[1m])` |
+| Traffic | Request Latency | Time series | avg over 5m window |
+| Traffic | Requests by Tool | Stacked bars | `rate(a2a_requests_by_tool_total[5m])` |
+| System | CPU Usage | Time series | `node_cpu_seconds_total` |
+| System | Memory Usage | Time series | `node_memory_MemAvailable_bytes` |
+| System | Disk Usage | Time series | `node_filesystem_avail_bytes` |
+| Network | Network Traffic | Time series | `node_network_receive/transmit_bytes_total` |
+| Network | Disk I/O | Time series | `node_disk_reads/writes_completed_total` |
+
+#### Alert Rules
+
+| Alert | Condition | Severity |
+|-------|-----------|----------|
+| HighErrorRate | >5% errors over 5min | critical |
+| HighLatency | >2s avg over 5min | warning |
+| GatewayDown | no scrape for 2min | critical |
+| HighCPU | >80% for 5min | warning |
+| HighMemory | >85% for 5min | warning |
+| DiskSpaceLow | <15% free for 5min | critical |
+
+### Test Results
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Total tests | 1,432 | 1,434 (+2) |
+| Modules passing | 10/10 | 10/10 |
+
+### Remaining Action Items
+
+| Priority | Item | Description |
+|----------|------|-------------|
+| **MEDIUM** | CRIT-2 | INTEGER millicents migration (dedicated session) |
+| **LOW** | OpenAPI | Auto-generate from catalog + route definitions |
+| **LOW** | Docs site | Deploy documentation from existing catalog |

@@ -17,6 +17,8 @@ async def harden_connection(db: aiosqlite.Connection) -> None:
     incremental auto-vacuum.  Safe to call multiple times (idempotent).
     """
     await db.execute("PRAGMA journal_mode=WAL")
+    await db.execute("PRAGMA synchronous=NORMAL")
+    await db.execute("PRAGMA busy_timeout=5000")
     await db.execute("PRAGMA foreign_keys=ON")
     await db.execute("PRAGMA secure_delete=ON")
     # auto_vacuum can only change before tables exist; apply + VACUUM on empty DBs

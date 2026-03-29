@@ -1,0 +1,44 @@
+# =============================================================================
+# Prometheus Configuration — A2A Commerce Platform
+# =============================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "alerts.yml"
+
+scrape_configs:
+  # A2A Gateway — /v1/metrics endpoint (Prometheus text format)
+  - job_name: "a2a-gateway"
+    metrics_path: "/v1/metrics"
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["host.docker.internal:8000"]
+        labels:
+          instance: "gateway-primary"
+          environment: "production"
+
+  # A2A Gateway — /v1/health endpoint (probe-style)
+  # Uses the blackbox-style approach: scrape and check for 200
+  - job_name: "a2a-health"
+    metrics_path: "/v1/health"
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["host.docker.internal:8000"]
+        labels:
+          instance: "gateway-primary"
+
+  # Node Exporter — system metrics (CPU, RAM, disk, network)
+  - job_name: "node-exporter"
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["node-exporter:9100"]
+        labels:
+          instance: "gateway-host"
+
+  # Prometheus self-monitoring
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]

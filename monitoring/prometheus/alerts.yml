@@ -1,0 +1,73 @@
+# =============================================================================
+# Prometheus Alert Rules — A2A Commerce Platform
+# =============================================================================
+
+groups:
+  - name: a2a_gateway
+    rules:
+      # High error rate (>5% of requests in 5 minutes)
+      - alert: HighErrorRate
+        expr: |
+          rate(a2a_errors_total[5m]) / rate(a2a_requests_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate on A2A Gateway"
+          description: "Error rate is {{ $value | humanizePercentage }} over the last 5 minutes."
+
+      # High latency (average >2s over 5 minutes)
+      - alert: HighLatency
+        expr: |
+          rate(a2a_request_duration_ms_sum[5m]) / rate(a2a_request_duration_ms_count[5m]) > 2000
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High average latency on A2A Gateway"
+          description: "Average request duration is {{ $value }}ms over the last 5 minutes."
+
+      # Gateway down (no successful scrape for 2 minutes)
+      - alert: GatewayDown
+        expr: up{job="a2a-gateway"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "A2A Gateway is unreachable"
+          description: "Prometheus cannot scrape the gateway metrics endpoint."
+
+  - name: system
+    rules:
+      # High CPU usage (>80% for 5 minutes)
+      - alert: HighCPU
+        expr: |
+          100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value }}%."
+
+      # High memory usage (>85%)
+      - alert: HighMemory
+        expr: |
+          (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value }}%."
+
+      # Disk space low (<15% free)
+      - alert: DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 15
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }}"
+          description: "Only {{ $value }}% disk space remaining."
