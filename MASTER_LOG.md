@@ -3590,6 +3590,75 @@ docker compose up -d
 
 | Priority | Item | Description |
 |----------|------|-------------|
-| **MEDIUM** | CRIT-2 | INTEGER millicents migration (dedicated session) |
+| **DONE** | CRIT-2 | ✅ Completed in Session 18 — INTEGER storage with SCALE=10^8 |
+| **LOW** | OpenAPI | Auto-generate from catalog + route definitions |
+| **LOW** | Docs site | Deploy documentation from existing catalog |
+
+---
+
+## Session 18 — 2026-03-29: CRIT-2 Integer Money Migration + Monitoring Script
+
+### Prompt
+
+> Add run_monitor.sh script to wrap the docker invocation with the right parameters and commit. Then address issue CRIT-2 and use integral value instead of float in the database for all monetary values. Consider range of values (e.g. satoshi for btc) and use BIGINT or similar large integer type.
+
+### Response
+
+#### 1. Monitoring Script (`scripts/run_monitor.sh`)
+
+Created a Docker Compose wrapper with subcommands (`up`, `down`, `status`, `logs`, `restart`, `clean`). Auto-detects `docker compose` vs `docker-compose`. Configurable via env vars (`GRAFANA_PORT`, `PROMETHEUS_PORT`, etc.). Committed as `e9ffb64`.
+
+#### 2. CRIT-2: Integer Money Storage Migration
+
+**Design Decision: SCALE = 10^8 (100,000,000)**
+
+| Factor | Choice | Rationale |
+|--------|--------|-----------|
+| Scale | 10^8 (100M) | Matches Bitcoin satoshi granularity natively |
+| Storage type | SQLite INTEGER (64-bit) | = BIGINT, holds ±9.2×10^18 → ±92 billion credits |
+| Precision | 8 decimal places | Covers all currencies (USD 2dp, USDC 6dp, BTC 8dp) |
+| Conversion | At storage boundary only | Python API signatures unchanged |
+
+**Files changed:**
+
+| File | Change |
+|------|--------|
+| `products/shared/src/money.py` | NEW — `SCALE`, `credits_to_atomic()`, `atomic_to_float()`, `atomic_to_credits()`, `validate_non_negative()` |
+| `products/shared/tests/test_money.py` | NEW — 23 unit tests for money module |
+| `products/billing/src/storage.py` | Schema REAL→INTEGER for 6 columns, boundary conversion in all methods, Migration #2 for existing DBs |
+| `products/billing/tests/test_integer_storage.py` | NEW — 7 verification tests (typeof checks, precision round-trip, SUM accuracy) |
+| `products/payments/src/storage.py` | Decimal adapter `float(d)`→`int(d*SCALE)`, schema REAL→INTEGER for 4 tables, `_convert_amount()` on reads |
+| `products/paywall/src/storage.py` | Schema INTEGER for audit cost, `credits_to_atomic()` on write, `atomic_to_float()` on read |
+
+**Key implementation details:**
+
+- `credits_to_atomic(Decimal(str(value)))` — avoids IEEE 754 float artifacts during conversion
+- Migration uses `CAST(ROUND(col * 100000000) AS INTEGER)` — ROUND prevents truncation (e.g. `0.1 * 1e8 = 9999999.999...`)
+- `record_transaction` uses `int(Decimal(str(amount)) * SCALE)` instead of `credits_to_atomic()` because transactions can be negative (withdrawals)
+- Payments Decimal adapter changed from `lambda d: float(d)` to `lambda d: int(d * SCALE)` — root cause of original precision loss
+
+**Verification examples:**
+
+| Input | Stored INTEGER | Round-trip |
+|-------|---------------|------------|
+| 10.5 credits | 1,050,000,000 | 10.5 ✓ |
+| 0.01 credits | 1,000,000 | 0.01 ✓ |
+| 9.99 credits | 999,000,000 | 9.99 ✓ (no IEEE 754 loss!) |
+| 5.25 credits | 525,000,000 | 5.25 ✓ |
+| 1 BTC (satoshi) | 100,000,000 | 1.0 ✓ (native!) |
+
+### Test Results
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Total tests | 1,434 | 1,464 (+30) |
+| Modules passing | 10/10 | 10/10 |
+| New tests | — | 23 (money) + 7 (integer storage) |
+
+### Remaining Action Items
+
+| Priority | Item | Description |
+|----------|------|-------------|
+| **DONE** | CRIT-2 | ✅ INTEGER storage with SCALE=10^8, all 3 products migrated |
 | **LOW** | OpenAPI | Auto-generate from catalog + route definitions |
 | **LOW** | Docs site | Deploy documentation from existing catalog |

@@ -1,6 +1,8 @@
 """SQLite storage for API keys, tier mappings, and audit logs.
 
 All database access is async via aiosqlite. Schema is auto-created on first connect.
+
+Monetary values (cost) are stored as INTEGER in atomic units (1 credit = 10^8 atomic).
 """
 
 from __future__ import annotations
@@ -8,9 +10,15 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Any
 
 import aiosqlite
+
+try:
+    from shared_src.money import atomic_to_float, credits_to_atomic
+except ImportError:
+    from src.money import atomic_to_float, credits_to_atomic
 
 # ---------------------------------------------------------------------------
 # Schema
@@ -35,7 +43,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
     connector  TEXT NOT NULL DEFAULT '',
     function   TEXT NOT NULL DEFAULT '',
     tier       TEXT NOT NULL DEFAULT '',
-    cost       REAL NOT NULL DEFAULT 0.0,
+    cost       INTEGER NOT NULL DEFAULT 0,
     allowed    INTEGER NOT NULL DEFAULT 1,
     reason     TEXT,
     created_at REAL NOT NULL
@@ -284,13 +292,21 @@ class PaywallStorage:
     ) -> int:
         """Record an audit log entry. Returns the row ID."""
         now = time.time()
+        cost_atomic = credits_to_atomic(Decimal(str(cost)))
         cursor = await self.db.execute(
             "INSERT INTO audit_log (agent_id, connector, function, tier, cost, allowed, reason, created_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (agent_id, connector, function, tier, cost, 1 if allowed else 0, reason, now),
+            (agent_id, connector, function, tier, cost_atomic, 1 if allowed else 0, reason, now),
         )
         await self.db.commit()
         return cursor.lastrowid  # type: ignore[return-value]
+
+    @staticmethod
+    def _convert_audit_cost(d: dict[str, Any]) -> dict[str, Any]:
+        """Convert integer cost back to float at the read boundary."""
+        if "cost" in d:
+            d["cost"] = atomic_to_float(d["cost"])
+        return d
 
     async def get_audit_log(
         self,
@@ -308,7 +324,7 @@ class PaywallStorage:
         params.append(limit)
         cursor = await self.db.execute(query, params)
         rows = await cursor.fetchall()
-        return [dict(r) for r in rows]
+        return [self._convert_audit_cost(dict(r)) for r in rows]
 
     async def get_global_audit_log(
         self,
@@ -325,7 +341,7 @@ class PaywallStorage:
         params.append(limit)
         cursor = await self.db.execute(query, params)
         rows = await cursor.fetchall()
-        return [dict(r) for r in rows]
+        return [self._convert_audit_cost(dict(r)) for r in rows]
 
     async def purge_audit_log(self, before: float) -> int:
         """Delete audit log entries older than the given timestamp. Returns count deleted."""

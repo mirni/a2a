@@ -1,6 +1,9 @@
 """SQLite storage layer for billing data.
 
 All database access is async via aiosqlite. Schema is auto-created on first connect.
+
+Monetary values are stored as INTEGER in atomic units (1 credit = 10^8 atomic).
+Conversion happens at the storage boundary using the shared money module.
 """
 
 from __future__ import annotations
@@ -8,14 +11,17 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any
 
 try:
     from shared_src.base_storage import BaseStorage
     from shared_src.migrate import Migration
+    from shared_src.money import SCALE, atomic_to_float, credits_to_atomic
 except ImportError:
     from src.base_storage import BaseStorage
     from src.migrate import Migration
+    from src.money import SCALE, atomic_to_float, credits_to_atomic
 
 
 @dataclass
@@ -25,7 +31,7 @@ class StorageBackend(BaseStorage):
     _SCHEMA: str = """
 CREATE TABLE IF NOT EXISTS wallets (
     agent_id   TEXT PRIMARY KEY,
-    balance    REAL NOT NULL DEFAULT 0.0,
+    balance    INTEGER NOT NULL DEFAULT 0,
     org_id     TEXT NOT NULL DEFAULT 'default',
     created_at REAL NOT NULL,
     updated_at REAL NOT NULL
@@ -35,7 +41,7 @@ CREATE TABLE IF NOT EXISTS usage_records (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     agent_id        TEXT NOT NULL,
     function        TEXT NOT NULL,
-    cost            REAL NOT NULL,
+    cost            INTEGER NOT NULL DEFAULT 0,
     tokens          INTEGER NOT NULL DEFAULT 0,
     metadata        TEXT,
     created_at      REAL NOT NULL
@@ -47,7 +53,7 @@ CREATE INDEX IF NOT EXISTS idx_usage_created ON usage_records(created_at);
 CREATE TABLE IF NOT EXISTS transactions (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     agent_id    TEXT NOT NULL,
-    amount      REAL NOT NULL,
+    amount      INTEGER NOT NULL DEFAULT 0,
     tx_type     TEXT NOT NULL,
     description TEXT,
     created_at  REAL NOT NULL
@@ -58,7 +64,7 @@ CREATE INDEX IF NOT EXISTS idx_tx_agent ON transactions(agent_id);
 CREATE TABLE IF NOT EXISTS rate_policies (
     agent_id        TEXT PRIMARY KEY,
     max_calls_per_min  INTEGER,
-    max_spend_per_day  REAL,
+    max_spend_per_day  INTEGER,
     updated_at      REAL NOT NULL
 );
 
@@ -75,8 +81,8 @@ CREATE INDEX IF NOT EXISTS idx_events_undelivered ON billing_events(delivered, c
 
 CREATE TABLE IF NOT EXISTS budget_caps (
     agent_id        TEXT PRIMARY KEY,
-    daily_cap       REAL,
-    monthly_cap     REAL,
+    daily_cap       INTEGER,
+    monthly_cap     INTEGER,
     alert_threshold REAL NOT NULL DEFAULT 0.8
 );
 """
@@ -89,11 +95,37 @@ CREATE TABLE IF NOT EXISTS budget_caps (
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_usage_idempotency "
             "ON usage_records(idempotency_key);",
         ),
+        Migration(
+            2,
+            "convert monetary columns from REAL to INTEGER (atomic units, SCALE=1e8)",
+            # Detect if migration is needed (balance is REAL with fractional part)
+            # Use ROUND to avoid float truncation issues (0.1*1e8=9999999.99...)
+            "UPDATE wallets SET balance = CAST(ROUND(balance * 100000000) AS INTEGER) "
+            "WHERE typeof(balance) = 'real' OR (balance > 0 AND balance < 100000000);\n"
+            "UPDATE usage_records SET cost = CAST(ROUND(cost * 100000000) AS INTEGER) "
+            "WHERE typeof(cost) = 'real' OR (cost > 0 AND cost < 100000000);\n"
+            "UPDATE transactions SET amount = CAST(ROUND(amount * 100000000) AS INTEGER) "
+            "WHERE typeof(amount) = 'real' OR (amount != 0 AND amount < 100000000 AND amount > -100000000);\n"
+            "UPDATE rate_policies SET max_spend_per_day = CAST(ROUND(max_spend_per_day * 100000000) AS INTEGER) "
+            "WHERE max_spend_per_day IS NOT NULL AND (typeof(max_spend_per_day) = 'real' OR (max_spend_per_day > 0 AND max_spend_per_day < 100000000));\n"
+            "UPDATE budget_caps SET daily_cap = CAST(ROUND(daily_cap * 100000000) AS INTEGER) "
+            "WHERE daily_cap IS NOT NULL AND (typeof(daily_cap) = 'real' OR (daily_cap > 0 AND daily_cap < 100000000));\n"
+            "UPDATE budget_caps SET monthly_cap = CAST(ROUND(monthly_cap * 100000000) AS INTEGER) "
+            "WHERE monthly_cap IS NOT NULL AND (typeof(monthly_cap) = 'real' OR (monthly_cap > 0 AND monthly_cap < 100000000));",
+        ),
     )
 
     # -----------------------------------------------------------------------
     # Wallet operations
     # -----------------------------------------------------------------------
+
+    def _to_atomic(self, value: float) -> int:
+        """Convert a float credit amount to atomic units at the storage boundary."""
+        return credits_to_atomic(Decimal(str(value)))
+
+    def _from_atomic(self, atomic: int) -> float:
+        """Convert atomic units back to float at the storage boundary."""
+        return atomic_to_float(atomic)
 
     async def get_wallet(self, agent_id: str) -> dict[str, Any] | None:
         cursor = await self.db.execute(
@@ -103,22 +135,26 @@ CREATE TABLE IF NOT EXISTS budget_caps (
         row = await cursor.fetchone()
         if row is None:
             return None
-        return dict(row)
+        d = dict(row)
+        d["balance"] = self._from_atomic(d["balance"])
+        return d
 
     async def create_wallet(self, agent_id: str, initial_balance: float = 0.0) -> dict[str, Any]:
         now = time.time()
+        bal_atomic = self._to_atomic(initial_balance)
         await self.db.execute(
             "INSERT INTO wallets (agent_id, balance, created_at, updated_at) VALUES (?, ?, ?, ?)",
-            (agent_id, initial_balance, now, now),
+            (agent_id, bal_atomic, now, now),
         )
         await self.db.commit()
         return {"agent_id": agent_id, "balance": initial_balance, "created_at": now, "updated_at": now}
 
     async def update_balance(self, agent_id: str, new_balance: float) -> None:
         now = time.time()
+        bal_atomic = self._to_atomic(new_balance)
         await self.db.execute(
             "UPDATE wallets SET balance = ?, updated_at = ? WHERE agent_id = ?",
-            (new_balance, now, agent_id),
+            (bal_atomic, now, agent_id),
         )
         await self.db.commit()
 
@@ -129,26 +165,20 @@ CREATE TABLE IF NOT EXISTS budget_caps (
         Returns the new balance on success, or None if insufficient funds.
         """
         now = time.time()
+        amt_atomic = self._to_atomic(amount)
         await self.db.execute(
             "UPDATE wallets SET balance = balance - ?, updated_at = ? "
             "WHERE agent_id = ? AND balance >= ?",
-            (amount, now, agent_id, amount),
+            (amt_atomic, now, agent_id, amt_atomic),
         )
         await self.db.commit()
-        # Check if the update actually modified a row
         cursor = await self.db.execute(
             "SELECT balance FROM wallets WHERE agent_id = ?", (agent_id,)
         )
         row = await cursor.fetchone()
         if row is None:
-            return None  # wallet doesn't exist
-        # We need to verify the debit happened. The balance after a successful
-        # debit of `amount` should be what we see. But if the WHERE clause
-        # didn't match (balance < amount), the row wasn't updated.
-        # Use changes() to check: not available via aiosqlite easily.
-        # Instead, use a different approach: check total_changes or use RETURNING.
-        # Simplest correct approach: use execute + rowcount.
-        return row[0]
+            return None
+        return self._from_atomic(row[0])
 
     async def atomic_debit_strict(self, agent_id: str, amount: float) -> tuple[bool, float]:
         """Atomically debit amount from wallet.
@@ -157,21 +187,21 @@ CREATE TABLE IF NOT EXISTS budget_caps (
         and balance is the current balance after the operation.
         """
         now = time.time()
+        amt_atomic = self._to_atomic(amount)
         cursor = await self.db.execute(
             "UPDATE wallets SET balance = balance - ?, updated_at = ? "
             "WHERE agent_id = ? AND balance >= ?",
-            (amount, now, agent_id, amount),
+            (amt_atomic, now, agent_id, amt_atomic),
         )
         await self.db.commit()
         affected = cursor.rowcount
-        # Fetch current balance
         cur2 = await self.db.execute(
             "SELECT balance FROM wallets WHERE agent_id = ?", (agent_id,)
         )
         row = await cur2.fetchone()
         if row is None:
             return (False, 0.0)
-        return (affected > 0, row[0])
+        return (affected > 0, self._from_atomic(row[0]))
 
     async def atomic_credit(self, agent_id: str, amount: float) -> tuple[bool, float]:
         """Atomically credit amount to wallet.
@@ -179,10 +209,11 @@ CREATE TABLE IF NOT EXISTS budget_caps (
         Returns (success, new_balance) where success=True if agent exists.
         """
         now = time.time()
+        amt_atomic = self._to_atomic(amount)
         cursor = await self.db.execute(
             "UPDATE wallets SET balance = balance + ?, updated_at = ? "
             "WHERE agent_id = ?",
-            (amount, now, agent_id),
+            (amt_atomic, now, agent_id),
         )
         await self.db.commit()
         affected = cursor.rowcount
@@ -192,7 +223,7 @@ CREATE TABLE IF NOT EXISTS budget_caps (
         row = await cur2.fetchone()
         if row is None:
             return (False, 0.0)
-        return (affected > 0, row[0])
+        return (affected > 0, self._from_atomic(row[0]))
 
     # -----------------------------------------------------------------------
     # Transaction log
@@ -202,10 +233,11 @@ CREATE TABLE IF NOT EXISTS budget_caps (
         self, agent_id: str, amount: float, tx_type: str, description: str = ""
     ) -> int:
         now = time.time()
+        amt_atomic = int(Decimal(str(amount)) * SCALE)  # allow negative for withdrawals
         cursor = await self.db.execute(
             "INSERT INTO transactions (agent_id, amount, tx_type, description, created_at) "
             "VALUES (?, ?, ?, ?, ?)",
-            (agent_id, amount, tx_type, description, now),
+            (agent_id, amt_atomic, tx_type, description, now),
         )
         await self.db.commit()
         return cursor.lastrowid  # type: ignore[return-value]
@@ -218,7 +250,12 @@ CREATE TABLE IF NOT EXISTS budget_caps (
             (agent_id, limit, offset),
         )
         rows = await cursor.fetchall()
-        return [dict(r) for r in rows]
+        results = []
+        for r in rows:
+            d = dict(r)
+            d["amount"] = self._from_atomic(d["amount"])
+            results.append(d)
+        return results
 
     # -----------------------------------------------------------------------
     # Usage records
@@ -235,7 +272,6 @@ CREATE TABLE IF NOT EXISTS budget_caps (
     ) -> int:
         now = time.time()
         if idempotency_key is not None:
-            # Skip if this idempotency key was already recorded
             cursor = await self.db.execute(
                 "SELECT id FROM usage_records WHERE idempotency_key = ?",
                 (idempotency_key,),
@@ -243,10 +279,11 @@ CREATE TABLE IF NOT EXISTS budget_caps (
             existing = await cursor.fetchone()
             if existing is not None:
                 return existing[0]
+        cost_atomic = self._to_atomic(cost)
         cursor = await self.db.execute(
             "INSERT INTO usage_records (agent_id, function, cost, tokens, metadata, created_at, idempotency_key) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (agent_id, function, cost, tokens, json.dumps(metadata) if metadata else None, now, idempotency_key),
+            (agent_id, function, cost_atomic, tokens, json.dumps(metadata) if metadata else None, now, idempotency_key),
         )
         await self.db.commit()
         return cursor.lastrowid  # type: ignore[return-value]
@@ -277,6 +314,7 @@ CREATE TABLE IF NOT EXISTS budget_caps (
         results = []
         for r in rows:
             d = dict(r)
+            d["cost"] = self._from_atomic(d["cost"])
             if d.get("metadata"):
                 d["metadata"] = json.loads(d["metadata"])
             results.append(d)
@@ -292,7 +330,11 @@ CREATE TABLE IF NOT EXISTS budget_caps (
             params.append(since)
         cursor = await self.db.execute(query, params)
         row = await cursor.fetchone()
-        return dict(row) if row else {"total_calls": 0, "total_cost": 0.0, "total_tokens": 0}
+        if row is None:
+            return {"total_calls": 0, "total_cost": 0.0, "total_tokens": 0}
+        d = dict(row)
+        d["total_cost"] = self._from_atomic(d["total_cost"])
+        return d
 
     # -----------------------------------------------------------------------
     # Rate policies
@@ -303,7 +345,12 @@ CREATE TABLE IF NOT EXISTS budget_caps (
             "SELECT * FROM rate_policies WHERE agent_id = ?", (agent_id,)
         )
         row = await cursor.fetchone()
-        return dict(row) if row else None
+        if row is None:
+            return None
+        d = dict(row)
+        if d.get("max_spend_per_day") is not None:
+            d["max_spend_per_day"] = self._from_atomic(d["max_spend_per_day"])
+        return d
 
     async def set_rate_policy(
         self,
@@ -312,6 +359,7 @@ CREATE TABLE IF NOT EXISTS budget_caps (
         max_spend_per_day: float | None = None,
     ) -> None:
         now = time.time()
+        spend_atomic = self._to_atomic(max_spend_per_day) if max_spend_per_day is not None else None
         await self.db.execute(
             "INSERT INTO rate_policies (agent_id, max_calls_per_min, max_spend_per_day, updated_at) "
             "VALUES (?, ?, ?, ?) "
@@ -319,7 +367,7 @@ CREATE TABLE IF NOT EXISTS budget_caps (
             "max_calls_per_min = excluded.max_calls_per_min, "
             "max_spend_per_day = excluded.max_spend_per_day, "
             "updated_at = excluded.updated_at",
-            (agent_id, max_calls_per_min, max_spend_per_day, now),
+            (agent_id, max_calls_per_min, spend_atomic, now),
         )
         await self.db.commit()
 
@@ -345,7 +393,7 @@ CREATE TABLE IF NOT EXISTS budget_caps (
             (agent_id, since),
         )
         row = await cursor.fetchone()
-        return float(row[0]) if row else 0.0
+        return self._from_atomic(row[0]) if row else 0.0
 
     # -----------------------------------------------------------------------
     # Billing events

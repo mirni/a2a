@@ -2,6 +2,8 @@
 
 Follows the same pattern as billing StorageBackend: async connect(), close(),
 schema auto-created on connect. All access via aiosqlite.
+
+Monetary values are stored as INTEGER in atomic units (1 credit = 10^8 atomic).
 """
 
 from __future__ import annotations
@@ -15,8 +17,13 @@ from typing import Any
 
 import aiosqlite
 
-# Register Decimal adapter so SQLite can bind Decimal values as floats
-sqlite3.register_adapter(Decimal, lambda d: float(d))
+try:
+    from shared_src.money import SCALE, atomic_to_float, credits_to_atomic
+except ImportError:
+    from src.money import SCALE, atomic_to_float, credits_to_atomic
+
+# Register Decimal adapter: convert to atomic integer units for SQLite binding
+sqlite3.register_adapter(Decimal, lambda d: int(d * SCALE))
 
 # ---------------------------------------------------------------------------
 # Schema
@@ -27,7 +34,7 @@ CREATE TABLE IF NOT EXISTS payment_intents (
     id              TEXT PRIMARY KEY,
     payer           TEXT NOT NULL,
     payee           TEXT NOT NULL,
-    amount          REAL NOT NULL,
+    amount          INTEGER NOT NULL DEFAULT 0,
     description     TEXT NOT NULL DEFAULT '',
     idempotency_key TEXT,
     status          TEXT NOT NULL DEFAULT 'pending',
@@ -47,7 +54,7 @@ CREATE TABLE IF NOT EXISTS escrows (
     id            TEXT PRIMARY KEY,
     payer         TEXT NOT NULL,
     payee         TEXT NOT NULL,
-    amount        REAL NOT NULL,
+    amount        INTEGER NOT NULL DEFAULT 0,
     description   TEXT NOT NULL DEFAULT '',
     status        TEXT NOT NULL DEFAULT 'held',
     settlement_id TEXT,
@@ -66,7 +73,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     id              TEXT PRIMARY KEY,
     payer           TEXT NOT NULL,
     payee           TEXT NOT NULL,
-    amount          REAL NOT NULL,
+    amount          INTEGER NOT NULL DEFAULT 0,
     interval        TEXT NOT NULL,
     description     TEXT NOT NULL DEFAULT '',
     status          TEXT NOT NULL DEFAULT 'active',
@@ -88,7 +95,7 @@ CREATE TABLE IF NOT EXISTS settlements (
     id          TEXT PRIMARY KEY,
     payer       TEXT NOT NULL,
     payee       TEXT NOT NULL,
-    amount      REAL NOT NULL,
+    amount      INTEGER NOT NULL DEFAULT 0,
     source_type TEXT NOT NULL,
     source_id   TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
@@ -137,18 +144,29 @@ class PaymentStorage:
     def db(self) -> aiosqlite.Connection:
         return self._ensure_connected()
 
+    @staticmethod
+    def _convert_amount(d: dict[str, Any]) -> dict[str, Any]:
+        """Convert integer 'amount' field back to float at the read boundary."""
+        if "amount" in d:
+            d["amount"] = atomic_to_float(d["amount"])
+        return d
+
     # -----------------------------------------------------------------------
     # Payment Intents
     # -----------------------------------------------------------------------
 
     async def insert_intent(self, data: dict[str, Any]) -> None:
+        amount = data["amount"]
+        # Convert to atomic: Decimal goes via adapter, float needs explicit conversion
+        if isinstance(amount, (int, float)) and not isinstance(amount, Decimal):
+            amount = credits_to_atomic(Decimal(str(amount)))
         await self.db.execute(
             "INSERT INTO payment_intents "
             "(id, payer, payee, amount, description, idempotency_key, status, "
             "settlement_id, created_at, updated_at, metadata) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                data["id"], data["payer"], data["payee"], data["amount"],
+                data["id"], data["payer"], data["payee"], amount,
                 data.get("description", ""), data.get("idempotency_key"),
                 data.get("status", "pending"), data.get("settlement_id"),
                 data["created_at"], data["updated_at"],
@@ -166,7 +184,7 @@ class PaymentStorage:
             return None
         d = dict(row)
         d["metadata"] = json.loads(d["metadata"])
-        return d
+        return self._convert_amount(d)
 
     async def get_intent_by_idempotency_key(self, key: str) -> dict[str, Any] | None:
         cursor = await self.db.execute(
@@ -177,7 +195,7 @@ class PaymentStorage:
             return None
         d = dict(row)
         d["metadata"] = json.loads(d["metadata"])
-        return d
+        return self._convert_amount(d)
 
     async def update_intent_status(
         self, intent_id: str, status: str, settlement_id: str | None = None
@@ -200,9 +218,10 @@ class PaymentStorage:
         self, intent_id: str, amount: float
     ) -> None:
         now = time.time()
+        amt_atomic = credits_to_atomic(Decimal(str(amount)))
         await self.db.execute(
             "UPDATE payment_intents SET amount = ?, updated_at = ? WHERE id = ?",
-            (amount, now, intent_id),
+            (amt_atomic, now, intent_id),
         )
         await self.db.commit()
 
@@ -229,7 +248,7 @@ class PaymentStorage:
         for r in rows:
             d = dict(r)
             d["metadata"] = json.loads(d["metadata"])
-            results.append(d)
+            results.append(self._convert_amount(d))
         return results
 
     # -----------------------------------------------------------------------
@@ -237,13 +256,16 @@ class PaymentStorage:
     # -----------------------------------------------------------------------
 
     async def insert_escrow(self, data: dict[str, Any]) -> None:
+        amount = data["amount"]
+        if isinstance(amount, (int, float)) and not isinstance(amount, Decimal):
+            amount = credits_to_atomic(Decimal(str(amount)))
         await self.db.execute(
             "INSERT INTO escrows "
             "(id, payer, payee, amount, description, status, settlement_id, "
             "timeout_at, created_at, updated_at, metadata) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                data["id"], data["payer"], data["payee"], data["amount"],
+                data["id"], data["payer"], data["payee"], amount,
                 data.get("description", ""), data.get("status", "held"),
                 data.get("settlement_id"), data.get("timeout_at"),
                 data["created_at"], data["updated_at"],
@@ -261,7 +283,7 @@ class PaymentStorage:
             return None
         d = dict(row)
         d["metadata"] = json.loads(d["metadata"])
-        return d
+        return self._convert_amount(d)
 
     async def update_escrow_status(
         self, escrow_id: str, status: str, settlement_id: str | None = None
@@ -302,7 +324,7 @@ class PaymentStorage:
         for r in rows:
             d = dict(r)
             d["metadata"] = json.loads(d["metadata"])
-            results.append(d)
+            results.append(self._convert_amount(d))
         return results
 
     async def get_expired_escrows(self, now: float | None = None) -> list[dict[str, Any]]:
@@ -318,7 +340,7 @@ class PaymentStorage:
         for r in rows:
             d = dict(r)
             d["metadata"] = json.loads(d["metadata"])
-            results.append(d)
+            results.append(self._convert_amount(d))
         return results
 
     # -----------------------------------------------------------------------
@@ -326,13 +348,16 @@ class PaymentStorage:
     # -----------------------------------------------------------------------
 
     async def insert_subscription(self, data: dict[str, Any]) -> None:
+        amount = data["amount"]
+        if isinstance(amount, (int, float)) and not isinstance(amount, Decimal):
+            amount = credits_to_atomic(Decimal(str(amount)))
         await self.db.execute(
             "INSERT INTO subscriptions "
             "(id, payer, payee, amount, interval, description, status, cancelled_by, "
             "next_charge_at, last_charged_at, charge_count, created_at, updated_at, metadata) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                data["id"], data["payer"], data["payee"], data["amount"],
+                data["id"], data["payer"], data["payee"], amount,
                 data["interval"], data.get("description", ""),
                 data.get("status", "active"), data.get("cancelled_by"),
                 data["next_charge_at"], data.get("last_charged_at"),
@@ -352,7 +377,7 @@ class PaymentStorage:
             return None
         d = dict(row)
         d["metadata"] = json.loads(d["metadata"])
-        return d
+        return self._convert_amount(d)
 
     _SUBSCRIPTION_COLUMNS = frozenset({
         "payer", "payee", "amount", "interval", "description", "status",
@@ -369,6 +394,13 @@ class PaymentStorage:
             raise ValueError(f"Invalid column(s) in subscription update: {invalid}")
         if "metadata" in updates:
             updates["metadata"] = json.dumps(updates["metadata"])
+        # Convert amount to atomic if present
+        if "amount" in updates:
+            amt = updates["amount"]
+            if isinstance(amt, Decimal):
+                updates["amount"] = int(amt * SCALE)
+            elif isinstance(amt, float):
+                updates["amount"] = credits_to_atomic(Decimal(str(amt)))
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         values = list(updates.values()) + [sub_id]
         await self.db.execute(
@@ -400,7 +432,7 @@ class PaymentStorage:
         for r in rows:
             d = dict(r)
             d["metadata"] = json.loads(d["metadata"])
-            results.append(d)
+            results.append(self._convert_amount(d))
         return results
 
     async def get_due_subscriptions(self, now: float | None = None) -> list[dict[str, Any]]:
@@ -416,7 +448,7 @@ class PaymentStorage:
         for r in rows:
             d = dict(r)
             d["metadata"] = json.loads(d["metadata"])
-            results.append(d)
+            results.append(self._convert_amount(d))
         return results
 
     # -----------------------------------------------------------------------
@@ -424,12 +456,15 @@ class PaymentStorage:
     # -----------------------------------------------------------------------
 
     async def insert_settlement(self, data: dict[str, Any]) -> None:
+        amount = data["amount"]
+        if isinstance(amount, (int, float)) and not isinstance(amount, Decimal):
+            amount = credits_to_atomic(Decimal(str(amount)))
         await self.db.execute(
             "INSERT INTO settlements "
             "(id, payer, payee, amount, source_type, source_id, description, created_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                data["id"], data["payer"], data["payee"], data["amount"],
+                data["id"], data["payer"], data["payee"], amount,
                 data["source_type"], data["source_id"],
                 data.get("description", ""), data["created_at"],
             ),
@@ -441,7 +476,9 @@ class PaymentStorage:
             "SELECT * FROM settlements WHERE id = ?", (settlement_id,)
         )
         row = await cursor.fetchone()
-        return dict(row) if row else None
+        if row is None:
+            return None
+        return self._convert_amount(dict(row))
 
     async def list_settlements(
         self,
@@ -462,7 +499,7 @@ class PaymentStorage:
         params.extend([limit, offset])
         cursor = await self.db.execute(query, params)
         rows = await cursor.fetchall()
-        return [dict(r) for r in rows]
+        return [self._convert_amount(dict(r)) for r in rows]
 
     # -----------------------------------------------------------------------
     # Payment History (unified view)
