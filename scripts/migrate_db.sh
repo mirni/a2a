@@ -24,10 +24,28 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 source "$SCRIPT_DIR/common.bash"
 
-# Python interpreter — prefer the virtualenv if it exists
-PYTHON="${PYTHON:-python3}"
-if [[ -x "$REPO_ROOT/.venv/bin/python" ]]; then
-    PYTHON="$REPO_ROOT/.venv/bin/python"
+# Python interpreter — prefer the deployed venv, then local .venv, then system
+PYTHON="${PYTHON:-}"
+if [[ -z "$PYTHON" ]]; then
+    for candidate in \
+        "$INSTALL_DIR/venv/bin/python" \
+        "$REPO_ROOT/venv/bin/python" \
+        "$REPO_ROOT/.venv/bin/python" \
+        python3; do
+        if [[ -x "$candidate" ]]; then
+            PYTHON="$candidate"
+            break
+        fi
+    done
+fi
+
+if [[ -z "$PYTHON" ]]; then
+    err "No Python interpreter found"
+fi
+
+# Verify aiosqlite is available
+if ! "$PYTHON" -c "import aiosqlite" 2>/dev/null; then
+    err "aiosqlite not installed in $PYTHON — run from the application venv"
 fi
 
 HELPER="$SCRIPT_DIR/migrate_db_helper.py"
@@ -56,6 +74,20 @@ restart_service() {
 }
 
 # ---------------------------------------------------------------------------
+# Get current DB version using sqlite3 CLI (no Python deps needed)
+# ---------------------------------------------------------------------------
+
+get_db_version() {
+    local db_path="$1"
+    # Check if schema_migrations table exists and query max version
+    local version
+    version=$(sqlite3 "$db_path" \
+        "SELECT COALESCE(MAX(version), 0) FROM schema_migrations;" 2>/dev/null \
+        || echo "0")
+    echo "$version"
+}
+
+# ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
 
@@ -67,19 +99,7 @@ while IFS=: read -r product env_var default_path expected_version; do
         continue
     fi
 
-    current_version=$("$PYTHON" -c "
-import asyncio, sys, os
-sys.path.insert(0, '$REPO_ROOT')
-from gateway.src.bootstrap import bootstrap; bootstrap()
-import aiosqlite
-from shared_src.migrate import get_current_version
-async def main():
-    db = await aiosqlite.connect('$db_path')
-    v = await get_current_version(db)
-    await db.close()
-    print(v)
-asyncio.run(main())
-")
+    current_version=$(get_db_version "$db_path")
 
     if [[ "$current_version" == "$expected_version" ]]; then
         log "$product: already at v$expected_version (skipping)"
@@ -98,8 +118,7 @@ asyncio.run(main())
 
     # 1. Create shadow copy using sqlite3 backup API (clean, no WAL)
     if ! sqlite3 "$db_path" ".backup '$shadow'" 2>/dev/null; then
-        err_msg="$product: failed to create shadow copy"
-        warn "$err_msg"
+        warn "$product: failed to create shadow copy"
         rm -f "$shadow"
         FAILED=1
         continue
