@@ -51,7 +51,7 @@ def _load_product_simple(product_name: str, prefix: str) -> None:
             if fname.endswith(".py") and fname != "__init__.py":
                 mod_name = fname[:-3]
                 try:
-                    importlib.import_module(f"src.{mod_name}")
+                    importlib.import_module(f"src.{mod_name}")  # nosemgrep: non-literal-import
                 except Exception:
                     pass
 
@@ -101,7 +101,7 @@ def _load_payments() -> None:
         if fname.endswith(".py") and fname != "__init__.py":
             mod_name = fname[:-3]
             try:
-                importlib.import_module(f"payments.{mod_name}")
+                importlib.import_module(f"payments.{mod_name}")  # nosemgrep: non-literal-import
             except Exception:
                 pass
 

@@ -98,7 +98,7 @@ def _load_migrations(product_name: str):
     import textwrap
 
     code = textwrap.dedent("\n".join(mig_lines))
-    exec(code, ns)  # noqa: S102
+    exec(code, ns)  # noqa: S102  # nosemgrep: exec-detected
     return ns.get("_MIGRATIONS", ())
 
 

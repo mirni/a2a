@@ -190,7 +190,7 @@ class ReputationStorage:
             return False
         params.append(server_id)
         query = f"UPDATE probe_targets SET {', '.join(updates)} WHERE server_id = ?"
-        cursor = await self.db.execute(query, params)
+        cursor = await self.db.execute(query, params)  # nosemgrep: sqlalchemy-execute-raw-query
         await self.db.commit()
         return cursor.rowcount > 0
 

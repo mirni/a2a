@@ -9,7 +9,6 @@ The registry replaces hardcoded connector config with a data-driven approach:
 
 from __future__ import annotations
 
-import json
 import os
 import tempfile
 

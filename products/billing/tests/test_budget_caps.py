@@ -6,11 +6,9 @@ Alerts: events emitted when spending reaches threshold (default 80%).
 
 from __future__ import annotations
 
-import time
-
 import pytest
-from src.wallet import Wallet
 from src.budget import BudgetCapExceededError, BudgetManager
+from src.wallet import Wallet
 
 pytestmark = pytest.mark.asyncio
 

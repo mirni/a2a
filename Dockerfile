@@ -46,7 +46,7 @@ RUN pip install --no-cache-dir \
     "httpx>=0.27" \
     "aiosqlite>=0.20" \
     "pydantic>=2.0" \
-    "cryptography>=42.0"
+    "cryptography>=46.0.6"
 
 # ---------------------------------------------------------------------------
 # Application layer
@@ -54,6 +54,7 @@ RUN pip install --no-cache-dir \
 FROM deps AS app
 
 # Copy application code
+COPY pricing.json pricing.json
 COPY gateway/ gateway/
 COPY products/ products/
 COPY sdk/ sdk/

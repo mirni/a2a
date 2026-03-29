@@ -11,7 +11,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 # Default location: repo-root/pricing.json
 _DEFAULT_PATH = Path(__file__).resolve().parents[3] / "pricing.json"
 

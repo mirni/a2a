@@ -10,12 +10,10 @@ import json
 from pathlib import Path
 
 import pytest
-
 from src.pricing_config import (
     PricingConfig,
     load_pricing_config,
 )
-
 
 PRICING_JSON = Path(__file__).resolve().parents[3] / "pricing.json"
 

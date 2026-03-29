@@ -9,9 +9,6 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
-# Bootstrap cross-product imports — MUST happen before any *_src imports
-import gateway.src.bootstrap  # noqa: F401, E402
-
 # Billing
 from billing_src.tracker import UsageTracker  # noqa: E402
 
@@ -43,6 +40,9 @@ from starlette.applications import Starlette
 from trust_src.api import TrustAPI  # noqa: E402
 from trust_src.scorer import ScoreEngine  # noqa: E402
 from trust_src.storage import StorageBackend as TrustStorage  # noqa: E402
+
+# Bootstrap cross-product imports — MUST happen before any *_src imports
+import gateway.src.bootstrap  # noqa: F401, E402
 
 # Disputes
 from gateway.src.disputes import DisputeEngine

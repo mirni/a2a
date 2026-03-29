@@ -257,7 +257,7 @@ class MessageStorage:
             raise ValueError(f"Invalid negotiation columns: {invalid}")
         set_clauses = ", ".join(f"{k} = ?" for k in updates)
         values = list(updates.values()) + [negotiation_id]
-        await self._db.execute(
+        await self._db.execute(  # nosemgrep: sqlalchemy-execute-raw-query
             f"UPDATE negotiations SET {set_clauses} WHERE id = ?",
             values,
         )

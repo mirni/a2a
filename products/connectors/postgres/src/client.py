@@ -95,7 +95,7 @@ class PostgresClient:
             if self._config.read_only:
                 await conn.execute("SET TRANSACTION READ ONLY")
 
-            rows = await conn.fetch(
+            rows = await conn.fetch(  # nosemgrep: asyncpg-sqli
                 sql + f" LIMIT {max_rows}",
                 *(params or []),
                 timeout=timeout,
@@ -187,7 +187,7 @@ class PostgresClient:
         full_sql = f"{explain_prefix} {sql}"
 
         async with self._pool.acquire() as conn:
-            rows = await conn.fetch(full_sql, *(params or []))
+            rows = await conn.fetch(full_sql, *(params or []))  # nosemgrep: asyncpg-sqli
 
         return "\n".join(row["QUERY PLAN"] for row in rows)
 

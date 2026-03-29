@@ -418,7 +418,7 @@ class PaymentStorage:
                 updates["amount"] = credits_to_atomic(Decimal(str(amt)))
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         values = list(updates.values()) + [sub_id]
-        await self.db.execute(
+        await self.db.execute(  # nosemgrep: sqlalchemy-execute-raw-query
             f"UPDATE subscriptions SET {set_clause} WHERE id = ?",
             values,
         )

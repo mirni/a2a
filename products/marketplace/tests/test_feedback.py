@@ -6,9 +6,8 @@ Agents can submit suggestions and the platform can retrieve them.
 from __future__ import annotations
 
 import pytest
-
-from src.models import ServiceCreate
 from src.marketplace import Marketplace, ServiceNotFoundError
+from src.models import ServiceCreate
 
 pytestmark = pytest.mark.asyncio
 

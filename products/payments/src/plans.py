@@ -13,10 +13,9 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-from shared_src.pricing_config import load_pricing_config
-
 from payments.engine import PaymentEngine
-from payments.models import Subscription, SubscriptionStatus
+from payments.models import Subscription
+from shared_src.pricing_config import load_pricing_config
 
 logger = logging.getLogger(__name__)
 

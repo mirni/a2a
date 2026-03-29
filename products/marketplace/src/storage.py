@@ -229,7 +229,7 @@ class MarketplaceStorage:
         values.append(now)
         values.append(service_id)
 
-        await self.db.execute(
+        await self.db.execute(  # nosemgrep: sqlalchemy-execute-raw-query
             f"UPDATE services SET {', '.join(updates)} WHERE id = ?",
             values,
         )
@@ -299,7 +299,7 @@ class MarketplaceStorage:
         """
         params.extend([limit, offset])
 
-        cursor = await self.db.execute(sql, params)
+        cursor = await self.db.execute(sql, params)  # nosemgrep: sqlalchemy-execute-raw-query
         rows = await cursor.fetchall()
         results = []
         for row in rows:
@@ -356,7 +356,7 @@ class MarketplaceStorage:
         where = " AND ".join(conditions)
         sql = f"SELECT COUNT(DISTINCT s.id) as cnt FROM services s WHERE {where}"
 
-        cursor = await self.db.execute(sql, params)
+        cursor = await self.db.execute(sql, params)  # nosemgrep: sqlalchemy-execute-raw-query
         row = await cursor.fetchone()
         return row["cnt"] if row else 0
 

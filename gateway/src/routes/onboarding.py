@@ -9,12 +9,12 @@ Returns an enriched OpenAPI 3.1.0 spec with:
 
 from __future__ import annotations
 
+from shared_src.pricing_config import load_pricing_config
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from gateway.src.openapi import generate_openapi_spec
-from shared_src.pricing_config import load_pricing_config
 
 _pricing = load_pricing_config()
 

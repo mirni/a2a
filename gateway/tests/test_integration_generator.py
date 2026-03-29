@@ -5,10 +5,6 @@ Generates LangChain and CrewAI integration code from the tool catalog.
 
 from __future__ import annotations
 
-import json
-
-import pytest
-
 
 class TestCatalogLoader:
     """Test loading and parsing the tool catalog."""

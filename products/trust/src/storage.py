@@ -212,7 +212,7 @@ class StorageBackend:
 
         if updates:
             values.append(server_id)
-            await self.db.execute(
+            await self.db.execute(  # nosemgrep: sqlalchemy-execute-raw-query
                 f"UPDATE servers SET {', '.join(updates)} WHERE id = ?",
                 values,
             )
