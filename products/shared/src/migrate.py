@@ -32,6 +32,19 @@ class MigrationError(Exception):
         )
 
 
+class SchemaVersionMismatchError(Exception):
+    """Raised when the DB schema version doesn't match the expected version."""
+
+    def __init__(self, db_name: str, current: int, expected: int) -> None:
+        self.db_name = db_name
+        self.current = current
+        self.expected = expected
+        super().__init__(
+            f"{db_name}: schema version mismatch (db={current}, expected={expected}). "
+            f"Run migrate_db.sh before starting the application."
+        )
+
+
 _TRACKING_DDL = """\
 CREATE TABLE IF NOT EXISTS schema_migrations (
     version     INTEGER PRIMARY KEY,
@@ -108,3 +121,25 @@ async def run_migrations(
             raise MigrationError(mig.version, mig.description, exc) from exc
 
     return applied
+
+
+async def check_schema_version(
+    db: aiosqlite.Connection,
+    expected_version: int,
+    db_name: str = "unknown",
+    allow_fresh: bool = False,
+) -> None:
+    """Verify the DB schema version matches *expected_version*.
+
+    Raises ``SchemaVersionMismatchError`` on mismatch.
+
+    If *expected_version* is 0, this is a no-op (no migrations declared).
+    If *allow_fresh* is True, a brand-new DB (version 0) is accepted.
+    """
+    if expected_version == 0:
+        return
+    current = await get_current_version(db)
+    if current == 0 and allow_fresh:
+        return
+    if current != expected_version:
+        raise SchemaVersionMismatchError(db_name, current, expected_version)

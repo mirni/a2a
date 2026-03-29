@@ -70,7 +70,7 @@ done
 cp -r "$REPO_ROOT/scripts" "$STAGING/opt/a2a/scripts"
 
 # Symlink each script to /usr/local/bin/ for PATH access
-for script in common.bash create_user.sh deploy_a2a.sh deploy_a2a-gateway.sh deploy_website.sh; do
+for script in common.bash create_user.sh deploy_a2a.sh deploy_a2a-gateway.sh deploy_website.sh migrate_db.sh; do
     if [[ -f "$REPO_ROOT/scripts/$script" ]]; then
         ln -sf "/opt/a2a/scripts/$script" "$STAGING/usr/local/bin/$script"
     fi

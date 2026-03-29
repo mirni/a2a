@@ -39,7 +39,7 @@ async def tmp_db():
 async def storage(tmp_db):
     """Yield a connected StorageBackend, closed after test."""
     backend = StorageBackend(dsn=tmp_db)
-    await backend.connect()
+    await backend.connect(apply_migrations=True)
     yield backend
     await backend.close()
 
@@ -66,6 +66,6 @@ async def event_stream(storage):
 async def tracker(tmp_db):
     """Yield a connected UsageTracker, closed after test."""
     t = UsageTracker(storage=tmp_db)
-    await t.connect()
+    await t.connect(apply_migrations=True)
     yield t
     await t.close()

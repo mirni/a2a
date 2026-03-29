@@ -1,4 +1,11 @@
-"""Tests for billing schema migrations (old-schema → new-schema CI pattern)."""
+"""Tests for billing schema migrations — atomic migration workflow (TDD).
+
+Tests verify that:
+- connect() WITHOUT apply_migrations fails on old-schema DBs
+- connect() WITH apply_migrations applies them
+- Fresh DBs work without migrations (allow_fresh)
+- Idempotency dedup still works after migration
+"""
 
 from __future__ import annotations
 
@@ -9,6 +16,11 @@ import aiosqlite
 import pytest
 
 from src.storage import StorageBackend
+
+try:
+    from shared_src.migrate import SchemaVersionMismatchError
+except ImportError:
+    from src.migrate import SchemaVersionMismatchError
 
 
 # The original DDL *without* idempotency_key — simulates a pre-migration DB.
@@ -86,10 +98,26 @@ async def old_schema_dsn():
 
 
 class TestBillingMigrations:
-    async def test_old_schema_migrates_on_connect(self, old_schema_dsn):
-        """An existing DB without idempotency_key gets the column after connect()."""
+    async def test_connect_fails_if_old_schema_not_migrated(self, old_schema_dsn):
+        """Old-schema DB without external migration raises SchemaVersionMismatchError."""
         backend = StorageBackend(dsn=old_schema_dsn)
-        await backend.connect()
+        with pytest.raises(SchemaVersionMismatchError):
+            await backend.connect()
+
+    async def test_connect_succeeds_after_external_migration(self, old_schema_dsn):
+        """Run migrations externally, then connect() succeeds."""
+        try:
+            from shared_src.migrate import run_migrations
+        except ImportError:
+            from src.migrate import run_migrations
+
+        # Simulate external migration script
+        db_path = old_schema_dsn.replace("sqlite:///", "")
+        async with aiosqlite.connect(db_path) as db:
+            await run_migrations(db, StorageBackend._MIGRATIONS)
+
+        backend = StorageBackend(dsn=old_schema_dsn)
+        await backend.connect()  # should NOT raise
         # idempotency_key should now work
         row_id = await backend.record_usage(
             agent_id="a1", function="test", cost=1.0, idempotency_key="key-1"
@@ -97,21 +125,17 @@ class TestBillingMigrations:
         assert row_id is not None
         await backend.close()
 
-    async def test_fresh_db_idempotent_on_second_connect(self, tmp_db):
-        """Fresh DB → connect() twice → no errors (migrations are idempotent)."""
+    async def test_fresh_db_connect_succeeds(self, tmp_db):
+        """Fresh DB (v0) connects successfully (allow_fresh=True)."""
         backend = StorageBackend(dsn=tmp_db)
-        await backend.connect()
+        await backend.connect()  # should NOT raise
+        assert True
         await backend.close()
-        # Second connect — migrations should skip (already applied)
-        backend2 = StorageBackend(dsn=tmp_db)
-        await backend2.connect()
-        assert True  # no exception
-        await backend2.close()
 
     async def test_idempotency_dedup_after_migration(self, old_schema_dsn):
         """After migration, duplicate idempotency_key is deduplicated."""
         backend = StorageBackend(dsn=old_schema_dsn)
-        await backend.connect()
+        await backend.connect(apply_migrations=True)
         await backend.create_wallet("a1", 100.0)
         id1 = await backend.record_usage(
             agent_id="a1", function="f", cost=1.0, idempotency_key="dup"
@@ -121,3 +145,14 @@ class TestBillingMigrations:
         )
         assert id1 == id2  # second insert returned existing row
         await backend.close()
+
+    async def test_fresh_db_idempotent_on_second_connect(self, tmp_db):
+        """Fresh DB → connect(apply_migrations=True) twice → no errors."""
+        backend = StorageBackend(dsn=tmp_db)
+        await backend.connect(apply_migrations=True)
+        await backend.close()
+        # Second connect — migrations should skip (already applied)
+        backend2 = StorageBackend(dsn=tmp_db)
+        await backend2.connect(apply_migrations=True)
+        assert True  # no exception
+        await backend2.close()

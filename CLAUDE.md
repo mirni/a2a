@@ -29,5 +29,12 @@ Infrastructure code is exempt from this rule.
 * Use `Decimal` for all currency-related fields; never use `float`.
 
 
+## Database Schema Migrations
+* Never execute schema changes within the application process.
+* All schema modifications must be scripted as Migration objects and applied via `scripts/migrate_db.sh`.
+* `_SCHEMA` DDL must always reflect the current expected state (post-migration) so fresh DBs get the full schema without needing migrations.
+* The app checks schema version on startup and fails with `SchemaVersionMismatchError` if the DB hasn't been migrated.
+
+
 # Append all prompts and outputs into MASTER_LOG.md
 * Both human prompt and claude terminal output should be appended.

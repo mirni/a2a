@@ -6,6 +6,13 @@ case "$1" in
         # Code is already installed from the deb — skip git clone/pull
         export A2A_SKIP_GIT=1
         export A2A_SKIP_APT=1  # dpkg holds the lock; deps satisfied via Depends:
+
+        # Run database migrations before starting the service.
+        # prerm already stopped the service; migrate_db.sh does shadow-copy + atomic swap.
+        if [[ -x /opt/a2a/scripts/migrate_db.sh ]]; then
+            /opt/a2a/scripts/migrate_db.sh || exit 1
+        fi
+
         /usr/local/bin/deploy_a2a.sh
         ;;
     abort-upgrade|abort-remove|abort-deconfigure)

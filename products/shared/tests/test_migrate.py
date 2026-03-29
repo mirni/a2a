@@ -8,7 +8,14 @@ import tempfile
 import aiosqlite
 import pytest
 
-from src.migrate import Migration, MigrationError, get_current_version, run_migrations
+from src.migrate import (
+    Migration,
+    MigrationError,
+    SchemaVersionMismatchError,
+    check_schema_version,
+    get_current_version,
+    run_migrations,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -203,3 +210,47 @@ class TestValidation:
         mig = Migration(version=0, description="bad", sql="SELECT 1")
         with pytest.raises(ValueError, match="[Pp]ositive"):
             await run_migrations(db, (mig,))
+
+
+# ---------------------------------------------------------------------------
+# Schema version checking
+# ---------------------------------------------------------------------------
+
+class TestCheckSchemaVersion:
+    async def test_check_version_matching_passes(self, db):
+        """DB at v2, expected v2 — no error."""
+        await run_migrations(db, SAMPLE_MIGRATIONS)
+        assert await get_current_version(db) == 2
+        await check_schema_version(db, expected_version=2, db_name="test")
+
+    async def test_check_version_mismatch_raises(self, db):
+        """DB at v1, expected v2 — raises SchemaVersionMismatchError."""
+        await run_migrations(db, (SAMPLE_MIGRATIONS[0],))
+        assert await get_current_version(db) == 1
+        with pytest.raises(SchemaVersionMismatchError):
+            await check_schema_version(db, expected_version=2, db_name="test")
+
+    async def test_check_version_zero_expected_noop(self, db):
+        """expected=0 always passes (no migrations declared)."""
+        await check_schema_version(db, expected_version=0, db_name="test")
+
+    async def test_check_version_fresh_db_allowed(self, db):
+        """DB at v0 with allow_fresh=True — passes."""
+        assert await get_current_version(db) == 0
+        await check_schema_version(
+            db, expected_version=2, db_name="test", allow_fresh=True
+        )
+
+    async def test_check_version_fresh_db_rejected(self, db):
+        """DB at v0 with allow_fresh=False — raises."""
+        assert await get_current_version(db) == 0
+        with pytest.raises(SchemaVersionMismatchError):
+            await check_schema_version(
+                db, expected_version=2, db_name="test", allow_fresh=False
+            )
+
+    async def test_error_message_includes_migrate_script(self, db):
+        """Error message contains migrate_db.sh for operator guidance."""
+        await run_migrations(db, (SAMPLE_MIGRATIONS[0],))
+        with pytest.raises(SchemaVersionMismatchError, match="migrate_db.sh"):
+            await check_schema_version(db, expected_version=2, db_name="test")

@@ -1,4 +1,4 @@
-"""Tests for BaseStorage — DB timeout wrapper (TDD)."""
+"""Tests for BaseStorage — DB timeout wrapper and schema version checks (TDD)."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ import aiosqlite
 import pytest
 
 from src.base_storage import BaseStorage
+from src.migrate import Migration, SchemaVersionMismatchError, get_current_version
 
 
 pytestmark = pytest.mark.asyncio
@@ -90,3 +91,74 @@ class TestDBTimeout:
             )
 
         await storage._db.close()
+
+
+# ---------------------------------------------------------------------------
+# Schema version checking on connect
+# ---------------------------------------------------------------------------
+
+_TEST_MIGRATIONS = (
+    Migration(version=1, description="add col name",
+              sql="ALTER TABLE t1 ADD COLUMN name TEXT"),
+    Migration(version=2, description="add col tag",
+              sql="ALTER TABLE t1 ADD COLUMN tag TEXT"),
+)
+
+
+class TestSchemaVersionCheck:
+    async def test_connect_raises_on_version_mismatch(self, tmp_path):
+        """DB at v1 but storage expects v2 — raises SchemaVersionMismatchError."""
+
+        @dataclass
+        class MigStorage(BaseStorage):
+            _SCHEMA: str = "CREATE TABLE IF NOT EXISTS t1 (id INTEGER PRIMARY KEY, name TEXT, tag TEXT);"
+            _MIGRATIONS: tuple = _TEST_MIGRATIONS
+
+        db_path = str(tmp_path / "mismatch.db")
+        # Pre-seed DB at v1 (base schema + first migration only)
+        async with aiosqlite.connect(db_path) as db:
+            await db.executescript("CREATE TABLE t1 (id INTEGER PRIMARY KEY);")
+            await db.commit()
+            from src.migrate import run_migrations
+            await run_migrations(db, _TEST_MIGRATIONS[:1])
+
+        storage = MigStorage(dsn=f"sqlite:///{db_path}")
+        with pytest.raises(SchemaVersionMismatchError):
+            await storage.connect()
+
+    async def test_connect_succeeds_on_fresh_db(self, tmp_path):
+        """Empty DB (v0) — connect succeeds (stamps version from _SCHEMA)."""
+
+        @dataclass
+        class MigStorage(BaseStorage):
+            _SCHEMA: str = "CREATE TABLE IF NOT EXISTS t1 (id INTEGER PRIMARY KEY, name TEXT, tag TEXT);"
+            _MIGRATIONS: tuple = _TEST_MIGRATIONS
+
+        storage = MigStorage(dsn=f"sqlite:///{tmp_path}/fresh.db")
+        await storage.connect()  # should NOT raise
+        await storage.close()
+
+    async def test_connect_with_apply_migrations_runs_them(self, tmp_path):
+        """connect(apply_migrations=True) on existing DB applies pending migrations."""
+
+        @dataclass
+        class MigStorage(BaseStorage):
+            _SCHEMA: str = "CREATE TABLE IF NOT EXISTS t1 (id INTEGER PRIMARY KEY, name TEXT, tag TEXT);"
+            _MIGRATIONS: tuple = _TEST_MIGRATIONS
+
+        # Pre-seed DB with base schema only (no migrations)
+        db_path = str(tmp_path / "apply.db")
+        async with aiosqlite.connect(db_path) as db:
+            await db.executescript("CREATE TABLE t1 (id INTEGER PRIMARY KEY);")
+            await db.commit()
+
+        storage = MigStorage(dsn=f"sqlite:///{db_path}")
+        await storage.connect(apply_migrations=True)
+
+        # Version should be 2
+        version = await get_current_version(storage.db)
+        assert version == 2
+
+        # Column from migration v2 should exist
+        await storage.db.execute("INSERT INTO t1 (id, name, tag) VALUES (1, 'ok', 't')")
+        await storage.close()

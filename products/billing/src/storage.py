@@ -44,11 +44,13 @@ CREATE TABLE IF NOT EXISTS usage_records (
     cost            INTEGER NOT NULL DEFAULT 0,
     tokens          INTEGER NOT NULL DEFAULT 0,
     metadata        TEXT,
-    created_at      REAL NOT NULL
+    created_at      REAL NOT NULL,
+    idempotency_key TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_usage_agent   ON usage_records(agent_id);
 CREATE INDEX IF NOT EXISTS idx_usage_created ON usage_records(created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_usage_idempotency ON usage_records(idempotency_key);
 
 CREATE TABLE IF NOT EXISTS transactions (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,

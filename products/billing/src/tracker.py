@@ -49,9 +49,9 @@ class UsageTracker:
         self._policies = RatePolicyManager(storage=self._storage)
         self._events = BillingEventStream(storage=self._storage)
 
-    async def connect(self) -> None:
+    async def connect(self, *, apply_migrations: bool = False) -> None:
         """Open the database and ensure schema exists."""
-        await self._storage.connect()
+        await self._storage.connect(apply_migrations=apply_migrations)
 
     async def close(self) -> None:
         """Close the database connection."""

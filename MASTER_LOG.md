@@ -3662,3 +3662,42 @@ Created a Docker Compose wrapper with subcommands (`up`, `down`, `status`, `logs
 | **DONE** | CRIT-2 | ✅ INTEGER storage with SCALE=10^8, all 3 products migrated |
 | **LOW** | OpenAPI | Auto-generate from catalog + route definitions |
 | **LOW** | Docs site | Deploy documentation from existing catalog |
+
+---
+
+# Session: Atomic Database Migration Workflow (2026-03-29)
+
+## Prompt
+Implement the atomic database migration workflow plan: decouple migrations from app startup, add schema version checks, create external migration scripts.
+
+## Changes Made
+
+### Step 1: Updated billing `_SCHEMA` DDL
+- Added `idempotency_key TEXT` column and `CREATE UNIQUE INDEX idx_usage_idempotency` to `_SCHEMA` DDL in `products/billing/src/storage.py`.
+
+### Step 2: Added `SchemaVersionMismatchError` + `check_schema_version()` (TDD)
+- `products/shared/src/migrate.py`: new exception + `check_schema_version()` with `allow_fresh`
+- 6 new tests in `products/shared/tests/test_migrate.py`
+
+### Step 3: Modified `BaseStorage.connect()` (TDD)
+- `products/shared/src/base_storage.py`: `apply_migrations` kwarg, fresh DB detection + version stamping
+- 3 new tests in `products/shared/tests/test_base_storage.py`
+
+### Steps 4-6: Billing layer updates
+- `products/billing/src/tracker.py`: threaded `apply_migrations`
+- `products/billing/tests/conftest.py`: fixtures pass `apply_migrations=True`
+- `products/billing/tests/test_migrations.py`: rewritten (5 tests)
+
+### Steps 7-8: Migration scripts
+- `scripts/migrate_db_helper.py`: Python helper (list-products/migrate/validate)
+- `scripts/migrate_db.sh`: atomic shadow-copy → migrate → validate → swap
+
+### Steps 9-11: Packaging + docs
+- `packaging/postinst`: runs `migrate_db.sh` before `deploy_a2a.sh`
+- `packaging/build-deb.sh`: added `migrate_db.sh` to symlink list
+- `CLAUDE.md`: added Database Schema Migrations rules
+
+## Test Results
+```
+Modules: 10 | Pass: 10 | Fail: 0 | Total: 1475 tests
+```
