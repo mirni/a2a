@@ -15,11 +15,11 @@ rule_files:
 scrape_configs:
   # A2A Gateway — /v1/metrics endpoint (Prometheus text format)
   - job_name: "a2a-gateway"
-    scheme: "https"
+    scheme: "${A2A_GATEWAY_SCHEME}"
     metrics_path: "/v1/metrics"
     scrape_interval: 10s
     static_configs:
-      - targets: ["api.greenhelix.net:443"]
+      - targets: ["${A2A_GATEWAY_HOST}:${A2A_GATEWAY_PORT}"]
         labels:
           instance: "gateway-primary"
           environment: "production"
@@ -27,11 +27,11 @@ scrape_configs:
   # A2A Gateway — /v1/health endpoint (probe-style)
   # Uses the blackbox-style approach: scrape and check for 200
   - job_name: "a2a-health"
-    scheme: "https"
+    scheme: "${A2A_GATEWAY_SCHEME}"
     metrics_path: "/v1/health"
     scrape_interval: 30s
     static_configs:
-      - targets: ["api.greenhelix.net:443"]
+      - targets: ["${A2A_GATEWAY_HOST}:${A2A_GATEWAY_PORT}"]
         labels:
           instance: "gateway-primary"
 

@@ -6,13 +6,12 @@
 #   docker compose up -d
 #
 # Access:
-#   Grafana:    http://localhost:3000  (admin / admin)
+#   Grafana:    http://localhost:3030  (admin / admin)
 #   Prometheus: http://localhost:9090
 #
 # The stack scrapes metrics from the A2A gateway at the target defined in
-# prometheus/prometheus.yml.  By default it expects the gateway at
-# host.docker.internal:8000 (works on Docker Desktop).  For Linux without
-# Docker Desktop, set A2A_GATEWAY_HOST in .env or use --network=host.
+# prometheus/prometheus.yml (generated from prometheus.yml.tmpl by run_monitor.sh).
+# Default target: api.greenhelix.net:8000.  Override with A2A_GATEWAY_HOST env var.
 # =============================================================================
 
 services:
@@ -38,7 +37,7 @@ services:
     container_name: a2a-grafana
     restart: unless-stopped
     ports:
-      - "${GRAFANA_PORT:-3000}:3000"
+      - "${GRAFANA_PORT:-3030}:3000"
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro

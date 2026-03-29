@@ -40,6 +40,9 @@ venv/
 .DS_Store
 Thumbs.db
 
+# Generated configs
+monitoring/prometheus/prometheus.yml
+
 # Data/runtime
 *.db
 *.sqlite3
