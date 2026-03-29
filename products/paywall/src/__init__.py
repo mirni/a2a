@@ -6,8 +6,8 @@ rate limits, and wallet-based billing.
 
 from .keys import InvalidKeyError, KeyManager
 from .middleware import (
-    PaywallAuthError,
     InsufficientBalanceError,
+    PaywallAuthError,
     PaywallError,
     PaywallMiddleware,
     RateLimitError,

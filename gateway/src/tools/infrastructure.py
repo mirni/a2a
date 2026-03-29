@@ -2,19 +2,17 @@
 
 from __future__ import annotations
 
+from datetime import UTC
 from typing import Any
 
 from gateway.src.lifespan import AppContext
-
 
 # ---------------------------------------------------------------------------
 # Paywall / Audit
 # ---------------------------------------------------------------------------
 
 
-async def _get_global_audit_log(
-    ctx: AppContext, params: dict[str, Any]
-) -> dict[str, Any]:
+async def _get_global_audit_log(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     entries = await ctx.paywall_storage.get_global_audit_log(
         since=params.get("since"),
         limit=params.get("limit", 100),
@@ -61,6 +59,7 @@ async def _register_event_schema(ctx: AppContext, params: dict[str, Any]) -> dic
     db = ctx.event_bus.db
 
     import time as _time
+
     now = _time.time()
     await db.execute(
         """
@@ -144,7 +143,7 @@ async def _test_webhook(ctx: AppContext, params: dict[str, Any]) -> dict[str, An
     try:
         return await wm.send_test_ping(webhook_id)
     except LookupError:
-        raise ToolNotFoundError(f"Webhook not found: {webhook_id}")
+        raise ToolNotFoundError(f"Webhook not found: {webhook_id}") from None
 
 
 # ---------------------------------------------------------------------------
@@ -215,6 +214,7 @@ def _resolve_db_path(db_name: str) -> str:
     env_var = _DB_DSN_MAP.get(db_name)
     if not env_var:
         from gateway.src.tool_errors import ToolValidationError
+
         raise ToolValidationError(f"Unknown database: {db_name}")
     dsn = os.environ.get(env_var, "")
     if not dsn:
@@ -224,7 +224,7 @@ def _resolve_db_path(db_name: str) -> str:
 
 async def _backup_database(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     import os
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from shared_src.db_security import backup_database, encrypt_backup
 
@@ -234,7 +234,7 @@ async def _backup_database(ctx: AppContext, params: dict[str, Any]) -> dict[str,
     backup_dir = os.path.join(data_dir, "backups")
     os.makedirs(backup_dir, exist_ok=True)
 
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     dest = os.path.join(backup_dir, f"{db_name}_{ts}.db")
 
     meta = await backup_database(db_path, dest)
@@ -298,9 +298,11 @@ async def _list_backups(ctx: AppContext, params: dict[str, Any]) -> dict[str, An
     for fname in sorted(os.listdir(backup_dir)):
         fpath = os.path.join(backup_dir, fname)
         if os.path.isfile(fpath):
-            backups.append({
-                "filename": fname,
-                "path": fpath,
-                "size_bytes": os.path.getsize(fpath),
-            })
+            backups.append(
+                {
+                    "filename": fname,
+                    "path": fpath,
+                    "size_bytes": os.path.getsize(fpath),
+                }
+            )
     return {"backups": backups}

@@ -71,16 +71,18 @@ class MessagingAPI:
         thread_id = uuid.uuid4().hex
         expires_at = time.time() + expires_hours * 3600
 
-        neg_id = await self._storage.store_negotiation({
-            "thread_id": thread_id,
-            "initiator": initiator,
-            "responder": responder,
-            "proposed_amount": amount,
-            "current_amount": amount,
-            "status": NegotiationState.PROPOSED.value,
-            "service_id": service_id,
-            "expires_at": expires_at,
-        })
+        neg_id = await self._storage.store_negotiation(
+            {
+                "thread_id": thread_id,
+                "initiator": initiator,
+                "responder": responder,
+                "proposed_amount": amount,
+                "current_amount": amount,
+                "status": NegotiationState.PROPOSED.value,
+                "service_id": service_id,
+                "expires_at": expires_at,
+            }
+        )
 
         # Send the proposal message
         await self.send_message(
@@ -112,10 +114,13 @@ class MessagingAPI:
 
         other = neg["responder"] if agent_id == neg["initiator"] else neg["initiator"]
 
-        await self._storage.update_negotiation(negotiation_id, {
-            "current_amount": new_amount,
-            "status": NegotiationState.COUNTERED.value,
-        })
+        await self._storage.update_negotiation(
+            negotiation_id,
+            {
+                "current_amount": new_amount,
+                "status": NegotiationState.COUNTERED.value,
+            },
+        )
 
         await self.send_message(
             sender=agent_id,
@@ -144,9 +149,12 @@ class MessagingAPI:
 
         other = neg["responder"] if agent_id == neg["initiator"] else neg["initiator"]
 
-        await self._storage.update_negotiation(negotiation_id, {
-            "status": NegotiationState.ACCEPTED.value,
-        })
+        await self._storage.update_negotiation(
+            negotiation_id,
+            {
+                "status": NegotiationState.ACCEPTED.value,
+            },
+        )
 
         await self.send_message(
             sender=agent_id,
@@ -175,9 +183,12 @@ class MessagingAPI:
 
         other = neg["responder"] if agent_id == neg["initiator"] else neg["initiator"]
 
-        await self._storage.update_negotiation(negotiation_id, {
-            "status": NegotiationState.REJECTED.value,
-        })
+        await self._storage.update_negotiation(
+            negotiation_id,
+            {
+                "status": NegotiationState.REJECTED.value,
+            },
+        )
 
         await self.send_message(
             sender=agent_id,

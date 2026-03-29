@@ -51,7 +51,7 @@ def classify_error(exc: Exception | None, status_code: int | None = None) -> Pro
         return ProbeErrorType.SSL_ERROR
 
     # httpx-specific exception types
-    if isinstance(exc, httpx.ConnectTimeout) or isinstance(exc, httpx.ReadTimeout):
+    if isinstance(exc, (httpx.ConnectTimeout, httpx.ReadTimeout)):
         return ProbeErrorType.TIMEOUT
     if isinstance(exc, httpx.TimeoutException):
         return ProbeErrorType.TIMEOUT
@@ -141,7 +141,10 @@ class ProbeWorker:
             await self.trust_storage.store_probe_result(result)
             logger.debug(
                 "Probe %s: status=%d latency=%.1fms error_type=%s",
-                server_id, status_code, latency_ms, error_type.value,
+                server_id,
+                status_code,
+                latency_ms,
+                error_type.value,
             )
             return result, error_type
 
@@ -149,9 +152,7 @@ class ProbeWorker:
             if should_close:
                 await client.aclose()
 
-    async def probe_batch(
-        self, targets: list[tuple[str, str]]
-    ) -> list[tuple[TrustProbeResult, ProbeErrorType]]:
+    async def probe_batch(self, targets: list[tuple[str, str]]) -> list[tuple[TrustProbeResult, ProbeErrorType]]:
         """Probe a batch of targets sequentially.
 
         Args:

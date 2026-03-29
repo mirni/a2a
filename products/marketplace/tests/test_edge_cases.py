@@ -2,17 +2,13 @@
 
 from __future__ import annotations
 
-import pytest
-
-from src.marketplace import Marketplace
 from src.models import (
+    SLA,
     MatchPreference,
     PricingModel,
     PricingModelType,
-    SLA,
     ServiceCreate,
     ServiceSearchParams,
-    ServiceStatus,
 )
 
 
@@ -53,14 +49,16 @@ class TestBestMatchTiedScores:
 
     async def test_tied_scores_deterministic_ordering(self, marketplace):
         for i in range(3):
-            await marketplace.register_service(make_service(
-                provider_id=f"agent-{i}",
-                name=f"translation service {i}",
-                description="Translates text between languages",
-                category="nlp",
-                tags=["translation"],
-                cost=1.0,
-            ))
+            await marketplace.register_service(
+                make_service(
+                    provider_id=f"agent-{i}",
+                    name=f"translation service {i}",
+                    description="Translates text between languages",
+                    category="nlp",
+                    tags=["translation"],
+                    cost=1.0,
+                )
+            )
 
         matches_a = await marketplace.best_match(query="translation", limit=3)
         matches_b = await marketplace.best_match(query="translation", limit=3)
@@ -82,18 +80,18 @@ class TestBestMatchPreferCostAllFree:
 
     async def test_all_free_services_returned(self, marketplace):
         for i in range(5):
-            await marketplace.register_service(make_service(
-                provider_id=f"free-{i}",
-                name=f"Free Tool {i}",
-                description="A free tool for testing",
-                category="utils",
-                cost=0.0,
-                pricing_model=PricingModelType.FREE,
-            ))
+            await marketplace.register_service(
+                make_service(
+                    provider_id=f"free-{i}",
+                    name=f"Free Tool {i}",
+                    description="A free tool for testing",
+                    category="utils",
+                    cost=0.0,
+                    pricing_model=PricingModelType.FREE,
+                )
+            )
 
-        matches = await marketplace.best_match(
-            query="free", prefer=MatchPreference.COST, limit=10
-        )
+        matches = await marketplace.best_match(query="free", prefer=MatchPreference.COST, limit=10)
         assert len(matches) == 5
         for m in matches:
             assert m.service.pricing.cost == 0.0
@@ -107,18 +105,18 @@ class TestBestMatchPreferLatency:
     async def test_latency_preference_ranks_low_latency_higher(self, marketplace):
         latencies = [50, 200, 500, 1000, 2000]
         for i, lat in enumerate(latencies):
-            await marketplace.register_service(make_service(
-                provider_id=f"lat-{i}",
-                name=f"Latency Service {i}",
-                description="Fast response service",
-                category="perf",
-                max_latency_ms=lat,
-                cost=1.0,
-            ))
+            await marketplace.register_service(
+                make_service(
+                    provider_id=f"lat-{i}",
+                    name=f"Latency Service {i}",
+                    description="Fast response service",
+                    category="perf",
+                    max_latency_ms=lat,
+                    cost=1.0,
+                )
+            )
 
-        matches = await marketplace.best_match(
-            query="service", prefer=MatchPreference.LATENCY, limit=5
-        )
+        matches = await marketplace.best_match(query="service", prefer=MatchPreference.LATENCY, limit=5)
         assert len(matches) == 5
         # Lower latency should produce higher rank_score
         # Check that the service with 50ms latency outscores 2000ms
@@ -126,18 +124,18 @@ class TestBestMatchPreferLatency:
         assert latency_map[50] > latency_map[2000]
 
     async def test_low_latency_reason_attached(self, marketplace):
-        await marketplace.register_service(make_service(
-            provider_id="fast",
-            name="Fast API",
-            description="Ultra fast API",
-            category="perf",
-            max_latency_ms=100,
-            cost=1.0,
-        ))
-
-        matches = await marketplace.best_match(
-            query="fast", prefer=MatchPreference.LATENCY, limit=1
+        await marketplace.register_service(
+            make_service(
+                provider_id="fast",
+                name="Fast API",
+                description="Ultra fast API",
+                category="perf",
+                max_latency_ms=100,
+                cost=1.0,
+            )
         )
+
+        matches = await marketplace.best_match(query="fast", prefer=MatchPreference.LATENCY, limit=1)
         assert len(matches) == 1
         assert "low_latency" in matches[0].match_reasons
 
@@ -146,10 +144,14 @@ class TestBestMatchEmptyQuery:
     """best_match with empty or None query should still work."""
 
     async def test_empty_string_query(self, marketplace):
-        await marketplace.register_service(make_service(
-            provider_id="a1", name="Some Service", cost=0.0,
-            pricing_model=PricingModelType.FREE,
-        ))
+        await marketplace.register_service(
+            make_service(
+                provider_id="a1",
+                name="Some Service",
+                cost=0.0,
+                pricing_model=PricingModelType.FREE,
+            )
+        )
         matches = await marketplace.best_match(query="", limit=5)
         # Should return service(s) even without text match
         assert len(matches) >= 1
@@ -162,14 +164,16 @@ class TestBestMatchBudgetFilter:
         costs = [0.0, 0.5, 1.0]
         for i, cost in enumerate(costs):
             pm = PricingModelType.FREE if cost == 0.0 else PricingModelType.PER_CALL
-            await marketplace.register_service(make_service(
-                provider_id=f"b-{i}",
-                name=f"Budget Test {i}",
-                description="Budget testing service",
-                category="budget",
-                cost=cost,
-                pricing_model=pm,
-            ))
+            await marketplace.register_service(
+                make_service(
+                    provider_id=f"b-{i}",
+                    name=f"Budget Test {i}",
+                    description="Budget testing service",
+                    category="budget",
+                    cost=cost,
+                    pricing_model=pm,
+                )
+            )
 
         matches = await marketplace.best_match(query="budget", budget=0.5, limit=10)
         for m in matches:
@@ -185,14 +189,15 @@ class TestBestMatchMinTrustNoProvider:
     """best_match with min_trust_score when no trust provider is configured."""
 
     async def test_min_trust_no_provider_returns_empty(self, marketplace):
-        await marketplace.register_service(make_service(
-            provider_id="a1", name="Service A",
-        ))
+        await marketplace.register_service(
+            make_service(
+                provider_id="a1",
+                name="Service A",
+            )
+        )
         # No trust provider => trust_score is None for all services
         # min_trust_score filter requires trust_score >= threshold AND trust_score is not None
-        matches = await marketplace.best_match(
-            query="service", min_trust_score=80, limit=5
-        )
+        matches = await marketplace.best_match(query="service", min_trust_score=80, limit=5)
         # Should return empty because trust_score is None
         assert len(matches) == 0
 
@@ -207,12 +212,14 @@ class TestSearchPagination:
 
     async def _seed_25(self, marketplace):
         for i in range(25):
-            await marketplace.register_service(make_service(
-                provider_id=f"pag-{i}",
-                name=f"Pagination Service {i:02d}",
-                description="A service for pagination testing",
-                category="pagination",
-            ))
+            await marketplace.register_service(
+                make_service(
+                    provider_id=f"pag-{i}",
+                    name=f"Pagination Service {i:02d}",
+                    description="A service for pagination testing",
+                    category="pagination",
+                )
+            )
 
     async def test_first_page(self, marketplace):
         await self._seed_25(marketplace)
@@ -262,14 +269,16 @@ class TestSearchMaxCostBoundary:
         costs = [0.0, 0.5, 1.0, 1.5, 2.0]
         for i, cost in enumerate(costs):
             pm = PricingModelType.FREE if cost == 0.0 else PricingModelType.PER_CALL
-            await marketplace.register_service(make_service(
-                provider_id=f"cost-{i}",
-                name=f"Cost Service {i}",
-                description="Cost boundary service",
-                category="cost-test",
-                cost=cost,
-                pricing_model=pm,
-            ))
+            await marketplace.register_service(
+                make_service(
+                    provider_id=f"cost-{i}",
+                    name=f"Cost Service {i}",
+                    description="Cost boundary service",
+                    category="cost-test",
+                    cost=cost,
+                    pricing_model=pm,
+                )
+            )
 
     async def test_max_cost_one(self, marketplace):
         await self._seed_costs(marketplace)

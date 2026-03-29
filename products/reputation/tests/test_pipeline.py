@@ -4,25 +4,21 @@ from __future__ import annotations
 
 import asyncio
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
 import pytest_asyncio
 
 from products.reputation.src.aggregator import Aggregator
-from products.reputation.src.models import PipelineConfig, ProbeSchedule, ProbeTarget, ScanSchedule
+from products.reputation.src.models import PipelineConfig, ProbeSchedule, ScanSchedule
 from products.reputation.src.pipeline import ReputationPipeline
 from products.reputation.src.probe_worker import ProbeWorker
 from products.reputation.src.scan_worker import ScanWorker
 from products.reputation.src.storage import ReputationStorage
 from products.trust.src.models import (
-    ProbeResult as TrustProbeResult,
-    SecurityScan as TrustSecurityScan,
     Server,
     TransportType,
-    TrustScore,
-    Window,
 )
 from products.trust.src.storage import StorageBackend as TrustStorageBackend
 
@@ -75,9 +71,7 @@ class TestPipelineAddTarget:
     async def test_add_target(self, pipeline_deps):
         pipeline, trust_storage, rep_storage = pipeline_deps
 
-        target = await pipeline.add_target(
-            url="https://example.com", server_id="svc-1"
-        )
+        target = await pipeline.add_target(url="https://example.com", server_id="svc-1")
         assert target.server_id == "svc-1"
         assert target.url == "https://example.com"
         assert target.probe_interval == 60.0
@@ -107,14 +101,15 @@ class TestPipelineAddTarget:
         pipeline, trust_storage, _ = pipeline_deps
 
         server = Server(
-            id="svc-1", name="existing", url="https://old.com",
-            transport_type=TransportType.HTTP, registered_at=time.time(),
+            id="svc-1",
+            name="existing",
+            url="https://old.com",
+            transport_type=TransportType.HTTP,
+            registered_at=time.time(),
         )
         await trust_storage.register_server(server)
 
-        target = await pipeline.add_target(
-            url="https://example.com", server_id="svc-1"
-        )
+        target = await pipeline.add_target(url="https://example.com", server_id="svc-1")
         assert target.server_id == "svc-1"
 
     @pytest.mark.asyncio

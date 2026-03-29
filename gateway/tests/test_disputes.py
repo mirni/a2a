@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-
 pytestmark = pytest.mark.asyncio
 
 
@@ -16,9 +15,7 @@ async def test_open_dispute(client, pro_api_key, app):
     disputer_key = await ctx.key_manager.create_key("disputer", tier="pro")
 
     # Create escrow first
-    escrow = await ctx.payment_engine.create_escrow(
-        payer="disputer", payee="disputed-party", amount=100.0
-    )
+    escrow = await ctx.payment_engine.create_escrow(payer="disputer", payee="disputed-party", amount=100.0)
 
     resp = await client.post(
         "/v1/execute",
@@ -46,14 +43,10 @@ async def test_respond_to_dispute(client, pro_api_key, app):
     await ctx.tracker.wallet.create("seller-d", initial_balance=0.0)
     seller_key = await ctx.key_manager.create_key("seller-d", tier="pro")
 
-    escrow = await ctx.payment_engine.create_escrow(
-        payer="buyer-d", payee="seller-d", amount=50.0
-    )
+    escrow = await ctx.payment_engine.create_escrow(payer="buyer-d", payee="seller-d", amount=50.0)
 
     # Open dispute
-    dispute = await ctx.dispute_engine.open_dispute(
-        escrow_id=escrow.id, opener="buyer-d", reason="Did not deliver"
-    )
+    dispute = await ctx.dispute_engine.open_dispute(escrow_id=escrow.id, opener="buyer-d", reason="Did not deliver")
 
     # Seller responds
     resp = await client.post(
@@ -79,13 +72,9 @@ async def test_resolve_dispute_refund(client, pro_api_key, app):
     await ctx.tracker.wallet.create("buyer-e", initial_balance=1000.0)
     await ctx.tracker.wallet.create("seller-e", initial_balance=0.0)
 
-    escrow = await ctx.payment_engine.create_escrow(
-        payer="buyer-e", payee="seller-e", amount=75.0
-    )
+    escrow = await ctx.payment_engine.create_escrow(payer="buyer-e", payee="seller-e", amount=75.0)
 
-    dispute = await ctx.dispute_engine.open_dispute(
-        escrow_id=escrow.id, opener="buyer-e", reason="Quality issue"
-    )
+    dispute = await ctx.dispute_engine.open_dispute(escrow_id=escrow.id, opener="buyer-e", reason="Quality issue")
 
     resp = await client.post(
         "/v1/execute",
@@ -116,13 +105,9 @@ async def test_resolve_dispute_release(client, pro_api_key, app):
     await ctx.tracker.wallet.create("buyer-f", initial_balance=1000.0)
     await ctx.tracker.wallet.create("seller-f", initial_balance=0.0)
 
-    escrow = await ctx.payment_engine.create_escrow(
-        payer="buyer-f", payee="seller-f", amount=60.0
-    )
+    escrow = await ctx.payment_engine.create_escrow(payer="buyer-f", payee="seller-f", amount=60.0)
 
-    dispute = await ctx.dispute_engine.open_dispute(
-        escrow_id=escrow.id, opener="buyer-f", reason="Dispute test"
-    )
+    dispute = await ctx.dispute_engine.open_dispute(escrow_id=escrow.id, opener="buyer-f", reason="Dispute test")
 
     resp = await client.post(
         "/v1/execute",

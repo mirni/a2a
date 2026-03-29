@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from gateway.src.tool_errors import (
     NegativeCostError,
     ToolNotFoundError,
@@ -21,13 +19,11 @@ class TestToolValidationError:
 
     def test_maps_to_400(self):
         """The error mapping should resolve ToolValidationError → 400."""
-        from gateway.src.errors import handle_product_exception
 
         exc = ToolValidationError("invalid interval")
         # We check the mapping dict directly since handle_product_exception
         # is async and requires a Request object.
         exc_type = type(exc).__name__
-        from gateway.src.errors import handle_product_exception  # noqa: F811
 
         # The mapping dict is inside handle_product_exception; verify the
         # exception name matches a 400 mapping.

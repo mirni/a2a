@@ -1,20 +1,17 @@
 """Tests for the Stripe API client wrapper."""
 
-import os
-
 import httpx
 import pytest
-
-from src.client import StripeClient, _flatten_dict, _translate_error, _get_api_key
+from src.client import StripeClient, _flatten_dict, _get_api_key, _translate_error
 from src.errors import (
     AuthenticationError,
     ConnectorError,
     RateLimitError,
     UpstreamError,
 )
-from src.retry import RetryConfig, RetryExhausted
+from src.retry import RetryConfig
 
-from .conftest import MockTransport, make_error_response, make_stripe_response
+from .conftest import make_error_response, make_stripe_response
 
 
 class TestFlattenDict:
@@ -91,9 +88,7 @@ class TestTranslateError:
 
 class TestStripeClientRequest:
     async def test_successful_get(self, stripe_client, mock_transport):
-        mock_transport.add_response(
-            make_stripe_response({"id": "bal_1", "object": "balance"})
-        )
+        mock_transport.add_response(make_stripe_response({"id": "bal_1", "object": "balance"}))
         result = await stripe_client.get("balance")
         assert result["id"] == "bal_1"
         # Verify auth header was sent
@@ -101,9 +96,7 @@ class TestStripeClientRequest:
         assert req.headers.get("authorization") is not None
 
     async def test_successful_post_with_idempotency(self, stripe_client, mock_transport):
-        mock_transport.add_response(
-            make_stripe_response({"id": "cus_123", "object": "customer"})
-        )
+        mock_transport.add_response(make_stripe_response({"id": "cus_123", "object": "customer"}))
         result = await stripe_client.post(
             "customers",
             {"email": "test@example.com"},
@@ -122,9 +115,7 @@ class TestStripeClientRequest:
     async def test_retry_on_500(self, mock_transport, fast_rate_limiter):
         """Client retries on 500, succeeds on second attempt."""
         mock_transport.add_response(make_error_response(500))
-        mock_transport.add_response(
-            make_stripe_response({"id": "cus_ok"})
-        )
+        mock_transport.add_response(make_stripe_response({"id": "cus_ok"}))
         retry_cfg = RetryConfig(max_retries=2, base_delay=0.0, max_delay=0.0)
         http = httpx.AsyncClient(transport=mock_transport, base_url="https://api.stripe.com/v1")
         client = StripeClient(
@@ -136,9 +127,7 @@ class TestStripeClientRequest:
         assert result["id"] == "cus_ok"
         assert len(mock_transport.requests) == 2
 
-    async def test_non_retryable_error_raises_immediately(
-        self, mock_transport, fast_rate_limiter
-    ):
+    async def test_non_retryable_error_raises_immediately(self, mock_transport, fast_rate_limiter):
         """400 errors are not retried and raise ConnectorError."""
         mock_transport.add_response(make_error_response(400, message="Invalid param"))
         retry_cfg = RetryConfig(max_retries=2, base_delay=0.0, max_delay=0.0)
@@ -169,9 +158,7 @@ class TestStripeClientRequest:
         assert len(mock_transport.requests) == 3
 
     async def test_post_flattens_nested_data(self, stripe_client, mock_transport):
-        mock_transport.add_response(
-            make_stripe_response({"id": "sub_1"})
-        )
+        mock_transport.add_response(make_stripe_response({"id": "sub_1"}))
         await stripe_client.post(
             "subscriptions",
             {

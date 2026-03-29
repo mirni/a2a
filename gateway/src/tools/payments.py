@@ -6,7 +6,6 @@ from typing import Any
 
 from gateway.src.lifespan import AppContext
 
-
 # ---------------------------------------------------------------------------
 # Payment Intents
 # ---------------------------------------------------------------------------
@@ -46,24 +45,16 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
         return {"id": voided.id, "status": "voided", "amount": float(voided.amount)}
 
     if intent.status.value == "settled":
-        await ctx.tracker.wallet.withdraw(
-            intent.payee, float(intent.amount), description=f"refund:{intent.id}"
-        )
-        await ctx.tracker.wallet.deposit(
-            intent.payer, float(intent.amount), description=f"refund:{intent.id}"
-        )
+        await ctx.tracker.wallet.withdraw(intent.payee, float(intent.amount), description=f"refund:{intent.id}")
+        await ctx.tracker.wallet.deposit(intent.payer, float(intent.amount), description=f"refund:{intent.id}")
         return {"id": intent.id, "status": "refunded", "amount": float(intent.amount)}
 
     from payments_src.engine import InvalidStateError
 
-    raise InvalidStateError(
-        f"Cannot refund intent in state '{intent.status.value}'"
-    )
+    raise InvalidStateError(f"Cannot refund intent in state '{intent.status.value}'")
 
 
-async def _get_payment_history(
-    ctx: AppContext, params: dict[str, Any]
-) -> dict[str, Any]:
+async def _get_payment_history(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     history = await ctx.payment_engine.get_payment_history(
         agent_id=params["agent_id"],
         limit=params.get("limit", 100),
@@ -235,9 +226,7 @@ async def _reactivate_subscription(ctx: AppContext, params: dict[str, Any]) -> d
     return {"id": sub.id, "status": sub.status.value}
 
 
-async def _process_due_subscriptions(
-    ctx: AppContext, params: dict[str, Any]
-) -> dict[str, Any]:
+async def _process_due_subscriptions(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     if ctx.scheduler is None:
         return {"error": "Scheduler not available"}
     result = await ctx.scheduler.process_due()

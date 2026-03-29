@@ -11,7 +11,6 @@ from products.identity.src.models import (
     AgentReputation,
     AuditorAttestation,
     MetricCommitment,
-    VerifiedClaim,
 )
 
 

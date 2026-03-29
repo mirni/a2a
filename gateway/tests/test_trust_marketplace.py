@@ -8,15 +8,16 @@ from __future__ import annotations
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 async def _register_trust_server(app, server_id: str, name: str) -> None:
     """Register a server in the trust system and give it probe data for a score."""
-    from trust_src.models import ProbeResult, SecurityScan
     import time
+
+    from trust_src.models import ProbeResult, SecurityScan
 
     trust_api = app.state.ctx.trust_api
     storage = trust_api.storage
@@ -50,9 +51,7 @@ async def _register_trust_server(app, server_id: str, name: str) -> None:
     await storage.store_security_scan(scan)
 
 
-async def _register_marketplace_service(
-    client, api_key, provider_id: str, name: str, category: str = "data"
-) -> dict:
+async def _register_marketplace_service(client, api_key, provider_id: str, name: str, category: str = "data") -> dict:
     """Register a service in the marketplace through the gateway.
 
     Uses the provided api_key which must be pro-tier (register_service requires pro).
@@ -91,9 +90,7 @@ class TestGatewayTrustMarketplace:
         await _register_trust_server(app, server_id="srv-1", name="Trusted Server")
 
         # Register a marketplace service with same provider_id (requires pro tier)
-        await _register_marketplace_service(
-            client, pro_api_key, provider_id="srv-1", name="Trusted Service"
-        )
+        await _register_marketplace_service(client, pro_api_key, provider_id="srv-1", name="Trusted Service")
 
         # Search (free tier) and verify trust_score is present
         resp = await client.post(
@@ -113,13 +110,9 @@ class TestGatewayTrustMarketplace:
         assert 0 <= services[0]["trust_score"] <= 100
 
     @pytest.mark.asyncio
-    async def test_search_without_trust_data_returns_none(
-        self, app, client, pro_api_key, api_key
-    ):
+    async def test_search_without_trust_data_returns_none(self, app, client, pro_api_key, api_key):
         """Services with provider_id not in trust system should get trust_score=None."""
-        await _register_marketplace_service(
-            client, pro_api_key, provider_id="no-trust-data", name="Unscored Service"
-        )
+        await _register_marketplace_service(client, pro_api_key, provider_id="no-trust-data", name="Unscored Service")
 
         resp = await client.post(
             "/v1/execute",
@@ -139,8 +132,9 @@ class TestGatewayTrustMarketplace:
         await _register_trust_server(app, server_id="low-t", name="LowTrust")
 
         # Give low-t a bad probe so its score is lower
-        from trust_src.models import ProbeResult
         import time
+
+        from trust_src.models import ProbeResult
 
         low_probe = ProbeResult(
             server_id="low-t",
@@ -154,12 +148,8 @@ class TestGatewayTrustMarketplace:
         await app.state.ctx.trust_api.storage.store_probe_result(low_probe)
 
         # Register marketplace services (requires pro tier)
-        await _register_marketplace_service(
-            client, pro_api_key, provider_id="high-t", name="Premium Data Service"
-        )
-        await _register_marketplace_service(
-            client, pro_api_key, provider_id="low-t", name="Budget Data Service"
-        )
+        await _register_marketplace_service(client, pro_api_key, provider_id="high-t", name="Premium Data Service")
+        await _register_marketplace_service(client, pro_api_key, provider_id="low-t", name="Budget Data Service")
 
         # best_match (free tier) with prefer=trust
         resp = await client.post(

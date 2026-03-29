@@ -35,9 +35,7 @@ async def test_volume_discount_tier_5pct(client, api_key, app):
     ctx = app.state.ctx
     # Record 150 usage records for test-agent on get_balance
     for _ in range(150):
-        await ctx.tracker.storage.record_usage(
-            agent_id="test-agent", function="get_balance", cost=0.0
-        )
+        await ctx.tracker.storage.record_usage(agent_id="test-agent", function="get_balance", cost=0.0)
 
     resp = await client.post(
         "/v1/execute",
@@ -61,9 +59,7 @@ async def test_volume_discount_tier_10pct(client, api_key, app):
     """Agent with 500-999 historical calls gets 10% discount."""
     ctx = app.state.ctx
     for _ in range(600):
-        await ctx.tracker.storage.record_usage(
-            agent_id="test-agent", function="search_services", cost=1.0
-        )
+        await ctx.tracker.storage.record_usage(agent_id="test-agent", function="search_services", cost=1.0)
 
     resp = await client.post(
         "/v1/execute",
@@ -87,9 +83,7 @@ async def test_volume_discount_tier_15pct(client, api_key, app):
     """Agent with 1000+ historical calls gets 15% discount."""
     ctx = app.state.ctx
     for _ in range(1050):
-        await ctx.tracker.storage.record_usage(
-            agent_id="test-agent", function="create_intent", cost=2.0
-        )
+        await ctx.tracker.storage.record_usage(agent_id="test-agent", function="create_intent", cost=2.0)
 
     resp = await client.post(
         "/v1/execute",

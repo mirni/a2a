@@ -7,7 +7,6 @@ import tempfile
 
 import aiosqlite
 import pytest
-
 from src.migrate import (
     Migration,
     MigrationError,
@@ -17,10 +16,10 @@ from src.migrate import (
     run_migrations,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 async def db():
@@ -42,16 +41,17 @@ async def file_db():
 
 
 SAMPLE_MIGRATIONS = (
-    Migration(version=1, description="create items table",
-              sql="CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)"),
-    Migration(version=2, description="add price column",
-              sql="ALTER TABLE items ADD COLUMN price REAL"),
+    Migration(
+        version=1, description="create items table", sql="CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)"
+    ),
+    Migration(version=2, description="add price column", sql="ALTER TABLE items ADD COLUMN price REAL"),
 )
 
 
 # ---------------------------------------------------------------------------
 # Tracking table creation
 # ---------------------------------------------------------------------------
+
 
 class TestTrackingTable:
     async def test_get_version_creates_tracking_table(self, db):
@@ -64,9 +64,7 @@ class TestTrackingTable:
         applied = await run_migrations(db, ())
         assert applied == 0
         # Table must exist
-        cursor = await db.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'"
-        )
+        cursor = await db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'")
         row = await cursor.fetchone()
         assert row is not None
 
@@ -74,6 +72,7 @@ class TestTrackingTable:
 # ---------------------------------------------------------------------------
 # Applying migrations
 # ---------------------------------------------------------------------------
+
 
 class TestApplyMigrations:
     async def test_single_migration(self, db):
@@ -97,9 +96,7 @@ class TestApplyMigrations:
     async def test_records_version_description_timestamp(self, db):
         """Each applied migration records version, description, and applied_at."""
         await run_migrations(db, SAMPLE_MIGRATIONS)
-        cursor = await db.execute(
-            "SELECT version, description, applied_at FROM schema_migrations ORDER BY version"
-        )
+        cursor = await db.execute("SELECT version, description, applied_at FROM schema_migrations ORDER BY version")
         rows = await cursor.fetchall()
         assert len(rows) == 2
         assert rows[0][0] == 1
@@ -129,6 +126,7 @@ class TestApplyMigrations:
 # Idempotency
 # ---------------------------------------------------------------------------
 
+
 class TestIdempotency:
     async def test_skip_already_applied(self, db):
         """Re-running on an already-migrated DB applies 0."""
@@ -150,6 +148,7 @@ class TestIdempotency:
 # Error handling
 # ---------------------------------------------------------------------------
 
+
 class TestErrorHandling:
     async def test_bad_sql_raises_migration_error(self, db):
         """Invalid SQL raises MigrationError with version info."""
@@ -162,8 +161,7 @@ class TestErrorHandling:
 
     async def test_failed_migration_does_not_advance_version(self, db):
         """If a migration fails, the version stays at its previous value."""
-        good = Migration(version=1, description="good",
-                         sql="CREATE TABLE ok (id INTEGER)")
+        good = Migration(version=1, description="good", sql="CREATE TABLE ok (id INTEGER)")
         bad = Migration(version=2, description="bad", sql="INVALID SQL HERE")
         with pytest.raises(MigrationError):
             await run_migrations(db, (good, bad))
@@ -172,8 +170,7 @@ class TestErrorHandling:
 
     async def test_partial_failure_preserves_earlier(self, db):
         """Earlier successful migrations survive when a later one fails."""
-        good = Migration(version=1, description="good",
-                         sql="CREATE TABLE survived (id INTEGER)")
+        good = Migration(version=1, description="good", sql="CREATE TABLE survived (id INTEGER)")
         bad = Migration(version=2, description="bad", sql="INVALID")
         with pytest.raises(MigrationError):
             await run_migrations(db, (good, bad))
@@ -185,6 +182,7 @@ class TestErrorHandling:
 # ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
+
 
 class TestValidation:
     async def test_duplicate_versions_raises(self, db):
@@ -216,6 +214,7 @@ class TestValidation:
 # Schema version checking
 # ---------------------------------------------------------------------------
 
+
 class TestCheckSchemaVersion:
     async def test_check_version_matching_passes(self, db):
         """DB at v2, expected v2 — no error."""
@@ -237,17 +236,13 @@ class TestCheckSchemaVersion:
     async def test_check_version_fresh_db_allowed(self, db):
         """DB at v0 with allow_fresh=True — passes."""
         assert await get_current_version(db) == 0
-        await check_schema_version(
-            db, expected_version=2, db_name="test", allow_fresh=True
-        )
+        await check_schema_version(db, expected_version=2, db_name="test", allow_fresh=True)
 
     async def test_check_version_fresh_db_rejected(self, db):
         """DB at v0 with allow_fresh=False — raises."""
         assert await get_current_version(db) == 0
         with pytest.raises(SchemaVersionMismatchError):
-            await check_schema_version(
-                db, expected_version=2, db_name="test", allow_fresh=False
-            )
+            await check_schema_version(db, expected_version=2, db_name="test", allow_fresh=False)
 
     async def test_error_message_includes_migrate_script(self, db):
         """Error message contains migrate_db.sh for operator guidance."""

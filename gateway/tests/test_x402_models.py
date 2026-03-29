@@ -19,9 +19,7 @@ class TestX402Authorization:
     """X402Authorization model validation."""
 
     def test_valid_authorization(self):
-        auth = X402Authorization(
-            **X402Authorization.model_config["json_schema_extra"]["example"]
-        )
+        auth = X402Authorization(**X402Authorization.model_config["json_schema_extra"]["example"])
         assert auth.from_address == "0xSenderAddress"
         assert auth.to == "0xMerchantAddress"
         assert auth.value == "1000000"
@@ -53,9 +51,7 @@ class TestX402Payload:
     """X402Payload model validation."""
 
     def test_valid_payload(self):
-        payload = X402Payload(
-            **X402Payload.model_config["json_schema_extra"]["example"]
-        )
+        payload = X402Payload(**X402Payload.model_config["json_schema_extra"]["example"])
         assert payload.signature.startswith("0x")
         assert isinstance(payload.authorization, X402Authorization)
 
@@ -70,9 +66,7 @@ class TestX402PaymentProof:
     """X402PaymentProof model validation."""
 
     def test_valid_proof(self):
-        proof = X402PaymentProof(
-            **X402PaymentProof.model_config["json_schema_extra"]["example"]
-        )
+        proof = X402PaymentProof(**X402PaymentProof.model_config["json_schema_extra"]["example"])
         assert proof.x402_version == 1
         assert proof.scheme == "exact"
         assert proof.network == "base"
@@ -97,9 +91,7 @@ class TestX402PaymentRequired:
     """X402PaymentRequired model validation."""
 
     def test_valid_required(self):
-        req = X402PaymentRequired(
-            **X402PaymentRequired.model_config["json_schema_extra"]["example"]
-        )
+        req = X402PaymentRequired(**X402PaymentRequired.model_config["json_schema_extra"]["example"])
         assert req.max_amount_required == "1000"
         assert req.network == "base"
         assert req.pay_to == "0xMerchantAddress"

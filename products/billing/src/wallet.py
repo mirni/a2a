@@ -15,10 +15,7 @@ class InsufficientCreditsError(Exception):
         self.agent_id = agent_id
         self.requested = requested
         self.available = available
-        super().__init__(
-            f"Agent {agent_id}: insufficient credits. "
-            f"Requested {requested}, available {available}"
-        )
+        super().__init__(f"Agent {agent_id}: insufficient credits. Requested {requested}, available {available}")
 
 
 class WalletNotFoundError(Exception):
@@ -42,9 +39,7 @@ class Wallet:
             raise ValueError(f"Wallet already exists for agent {agent_id}")
         wallet = await self.storage.create_wallet(agent_id, initial_balance)
         if initial_balance > 0:
-            await self.storage.record_transaction(
-                agent_id, initial_balance, "deposit", "Initial deposit"
-            )
+            await self.storage.record_transaction(agent_id, initial_balance, "deposit", "Initial deposit")
             await self.storage.emit_event(
                 "wallet.created",
                 agent_id,
@@ -124,9 +119,7 @@ class Wallet:
         await self.storage.record_transaction(agent_id, -amount, "charge", description)
         return new_balance
 
-    async def get_transactions(
-        self, agent_id: str, limit: int = 100, offset: int = 0
-    ) -> list[dict[str, Any]]:
+    async def get_transactions(self, agent_id: str, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
         """Return transaction history for an agent."""
         wallet = await self.storage.get_wallet(agent_id)
         if wallet is None:

@@ -52,9 +52,7 @@ class RateLimitError(ConnectorError):
 
     def __init__(self, retry_after: float | None = None):
         details = {"retry_after": retry_after} if retry_after else {}
-        super().__init__(
-            "Rate limit exceeded", code="RATE_LIMIT", details=details, retryable=True
-        )
+        super().__init__("Rate limit exceeded", code="RATE_LIMIT", details=details, retryable=True)
 
 
 class UpstreamError(ConnectorError):

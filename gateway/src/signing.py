@@ -11,7 +11,6 @@ import hashlib
 import hmac
 import logging
 import os
-from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -50,16 +49,12 @@ class SigningManager:
                 return
             except Exception:
                 logger.warning(
-                    "SigningManager: dilithium module found but keygen failed; "
-                    "falling back to HMAC-SHA3-256",
+                    "SigningManager: dilithium module found but keygen failed; falling back to HMAC-SHA3-256",
                     exc_info=True,
                 )
 
         # -- Fallback: HMAC-SHA3-256 with a random 32-byte key ---------------
-        logger.warning(
-            "SigningManager: dilithium package not available; "
-            "using HMAC-SHA3-256 fallback"
-        )
+        logger.warning("SigningManager: dilithium package not available; using HMAC-SHA3-256 fallback")
         self._hmac_key = os.urandom(32)
         self.available = True
 
@@ -68,16 +63,14 @@ class SigningManager:
     def _hmac_sign(self, data: bytes) -> str:
         """Compute HMAC-SHA3-256 of *data* using the internal key."""
         assert self._hmac_key is not None
-        return hmac.new(
-            self._hmac_key, data, hashlib.sha3_256
-        ).hexdigest()
+        return hmac.new(self._hmac_key, data, hashlib.sha3_256).hexdigest()
 
     def _is_dilithium(self) -> bool:
         return self._dilithium_sk is not None
 
     # -- public API ---------------------------------------------------------
 
-    def sign(self, data: bytes) -> Optional[str]:
+    def sign(self, data: bytes) -> str | None:
         """Sign *data* and return the hex-encoded signature.
 
         Returns ``None`` if signing is not available.
@@ -95,7 +88,7 @@ class SigningManager:
 
         return self._hmac_sign(data)
 
-    def get_public_key(self) -> Optional[str]:
+    def get_public_key(self) -> str | None:
         """Return the hex-encoded public key, or ``None`` if unavailable."""
         if not self.available:
             return None
@@ -103,9 +96,7 @@ class SigningManager:
         if self._is_dilithium():
             try:
                 pk_bytes: bytes = (
-                    self._dilithium_pk
-                    if isinstance(self._dilithium_pk, bytes)
-                    else bytes(self._dilithium_pk)  # type: ignore[arg-type]
+                    self._dilithium_pk if isinstance(self._dilithium_pk, bytes) else bytes(self._dilithium_pk)  # type: ignore[arg-type]
                 )
                 return pk_bytes.hex()
             except Exception:
@@ -145,7 +136,8 @@ class SigningManager:
 # Route handler
 # ---------------------------------------------------------------------------
 
-async def signing_key_handler(request) -> "JSONResponse":  # noqa: ANN001
+
+async def signing_key_handler(request) -> JSONResponse:  # noqa: ANN001
     """Return the public key and algorithm used by the active SigningManager.
 
     Expects ``request.app.state.signing_manager`` to be a :class:`SigningManager`.
@@ -153,21 +145,16 @@ async def signing_key_handler(request) -> "JSONResponse":  # noqa: ANN001
     from starlette.responses import JSONResponse  # local import to avoid top-level dep
 
     manager: SigningManager = request.app.state.signing_manager
-    algorithm = (
-        "crystals-dilithium"
-        if manager._is_dilithium()
-        else "hmac-sha3-256"
-    )
-    return JSONResponse(
-        {"public_key": manager.get_public_key(), "algorithm": algorithm}
-    )
+    algorithm = "crystals-dilithium" if manager._is_dilithium() else "hmac-sha3-256"
+    return JSONResponse({"public_key": manager.get_public_key(), "algorithm": algorithm})
 
 
 # ---------------------------------------------------------------------------
 # Response-signing helper
 # ---------------------------------------------------------------------------
 
-def sign_response(manager: SigningManager, body: bytes) -> Dict[str, str]:
+
+def sign_response(manager: SigningManager, body: bytes) -> dict[str, str]:
     """Return a headers dict with the signature header if signing is available.
 
     Returns an empty dict when signing is unavailable so callers can always

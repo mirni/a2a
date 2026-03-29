@@ -1,7 +1,7 @@
 """A2A Service Marketplace — agent-native service discovery and matching."""
 
 from .marketplace import Marketplace
-from .models import PricingModel, Service, ServiceCreate, ServiceSearchParams, SLA
+from .models import SLA, PricingModel, Service, ServiceCreate, ServiceSearchParams
 from .storage import MarketplaceStorage
 
 __all__ = [

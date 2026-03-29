@@ -284,9 +284,7 @@ class WebhookManager:
     # Delivery history
     # ------------------------------------------------------------------
 
-    async def get_delivery_history(
-        self, webhook_id: str, limit: int = 50
-    ) -> list[dict]:
+    async def get_delivery_history(self, webhook_id: str, limit: int = 50) -> list[dict]:
         """Return delivery history for a webhook, most recent first."""
         self._require_db()
 

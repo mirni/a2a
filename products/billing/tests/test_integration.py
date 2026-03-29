@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from src.tracker import UsageTracker
 from src.wallet import InsufficientCreditsError
 
@@ -18,9 +17,7 @@ class TestFullWorkflow:
             assert await tracker.get_balance("agent-A") == 1000.0
 
             # 2. Set rate policy
-            await tracker.policies.set_policy(
-                "agent-A", max_calls_per_min=100, max_spend_per_day=500.0
-            )
+            await tracker.policies.set_policy("agent-A", max_calls_per_min=100, max_spend_per_day=500.0)
 
             # 3. Register event handler
             events_log = []

@@ -8,7 +8,6 @@ import json
 import time
 
 import pytest
-
 from src.event_bus import EventBus
 
 
@@ -36,7 +35,7 @@ class TestPublish:
 
     @pytest.mark.asyncio
     async def test_publish_stores_sha3_integrity_hash(self, bus: EventBus):
-        event_id = await bus.publish("order.created", "billing", {"amount": 42})
+        await bus.publish("order.created", "billing", {"amount": 42})
         events = await bus.get_events(event_type="order.created")
         assert len(events) == 1
         ev = events[0]
@@ -48,7 +47,7 @@ class TestPublish:
     async def test_integrity_hash_uses_sha3_256(self, bus: EventBus):
         """Verify the stored hash matches SHA-3-256 recomputation."""
         payload = {"amount": 99, "currency": "USD"}
-        event_id = await bus.publish("payment.settled", "payments", payload)
+        await bus.publish("payment.settled", "payments", payload)
         events = await bus.get_events(event_type="payment.settled")
         ev = events[0]
 
@@ -234,7 +233,7 @@ class TestAcknowledge:
             pass
 
         sub_id = await bus.subscribe("evt", handler)
-        id1 = await bus.publish("evt", "src", {"n": 1})
+        await bus.publish("evt", "src", {"n": 1})
         id2 = await bus.publish("evt", "src", {"n": 2})
         id3 = await bus.publish("evt", "src", {"n": 3})
         await asyncio.sleep(0.05)
@@ -391,12 +390,8 @@ class TestCleanup:
         # Manually backdate them in the database
         dsn_path = bus.dsn.replace("sqlite:///", "")
         async with aiosqlite.connect(dsn_path) as db:
-            old_time = time.strftime(
-                "%Y-%m-%dT%H:%M:%S", time.gmtime(time.time() - 7200)
-            )
-            await db.execute(
-                "UPDATE events SET created_at = ?", (old_time,)
-            )
+            old_time = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(time.time() - 7200))
+            await db.execute("UPDATE events SET created_at = ?", (old_time,))
             await db.commit()
 
         # Publish a fresh event

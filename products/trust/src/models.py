@@ -6,14 +6,14 @@ Scores are 0-100. Confidence is 0.0-1.0.
 
 from __future__ import annotations
 
-from enum import Enum
-from typing import Literal
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class TransportType(str, Enum):
+class TransportType(StrEnum):
     """MCP server transport type."""
+
     STDIO = "stdio"
     HTTP = "http"
 
@@ -101,8 +101,9 @@ class SecurityScan(BaseModel):
     cve_count: int = 0
 
 
-class Window(str, Enum):
+class Window(StrEnum):
     """Time window for score aggregation."""
+
     H24 = "24h"
     D7 = "7d"
     D30 = "30d"

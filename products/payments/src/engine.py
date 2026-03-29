@@ -7,7 +7,6 @@ payment-specific records. All monetary operations are atomic via transactions.
 from __future__ import annotations
 
 import time
-import uuid
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
@@ -27,10 +26,10 @@ from payments.storage import PaymentStorage
 # Import InsufficientCreditsError from billing layer
 from src.wallet import InsufficientCreditsError
 
-
 # ---------------------------------------------------------------------------
 # Exceptions
 # ---------------------------------------------------------------------------
+
 
 class PaymentError(Exception):
     """Base exception for payment errors."""
@@ -57,14 +56,13 @@ class DuplicateIntentError(PaymentError):
 
     def __init__(self, existing_intent: PaymentIntent) -> None:
         self.existing_intent = existing_intent
-        super().__init__(
-            f"Duplicate intent with idempotency key; existing id={existing_intent.id}"
-        )
+        super().__init__(f"Duplicate intent with idempotency key; existing id={existing_intent.id}")
 
 
 # ---------------------------------------------------------------------------
 # Engine
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class PaymentEngine:
@@ -125,18 +123,18 @@ class PaymentEngine:
 
         intent = PaymentIntent(**intent_data)
         if intent.status != IntentStatus.PENDING:
-            raise InvalidStateError(
-                f"Cannot capture intent in state '{intent.status.value}'; must be 'pending'"
-            )
+            raise InvalidStateError(f"Cannot capture intent in state '{intent.status.value}'; must be 'pending'")
 
         # Transfer funds: withdraw from payer, deposit to payee
         amount = float(intent.amount)
         await self.wallet.withdraw(
-            intent.payer, amount,
+            intent.payer,
+            amount,
             description=f"payment:{intent.id}",
         )
         await self.wallet.deposit(
-            intent.payee, amount,
+            intent.payee,
+            amount,
             description=f"payment:{intent.id}",
         )
 
@@ -152,9 +150,7 @@ class PaymentEngine:
         await self.storage.insert_settlement(settlement.model_dump())
 
         # Update intent status to settled
-        await self.storage.update_intent_status(
-            intent.id, IntentStatus.SETTLED.value, settlement_id=settlement.id
-        )
+        await self.storage.update_intent_status(intent.id, IntentStatus.SETTLED.value, settlement_id=settlement.id)
 
         return settlement
 
@@ -166,9 +162,7 @@ class PaymentEngine:
 
         intent = PaymentIntent(**intent_data)
         if intent.status != IntentStatus.PENDING:
-            raise InvalidStateError(
-                f"Cannot void intent in state '{intent.status.value}'; must be 'pending'"
-            )
+            raise InvalidStateError(f"Cannot void intent in state '{intent.status.value}'; must be 'pending'")
 
         await self.storage.update_intent_status(intent.id, IntentStatus.VOIDED.value)
         intent.status = IntentStatus.VOIDED
@@ -187,25 +181,23 @@ class PaymentEngine:
 
         intent = PaymentIntent(**intent_data)
         if intent.status != IntentStatus.PENDING:
-            raise InvalidStateError(
-                f"Cannot capture intent in state '{intent.status.value}'; must be 'pending'"
-            )
+            raise InvalidStateError(f"Cannot capture intent in state '{intent.status.value}'; must be 'pending'")
 
         if amount <= 0:
             raise PaymentError("Amount must be positive")
         intent_amount_f = float(intent.amount)
         if amount > intent_amount_f:
-            raise PaymentError(
-                f"Capture amount {amount} exceeds intent amount {intent_amount_f}"
-            )
+            raise PaymentError(f"Capture amount {amount} exceeds intent amount {intent_amount_f}")
 
         # Transfer the partial amount
         await self.wallet.withdraw(
-            intent.payer, amount,
+            intent.payer,
+            amount,
             description=f"partial_capture:{intent.id}",
         )
         await self.wallet.deposit(
-            intent.payee, amount,
+            intent.payee,
+            amount,
             description=f"partial_capture:{intent.id}",
         )
 
@@ -223,9 +215,7 @@ class PaymentEngine:
         remaining = float(Decimal(str(intent_amount_f)) - Decimal(str(amount)))
         if remaining <= 0:
             # Fully captured - mark as settled
-            await self.storage.update_intent_status(
-                intent.id, IntentStatus.SETTLED.value, settlement_id=settlement.id
-            )
+            await self.storage.update_intent_status(intent.id, IntentStatus.SETTLED.value, settlement_id=settlement.id)
         else:
             # Update the intent with the remaining amount
             await self.storage.update_intent_amount(intent.id, remaining)
@@ -266,7 +256,9 @@ class PaymentEngine:
 
         # Withdraw funds from payer (locks them)
         await self.wallet.withdraw(
-            payer, amount, description=f"escrow_hold:{payer}->{payee}",
+            payer,
+            amount,
+            description=f"escrow_hold:{payer}->{payee}",
         )
 
         escrow = Escrow(
@@ -288,14 +280,13 @@ class PaymentEngine:
 
         escrow = Escrow(**escrow_data)
         if escrow.status != EscrowStatus.HELD:
-            raise InvalidStateError(
-                f"Cannot release escrow in state '{escrow.status.value}'; must be 'held'"
-            )
+            raise InvalidStateError(f"Cannot release escrow in state '{escrow.status.value}'; must be 'held'")
 
         # Deposit to payee
         escrow_amount = float(escrow.amount)
         await self.wallet.deposit(
-            escrow.payee, escrow_amount,
+            escrow.payee,
+            escrow_amount,
             description=f"escrow_release:{escrow.id}",
         )
 
@@ -311,9 +302,7 @@ class PaymentEngine:
         await self.storage.insert_settlement(settlement.model_dump())
 
         # Update escrow status
-        await self.storage.update_escrow_status(
-            escrow.id, EscrowStatus.SETTLED.value, settlement_id=settlement.id
-        )
+        await self.storage.update_escrow_status(escrow.id, EscrowStatus.SETTLED.value, settlement_id=settlement.id)
 
         return settlement
 
@@ -325,13 +314,12 @@ class PaymentEngine:
 
         escrow = Escrow(**escrow_data)
         if escrow.status != EscrowStatus.HELD:
-            raise InvalidStateError(
-                f"Cannot refund escrow in state '{escrow.status.value}'; must be 'held'"
-            )
+            raise InvalidStateError(f"Cannot refund escrow in state '{escrow.status.value}'; must be 'held'")
 
         # Return funds to payer
         await self.wallet.deposit(
-            escrow.payer, float(escrow.amount),
+            escrow.payer,
+            float(escrow.amount),
             description=f"escrow_refund:{escrow.id}",
         )
 
@@ -348,13 +336,12 @@ class PaymentEngine:
 
         escrow = Escrow(**escrow_data)
         if escrow.status != EscrowStatus.HELD:
-            raise InvalidStateError(
-                f"Cannot expire escrow in state '{escrow.status.value}'; must be 'held'"
-            )
+            raise InvalidStateError(f"Cannot expire escrow in state '{escrow.status.value}'; must be 'held'")
 
         # Return funds to payer
         await self.wallet.deposit(
-            escrow.payer, float(escrow.amount),
+            escrow.payer,
+            float(escrow.amount),
             description=f"escrow_expired:{escrow.id}",
         )
 
@@ -403,7 +390,7 @@ class PaymentEngine:
             sub_interval = SubscriptionInterval(interval)
         except ValueError:
             valid = [i.value for i in SubscriptionInterval]
-            raise PaymentError(f"Invalid interval '{interval}'; must be one of {valid}")
+            raise PaymentError(f"Invalid interval '{interval}'; must be one of {valid}") from None
 
         sub = Subscription(
             payer=payer,
@@ -419,9 +406,7 @@ class PaymentEngine:
         await self.storage.insert_subscription(sub.model_dump())
         return sub
 
-    async def cancel_subscription(
-        self, sub_id: str, cancelled_by: str | None = None
-    ) -> Subscription:
+    async def cancel_subscription(self, sub_id: str, cancelled_by: str | None = None) -> Subscription:
         """Cancel an active or suspended subscription."""
         sub_data = await self.storage.get_subscription(sub_id)
         if sub_data is None:
@@ -430,14 +415,16 @@ class PaymentEngine:
         sub = Subscription(**sub_data)
         if sub.status not in (SubscriptionStatus.ACTIVE, SubscriptionStatus.SUSPENDED):
             raise InvalidStateError(
-                f"Cannot cancel subscription in state '{sub.status.value}'; "
-                "must be 'active' or 'suspended'"
+                f"Cannot cancel subscription in state '{sub.status.value}'; must be 'active' or 'suspended'"
             )
 
-        await self.storage.update_subscription(sub.id, {
-            "status": SubscriptionStatus.CANCELLED.value,
-            "cancelled_by": cancelled_by,
-        })
+        await self.storage.update_subscription(
+            sub.id,
+            {
+                "status": SubscriptionStatus.CANCELLED.value,
+                "cancelled_by": cancelled_by,
+            },
+        )
         sub.status = SubscriptionStatus.CANCELLED
         sub.cancelled_by = cancelled_by
         sub.updated_at = time.time()
@@ -451,13 +438,14 @@ class PaymentEngine:
 
         sub = Subscription(**sub_data)
         if sub.status != SubscriptionStatus.ACTIVE:
-            raise InvalidStateError(
-                f"Cannot suspend subscription in state '{sub.status.value}'; must be 'active'"
-            )
+            raise InvalidStateError(f"Cannot suspend subscription in state '{sub.status.value}'; must be 'active'")
 
-        await self.storage.update_subscription(sub.id, {
-            "status": SubscriptionStatus.SUSPENDED.value,
-        })
+        await self.storage.update_subscription(
+            sub.id,
+            {
+                "status": SubscriptionStatus.SUSPENDED.value,
+            },
+        )
         sub.status = SubscriptionStatus.SUSPENDED
         sub.updated_at = time.time()
         return sub
@@ -471,13 +459,15 @@ class PaymentEngine:
         sub = Subscription(**sub_data)
         if sub.status != SubscriptionStatus.SUSPENDED:
             raise InvalidStateError(
-                f"Cannot reactivate subscription in state '{sub.status.value}'; "
-                "must be 'suspended'"
+                f"Cannot reactivate subscription in state '{sub.status.value}'; must be 'suspended'"
             )
 
-        await self.storage.update_subscription(sub.id, {
-            "status": SubscriptionStatus.ACTIVE.value,
-        })
+        await self.storage.update_subscription(
+            sub.id,
+            {
+                "status": SubscriptionStatus.ACTIVE.value,
+            },
+        )
         sub.status = SubscriptionStatus.ACTIVE
         sub.updated_at = time.time()
         return sub
@@ -494,26 +484,29 @@ class PaymentEngine:
 
         sub = Subscription(**sub_data)
         if sub.status != SubscriptionStatus.ACTIVE:
-            raise InvalidStateError(
-                f"Cannot charge subscription in state '{sub.status.value}'; must be 'active'"
-            )
+            raise InvalidStateError(f"Cannot charge subscription in state '{sub.status.value}'; must be 'active'")
 
         # Attempt to transfer funds
         sub_amount = float(sub.amount)
         try:
             await self.wallet.withdraw(
-                sub.payer, sub_amount,
+                sub.payer,
+                sub_amount,
                 description=f"subscription:{sub.id}",
             )
         except InsufficientCreditsError:
             # Suspend the subscription
-            await self.storage.update_subscription(sub.id, {
-                "status": SubscriptionStatus.SUSPENDED.value,
-            })
+            await self.storage.update_subscription(
+                sub.id,
+                {
+                    "status": SubscriptionStatus.SUSPENDED.value,
+                },
+            )
             raise
 
         await self.wallet.deposit(
-            sub.payee, sub_amount,
+            sub.payee,
+            sub_amount,
             description=f"subscription:{sub.id}",
         )
 
@@ -535,11 +528,14 @@ class PaymentEngine:
         new_sub.charge_count = sub.charge_count + 1
         new_sub.next_charge_at = new_sub.compute_next_charge()
 
-        await self.storage.update_subscription(sub.id, {
-            "last_charged_at": new_sub.last_charged_at,
-            "charge_count": new_sub.charge_count,
-            "next_charge_at": new_sub.next_charge_at,
-        })
+        await self.storage.update_subscription(
+            sub.id,
+            {
+                "last_charged_at": new_sub.last_charged_at,
+                "charge_count": new_sub.charge_count,
+                "next_charge_at": new_sub.next_charge_at,
+            },
+        )
 
         return settlement
 

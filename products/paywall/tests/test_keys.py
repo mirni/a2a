@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from src.keys import InvalidKeyError, KeyManager, _hash_key
 
 
@@ -26,9 +25,7 @@ class TestKeyGeneration:
         assert result["tier"] == "enterprise"
 
     async def test_create_key_with_connector(self, key_manager: KeyManager):
-        result = await key_manager.create_key(
-            agent_id="agent-1", tier="pro", connector="stripe"
-        )
+        result = await key_manager.create_key(agent_id="agent-1", tier="pro", connector="stripe")
         assert result["connector"] == "stripe"
 
     async def test_invalid_tier_rejected(self, key_manager: KeyManager):

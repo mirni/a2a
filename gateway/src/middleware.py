@@ -6,16 +6,17 @@ import json
 import logging
 import threading
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Callable
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import Any
 
 from starlette.requests import Request
 from starlette.responses import Response
 
-
 # ---------------------------------------------------------------------------
 # 1. Correlation ID Middleware (raw ASGI interface)
 # ---------------------------------------------------------------------------
+
 
 class CorrelationIDMiddleware:
     """ASGI middleware that propagates or generates an X-Request-ID header."""
@@ -41,12 +42,8 @@ class CorrelationIDMiddleware:
         # --- Wrap send to inject the header into the response ---
         async def send_with_correlation_id(message: dict) -> None:
             if message["type"] == "http.response.start":
-                headers_list: list[tuple[bytes, bytes]] = list(
-                    message.get("headers", [])
-                )
-                headers_list.append(
-                    (b"x-request-id", correlation_id.encode("latin-1"))
-                )
+                headers_list: list[tuple[bytes, bytes]] = list(message.get("headers", []))
+                headers_list.append((b"x-request-id", correlation_id.encode("latin-1")))
                 message["headers"] = headers_list
             await send(message)
 
@@ -56,6 +53,7 @@ class CorrelationIDMiddleware:
 # ---------------------------------------------------------------------------
 # 2. Metrics singleton
 # ---------------------------------------------------------------------------
+
 
 class Metrics:
     """Simple in-process metrics collector (thread-safe)."""
@@ -138,12 +136,13 @@ async def metrics_handler(request: Request) -> Response:
 # 3. Structured JSON logging
 # ---------------------------------------------------------------------------
 
+
 class JSONFormatter(logging.Formatter):
     """Formats log records as single-line JSON objects."""
 
     def format(self, record: logging.LogRecord) -> str:
         log_entry: dict[str, Any] = {
-            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "timestamp": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
             "level": record.levelname,
             "name": record.name,
             "message": record.getMessage(),

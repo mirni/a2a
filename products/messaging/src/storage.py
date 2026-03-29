@@ -8,7 +8,6 @@ from __future__ import annotations
 import json
 import time
 import uuid
-from typing import Any
 
 import aiosqlite
 
@@ -62,7 +61,7 @@ def _parse_dsn(dsn: str) -> str:
     """Extract the file path from a sqlite:/// DSN string."""
     prefix = "sqlite:///"
     if dsn.startswith(prefix):
-        return dsn[len(prefix):]
+        return dsn[len(prefix) :]
     return dsn
 
 
@@ -234,10 +233,16 @@ class MessageStorage:
             return None
         return self._row_to_negotiation_dict(row)
 
-    _NEGOTIATION_COLUMNS = frozenset({
-        "current_amount", "status", "counter_party_id",
-        "expires_at", "updated_at", "metadata",
-    })
+    _NEGOTIATION_COLUMNS = frozenset(
+        {
+            "current_amount",
+            "status",
+            "counter_party_id",
+            "expires_at",
+            "updated_at",
+            "metadata",
+        }
+    )
 
     async def update_negotiation(self, negotiation_id: str, updates: dict) -> None:
         """Update specific fields of a negotiation.

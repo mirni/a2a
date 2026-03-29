@@ -1,9 +1,5 @@
 """Extended tests for tool handlers — covers optional parameter branches and error paths."""
 
-import pytest
-
-from src.client import StripeClient
-from src.errors import ValidationError
 from src.models import (
     CreateCustomerInput,
     CreatePaymentIntentInput,
@@ -17,20 +13,17 @@ from src.tools import (
     create_payment_intent,
     create_refund,
     create_subscription,
-    get_balance,
     list_charges,
     list_invoices,
 )
 
-from .conftest import MockTransport, make_error_response, make_stripe_response
+from .conftest import make_error_response, make_stripe_response
 
 
 class TestCreateCustomerBranches:
     async def test_with_description(self, stripe_client, mock_transport):
         mock_transport.add_response(make_stripe_response({"id": "cus_d"}))
-        inp = CreateCustomerInput(
-            email="a@b.com", description="A VIP", idempotency_key="k-desc"
-        )
+        inp = CreateCustomerInput(email="a@b.com", description="A VIP", idempotency_key="k-desc")
         result = await create_customer(stripe_client, inp)
         assert result.success is True
 
@@ -63,9 +56,7 @@ class TestCreatePaymentIntentBranches:
 
     async def test_api_error(self, stripe_client, mock_transport):
         mock_transport.add_response(make_error_response(400, message="Invalid currency"))
-        inp = CreatePaymentIntentInput(
-            amount=100, currency="usd", idempotency_key="pi-err"
-        )
+        inp = CreatePaymentIntentInput(amount=100, currency="usd", idempotency_key="pi-err")
         result = await create_payment_intent(stripe_client, inp)
         assert result.success is False
         assert result.error["code"] == "UPSTREAM_ERROR"
@@ -95,9 +86,7 @@ class TestCreateSubscriptionBranches:
 
     async def test_api_error(self, stripe_client, mock_transport):
         mock_transport.add_response(make_error_response(400, message="No such customer"))
-        inp = CreateSubscriptionInput(
-            customer_id="cus_bad", price_id="price_1", idempotency_key="sub-err"
-        )
+        inp = CreateSubscriptionInput(customer_id="cus_bad", price_id="price_1", idempotency_key="sub-err")
         result = await create_subscription(stripe_client, inp)
         assert result.success is False
 
@@ -117,9 +106,7 @@ class TestCreateRefundBranches:
 
     async def test_api_error(self, stripe_client, mock_transport):
         mock_transport.add_response(make_error_response(400, message="Already refunded"))
-        inp = CreateRefundInput(
-            charge_id="ch_1", idempotency_key="ref-err"
-        )
+        inp = CreateRefundInput(charge_id="ch_1", idempotency_key="ref-err")
         result = await create_refund(stripe_client, inp)
         assert result.success is False
 

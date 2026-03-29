@@ -14,13 +14,12 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
-
-import logging
 
 import aiosqlite
 
@@ -37,9 +36,7 @@ class EventBus:
 
     dsn: str
     _db: aiosqlite.Connection | None = field(default=None, init=False, repr=False)
-    _subscribers: dict[str, dict[str, Any]] = field(
-        default_factory=dict, init=False, repr=False
-    )
+    _subscribers: dict[str, dict[str, Any]] = field(default_factory=dict, init=False, repr=False)
 
     @property
     def db(self) -> aiosqlite.Connection:
@@ -192,9 +189,7 @@ class EventBus:
 
         self._subscribers.pop(subscription_id, None)
 
-        await self._db.execute(
-            "DELETE FROM subscriptions WHERE id = ?", (subscription_id,)
-        )
+        await self._db.execute("DELETE FROM subscriptions WHERE id = ?", (subscription_id,))
         await self._db.commit()
 
     # ------------------------------------------------------------------
@@ -307,12 +302,8 @@ class EventBus:
         """
         self._require_db()
 
-        cutoff = time.strftime(
-            "%Y-%m-%dT%H:%M:%S", time.gmtime(time.time() - older_than_seconds)
-        )
-        cursor = await self._db.execute(
-            "DELETE FROM events WHERE created_at <= ?", (cutoff,)
-        )
+        cutoff = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(time.time() - older_than_seconds))
+        cursor = await self._db.execute("DELETE FROM events WHERE created_at <= ?", (cutoff,))
         await self._db.commit()
         return cursor.rowcount
 

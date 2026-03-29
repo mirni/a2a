@@ -54,8 +54,7 @@ class BaseStorage:
         # Detect whether this is a pre-existing DB (has user tables) before
         # running DDL, so we can distinguish "fresh" from "old schema".
         cursor = await self._db.execute(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' "
-            "AND name NOT LIKE 'sqlite_%'"
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
         )
         row = await cursor.fetchone()
         is_fresh_db = row[0] == 0
@@ -76,27 +75,31 @@ class BaseStorage:
         if self._MIGRATIONS:
             try:
                 from shared_src.migrate import (
-                    run_migrations, check_schema_version,
-                    get_current_version, _ensure_tracking_table,
+                    _ensure_tracking_table,
+                    check_schema_version,
+                    get_current_version,
+                    run_migrations,
                 )
             except ImportError:
                 from src.migrate import (
-                    run_migrations, check_schema_version,
-                    get_current_version, _ensure_tracking_table,
+                    _ensure_tracking_table,
+                    check_schema_version,
+                    get_current_version,
+                    run_migrations,
                 )
 
             if is_fresh_db:
                 # Fresh DB: _SCHEMA already includes the full current DDL.
                 # Stamp the max migration version so run_migrations() skips.
                 import time as _time
-                max_ver = max(m.version for m in self._MIGRATIONS)
+
+                max(m.version for m in self._MIGRATIONS)
                 await _ensure_tracking_table(self._db)
                 current = await get_current_version(self._db)
                 if current == 0:
                     for m in self._MIGRATIONS:
                         await self._db.execute(
-                            "INSERT INTO schema_migrations "
-                            "(version, description, applied_at) VALUES (?, ?, ?)",
+                            "INSERT INTO schema_migrations (version, description, applied_at) VALUES (?, ?, ?)",
                             (m.version, m.description, _time.time()),
                         )
                     await self._db.commit()
@@ -109,7 +112,9 @@ class BaseStorage:
             else:
                 expected = max(m.version for m in self._MIGRATIONS)
                 await check_schema_version(
-                    self._db, expected, type(self).__name__,
+                    self._db,
+                    expected,
+                    type(self).__name__,
                     allow_fresh=is_fresh_db,
                 )
 
@@ -123,7 +128,5 @@ class BaseStorage:
     def db(self) -> aiosqlite.Connection:
         """Return the active database connection or raise if not connected."""
         if self._db is None:
-            raise RuntimeError(
-                f"{type(self).__name__} not connected. Call connect() first."
-            )
+            raise RuntimeError(f"{type(self).__name__} not connected. Call connect() first.")
         return self._db

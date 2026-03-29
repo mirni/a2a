@@ -28,6 +28,7 @@ def _get_audit():
     global _audit
     if _audit is None:
         import importlib
+
         _audit = importlib.import_module("shared.src.audit_log")
     return _audit
 
@@ -36,6 +37,7 @@ def _get_errors():
     global _errors
     if _errors is None:
         import importlib
+
         _errors = importlib.import_module("shared.src.errors")
     return _errors
 
@@ -48,7 +50,7 @@ async def handle_list_repos(client, params: dict[str, Any]) -> dict[str, Any]:
     try:
         validated = ListReposParams(**params)
     except Exception as e:
-        raise errors.ValidationError(str(e), details={"params": params})
+        raise errors.ValidationError(str(e), details={"params": params}) from e
 
     try:
         repos = await client.list_repos(
@@ -92,7 +94,7 @@ async def handle_get_repo(client, params: dict[str, Any]) -> dict[str, Any]:
     try:
         validated = GetRepoParams(**params)
     except Exception as e:
-        raise errors.ValidationError(str(e), details={"params": params})
+        raise errors.ValidationError(str(e), details={"params": params}) from e
 
     try:
         repo = await client.get_repo(owner=validated.owner, repo=validated.repo)
@@ -125,7 +127,7 @@ async def handle_list_issues(client, params: dict[str, Any]) -> dict[str, Any]:
     try:
         validated = ListIssuesParams(**params)
     except Exception as e:
-        raise errors.ValidationError(str(e), details={"params": params})
+        raise errors.ValidationError(str(e), details={"params": params}) from e
 
     try:
         issues = await client.list_issues(
@@ -143,8 +145,10 @@ async def handle_list_issues(client, params: dict[str, Any]) -> dict[str, Any]:
             operation="list_issues",
             connector="github",
             params={
-                "owner": validated.owner, "repo": validated.repo,
-                "state": validated.state, "page": validated.page,
+                "owner": validated.owner,
+                "repo": validated.repo,
+                "state": validated.state,
+                "page": validated.page,
             },
             result_summary=f"returned {len(issues)} issues",
             duration_ms=duration,
@@ -175,7 +179,7 @@ async def handle_create_issue(client, params: dict[str, Any]) -> dict[str, Any]:
     try:
         validated = CreateIssueParams(**params)
     except Exception as e:
-        raise errors.ValidationError(str(e), details={"params": params})
+        raise errors.ValidationError(str(e), details={"params": params}) from e
 
     try:
         issue = await client.create_issue(
@@ -191,7 +195,8 @@ async def handle_create_issue(client, params: dict[str, Any]) -> dict[str, Any]:
             operation="create_issue",
             connector="github",
             params={
-                "owner": validated.owner, "repo": validated.repo,
+                "owner": validated.owner,
+                "repo": validated.repo,
                 "title": validated.title,
             },
             result_summary=f"created issue #{issue.get('number', '?')}",
@@ -218,7 +223,7 @@ async def handle_list_pull_requests(client, params: dict[str, Any]) -> dict[str,
     try:
         validated = ListPullRequestsParams(**params)
     except Exception as e:
-        raise errors.ValidationError(str(e), details={"params": params})
+        raise errors.ValidationError(str(e), details={"params": params}) from e
 
     try:
         prs = await client.list_pull_requests(
@@ -237,8 +242,10 @@ async def handle_list_pull_requests(client, params: dict[str, Any]) -> dict[str,
             operation="list_pull_requests",
             connector="github",
             params={
-                "owner": validated.owner, "repo": validated.repo,
-                "state": validated.state, "page": validated.page,
+                "owner": validated.owner,
+                "repo": validated.repo,
+                "state": validated.state,
+                "page": validated.page,
             },
             result_summary=f"returned {len(prs)} pull requests",
             duration_ms=duration,
@@ -269,7 +276,7 @@ async def handle_get_pull_request(client, params: dict[str, Any]) -> dict[str, A
     try:
         validated = GetPullRequestParams(**params)
     except Exception as e:
-        raise errors.ValidationError(str(e), details={"params": params})
+        raise errors.ValidationError(str(e), details={"params": params}) from e
 
     try:
         pr = await client.get_pull_request(
@@ -282,7 +289,8 @@ async def handle_get_pull_request(client, params: dict[str, Any]) -> dict[str, A
             operation="get_pull_request",
             connector="github",
             params={
-                "owner": validated.owner, "repo": validated.repo,
+                "owner": validated.owner,
+                "repo": validated.repo,
                 "pull_number": validated.pull_number,
             },
             result_summary=f"found PR #{validated.pull_number}",
@@ -295,7 +303,8 @@ async def handle_get_pull_request(client, params: dict[str, Any]) -> dict[str, A
             operation="get_pull_request",
             connector="github",
             params={
-                "owner": validated.owner, "repo": validated.repo,
+                "owner": validated.owner,
+                "repo": validated.repo,
                 "pull_number": validated.pull_number,
             },
             error=str(e),
@@ -312,7 +321,7 @@ async def handle_create_pull_request(client, params: dict[str, Any]) -> dict[str
     try:
         validated = CreatePullRequestParams(**params)
     except Exception as e:
-        raise errors.ValidationError(str(e), details={"params": params})
+        raise errors.ValidationError(str(e), details={"params": params}) from e
 
     try:
         pr = await client.create_pull_request(
@@ -329,8 +338,10 @@ async def handle_create_pull_request(client, params: dict[str, Any]) -> dict[str
             operation="create_pull_request",
             connector="github",
             params={
-                "owner": validated.owner, "repo": validated.repo,
-                "title": validated.title, "head": validated.head,
+                "owner": validated.owner,
+                "repo": validated.repo,
+                "title": validated.title,
+                "head": validated.head,
                 "base": validated.base,
             },
             result_summary=f"created PR #{pr.get('number', '?')}",
@@ -343,7 +354,8 @@ async def handle_create_pull_request(client, params: dict[str, Any]) -> dict[str
             operation="create_pull_request",
             connector="github",
             params={
-                "owner": validated.owner, "repo": validated.repo,
+                "owner": validated.owner,
+                "repo": validated.repo,
                 "title": validated.title,
             },
             error=str(e),
@@ -360,7 +372,7 @@ async def handle_list_commits(client, params: dict[str, Any]) -> dict[str, Any]:
     try:
         validated = ListCommitsParams(**params)
     except Exception as e:
-        raise errors.ValidationError(str(e), details={"params": params})
+        raise errors.ValidationError(str(e), details={"params": params}) from e
 
     try:
         commits = await client.list_commits(
@@ -378,7 +390,8 @@ async def handle_list_commits(client, params: dict[str, Any]) -> dict[str, Any]:
             operation="list_commits",
             connector="github",
             params={
-                "owner": validated.owner, "repo": validated.repo,
+                "owner": validated.owner,
+                "repo": validated.repo,
                 "page": validated.page,
             },
             result_summary=f"returned {len(commits)} commits",
@@ -410,7 +423,7 @@ async def handle_get_file_contents(client, params: dict[str, Any]) -> dict[str, 
     try:
         validated = GetFileContentsParams(**params)
     except Exception as e:
-        raise errors.ValidationError(str(e), details={"params": params})
+        raise errors.ValidationError(str(e), details={"params": params}) from e
 
     try:
         contents = await client.get_file_contents(
@@ -424,8 +437,10 @@ async def handle_get_file_contents(client, params: dict[str, Any]) -> dict[str, 
             operation="get_file_contents",
             connector="github",
             params={
-                "owner": validated.owner, "repo": validated.repo,
-                "path": validated.path, "ref": validated.ref,
+                "owner": validated.owner,
+                "repo": validated.repo,
+                "path": validated.path,
+                "ref": validated.ref,
             },
             result_summary=f"type={contents.get('type', 'unknown')}",
             duration_ms=duration,
@@ -437,7 +452,8 @@ async def handle_get_file_contents(client, params: dict[str, Any]) -> dict[str, 
             operation="get_file_contents",
             connector="github",
             params={
-                "owner": validated.owner, "repo": validated.repo,
+                "owner": validated.owner,
+                "repo": validated.repo,
                 "path": validated.path,
             },
             error=str(e),
@@ -454,7 +470,7 @@ async def handle_search_code(client, params: dict[str, Any]) -> dict[str, Any]:
     try:
         validated = SearchCodeParams(**params)
     except Exception as e:
-        raise errors.ValidationError(str(e), details={"params": params})
+        raise errors.ValidationError(str(e), details={"params": params}) from e
 
     try:
         results = await client.search_code(

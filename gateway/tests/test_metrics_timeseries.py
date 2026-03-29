@@ -6,7 +6,6 @@ import time
 
 import pytest
 
-
 pytestmark = pytest.mark.asyncio
 
 
@@ -28,7 +27,7 @@ class TestMetricsTimeseries:
         """Should return bucketed usage data with hourly interval."""
         ctx = app.state.ctx
         # Record some usage
-        now = time.time()
+        time.time()
         await ctx.tracker.storage.record_usage("test-agent", "get_balance", 0.1)
         await ctx.tracker.storage.record_usage("test-agent", "get_balance", 0.2)
 

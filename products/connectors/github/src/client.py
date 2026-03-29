@@ -20,6 +20,7 @@ def _get_retry():
     global _retry_mod
     if _retry_mod is None:
         import importlib
+
         _retry_mod = importlib.import_module("shared.src.retry")
     return _retry_mod
 
@@ -28,6 +29,7 @@ def _get_rate_limiter():
     global _rate_limiter_mod
     if _rate_limiter_mod is None:
         import importlib
+
         _rate_limiter_mod = importlib.import_module("shared.src.rate_limiter")
     return _rate_limiter_mod
 
@@ -36,39 +38,98 @@ def _get_errors():
     global _errors_mod
     if _errors_mod is None:
         import importlib
+
         _errors_mod = importlib.import_module("shared.src.errors")
     return _errors_mod
 
 
 # Keys to keep from GitHub API responses for token-efficient output
-_REPO_KEYS = frozenset({
-    "id", "name", "full_name", "description", "private", "fork",
-    "html_url", "language", "default_branch", "stargazers_count",
-    "forks_count", "open_issues_count", "created_at", "updated_at",
-    "pushed_at", "archived", "disabled", "topics",
-})
+_REPO_KEYS = frozenset(
+    {
+        "id",
+        "name",
+        "full_name",
+        "description",
+        "private",
+        "fork",
+        "html_url",
+        "language",
+        "default_branch",
+        "stargazers_count",
+        "forks_count",
+        "open_issues_count",
+        "created_at",
+        "updated_at",
+        "pushed_at",
+        "archived",
+        "disabled",
+        "topics",
+    }
+)
 
-_ISSUE_KEYS = frozenset({
-    "number", "title", "state", "body", "html_url",
-    "created_at", "updated_at", "closed_at", "labels", "assignees",
-    "comments", "user",
-})
+_ISSUE_KEYS = frozenset(
+    {
+        "number",
+        "title",
+        "state",
+        "body",
+        "html_url",
+        "created_at",
+        "updated_at",
+        "closed_at",
+        "labels",
+        "assignees",
+        "comments",
+        "user",
+    }
+)
 
-_PR_KEYS = frozenset({
-    "number", "title", "state", "body", "html_url",
-    "created_at", "updated_at", "closed_at", "merged_at",
-    "head", "base", "user", "labels", "draft",
-    "additions", "deletions", "changed_files", "mergeable",
-    "merged", "commits", "comments", "review_comments",
-})
+_PR_KEYS = frozenset(
+    {
+        "number",
+        "title",
+        "state",
+        "body",
+        "html_url",
+        "created_at",
+        "updated_at",
+        "closed_at",
+        "merged_at",
+        "head",
+        "base",
+        "user",
+        "labels",
+        "draft",
+        "additions",
+        "deletions",
+        "changed_files",
+        "mergeable",
+        "merged",
+        "commits",
+        "comments",
+        "review_comments",
+    }
+)
 
-_COMMIT_KEYS = frozenset({
-    "sha", "commit", "html_url", "author", "committer",
-})
+_COMMIT_KEYS = frozenset(
+    {
+        "sha",
+        "commit",
+        "html_url",
+        "author",
+        "committer",
+    }
+)
 
-_SEARCH_CODE_ITEM_KEYS = frozenset({
-    "name", "path", "sha", "html_url", "repository",
-})
+_SEARCH_CODE_ITEM_KEYS = frozenset(
+    {
+        "name",
+        "path",
+        "sha",
+        "html_url",
+        "repository",
+    }
+)
 
 
 def _slim(data: dict[str, Any], allowed_keys: frozenset[str]) -> dict[str, Any]:
@@ -215,7 +276,9 @@ class GitHubClient:
             if int(remaining) < 100:
                 logger.warning(
                     "Rate limit low: %s/%s remaining, resets at %s",
-                    remaining, limit, reset_ts,
+                    remaining,
+                    limit,
+                    reset_ts,
                 )
 
     async def _request(
@@ -251,13 +314,13 @@ class GitHubClient:
                     if wait_seconds:
                         await self._rate_limiter.wait_for_rate_limit(wait_seconds)
                     raise errors.RateLimitError(retry_after=wait_seconds)
-                raise errors.ConnectorError(
-                    f"Forbidden: {response.text}", code="FORBIDDEN", retryable=False
-                )
+                raise errors.ConnectorError(f"Forbidden: {response.text}", code="FORBIDDEN", retryable=False)
             if response.status_code == 404:
                 raise errors.ConnectorError(
-                    "Resource not found", code="NOT_FOUND",
-                    details={"path": path}, retryable=False,
+                    "Resource not found",
+                    code="NOT_FOUND",
+                    details={"path": path},
+                    retryable=False,
                 )
             if response.status_code == 422:
                 raise errors.ValidationError(
@@ -268,9 +331,7 @@ class GitHubClient:
                 retry_after = response.headers.get("Retry-After")
                 wait = float(retry_after) if retry_after else 60.0
                 await self._rate_limiter.wait_for_rate_limit(wait)
-                raise httpx.HTTPStatusError(
-                    "Rate limited", request=response.request, response=response
-                )
+                raise httpx.HTTPStatusError("Rate limited", request=response.request, response=response)
             if response.status_code >= 500:
                 raise httpx.HTTPStatusError(
                     f"Server error {response.status_code}",

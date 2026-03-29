@@ -6,7 +6,6 @@ import pytest
 
 from products.messaging.src.models import MessageType, NegotiationState
 
-
 # ---------------------------------------------------------------------------
 # Happy-path lifecycle
 # ---------------------------------------------------------------------------
@@ -110,13 +109,15 @@ class TestNegotiationErrors:
 
     async def test_column_whitelist_rejects_invalid_field(self, storage):
         """H-11: update_negotiation rejects columns not in the whitelist."""
-        neg_id = await storage.store_negotiation({
-            "thread_id": "t1",
-            "initiator": "a",
-            "responder": "b",
-            "proposed_amount": 100.0,
-            "current_amount": 100.0,
-            "status": NegotiationState.PROPOSED.value,
-        })
+        neg_id = await storage.store_negotiation(
+            {
+                "thread_id": "t1",
+                "initiator": "a",
+                "responder": "b",
+                "proposed_amount": 100.0,
+                "current_amount": 100.0,
+                "status": NegotiationState.PROPOSED.value,
+            }
+        )
         with pytest.raises(ValueError, match="Invalid negotiation columns"):
             await storage.update_negotiation(neg_id, {"initiator": "evil"})

@@ -37,9 +37,7 @@ async def test_estimate_cost_with_agent_discount(client, api_key, app):
     ctx = app.state.ctx
     # Generate 200 calls to qualify for 5% discount
     for _ in range(200):
-        await ctx.tracker.storage.record_usage(
-            agent_id="test-agent", function="search_services", cost=1.0
-        )
+        await ctx.tracker.storage.record_usage(agent_id="test-agent", function="search_services", cost=1.0)
 
     resp = await client.post(
         "/v1/execute",

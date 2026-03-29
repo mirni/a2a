@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import pytest
-
+from src.policies import RateLimitExceededError, SpendCapExceededError
 from src.tracker import UsageTracker, require_credits
 from src.wallet import InsufficientCreditsError
-from src.policies import RateLimitExceededError, SpendCapExceededError
 
 
 class TestTrackerLifecycle:

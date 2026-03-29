@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import time
 
-import pytest
-
 from payments.models import (
     Escrow,
     EscrowStatus,
@@ -17,13 +15,12 @@ from payments.models import (
     SubscriptionStatus,
 )
 
-
 # ---------------------------------------------------------------------------
 # PaymentIntent
 # ---------------------------------------------------------------------------
 
-class TestPaymentIntent:
 
+class TestPaymentIntent:
     def test_create_default(self):
         intent = PaymentIntent(payer="a", payee="b", amount=10.0)
         assert intent.payer == "a"
@@ -35,21 +32,15 @@ class TestPaymentIntent:
         assert intent.settlement_id is None
 
     def test_create_with_idempotency_key(self):
-        intent = PaymentIntent(
-            payer="a", payee="b", amount=5.0, idempotency_key="req-123"
-        )
+        intent = PaymentIntent(payer="a", payee="b", amount=5.0, idempotency_key="req-123")
         assert intent.idempotency_key == "req-123"
 
     def test_create_with_description(self):
-        intent = PaymentIntent(
-            payer="a", payee="b", amount=5.0, description="test payment"
-        )
+        intent = PaymentIntent(payer="a", payee="b", amount=5.0, description="test payment")
         assert intent.description == "test payment"
 
     def test_create_with_metadata(self):
-        intent = PaymentIntent(
-            payer="a", payee="b", amount=5.0, metadata={"key": "value"}
-        )
+        intent = PaymentIntent(payer="a", payee="b", amount=5.0, metadata={"key": "value"})
         assert intent.metadata == {"key": "value"}
 
     def test_unique_ids(self):
@@ -90,8 +81,8 @@ class TestPaymentIntent:
 # Escrow
 # ---------------------------------------------------------------------------
 
-class TestEscrow:
 
+class TestEscrow:
     def test_create_default(self):
         escrow = Escrow(payer="a", payee="b", amount=50.0)
         assert escrow.payer == "a"
@@ -106,9 +97,7 @@ class TestEscrow:
         assert escrow.timeout_at == timeout
 
     def test_create_with_metadata(self):
-        escrow = Escrow(
-            payer="a", payee="b", amount=50.0, metadata={"task": "pipeline"}
-        )
+        escrow = Escrow(payer="a", payee="b", amount=50.0, metadata={"task": "pipeline"})
         assert escrow.metadata["task"] == "pipeline"
 
     def test_escrow_status_values(self):
@@ -134,12 +123,15 @@ class TestEscrow:
 # Settlement
 # ---------------------------------------------------------------------------
 
-class TestSettlement:
 
+class TestSettlement:
     def test_create(self):
         s = Settlement(
-            payer="a", payee="b", amount=10.0,
-            source_type="intent", source_id="xyz",
+            payer="a",
+            payee="b",
+            amount=10.0,
+            source_type="intent",
+            source_id="xyz",
         )
         assert s.payer == "a"
         assert s.payee == "b"
@@ -150,16 +142,22 @@ class TestSettlement:
 
     def test_create_with_description(self):
         s = Settlement(
-            payer="a", payee="b", amount=10.0,
-            source_type="escrow", source_id="xyz",
+            payer="a",
+            payee="b",
+            amount=10.0,
+            source_type="escrow",
+            source_id="xyz",
             description="escrow release",
         )
         assert s.description == "escrow release"
 
     def test_model_dump(self):
         s = Settlement(
-            payer="a", payee="b", amount=10.0,
-            source_type="subscription", source_id="sub-1",
+            payer="a",
+            payee="b",
+            amount=10.0,
+            source_type="subscription",
+            source_id="sub-1",
         )
         d = s.model_dump()
         assert d["source_type"] == "subscription"
@@ -174,11 +172,13 @@ class TestSettlement:
 # Subscription
 # ---------------------------------------------------------------------------
 
-class TestSubscription:
 
+class TestSubscription:
     def test_create_default(self):
         sub = Subscription(
-            payer="a", payee="b", amount=100.0,
+            payer="a",
+            payee="b",
+            amount=100.0,
             interval=SubscriptionInterval.MONTHLY,
         )
         assert sub.payer == "a"
@@ -191,28 +191,36 @@ class TestSubscription:
 
     def test_create_hourly(self):
         sub = Subscription(
-            payer="a", payee="b", amount=1.0,
+            payer="a",
+            payee="b",
+            amount=1.0,
             interval=SubscriptionInterval.HOURLY,
         )
         assert sub.interval == SubscriptionInterval.HOURLY
 
     def test_create_daily(self):
         sub = Subscription(
-            payer="a", payee="b", amount=10.0,
+            payer="a",
+            payee="b",
+            amount=10.0,
             interval=SubscriptionInterval.DAILY,
         )
         assert sub.interval == SubscriptionInterval.DAILY
 
     def test_create_weekly(self):
         sub = Subscription(
-            payer="a", payee="b", amount=50.0,
+            payer="a",
+            payee="b",
+            amount=50.0,
             interval=SubscriptionInterval.WEEKLY,
         )
         assert sub.interval == SubscriptionInterval.WEEKLY
 
     def test_compute_next_charge_hourly(self):
         sub = Subscription(
-            payer="a", payee="b", amount=1.0,
+            payer="a",
+            payee="b",
+            amount=1.0,
             interval=SubscriptionInterval.HOURLY,
         )
         before = time.time()
@@ -223,7 +231,9 @@ class TestSubscription:
 
     def test_compute_next_charge_daily(self):
         sub = Subscription(
-            payer="a", payee="b", amount=10.0,
+            payer="a",
+            payee="b",
+            amount=10.0,
             interval=SubscriptionInterval.DAILY,
         )
         before = time.time()
@@ -232,7 +242,9 @@ class TestSubscription:
 
     def test_compute_next_charge_weekly(self):
         sub = Subscription(
-            payer="a", payee="b", amount=50.0,
+            payer="a",
+            payee="b",
+            amount=50.0,
             interval=SubscriptionInterval.WEEKLY,
         )
         before = time.time()
@@ -241,7 +253,9 @@ class TestSubscription:
 
     def test_compute_next_charge_monthly(self):
         sub = Subscription(
-            payer="a", payee="b", amount=100.0,
+            payer="a",
+            payee="b",
+            amount=100.0,
             interval=SubscriptionInterval.MONTHLY,
         )
         before = time.time()
@@ -261,7 +275,9 @@ class TestSubscription:
 
     def test_model_dump(self):
         sub = Subscription(
-            payer="a", payee="b", amount=100.0,
+            payer="a",
+            payee="b",
+            amount=100.0,
             interval=SubscriptionInterval.MONTHLY,
             metadata={"plan": "premium"},
         )

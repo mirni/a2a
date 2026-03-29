@@ -13,7 +13,6 @@ import os
 import sys
 import tempfile
 import time
-import traceback
 from dataclasses import dataclass, field
 
 # ---------------------------------------------------------------------------
@@ -35,10 +34,9 @@ os.environ["EVENT_BUS_DSN"] = f"sqlite:///{_tmp_dir}/event_bus.db"
 os.environ["WEBHOOK_DSN"] = f"sqlite:///{_tmp_dir}/webhooks.db"
 
 # Bootstrap product imports
-import gateway.src.bootstrap  # noqa: F401, E402
-
 import httpx  # noqa: E402
 
+import gateway.src.bootstrap  # noqa: F401, E402
 from gateway.src.app import create_app  # noqa: E402
 from gateway.src.lifespan import lifespan  # noqa: E402
 
@@ -142,7 +140,9 @@ async def call_tool(
             status_code=resp.status_code,
             response_body=body,
             latency_ms=elapsed,
-            error=None if passed else f"Expected {expect_status}, got {resp.status_code}: {json.dumps(body, indent=None)[:200]}",
+            error=None
+            if passed
+            else f"Expected {expect_status}, got {resp.status_code}: {json.dumps(body, indent=None)[:200]}",
         )
     except Exception as exc:
         elapsed = (time.time() - t0) * 1000
@@ -187,6 +187,7 @@ async def call_get(
 # ---------------------------------------------------------------------------
 # Simulation phases
 # ---------------------------------------------------------------------------
+
 
 async def phase_system(client: httpx.AsyncClient, report: FeedbackReport) -> None:
     """Test system endpoints: health, pricing catalog, openapi spec, metrics."""
@@ -276,9 +277,7 @@ async def phase_system(client: httpx.AsyncClient, report: FeedbackReport) -> Non
     report.modules["system"] = fb
 
 
-async def phase_identity(
-    client: httpx.AsyncClient, report: FeedbackReport, app
-) -> tuple[str, str]:
+async def phase_identity(client: httpx.AsyncClient, report: FeedbackReport, app) -> tuple[str, str]:
     """Register AlphaBot-v3 identity, get API keys."""
     _section("Phase 1: Identity & API Key Setup")
     fb = ModuleFeedback(module="Identity + Paywall (API Keys)")
@@ -363,9 +362,7 @@ async def phase_identity(
     return free_key, pro_key
 
 
-async def phase_billing(
-    client: httpx.AsyncClient, report: FeedbackReport, free_key: str, pro_key: str
-) -> None:
+async def phase_billing(client: httpx.AsyncClient, report: FeedbackReport, free_key: str, pro_key: str) -> None:
     """Test billing: balance, deposit, usage summary."""
     _section("Phase 2: Billing & Wallet")
     fb = ModuleFeedback(module="Billing")
@@ -382,11 +379,12 @@ async def phase_billing(
         fb.failed.append(f"get_balance: {r.error}")
 
     # Deposit credits
-    r = await call_tool(client, "deposit", {
-        "agent_id": "alphabot-v3",
-        "amount": 250.0,
-        "description": "Trading strategy subscription topup"
-    }, free_key)
+    r = await call_tool(
+        client,
+        "deposit",
+        {"agent_id": "alphabot-v3", "amount": 250.0, "description": "Trading strategy subscription topup"},
+        free_key,
+    )
     fb.steps.append(r)
     if r.passed:
         new_bal = r.response_body.get("result", {}).get("new_balance", 0)
@@ -397,11 +395,12 @@ async def phase_billing(
         fb.failed.append(f"deposit: {r.error}")
 
     # Try depositing negative amount
-    r = await call_tool(client, "deposit", {
-        "agent_id": "alphabot-v3",
-        "amount": -100.0,
-        "description": "Attempting negative deposit"
-    }, free_key)
+    r = await call_tool(
+        client,
+        "deposit",
+        {"agent_id": "alphabot-v3", "amount": -100.0, "description": "Attempting negative deposit"},
+        free_key,
+    )
     fb.steps.append(r)
     if r.passed:
         new_bal = r.response_body.get("result", {}).get("new_balance", 0)
@@ -450,9 +449,7 @@ async def phase_billing(
     report.modules["billing"] = fb
 
 
-async def phase_payments(
-    client: httpx.AsyncClient, report: FeedbackReport, free_key: str, pro_key: str, app
-) -> None:
+async def phase_payments(client: httpx.AsyncClient, report: FeedbackReport, free_key: str, pro_key: str, app) -> None:
     """Test payment flows: intent, capture, escrow, release, history."""
     _section("Phase 3: Payments (Intent + Escrow)")
     fb = ModuleFeedback(module="Payments")
@@ -462,12 +459,17 @@ async def phase_payments(
     await ctx.tracker.wallet.create("signal-provider-x", initial_balance=100.0)
 
     # --- Payment Intent ---
-    r = await call_tool(client, "create_intent", {
-        "payer": "alphabot-v3",
-        "payee": "signal-provider-x",
-        "amount": 10.0,
-        "description": "Payment for BTC signal alert"
-    }, free_key)
+    r = await call_tool(
+        client,
+        "create_intent",
+        {
+            "payer": "alphabot-v3",
+            "payee": "signal-provider-x",
+            "amount": 10.0,
+            "description": "Payment for BTC signal alert",
+        },
+        free_key,
+    )
     fb.steps.append(r)
     intent_id = None
     if r.passed:
@@ -501,13 +503,19 @@ async def phase_payments(
 
     # --- Escrow (requires pro tier) ---
     # First try with free key (should fail)
-    r = await call_tool(client, "create_escrow", {
-        "payer": "alphabot-v3-pro",
-        "payee": "signal-provider-x",
-        "amount": 50.0,
-        "description": "Escrow for backtesting data delivery",
-        "timeout_hours": 24
-    }, free_key, expect_status=403)
+    r = await call_tool(
+        client,
+        "create_escrow",
+        {
+            "payer": "alphabot-v3-pro",
+            "payee": "signal-provider-x",
+            "amount": 50.0,
+            "description": "Escrow for backtesting data delivery",
+            "timeout_hours": 24,
+        },
+        free_key,
+        expect_status=403,
+    )
     fb.steps.append(r)
     if r.status_code == 403:
         _ok("Free-tier correctly blocked from escrow (403)")
@@ -517,13 +525,18 @@ async def phase_payments(
         fb.confusing.append(f"Free-tier escrow access returned {r.status_code} instead of 403")
 
     # Now with pro key
-    r = await call_tool(client, "create_escrow", {
-        "payer": "alphabot-v3-pro",
-        "payee": "signal-provider-x",
-        "amount": 50.0,
-        "description": "Escrow for backtesting data delivery",
-        "timeout_hours": 24
-    }, pro_key)
+    r = await call_tool(
+        client,
+        "create_escrow",
+        {
+            "payer": "alphabot-v3-pro",
+            "payee": "signal-provider-x",
+            "amount": 50.0,
+            "description": "Escrow for backtesting data delivery",
+            "timeout_hours": 24,
+        },
+        pro_key,
+    )
     fb.steps.append(r)
     escrow_id = None
     if r.passed:
@@ -559,20 +572,34 @@ async def phase_payments(
     _info("Attempting features that should exist but don't...")
 
     # Try to dispute a payment
-    r = await call_tool(client, "dispute_payment", {"intent_id": "any-id", "reason": "service not delivered"}, free_key, expect_status=400)
+    r = await call_tool(
+        client,
+        "dispute_payment",
+        {"intent_id": "any-id", "reason": "service not delivered"},
+        free_key,
+        expect_status=400,
+    )
     fb.steps.append(r)
     fb.missing.append("No dispute_payment tool — cannot contest charges or request refunds")
 
     # Try to create a subscription
-    r = await call_tool(client, "create_subscription", {
-        "payer": "alphabot-v3",
-        "payee": "signal-provider-x",
-        "amount": 5.0,
-        "interval": "daily",
-        "description": "Daily BTC signal subscription"
-    }, free_key, expect_status=400)
+    r = await call_tool(
+        client,
+        "create_subscription",
+        {
+            "payer": "alphabot-v3",
+            "payee": "signal-provider-x",
+            "amount": 5.0,
+            "interval": "daily",
+            "description": "Daily BTC signal subscription",
+        },
+        free_key,
+        expect_status=400,
+    )
     fb.steps.append(r)
-    fb.missing.append("No create_subscription tool in catalog — process_due_subscriptions exists but no way to create one via gateway")
+    fb.missing.append(
+        "No create_subscription tool in catalog — process_due_subscriptions exists but no way to create one via gateway"
+    )
 
     # Try to cancel escrow (not release)
     r = await call_tool(client, "cancel_escrow", {"escrow_id": "any-id"}, pro_key, expect_status=400)
@@ -581,18 +608,18 @@ async def phase_payments(
 
     # Try idempotency
     idem_key = "idem-test-12345"
-    r1 = await call_tool(client, "create_intent", {
-        "payer": "alphabot-v3",
-        "payee": "signal-provider-x",
-        "amount": 5.0,
-        "idempotency_key": idem_key
-    }, free_key)
-    r2 = await call_tool(client, "create_intent", {
-        "payer": "alphabot-v3",
-        "payee": "signal-provider-x",
-        "amount": 5.0,
-        "idempotency_key": idem_key
-    }, free_key)
+    r1 = await call_tool(
+        client,
+        "create_intent",
+        {"payer": "alphabot-v3", "payee": "signal-provider-x", "amount": 5.0, "idempotency_key": idem_key},
+        free_key,
+    )
+    r2 = await call_tool(
+        client,
+        "create_intent",
+        {"payer": "alphabot-v3", "payee": "signal-provider-x", "amount": 5.0, "idempotency_key": idem_key},
+        free_key,
+    )
     fb.steps.extend([r1, r2])
     if r1.passed and r2.passed:
         id1 = r1.response_body.get("result", {}).get("id")
@@ -619,9 +646,7 @@ async def phase_payments(
     report.modules["payments"] = fb
 
 
-async def phase_marketplace(
-    client: httpx.AsyncClient, report: FeedbackReport, free_key: str, pro_key: str
-) -> None:
+async def phase_marketplace(client: httpx.AsyncClient, report: FeedbackReport, free_key: str, pro_key: str) -> None:
     """Test marketplace: search, register service, best match."""
     _section("Phase 4: Marketplace")
     fb = ModuleFeedback(module="Marketplace")
@@ -637,16 +662,21 @@ async def phase_marketplace(
         _fail(f"search_services: {r.error}")
 
     # Register a service (requires pro)
-    r = await call_tool(client, "register_service", {
-        "provider_id": "alphabot-v3",
-        "name": "AlphaBot Crypto Signals",
-        "description": "BTC/ETH/SOL perpetual trend-following signals. 24h Sharpe > 1.5, max drawdown < 8%.",
-        "category": "trading-signals",
-        "tools": ["get_signal", "get_backtest_report"],
-        "tags": ["crypto", "perpetuals", "trend-following", "btc", "eth", "sol"],
-        "endpoint": "https://alphabot-v3.example.com/a2a",
-        "pricing": {"model": "per_call", "cost": 0.5}
-    }, pro_key)
+    r = await call_tool(
+        client,
+        "register_service",
+        {
+            "provider_id": "alphabot-v3",
+            "name": "AlphaBot Crypto Signals",
+            "description": "BTC/ETH/SOL perpetual trend-following signals. 24h Sharpe > 1.5, max drawdown < 8%.",
+            "category": "trading-signals",
+            "tools": ["get_signal", "get_backtest_report"],
+            "tags": ["crypto", "perpetuals", "trend-following", "btc", "eth", "sol"],
+            "endpoint": "https://alphabot-v3.example.com/a2a",
+            "pricing": {"model": "per_call", "cost": 0.5},
+        },
+        pro_key,
+    )
     fb.steps.append(r)
     service_id = None
     if r.passed:
@@ -658,16 +688,21 @@ async def phase_marketplace(
         fb.failed.append(f"register_service: {r.error}")
 
     # Register a second service for variety
-    r2 = await call_tool(client, "register_service", {
-        "provider_id": "signal-provider-x",
-        "name": "OnChain Analytics Feed",
-        "description": "Real-time on-chain whale alerts, liquidation cascades, and funding rate shifts.",
-        "category": "on-chain-data",
-        "tools": ["get_whale_alerts", "get_funding_rates"],
-        "tags": ["crypto", "on-chain", "whale-tracking", "funding-rates"],
-        "endpoint": "https://onchain-x.example.com/a2a",
-        "pricing": {"model": "per_call", "cost": 0.1}
-    }, pro_key)
+    r2 = await call_tool(
+        client,
+        "register_service",
+        {
+            "provider_id": "signal-provider-x",
+            "name": "OnChain Analytics Feed",
+            "description": "Real-time on-chain whale alerts, liquidation cascades, and funding rate shifts.",
+            "category": "on-chain-data",
+            "tools": ["get_whale_alerts", "get_funding_rates"],
+            "tags": ["crypto", "on-chain", "whale-tracking", "funding-rates"],
+            "endpoint": "https://onchain-x.example.com/a2a",
+            "pricing": {"model": "per_call", "cost": 0.1},
+        },
+        pro_key,
+    )
     fb.steps.append(r2)
     if r2.passed:
         _ok(f"Second service registered: id={r2.response_body.get('result', {}).get('id')}")
@@ -691,11 +726,9 @@ async def phase_marketplace(
         _ok(f"Category search returned {len(r.response_body.get('result', {}).get('services', []))} services")
 
     # Best match
-    r = await call_tool(client, "best_match", {
-        "query": "crypto trading signals BTC",
-        "budget": 1.0,
-        "prefer": "trust"
-    }, free_key)
+    r = await call_tool(
+        client, "best_match", {"query": "crypto trading signals BTC", "budget": 1.0, "prefer": "trust"}, free_key
+    )
     fb.steps.append(r)
     if r.passed:
         matches = r.response_body.get("result", {}).get("matches", [])
@@ -720,10 +753,13 @@ async def phase_marketplace(
 
     # --- Missing features ---
     # Try to subscribe to a service
-    r = await call_tool(client, "subscribe_service", {
-        "service_id": service_id or "any",
-        "subscriber_id": "alphabot-v3"
-    }, pro_key, expect_status=400)
+    r = await call_tool(
+        client,
+        "subscribe_service",
+        {"service_id": service_id or "any", "subscriber_id": "alphabot-v3"},
+        pro_key,
+        expect_status=400,
+    )
     fb.steps.append(r)
     fb.missing.append("No subscribe_service — cannot programmatically subscribe to discovered services")
 
@@ -733,19 +769,24 @@ async def phase_marketplace(
     fb.missing.append("No get_service (by ID) — must search to find a service you already know the ID of")
 
     # Try to rate/review a service
-    r = await call_tool(client, "rate_service", {
-        "service_id": service_id or "any",
-        "rating": 4,
-        "review": "Good signals, occasional late delivery"
-    }, free_key, expect_status=400)
+    r = await call_tool(
+        client,
+        "rate_service",
+        {"service_id": service_id or "any", "rating": 4, "review": "Good signals, occasional late delivery"},
+        free_key,
+        expect_status=400,
+    )
     fb.steps.append(r)
     fb.missing.append("No rate_service / review_service — no way to build marketplace reputation")
 
     # Try to update a service
-    r = await call_tool(client, "update_service", {
-        "service_id": service_id or "any",
-        "description": "Updated description"
-    }, pro_key, expect_status=400)
+    r = await call_tool(
+        client,
+        "update_service",
+        {"service_id": service_id or "any", "description": "Updated description"},
+        pro_key,
+        expect_status=400,
+    )
     fb.steps.append(r)
     fb.missing.append("No update_service — provider cannot update their listing after registration")
 
@@ -766,24 +807,21 @@ async def phase_marketplace(
     report.modules["marketplace"] = fb
 
 
-async def phase_trust(
-    client: httpx.AsyncClient, report: FeedbackReport, free_key: str, pro_key: str
-) -> None:
+async def phase_trust(client: httpx.AsyncClient, report: FeedbackReport, free_key: str, pro_key: str) -> None:
     """Test trust: trust scores, server search."""
     _section("Phase 5: Trust Scoring")
     fb = ModuleFeedback(module="Trust")
 
     # Get trust score for a new server
-    r = await call_tool(client, "get_trust_score", {
-        "server_id": "alphabot-v3-server",
-        "window": "24h"
-    }, free_key)
+    r = await call_tool(client, "get_trust_score", {"server_id": "alphabot-v3-server", "window": "24h"}, free_key)
     fb.steps.append(r)
     if r.passed:
         score = r.response_body.get("result", {})
-        _ok(f"Trust score: composite={score.get('composite_score', 'N/A')}, "
+        _ok(
+            f"Trust score: composite={score.get('composite_score', 'N/A')}, "
             f"reliability={score.get('reliability_score', 'N/A')}, "
-            f"confidence={score.get('confidence', 'N/A')}")
+            f"confidence={score.get('confidence', 'N/A')}"
+        )
         fb.worked_well.append("Trust scoring returns granular dimensions (reliability, security, responsiveness)")
     else:
         _fail(f"get_trust_score: {r.error}")
@@ -791,10 +829,7 @@ async def phase_trust(
 
     # Different windows
     for window in ["7d", "30d"]:
-        r = await call_tool(client, "get_trust_score", {
-            "server_id": "alphabot-v3-server",
-            "window": window
-        }, free_key)
+        r = await call_tool(client, "get_trust_score", {"server_id": "alphabot-v3-server", "window": window}, free_key)
         fb.steps.append(r)
         if r.passed:
             _ok(f"Trust score ({window}): composite={r.response_body.get('result', {}).get('composite_score', 'N/A')}")
@@ -817,11 +852,16 @@ async def phase_trust(
         _ok(f"Min score search: {len(r.response_body.get('result', {}).get('servers', []))} servers")
 
     # Update server (pro)
-    r = await call_tool(client, "update_server", {
-        "server_id": "alphabot-v3-server",
-        "name": "AlphaBot-v3 Trading Server",
-        "url": "https://alphabot-v3.example.com"
-    }, pro_key)
+    r = await call_tool(
+        client,
+        "update_server",
+        {
+            "server_id": "alphabot-v3-server",
+            "name": "AlphaBot-v3 Trading Server",
+            "url": "https://alphabot-v3.example.com",
+        },
+        pro_key,
+    )
     fb.steps.append(r)
     if r.passed:
         _ok(f"Server updated: {r.response_body.get('result', {}).get('name')}")
@@ -832,27 +872,35 @@ async def phase_trust(
 
     # --- Missing ---
     # Try to submit a probe/scan result
-    r = await call_tool(client, "submit_probe", {
-        "server_id": "alphabot-v3-server",
-        "probe_type": "health_check",
-        "result": {"status": "healthy", "latency_ms": 42}
-    }, free_key, expect_status=400)
+    r = await call_tool(
+        client,
+        "submit_probe",
+        {
+            "server_id": "alphabot-v3-server",
+            "probe_type": "health_check",
+            "result": {"status": "healthy", "latency_ms": 42},
+        },
+        free_key,
+        expect_status=400,
+    )
     fb.steps.append(r)
     fb.missing.append("No submit_probe tool — trust scores seem to require internal probing, agents cannot self-report")
 
     # Try to get trust history/trend
-    r = await call_tool(client, "get_trust_history", {
-        "server_id": "alphabot-v3-server",
-        "window": "30d"
-    }, free_key, expect_status=400)
+    r = await call_tool(
+        client, "get_trust_history", {"server_id": "alphabot-v3-server", "window": "30d"}, free_key, expect_status=400
+    )
     fb.steps.append(r)
     fb.missing.append("No trust history/trend endpoint — cannot track score changes over time")
 
     # Try SLA compliance check
-    r = await call_tool(client, "check_sla_compliance", {
-        "server_id": "alphabot-v3-server",
-        "sla": {"max_latency_ms": 200, "uptime_pct": 99.5}
-    }, free_key, expect_status=400)
+    r = await call_tool(
+        client,
+        "check_sla_compliance",
+        {"server_id": "alphabot-v3-server", "sla": {"max_latency_ms": 200, "uptime_pct": 99.5}},
+        free_key,
+        expect_status=400,
+    )
     fb.steps.append(r)
     fb.missing.append("No SLA compliance check tool — SLA is defined in catalog but never verified")
 
@@ -869,9 +917,7 @@ async def phase_trust(
     report.modules["trust"] = fb
 
 
-async def phase_metrics_claims(
-    client: httpx.AsyncClient, report: FeedbackReport, free_key: str, pro_key: str
-) -> None:
+async def phase_metrics_claims(client: httpx.AsyncClient, report: FeedbackReport, free_key: str, pro_key: str) -> None:
     """Test trading bot metrics submission and verified claims."""
     _section("Phase 6: Trading Bot Metrics & Claims")
     fb = ModuleFeedback(module="Metrics & Verified Claims")
@@ -891,11 +937,13 @@ async def phase_metrics_claims(
     }
 
     # submit_metrics requires pro tier — first try with free key
-    r = await call_tool(client, "submit_metrics", {
-        "agent_id": "alphabot-v3",
-        "metrics": metrics_payload,
-        "data_source": "self_reported"
-    }, free_key, expect_status=403)
+    r = await call_tool(
+        client,
+        "submit_metrics",
+        {"agent_id": "alphabot-v3", "metrics": metrics_payload, "data_source": "self_reported"},
+        free_key,
+        expect_status=403,
+    )
     fb.steps.append(r)
     if r.status_code == 403:
         _ok("Free-tier correctly blocked from submit_metrics (403)")
@@ -906,11 +954,12 @@ async def phase_metrics_claims(
     r_reg = await call_tool(client, "register_agent", {"agent_id": "alphabot-v3-pro"}, pro_key)
     fb.steps.append(r_reg)
 
-    r = await call_tool(client, "submit_metrics", {
-        "agent_id": "alphabot-v3-pro",
-        "metrics": metrics_payload,
-        "data_source": "self_reported"
-    }, pro_key)
+    r = await call_tool(
+        client,
+        "submit_metrics",
+        {"agent_id": "alphabot-v3-pro", "metrics": metrics_payload, "data_source": "self_reported"},
+        pro_key,
+    )
     fb.steps.append(r)
     if r.passed:
         result = r.response_body.get("result", {})
@@ -937,14 +986,19 @@ async def phase_metrics_claims(
         _fail(f"get_verified_claims: {r.error}")
 
     # Submit with exchange_api source
-    r = await call_tool(client, "submit_metrics", {
-        "agent_id": "alphabot-v3-pro",
-        "metrics": {
-            "sharpe_30d": 2.10,
-            "max_drawdown_30d": -0.042,
+    r = await call_tool(
+        client,
+        "submit_metrics",
+        {
+            "agent_id": "alphabot-v3-pro",
+            "metrics": {
+                "sharpe_30d": 2.10,
+                "max_drawdown_30d": -0.042,
+            },
+            "data_source": "exchange_api",
         },
-        "data_source": "exchange_api"
-    }, pro_key)
+        pro_key,
+    )
     fb.steps.append(r)
     if r.passed:
         _ok(f"Exchange-sourced metrics submitted ({r.latency_ms:.0f}ms)")
@@ -957,7 +1011,9 @@ async def phase_metrics_claims(
         "No exchange_api verification — data_source='exchange_api' is accepted at face value. "
         "Platform should verify against actual exchange API to earn 'platform_verified' status."
     )
-    fb.missing.append("No metric schema definition — any key/value accepted. Standard metric names should be documented.")
+    fb.missing.append(
+        "No metric schema definition — any key/value accepted. Standard metric names should be documented."
+    )
     fb.missing.append("No historical metrics endpoint — cannot query 'Sharpe for March 2026'")
     fb.missing.append("No leaderboard or ranking tool — cannot compare metrics across agents")
     fb.missing.append(
@@ -973,25 +1029,28 @@ async def phase_metrics_claims(
     report.modules["metrics"] = fb
 
 
-async def phase_events_webhooks(
-    client: httpx.AsyncClient, report: FeedbackReport, free_key: str, pro_key: str
-) -> None:
+async def phase_events_webhooks(client: httpx.AsyncClient, report: FeedbackReport, free_key: str, pro_key: str) -> None:
     """Test event bus, webhooks."""
     _section("Phase 7: Events & Webhooks")
     fb = ModuleFeedback(module="Events & Webhooks")
 
     # Publish an event
-    r = await call_tool(client, "publish_event", {
-        "event_type": "trading.signal_generated",
-        "source": "alphabot-v3",
-        "payload": {
-            "pair": "BTC/USDT:USDT",
-            "direction": "long",
-            "confidence": 0.72,
-            "entry_price": 84250.0,
-            "timestamp": time.time()
-        }
-    }, free_key)
+    r = await call_tool(
+        client,
+        "publish_event",
+        {
+            "event_type": "trading.signal_generated",
+            "source": "alphabot-v3",
+            "payload": {
+                "pair": "BTC/USDT:USDT",
+                "direction": "long",
+                "confidence": 0.72,
+                "entry_price": 84250.0,
+                "timestamp": time.time(),
+            },
+        },
+        free_key,
+    )
     fb.steps.append(r)
     if r.passed:
         event_id = r.response_body.get("result", {}).get("event_id")
@@ -1003,11 +1062,12 @@ async def phase_events_webhooks(
 
     # Publish a few more events
     for etype in ["trading.position_opened", "trading.position_closed", "billing.deposit"]:
-        r = await call_tool(client, "publish_event", {
-            "event_type": etype,
-            "source": "alphabot-v3",
-            "payload": {"detail": f"Test event for {etype}"}
-        }, free_key)
+        r = await call_tool(
+            client,
+            "publish_event",
+            {"event_type": etype, "source": "alphabot-v3", "payload": {"detail": f"Test event for {etype}"}},
+            free_key,
+        )
         fb.steps.append(r)
 
     # Query events
@@ -1039,12 +1099,17 @@ async def phase_events_webhooks(
         fb.worked_well.append("Cursor-based pagination (since_id) enables real-time tailing")
 
     # Register webhook (pro only)
-    r = await call_tool(client, "register_webhook", {
-        "agent_id": "alphabot-v3-pro",
-        "url": "https://alphabot-v3.example.com/webhooks/a2a",
-        "event_types": ["billing.deposit", "trust.score_drop", "payments.escrow_expired"],
-        "secret": "whsec_alphabot_v3_secret_key_2026"
-    }, pro_key)
+    r = await call_tool(
+        client,
+        "register_webhook",
+        {
+            "agent_id": "alphabot-v3-pro",
+            "url": "https://alphabot-v3.example.com/webhooks/a2a",
+            "event_types": ["billing.deposit", "trust.score_drop", "payments.escrow_expired"],
+            "secret": "whsec_alphabot_v3_secret_key_2026",
+        },
+        pro_key,
+    )
     fb.steps.append(r)
     webhook_id = None
     if r.passed:
@@ -1091,9 +1156,7 @@ async def phase_events_webhooks(
     report.modules["events_webhooks"] = fb
 
 
-async def phase_rate_limiting(
-    client: httpx.AsyncClient, report: FeedbackReport, free_key: str, pro_key: str
-) -> None:
+async def phase_rate_limiting(client: httpx.AsyncClient, report: FeedbackReport, free_key: str, pro_key: str) -> None:
     """Test rate limiting behavior."""
     _section("Phase 8: Rate Limiting")
     fb = ModuleFeedback(module="Rate Limiting")
@@ -1106,8 +1169,8 @@ async def phase_rate_limiting(
         results.append(r)
         if r.status_code == 429:
             hit_429 = True
-            _ok(f"Rate limit hit after {i+1} requests (429)")
-            fb.worked_well.append(f"Rate limiting kicks in — 429 returned after {i+1} rapid calls")
+            _ok(f"Rate limit hit after {i + 1} requests (429)")
+            fb.worked_well.append(f"Rate limiting kicks in — 429 returned after {i + 1} rapid calls")
             break
 
     fb.steps.extend(results)
@@ -1122,7 +1185,7 @@ async def phase_rate_limiting(
     # Check that pro tier has higher limits
     _info("Testing pro-tier rate allowance...")
     pro_results = []
-    for i in range(10):
+    for _i in range(10):
         r = await call_tool(client, "get_balance", {"agent_id": "alphabot-v3-pro"}, pro_key)
         pro_results.append(r)
     fb.steps.extend(pro_results)
@@ -1137,16 +1200,13 @@ async def phase_rate_limiting(
     fb.missing.append("No rate limit status endpoint to check current usage against quota")
     fb.missing.append("No rate limit customization — cannot request temporary burst allowance")
     fb.confusing.append(
-        "Rate limit error message shows count/limit but no reset time. "
-        "A trading bot needs to know WHEN to retry."
+        "Rate limit error message shows count/limit but no reset time. A trading bot needs to know WHEN to retry."
     )
     fb.nps_score = 5
     report.modules["rate_limiting"] = fb
 
 
-async def phase_audit(
-    client: httpx.AsyncClient, report: FeedbackReport, pro_key: str
-) -> None:
+async def phase_audit(client: httpx.AsyncClient, report: FeedbackReport, pro_key: str) -> None:
     """Test audit/admin operations."""
     _section("Phase 9: Audit & Admin")
     fb = ModuleFeedback(module="Audit & Admin")
@@ -1167,8 +1227,10 @@ async def phase_audit(
     fb.steps.append(r)
     if r.passed:
         result = r.response_body.get("result", {})
-        _ok(f"Subscription processing: processed={result.get('processed', 0)}, "
-            f"expired_escrows={result.get('expired_escrows', 0)}")
+        _ok(
+            f"Subscription processing: processed={result.get('processed', 0)}, "
+            f"expired_escrows={result.get('expired_escrows', 0)}"
+        )
         fb.worked_well.append("Manual subscription processing trigger available for testing")
     else:
         _fail(f"process_due_subscriptions: {r.error}")
@@ -1180,9 +1242,7 @@ async def phase_audit(
     report.modules["audit"] = fb
 
 
-async def phase_edge_cases(
-    client: httpx.AsyncClient, report: FeedbackReport, free_key: str, pro_key: str
-) -> None:
+async def phase_edge_cases(client: httpx.AsyncClient, report: FeedbackReport, free_key: str, pro_key: str) -> None:
     """Test error handling and edge cases."""
     _section("Phase 10: Edge Cases & Error Handling")
     fb = ModuleFeedback(module="Error Handling")
@@ -1286,6 +1346,7 @@ async def phase_edge_cases(
 # Report generator
 # ---------------------------------------------------------------------------
 
+
 def generate_report(report: FeedbackReport) -> str:
     """Generate the markdown feedback report."""
     duration = report.end_time - report.start_time
@@ -1302,7 +1363,7 @@ def generate_report(report: FeedbackReport) -> str:
     lines.append("")
     lines.append(f"**Agent**: {report.agent_name}")
     lines.append(f"**Agent Type**: {report.agent_description}")
-    lines.append(f"**Date**: 2026-03-27")
+    lines.append("**Date**: 2026-03-27")
     lines.append(f"**Simulation Duration**: {duration:.1f}s")
     lines.append(f"**Total API Calls**: {total_steps}")
     lines.append(f"**Passed / Failed**: {passed_steps} / {failed_steps}")
@@ -1335,7 +1396,7 @@ def generate_report(report: FeedbackReport) -> str:
     lines.append("")
     lines.append("| Module | NPS (1-10) | Verdict |")
     lines.append("|--------|-----------|---------|")
-    for name, mod in report.modules.items():
+    for _name, mod in report.modules.items():
         verdict = "Strong" if mod.nps_score >= 8 else "Adequate" if mod.nps_score >= 6 else "Needs Work"
         lines.append(f"| {mod.module} | {mod.nps_score} | {verdict} |")
     lines.append("")
@@ -1346,7 +1407,7 @@ def generate_report(report: FeedbackReport) -> str:
     lines.append("## Detailed Module Feedback")
     lines.append("")
 
-    for name, mod in report.modules.items():
+    for _name, mod in report.modules.items():
         lines.append(f"### {mod.module} (NPS: {mod.nps_score}/10)")
         lines.append("")
 
@@ -1390,9 +1451,15 @@ def generate_report(report: FeedbackReport) -> str:
     lines.append("| Tool | Pricing | Assessment |")
     lines.append("|------|---------|------------|")
     lines.append("| get_balance, get_usage_summary, deposit | Free | Correct -- operational queries should be free |")
-    lines.append("| create_intent | 2% of amount (min 0.01, max 5.0) | Steep for micro-transactions. A $0.50 signal purchase costs $0.01 fee (2%), which is fine, but a $200 data feed purchase costs $4.00 fee -- that adds up |")
-    lines.append("| create_escrow | 1.5% of amount (min 0.01, max 10.0) | More reasonable than intent fees. The $10 max cap helps |")
-    lines.append("| best_match | 0.1 credits/call | Reasonable for a ranking query but discourages exploration. Trading bots that search frequently will burn credits on discovery |")
+    lines.append(
+        "| create_intent | 2% of amount (min 0.01, max 5.0) | Steep for micro-transactions. A $0.50 signal purchase costs $0.01 fee (2%), which is fine, but a $200 data feed purchase costs $4.00 fee -- that adds up |"
+    )
+    lines.append(
+        "| create_escrow | 1.5% of amount (min 0.01, max 10.0) | More reasonable than intent fees. The $10 max cap helps |"
+    )
+    lines.append(
+        "| best_match | 0.1 credits/call | Reasonable for a ranking query but discourages exploration. Trading bots that search frequently will burn credits on discovery |"
+    )
     lines.append("| search_services | Free | Good -- discovery should have zero friction |")
     lines.append("| submit_metrics | Free (pro-tier gate) | Correct -- metrics submission builds platform value |")
     lines.append("| All trust tools | Free | Good -- trust data should be a public good |")
@@ -1437,9 +1504,9 @@ def generate_report(report: FeedbackReport) -> str:
     lines.append("### Weaknesses")
     lines.append("")
     lines.append(
-        "- **Error envelope inconsistency**: Some errors use `{\"error\": {\"code\": ..., \"message\": ...}}` "
-        "while success uses `{\"success\": true, \"result\": ...}`. The error path should also include "
-        "`\"success\": false` for uniform parsing."
+        '- **Error envelope inconsistency**: Some errors use `{"error": {"code": ..., "message": ...}}` '
+        'while success uses `{"success": true, "result": ...}`. The error path should also include '
+        '`"success": false` for uniform parsing.'
     )
     lines.append(
         "- **No pagination on most list endpoints**: search_services, get_events have limit/offset "
@@ -1535,40 +1602,52 @@ def generate_report(report: FeedbackReport) -> str:
     lines.append("## Consolidated Missing Features (Priority Order)")
     lines.append("")
     all_missing = []
-    for name, mod in report.modules.items():
+    for _name, mod in report.modules.items():
         for item in mod.missing:
             all_missing.append((mod.module, item))
 
     priority_features = [
-        ("P0 - Critical", [
-            "Self-service onboarding: create_wallet + create_api_key tools so agents can bootstrap themselves",
-            "Subscription management: create_subscription / cancel_subscription for recurring payments",
-            "Dispute resolution: dispute_payment / resolve_dispute for contested transactions",
-            "Refund capability: refund_intent for reversing captured payments",
-        ]),
-        ("P1 - High", [
-            "Cancel escrow: payer can reclaim funds if payee fails to deliver",
-            "Rate limit headers: X-RateLimit-Remaining, X-RateLimit-Reset in every response",
-            "Webhook delivery status: history of delivery attempts and retry status",
-            "Service lifecycle: update_service, delete_service for marketplace listings",
-            "Transaction ledger: per-agent transaction history (deposits, charges, payments)",
-        ]),
-        ("P2 - Medium", [
-            "Key rotation: rotate_key for compromised Ed25519 keys",
-            "Agent search/discovery: search_agents by capabilities or metrics",
-            "Metrics time-series: historical metric queries, not just latest",
-            "Leaderboard: rank agents by verified metrics within categories",
-            "Batch execution: multiple tool calls in one request",
-            "Event schema registry: validate event types against registered schemas",
-        ]),
-        ("P3 - Nice to have", [
-            "SSE/WebSocket streaming for real-time events",
-            "Volume discount pricing tiers",
-            "Cost estimation calculator",
-            "Service ratings and reviews",
-            "Multi-party payment splits",
-            "Conditional escrow release",
-        ]),
+        (
+            "P0 - Critical",
+            [
+                "Self-service onboarding: create_wallet + create_api_key tools so agents can bootstrap themselves",
+                "Subscription management: create_subscription / cancel_subscription for recurring payments",
+                "Dispute resolution: dispute_payment / resolve_dispute for contested transactions",
+                "Refund capability: refund_intent for reversing captured payments",
+            ],
+        ),
+        (
+            "P1 - High",
+            [
+                "Cancel escrow: payer can reclaim funds if payee fails to deliver",
+                "Rate limit headers: X-RateLimit-Remaining, X-RateLimit-Reset in every response",
+                "Webhook delivery status: history of delivery attempts and retry status",
+                "Service lifecycle: update_service, delete_service for marketplace listings",
+                "Transaction ledger: per-agent transaction history (deposits, charges, payments)",
+            ],
+        ),
+        (
+            "P2 - Medium",
+            [
+                "Key rotation: rotate_key for compromised Ed25519 keys",
+                "Agent search/discovery: search_agents by capabilities or metrics",
+                "Metrics time-series: historical metric queries, not just latest",
+                "Leaderboard: rank agents by verified metrics within categories",
+                "Batch execution: multiple tool calls in one request",
+                "Event schema registry: validate event types against registered schemas",
+            ],
+        ),
+        (
+            "P3 - Nice to have",
+            [
+                "SSE/WebSocket streaming for real-time events",
+                "Volume discount pricing tiers",
+                "Cost estimation calculator",
+                "Service ratings and reviews",
+                "Multi-party payment splits",
+                "Conditional escrow release",
+            ],
+        ),
     ]
 
     for priority, items in priority_features:
@@ -1590,8 +1669,8 @@ def generate_report(report: FeedbackReport) -> str:
     lines.append("")
     lines.append("## Appendix: Test Execution Summary")
     lines.append("")
-    lines.append(f"| Metric | Value |")
-    lines.append(f"|--------|-------|")
+    lines.append("| Metric | Value |")
+    lines.append("|--------|-------|")
     lines.append(f"| Total API calls | {total_steps} |")
     lines.append(f"| Passed | {passed_steps} |")
     lines.append(f"| Failed / Expected errors | {failed_steps} |")
@@ -1602,7 +1681,7 @@ def generate_report(report: FeedbackReport) -> str:
     lines.append("")
 
     # Per-module step details
-    for name, mod in report.modules.items():
+    for _name, mod in report.modules.items():
         lines.append(f"### {mod.module}")
         lines.append("")
         lines.append("| Step | Status | HTTP | Latency |")
@@ -1616,7 +1695,7 @@ def generate_report(report: FeedbackReport) -> str:
     lines.append("---")
     lines.append("")
     lines.append("*Report generated by AlphaBot-v3 Customer Agent Simulation*")
-    lines.append(f"*Simulation ran against A2A Commerce Gateway v0.1.0 using httpx ASGI transport (no live server)*")
+    lines.append("*Simulation ran against A2A Commerce Gateway v0.1.0 using httpx ASGI transport (no live server)*")
     lines.append("")
 
     return "\n".join(lines)
@@ -1625,6 +1704,7 @@ def generate_report(report: FeedbackReport) -> str:
 # ---------------------------------------------------------------------------
 # Main simulation
 # ---------------------------------------------------------------------------
+
 
 async def run_simulation() -> None:
     """Run the full customer agent simulation."""

@@ -6,7 +6,6 @@ already started) and returns one or more BenchmarkResult objects.
 
 from __future__ import annotations
 
-import asyncio
 import os
 import sys
 from typing import Any
@@ -22,7 +21,6 @@ from gateway.benchmarks.bench_runner import (
     run_benchmark,
     run_benchmark_multi_concurrency,
 )
-
 
 # ---------------------------------------------------------------------------
 # Scenario 1: Health endpoint throughput
@@ -226,9 +224,7 @@ async def scenario_wallet_stress(
 
     # Verify balance consistency: started at 10000, deposited 10 * (total_ops // 2)
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(
-        transport=transport, base_url="http://bench"
-    ) as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://bench") as client:
         resp = await client.post(
             "/execute",
             json={
@@ -302,7 +298,7 @@ async def scenario_rate_limiter_burst(
     result.extra["success_count"] = success_count
     result.extra["rate_limited_count"] = rate_limited_count
     result.extra["status_distribution"] = dict(status_counts)
-    result.extra["cutoff_accurate"] = (success_count == 100 and rate_limited_count == 100)
+    result.extra["cutoff_accurate"] = success_count == 100 and rate_limited_count == 100
 
     return [result]
 

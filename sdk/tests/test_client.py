@@ -16,10 +16,9 @@ if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 # Bootstrap product imports
-import gateway.src.bootstrap  # noqa: F401
-
 import httpx
 
+import gateway.src.bootstrap  # noqa: F401
 from gateway.src.app import create_app
 from gateway.src.lifespan import lifespan
 from sdk.src.a2a_client import A2AClient
@@ -61,9 +60,7 @@ async def sdk_client(gateway_app):
     client.pricing_cache_ttl = 300.0
     client._pricing_cache = None
     client._pricing_cache_time = 0.0
-    client._client = httpx.AsyncClient(
-        transport=transport, base_url="http://test", timeout=30.0
-    )
+    client._client = httpx.AsyncClient(transport=transport, base_url="http://test", timeout=30.0)
     yield client
     await client.close()
 

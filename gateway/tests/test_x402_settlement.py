@@ -72,6 +72,7 @@ async def x402_app(tmp_data_dir, monkeypatch):
 @pytest.fixture
 async def x402_client(x402_app):
     import httpx
+
     transport = httpx.ASGITransport(app=x402_app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
@@ -157,9 +158,7 @@ class TestEventPublishing:
 
         # Check event was published
         db = ctx.event_bus.db
-        cursor = await db.execute(
-            "SELECT event_type, payload FROM events WHERE event_type = 'x402.payment_settled'"
-        )
+        cursor = await db.execute("SELECT event_type, payload FROM events WHERE event_type = 'x402.payment_settled'")
         row = await cursor.fetchone()
         assert row is not None
         payload = json.loads(row[1])

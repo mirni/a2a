@@ -1,7 +1,6 @@
 """Tests for marketplace storage layer."""
 
 import pytest
-
 from src.storage import MarketplaceStorage
 
 
@@ -55,36 +54,67 @@ class TestInsertAndGet:
 
     async def test_get_services_by_provider(self, storage):
         await storage.insert_service(
-            provider_id="agent-1", name="S1", description="D", category="C",
-            tools=[], pricing={}, sla={}, tags=[],
+            provider_id="agent-1",
+            name="S1",
+            description="D",
+            category="C",
+            tools=[],
+            pricing={},
+            sla={},
+            tags=[],
         )
         await storage.insert_service(
-            provider_id="agent-1", name="S2", description="D", category="C",
-            tools=[], pricing={}, sla={}, tags=[],
+            provider_id="agent-1",
+            name="S2",
+            description="D",
+            category="C",
+            tools=[],
+            pricing={},
+            sla={},
+            tags=[],
         )
         await storage.insert_service(
-            provider_id="agent-2", name="S3", description="D", category="C",
-            tools=[], pricing={}, sla={}, tags=[],
+            provider_id="agent-2",
+            name="S3",
+            description="D",
+            category="C",
+            tools=[],
+            pricing={},
+            sla={},
+            tags=[],
         )
         results = await storage.get_services_by_provider("agent-1")
         assert len(results) == 2
 
     async def test_insert_with_metadata(self, storage):
         sid = await storage.insert_service(
-            provider_id="a", name="N", description="D", category="C",
-            tools=[], pricing={}, sla={}, tags=[],
+            provider_id="a",
+            name="N",
+            description="D",
+            category="C",
+            tools=[],
+            pricing={},
+            sla={},
+            tags=[],
             metadata={"key": "value"},
         )
         svc = await storage.get_service(sid)
         assert svc is not None
         import json
+
         meta = json.loads(svc["metadata_json"])
         assert meta["key"] == "value"
 
     async def test_insert_with_endpoint(self, storage):
         sid = await storage.insert_service(
-            provider_id="a", name="N", description="D", category="C",
-            tools=[], pricing={}, sla={}, tags=[],
+            provider_id="a",
+            name="N",
+            description="D",
+            category="C",
+            tools=[],
+            pricing={},
+            sla={},
+            tags=[],
             endpoint="https://example.com",
         )
         svc = await storage.get_service(sid)
@@ -94,8 +124,14 @@ class TestInsertAndGet:
 class TestUpdate:
     async def test_update_name(self, storage):
         sid = await storage.insert_service(
-            provider_id="a", name="Old", description="D", category="C",
-            tools=[], pricing={}, sla={}, tags=[],
+            provider_id="a",
+            name="Old",
+            description="D",
+            category="C",
+            tools=[],
+            pricing={},
+            sla={},
+            tags=[],
         )
         assert await storage.update_service(sid, name="New")
         svc = await storage.get_service(sid)
@@ -106,8 +142,14 @@ class TestUpdate:
 
     async def test_update_tools(self, storage):
         sid = await storage.insert_service(
-            provider_id="a", name="N", description="D", category="C",
-            tools=["old_tool"], pricing={}, sla={}, tags=[],
+            provider_id="a",
+            name="N",
+            description="D",
+            category="C",
+            tools=["old_tool"],
+            pricing={},
+            sla={},
+            tags=[],
         )
         await storage.update_service(sid, tools=["new_tool_1", "new_tool_2"])
         svc = await storage.get_service(sid)
@@ -115,8 +157,14 @@ class TestUpdate:
 
     async def test_update_tags(self, storage):
         sid = await storage.insert_service(
-            provider_id="a", name="N", description="D", category="C",
-            tools=[], pricing={}, sla={}, tags=["old"],
+            provider_id="a",
+            name="N",
+            description="D",
+            category="C",
+            tools=[],
+            pricing={},
+            sla={},
+            tags=["old"],
         )
         await storage.update_service(sid, tags=["new1", "new2"])
         svc = await storage.get_service(sid)
@@ -124,8 +172,14 @@ class TestUpdate:
 
     async def test_update_status(self, storage):
         sid = await storage.insert_service(
-            provider_id="a", name="N", description="D", category="C",
-            tools=[], pricing={}, sla={}, tags=[],
+            provider_id="a",
+            name="N",
+            description="D",
+            category="C",
+            tools=[],
+            pricing={},
+            sla={},
+            tags=[],
         )
         await storage.update_service(sid, status="inactive")
         svc = await storage.get_service(sid)
@@ -133,12 +187,19 @@ class TestUpdate:
 
     async def test_update_pricing(self, storage):
         sid = await storage.insert_service(
-            provider_id="a", name="N", description="D", category="C",
-            tools=[], pricing={"model": "free"}, sla={}, tags=[],
+            provider_id="a",
+            name="N",
+            description="D",
+            category="C",
+            tools=[],
+            pricing={"model": "free"},
+            sla={},
+            tags=[],
         )
         await storage.update_service(sid, pricing={"model": "per_call", "cost": 5.0})
         svc = await storage.get_service(sid)
         import json
+
         p = json.loads(svc["pricing_json"])
         assert p["cost"] == 5.0
 
@@ -147,19 +208,34 @@ class TestSearch:
     async def _seed(self, storage):
         """Seed test data."""
         await storage.insert_service(
-            provider_id="a1", name="Market Data", description="Crypto price feeds",
-            category="market-data", tools=["get_price"], pricing={"model": "per_call", "cost": 0.5},
-            sla={}, tags=["crypto", "real-time"],
+            provider_id="a1",
+            name="Market Data",
+            description="Crypto price feeds",
+            category="market-data",
+            tools=["get_price"],
+            pricing={"model": "per_call", "cost": 0.5},
+            sla={},
+            tags=["crypto", "real-time"],
         )
         await storage.insert_service(
-            provider_id="a2", name="Analytics Engine", description="Data analytics",
-            category="analytics", tools=["analyze"], pricing={"model": "per_call", "cost": 2.0},
-            sla={}, tags=["analytics", "data"],
+            provider_id="a2",
+            name="Analytics Engine",
+            description="Data analytics",
+            category="analytics",
+            tools=["analyze"],
+            pricing={"model": "per_call", "cost": 2.0},
+            sla={},
+            tags=["analytics", "data"],
         )
         await storage.insert_service(
-            provider_id="a3", name="Free Tool", description="A free service",
-            category="utilities", tools=["ping"], pricing={"model": "free", "cost": 0},
-            sla={}, tags=["free", "utility"],
+            provider_id="a3",
+            name="Free Tool",
+            description="A free service",
+            category="utilities",
+            tools=["ping"],
+            pricing={"model": "free", "cost": 0},
+            sla={},
+            tags=["free", "utility"],
         )
 
     async def test_search_all(self, storage):
@@ -196,8 +272,14 @@ class TestSearch:
 
     async def test_search_inactive_not_returned(self, storage):
         sid = await storage.insert_service(
-            provider_id="a", name="Inactive", description="D", category="C",
-            tools=[], pricing={}, sla={}, tags=[],
+            provider_id="a",
+            name="Inactive",
+            description="D",
+            category="C",
+            tools=[],
+            pricing={},
+            sla={},
+            tags=[],
         )
         await storage.update_service(sid, status="inactive")
         results = await storage.search_services()
@@ -223,16 +305,34 @@ class TestSearch:
 class TestCategories:
     async def test_list_categories(self, storage):
         await storage.insert_service(
-            provider_id="a", name="S1", description="D", category="data",
-            tools=[], pricing={}, sla={}, tags=[],
+            provider_id="a",
+            name="S1",
+            description="D",
+            category="data",
+            tools=[],
+            pricing={},
+            sla={},
+            tags=[],
         )
         await storage.insert_service(
-            provider_id="a", name="S2", description="D", category="data",
-            tools=[], pricing={}, sla={}, tags=[],
+            provider_id="a",
+            name="S2",
+            description="D",
+            category="data",
+            tools=[],
+            pricing={},
+            sla={},
+            tags=[],
         )
         await storage.insert_service(
-            provider_id="a", name="S3", description="D", category="ai",
-            tools=[], pricing={}, sla={}, tags=[],
+            provider_id="a",
+            name="S3",
+            description="D",
+            category="ai",
+            tools=[],
+            pricing={},
+            sla={},
+            tags=[],
         )
         cats = await storage.list_categories()
         assert len(cats) == 2
@@ -250,12 +350,24 @@ class TestCount:
 
     async def test_count_active(self, storage):
         await storage.insert_service(
-            provider_id="a", name="S1", description="D", category="C",
-            tools=[], pricing={}, sla={}, tags=[],
+            provider_id="a",
+            name="S1",
+            description="D",
+            category="C",
+            tools=[],
+            pricing={},
+            sla={},
+            tags=[],
         )
         sid = await storage.insert_service(
-            provider_id="a", name="S2", description="D", category="C",
-            tools=[], pricing={}, sla={}, tags=[],
+            provider_id="a",
+            name="S2",
+            description="D",
+            category="C",
+            tools=[],
+            pricing={},
+            sla={},
+            tags=[],
         )
         await storage.update_service(sid, status="inactive")
         assert await storage.count_services() == 1

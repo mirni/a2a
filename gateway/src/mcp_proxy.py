@@ -16,7 +16,6 @@ import logging
 import os
 import shutil
 import sys
-from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -24,28 +23,41 @@ logger = logging.getLogger("a2a.mcp_proxy")
 
 # Tool definitions for each connector (added to catalog dynamically)
 STRIPE_MCP_TOOLS = [
-    "stripe_list_customers", "stripe_create_customer",
-    "stripe_list_products", "stripe_create_product",
-    "stripe_list_prices", "stripe_create_price",
+    "stripe_list_customers",
+    "stripe_create_customer",
+    "stripe_list_products",
+    "stripe_create_product",
+    "stripe_list_prices",
+    "stripe_create_price",
     "stripe_create_payment_link",
-    "stripe_list_invoices", "stripe_create_invoice",
-    "stripe_list_subscriptions", "stripe_cancel_subscription",
+    "stripe_list_invoices",
+    "stripe_create_invoice",
+    "stripe_list_subscriptions",
+    "stripe_cancel_subscription",
     "stripe_create_refund",
     "stripe_retrieve_balance",
 ]
 
 GITHUB_MCP_TOOLS = [
-    "github_list_repos", "github_get_repo",
-    "github_list_issues", "github_create_issue",
-    "github_list_pull_requests", "github_get_pull_request",
+    "github_list_repos",
+    "github_get_repo",
+    "github_list_issues",
+    "github_create_issue",
+    "github_list_pull_requests",
+    "github_get_pull_request",
     "github_create_pull_request",
-    "github_list_commits", "github_get_file_contents",
+    "github_list_commits",
+    "github_get_file_contents",
     "github_search_code",
 ]
 
 POSTGRES_MCP_TOOLS = [
-    "pg_query", "pg_execute", "pg_list_tables",
-    "pg_describe_table", "pg_explain_query", "pg_list_schemas",
+    "pg_query",
+    "pg_execute",
+    "pg_list_tables",
+    "pg_describe_table",
+    "pg_explain_query",
+    "pg_list_schemas",
 ]
 
 # Map gateway tool name → (connector, mcp_tool_name)
@@ -75,11 +87,14 @@ class MCPConnection:
 
     async def _initialize(self) -> None:
         """Send MCP initialize handshake."""
-        resp = await self._send_request("initialize", {
-            "protocolVersion": "2024-11-05",
-            "capabilities": {},
-            "clientInfo": {"name": "a2a-gateway", "version": "0.1.0"},
-        })
+        resp = await self._send_request(
+            "initialize",
+            {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "a2a-gateway", "version": "0.1.0"},
+            },
+        )
         # Send initialized notification
         await self._send_notification("notifications/initialized", {})
         self._initialized = True
@@ -87,10 +102,13 @@ class MCPConnection:
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         """Call a tool on the MCP server."""
-        result = await self._send_request("tools/call", {
-            "name": name,
-            "arguments": arguments,
-        })
+        result = await self._send_request(
+            "tools/call",
+            {
+                "name": name,
+                "arguments": arguments,
+            },
+        )
         # Extract text content from MCP result
         content = result.get("content", [])
         if content and isinstance(content, list):
@@ -121,9 +139,9 @@ class MCPConnection:
 
         try:
             return await asyncio.wait_for(future, timeout=30.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self._pending.pop(req_id, None)
-            raise TimeoutError(f"MCP request timed out: {method}")
+            raise TimeoutError(f"MCP request timed out: {method}") from None
 
     async def _send_notification(self, method: str, params: dict) -> None:
         """Send a JSON-RPC notification (no response expected)."""
@@ -156,9 +174,7 @@ class MCPConnection:
                     if req_id is not None and req_id in self._pending:
                         future = self._pending.pop(req_id)
                         if "error" in msg:
-                            future.set_exception(
-                                RuntimeError(f"MCP error: {msg['error']}")
-                            )
+                            future.set_exception(RuntimeError(f"MCP error: {msg['error']}"))
                         else:
                             future.set_result(msg.get("result", {}))
             except asyncio.CancelledError:
@@ -179,7 +195,7 @@ class MCPConnection:
             self.process.terminate()
             try:
                 await asyncio.wait_for(self.process.wait(), timeout=5.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 self.process.kill()
 
 
@@ -253,7 +269,10 @@ class MCPProxyManager:
 
         env = {**os.environ, "STRIPE_SECRET_KEY": stripe_key}
         process = await asyncio.create_subprocess_exec(
-            npx, "-y", "@stripe/mcp@latest", "--tools=all",
+            npx,
+            "-y",
+            "@stripe/mcp@latest",
+            "--tools=all",
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
@@ -277,7 +296,9 @@ class MCPProxyManager:
 
         python = sys.executable
         process = await asyncio.create_subprocess_exec(
-            python, "-m", "src.server",
+            python,
+            "-m",
+            "src.server",
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,

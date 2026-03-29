@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-
 pytestmark = pytest.mark.asyncio
 
 
@@ -90,12 +89,8 @@ async def test_list_subscriptions_via_gateway(client, pro_api_key, app):
     ctx = app.state.ctx
     await ctx.tracker.wallet.create("provider-d", initial_balance=0.0)
 
-    await ctx.payment_engine.create_subscription(
-        payer="pro-agent", payee="provider-d", amount=5.0, interval="daily"
-    )
-    await ctx.payment_engine.create_subscription(
-        payer="pro-agent", payee="provider-d", amount=10.0, interval="weekly"
-    )
+    await ctx.payment_engine.create_subscription(payer="pro-agent", payee="provider-d", amount=5.0, interval="daily")
+    await ctx.payment_engine.create_subscription(payer="pro-agent", payee="provider-d", amount=10.0, interval="weekly")
 
     resp = await client.post(
         "/v1/execute",

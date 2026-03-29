@@ -156,6 +156,7 @@ async def create_server():
     @server.list_tools()
     async def list_tools():
         from mcp.types import Tool
+
         return [Tool(**t) for t in TOOL_DEFINITIONS]
 
     @server.call_tool()
@@ -164,21 +165,32 @@ async def create_server():
 
         handler = TOOL_HANDLERS.get(name)
         if not handler:
-            return [TextContent(type="text", text=json.dumps({
-                "error": True,
-                "code": "UNKNOWN_TOOL",
-                "message": f"Unknown tool: {name}",
-            }))]
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {
+                            "error": True,
+                            "code": "UNKNOWN_TOOL",
+                            "message": f"Unknown tool: {name}",
+                        }
+                    ),
+                )
+            ]
 
         try:
             result = await handler(client, arguments or {})
             return [TextContent(type="text", text=json.dumps(result, default=str))]
         except Exception as e:
-            error_dict = e.to_dict() if hasattr(e, "to_dict") else {
-                "error": True,
-                "code": "INTERNAL_ERROR",
-                "message": str(e),
-            }
+            error_dict = (
+                e.to_dict()
+                if hasattr(e, "to_dict")
+                else {
+                    "error": True,
+                    "code": "INTERNAL_ERROR",
+                    "message": str(e),
+                }
+            )
             return [TextContent(type="text", text=json.dumps(error_dict))]
 
     return server, client
@@ -200,4 +212,5 @@ async def main():
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(main())

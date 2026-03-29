@@ -7,10 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import pytest
-
-from src.models import Server, TransportType
 from src.prober import Prober
-from src.storage import StorageBackend
 
 
 @dataclass

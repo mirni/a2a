@@ -43,11 +43,13 @@ class GatewayConfig:
     # --- Tool defaults ---
     default_page_limit: int = 100
     budget_alert_threshold: float = 0.8
-    volume_discount_tiers: dict[int, int] = field(default_factory=lambda: {
-        100: 5,
-        500: 10,
-        1000: 15,
-    })
+    volume_discount_tiers: dict[int, int] = field(
+        default_factory=lambda: {
+            100: 5,
+            500: 10,
+            1000: 15,
+        }
+    )
 
     # --- x402 Protocol ---
     x402_enabled: bool = False
@@ -59,12 +61,14 @@ class GatewayConfig:
     stripe_timeout: float = 15.0
 
     # --- Stripe packages (credits, price in cents) ---
-    stripe_packages: dict[str, tuple[int, int]] = field(default_factory=lambda: {
-        "starter": (1000, 1000),
-        "growth": (5000, 4500),
-        "scale": (25000, 20000),
-        "enterprise": (100000, 75000),
-    })
+    stripe_packages: dict[str, tuple[int, int]] = field(
+        default_factory=lambda: {
+            "starter": (1000, 1000),
+            "growth": (5000, 4500),
+            "scale": (25000, 20000),
+            "enterprise": (100000, 75000),
+        }
+    )
 
     @classmethod
     def from_env(cls) -> GatewayConfig:
@@ -81,8 +85,6 @@ class GatewayConfig:
             scheduler_interval=int(os.environ.get("A2A_SCHEDULER_INTERVAL", "300")),
             x402_enabled=os.environ.get("X402_ENABLED", "").lower() in ("1", "true", "yes"),
             x402_merchant_address=os.environ.get("X402_MERCHANT_ADDRESS", ""),
-            x402_facilitator_url=os.environ.get(
-                "X402_FACILITATOR_URL", "https://x402.org/facilitator"
-            ),
+            x402_facilitator_url=os.environ.get("X402_FACILITATOR_URL", "https://x402.org/facilitator"),
             x402_supported_networks=os.environ.get("X402_SUPPORTED_NETWORKS", "base,polygon"),
         )

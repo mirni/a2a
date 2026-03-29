@@ -169,14 +169,11 @@ CREATE TABLE IF NOT EXISTS budget_caps (
         now = time.time()
         amt_atomic = self._to_atomic(amount)
         await self.db.execute(
-            "UPDATE wallets SET balance = balance - ?, updated_at = ? "
-            "WHERE agent_id = ? AND balance >= ?",
+            "UPDATE wallets SET balance = balance - ?, updated_at = ? WHERE agent_id = ? AND balance >= ?",
             (amt_atomic, now, agent_id, amt_atomic),
         )
         await self.db.commit()
-        cursor = await self.db.execute(
-            "SELECT balance FROM wallets WHERE agent_id = ?", (agent_id,)
-        )
+        cursor = await self.db.execute("SELECT balance FROM wallets WHERE agent_id = ?", (agent_id,))
         row = await cursor.fetchone()
         if row is None:
             return None
@@ -191,15 +188,12 @@ CREATE TABLE IF NOT EXISTS budget_caps (
         now = time.time()
         amt_atomic = self._to_atomic(amount)
         cursor = await self.db.execute(
-            "UPDATE wallets SET balance = balance - ?, updated_at = ? "
-            "WHERE agent_id = ? AND balance >= ?",
+            "UPDATE wallets SET balance = balance - ?, updated_at = ? WHERE agent_id = ? AND balance >= ?",
             (amt_atomic, now, agent_id, amt_atomic),
         )
         await self.db.commit()
         affected = cursor.rowcount
-        cur2 = await self.db.execute(
-            "SELECT balance FROM wallets WHERE agent_id = ?", (agent_id,)
-        )
+        cur2 = await self.db.execute("SELECT balance FROM wallets WHERE agent_id = ?", (agent_id,))
         row = await cur2.fetchone()
         if row is None:
             return (False, 0.0)
@@ -213,15 +207,12 @@ CREATE TABLE IF NOT EXISTS budget_caps (
         now = time.time()
         amt_atomic = self._to_atomic(amount)
         cursor = await self.db.execute(
-            "UPDATE wallets SET balance = balance + ?, updated_at = ? "
-            "WHERE agent_id = ?",
+            "UPDATE wallets SET balance = balance + ?, updated_at = ? WHERE agent_id = ?",
             (amt_atomic, now, agent_id),
         )
         await self.db.commit()
         affected = cursor.rowcount
-        cur2 = await self.db.execute(
-            "SELECT balance FROM wallets WHERE agent_id = ?", (agent_id,)
-        )
+        cur2 = await self.db.execute("SELECT balance FROM wallets WHERE agent_id = ?", (agent_id,))
         row = await cur2.fetchone()
         if row is None:
             return (False, 0.0)
@@ -231,22 +222,17 @@ CREATE TABLE IF NOT EXISTS budget_caps (
     # Transaction log
     # -----------------------------------------------------------------------
 
-    async def record_transaction(
-        self, agent_id: str, amount: float, tx_type: str, description: str = ""
-    ) -> int:
+    async def record_transaction(self, agent_id: str, amount: float, tx_type: str, description: str = "") -> int:
         now = time.time()
         amt_atomic = int(Decimal(str(amount)) * SCALE)  # allow negative for withdrawals
         cursor = await self.db.execute(
-            "INSERT INTO transactions (agent_id, amount, tx_type, description, created_at) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO transactions (agent_id, amount, tx_type, description, created_at) VALUES (?, ?, ?, ?, ?)",
             (agent_id, amt_atomic, tx_type, description, now),
         )
         await self.db.commit()
         return cursor.lastrowid  # type: ignore[return-value]
 
-    async def get_transactions(
-        self, agent_id: str, limit: int = 100, offset: int = 0
-    ) -> list[dict[str, Any]]:
+    async def get_transactions(self, agent_id: str, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
         cursor = await self.db.execute(
             "SELECT * FROM transactions WHERE agent_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
             (agent_id, limit, offset),
@@ -322,9 +308,7 @@ CREATE TABLE IF NOT EXISTS budget_caps (
             results.append(d)
         return results
 
-    async def get_usage_summary(
-        self, agent_id: str, since: float | None = None
-    ) -> dict[str, Any]:
+    async def get_usage_summary(self, agent_id: str, since: float | None = None) -> dict[str, Any]:
         query = "SELECT COUNT(*) as total_calls, COALESCE(SUM(cost), 0) as total_cost, COALESCE(SUM(tokens), 0) as total_tokens FROM usage_records WHERE agent_id = ?"
         params: list[Any] = [agent_id]
         if since is not None:
@@ -343,9 +327,7 @@ CREATE TABLE IF NOT EXISTS budget_caps (
     # -----------------------------------------------------------------------
 
     async def get_rate_policy(self, agent_id: str) -> dict[str, Any] | None:
-        cursor = await self.db.execute(
-            "SELECT * FROM rate_policies WHERE agent_id = ?", (agent_id,)
-        )
+        cursor = await self.db.execute("SELECT * FROM rate_policies WHERE agent_id = ?", (agent_id,))
         row = await cursor.fetchone()
         if row is None:
             return None
@@ -401,13 +383,10 @@ CREATE TABLE IF NOT EXISTS budget_caps (
     # Billing events
     # -----------------------------------------------------------------------
 
-    async def emit_event(
-        self, event_type: str, agent_id: str, payload: dict[str, Any]
-    ) -> int:
+    async def emit_event(self, event_type: str, agent_id: str, payload: dict[str, Any]) -> int:
         now = time.time()
         cursor = await self.db.execute(
-            "INSERT INTO billing_events (event_type, agent_id, payload, created_at) "
-            "VALUES (?, ?, ?, ?)",
+            "INSERT INTO billing_events (event_type, agent_id, payload, created_at) VALUES (?, ?, ?, ?)",
             (event_type, agent_id, json.dumps(payload), now),
         )
         await self.db.commit()
@@ -427,14 +406,10 @@ CREATE TABLE IF NOT EXISTS budget_caps (
         return results
 
     async def mark_event_delivered(self, event_id: int) -> None:
-        await self.db.execute(
-            "UPDATE billing_events SET delivered = 1 WHERE id = ?", (event_id,)
-        )
+        await self.db.execute("UPDATE billing_events SET delivered = 1 WHERE id = ?", (event_id,))
         await self.db.commit()
 
-    async def get_events(
-        self, agent_id: str, limit: int = 100
-    ) -> list[dict[str, Any]]:
+    async def get_events(self, agent_id: str, limit: int = 100) -> list[dict[str, Any]]:
         cursor = await self.db.execute(
             "SELECT * FROM billing_events WHERE agent_id = ? ORDER BY created_at DESC LIMIT ?",
             (agent_id, limit),

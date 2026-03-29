@@ -7,7 +7,6 @@ non-existent wallet, charge 0 credits, and double create.
 from __future__ import annotations
 
 import pytest
-
 from src.wallet import InsufficientCreditsError, Wallet, WalletNotFoundError
 
 

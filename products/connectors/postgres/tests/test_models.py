@@ -2,7 +2,6 @@
 
 import pytest
 from pydantic import ValidationError as PydanticValidationError
-
 from src.models import (
     ConnectionConfig,
     DescribeTableParams,

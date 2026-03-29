@@ -7,7 +7,8 @@ Provides sequential, version-tracked migrations so that schema changes
 from __future__ import annotations
 
 import time
-from typing import NamedTuple, Sequence
+from collections.abc import Sequence
+from typing import NamedTuple
 
 import aiosqlite
 
@@ -27,9 +28,7 @@ class MigrationError(Exception):
         self.version = version
         self.description = description
         self.cause = cause
-        super().__init__(
-            f"Migration v{version} ({description}) failed: {cause}"
-        )
+        super().__init__(f"Migration v{version} ({description}) failed: {cause}")
 
 
 class SchemaVersionMismatchError(Exception):
@@ -62,9 +61,7 @@ async def _ensure_tracking_table(db: aiosqlite.Connection) -> None:
 async def get_current_version(db: aiosqlite.Connection) -> int:
     """Return the highest applied migration version, or 0 if none."""
     await _ensure_tracking_table(db)
-    cursor = await db.execute(
-        "SELECT COALESCE(MAX(version), 0) FROM schema_migrations"
-    )
+    cursor = await db.execute("SELECT COALESCE(MAX(version), 0) FROM schema_migrations")
     row = await cursor.fetchone()
     return row[0] if row else 0
 
@@ -78,9 +75,7 @@ def _validate_migrations(migrations: Sequence[Migration]) -> None:
     if len(versions) != len(set(versions)):
         raise ValueError(f"Duplicate migration versions: {versions}")
     if versions != sorted(versions):
-        raise ValueError(
-            f"Migration versions must be in ascending order: {versions}"
-        )
+        raise ValueError(f"Migration versions must be in ascending order: {versions}")
 
 
 async def run_migrations(
@@ -107,8 +102,7 @@ async def run_migrations(
             await db.execute("BEGIN")
             await db.executescript(mig.sql)
             await db.execute(
-                "INSERT INTO schema_migrations (version, description, applied_at) "
-                "VALUES (?, ?, ?)",
+                "INSERT INTO schema_migrations (version, description, applied_at) VALUES (?, ?, ?)",
                 (mig.version, mig.description, time.time()),
             )
             await db.commit()

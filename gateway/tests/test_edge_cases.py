@@ -8,9 +8,6 @@ from __future__ import annotations
 
 import time
 
-import pytest
-
-
 # ---------------------------------------------------------------------------
 # Invalid JSON variants
 # ---------------------------------------------------------------------------
@@ -125,8 +122,7 @@ class TestRateLimitSlidingWindow:
         old_time = time.time() - 7200  # 2 hours ago
         for _ in range(200):
             await ctx.paywall_storage.db.execute(
-                "INSERT INTO rate_events (agent_id, window_key, tool_name, timestamp) "
-                "VALUES (?, ?, ?, ?)",
+                "INSERT INTO rate_events (agent_id, window_key, tool_name, timestamp) VALUES (?, ?, ?, ?)",
                 ("rate-agent", "gateway", "", old_time),
             )
         await ctx.paywall_storage.db.commit()
@@ -154,8 +150,7 @@ class TestRateLimitExceeded:
         now = time.time()
         for _ in range(111):
             await ctx.paywall_storage.db.execute(
-                "INSERT INTO rate_events (agent_id, window_key, tool_name, timestamp) "
-                "VALUES (?, ?, ?, ?)",
+                "INSERT INTO rate_events (agent_id, window_key, tool_name, timestamp) VALUES (?, ?, ?, ?)",
                 ("rate-blocked", "gateway", "", now),
             )
         await ctx.paywall_storage.db.commit()

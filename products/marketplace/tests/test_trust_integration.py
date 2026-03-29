@@ -7,23 +7,22 @@ into the Marketplace, search and best_match populate trust_score correctly.
 from __future__ import annotations
 
 import pytest
-
 from src.marketplace import Marketplace
 from src.models import (
+    SLA,
     MatchPreference,
     PricingModel,
     PricingModelType,
-    SLA,
     ServiceCreate,
     ServiceSearchParams,
     SortBy,
 )
 from src.storage import MarketplaceStorage
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_service(
     provider_id: str = "agent-1",
@@ -49,6 +48,7 @@ def make_service(
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 async def storage():
@@ -78,6 +78,7 @@ async def marketplace_with_trust(storage, trust_scores):
 # Tests: search returns trust_score
 # ---------------------------------------------------------------------------
 
+
 class TestSearchWithTrustProvider:
     """Search populates trust_score when trust_provider is wired."""
 
@@ -85,27 +86,19 @@ class TestSearchWithTrustProvider:
         """Services returned by search should carry the provider's trust_score."""
         trust_scores["provider-a"] = 92.5
 
-        await marketplace_with_trust.register_service(
-            make_service(provider_id="provider-a", name="Trusted Svc")
-        )
+        await marketplace_with_trust.register_service(make_service(provider_id="provider-a", name="Trusted Svc"))
 
         results = await marketplace_with_trust.search()
         assert len(results) == 1
         assert results[0].trust_score == 92.5
 
-    async def test_search_multiple_providers_different_scores(
-        self, marketplace_with_trust, trust_scores
-    ):
+    async def test_search_multiple_providers_different_scores(self, marketplace_with_trust, trust_scores):
         """Each service should get its own provider's trust score."""
         trust_scores["p1"] = 95.0
         trust_scores["p2"] = 60.0
 
-        await marketplace_with_trust.register_service(
-            make_service(provider_id="p1", name="High Trust")
-        )
-        await marketplace_with_trust.register_service(
-            make_service(provider_id="p2", name="Low Trust")
-        )
+        await marketplace_with_trust.register_service(make_service(provider_id="p1", name="High Trust"))
+        await marketplace_with_trust.register_service(make_service(provider_id="p2", name="Low Trust"))
 
         results = await marketplace_with_trust.search()
         scores_by_name = {r.name: r.trust_score for r in results}
@@ -118,15 +111,9 @@ class TestSearchWithTrustProvider:
         trust_scores["mid"] = 60.0
         trust_scores["high"] = 90.0
 
-        await marketplace_with_trust.register_service(
-            make_service(provider_id="low", name="Low")
-        )
-        await marketplace_with_trust.register_service(
-            make_service(provider_id="mid", name="Mid")
-        )
-        await marketplace_with_trust.register_service(
-            make_service(provider_id="high", name="High")
-        )
+        await marketplace_with_trust.register_service(make_service(provider_id="low", name="Low"))
+        await marketplace_with_trust.register_service(make_service(provider_id="mid", name="Mid"))
+        await marketplace_with_trust.register_service(make_service(provider_id="high", name="High"))
 
         params = ServiceSearchParams(sort_by=SortBy.TRUST_SCORE, sort_desc=True)
         results = await marketplace_with_trust.search(params)
@@ -138,12 +125,8 @@ class TestSearchWithTrustProvider:
         trust_scores["low"] = 20.0
         trust_scores["high"] = 80.0
 
-        await marketplace_with_trust.register_service(
-            make_service(provider_id="high", name="High")
-        )
-        await marketplace_with_trust.register_service(
-            make_service(provider_id="low", name="Low")
-        )
+        await marketplace_with_trust.register_service(make_service(provider_id="high", name="High"))
+        await marketplace_with_trust.register_service(make_service(provider_id="low", name="Low"))
 
         params = ServiceSearchParams(sort_by=SortBy.TRUST_SCORE, sort_desc=False)
         results = await marketplace_with_trust.search(params)
@@ -155,6 +138,7 @@ class TestSearchWithTrustProvider:
 # Tests: best_match with prefer=TRUST
 # ---------------------------------------------------------------------------
 
+
 class TestBestMatchWithTrust:
     """best_match with prefer=TRUST should rank by actual trust scores."""
 
@@ -165,28 +149,30 @@ class TestBestMatchWithTrust:
 
         await marketplace_with_trust.register_service(
             make_service(
-                provider_id="trusted", name="Trusted Data",
-                description="data service", cost=5.0, tags=["data"],
+                provider_id="trusted",
+                name="Trusted Data",
+                description="data service",
+                cost=5.0,
+                tags=["data"],
             )
         )
         await marketplace_with_trust.register_service(
             make_service(
-                provider_id="cheap", name="Cheap Data",
-                description="data service", cost=0.1, tags=["data"],
+                provider_id="cheap",
+                name="Cheap Data",
+                description="data service",
+                cost=0.1,
+                tags=["data"],
             )
         )
 
-        matches = await marketplace_with_trust.best_match(
-            query="data", prefer=MatchPreference.TRUST
-        )
+        matches = await marketplace_with_trust.best_match(query="data", prefer=MatchPreference.TRUST)
         assert len(matches) >= 2
         # Trusted provider should rank higher
         assert matches[0].service.provider_id == "trusted"
         assert "high_trust" in matches[0].match_reasons
 
-    async def test_best_match_trust_scores_in_results(
-        self, marketplace_with_trust, trust_scores
-    ):
+    async def test_best_match_trust_scores_in_results(self, marketplace_with_trust, trust_scores):
         """Service objects in match results should carry trust_score."""
         trust_scores["prov"] = 88.0
 
@@ -202,15 +188,14 @@ class TestBestMatchWithTrust:
 # Tests: fallback when trust_provider returns None
 # ---------------------------------------------------------------------------
 
+
 class TestTrustProviderFallback:
     """When the trust provider returns None (server not found), trust_score = None."""
 
     async def test_unknown_provider_gets_none(self, marketplace_with_trust, trust_scores):
         """Provider not in trust system should get trust_score=None."""
         # trust_scores dict is empty - provider "unknown" won't be found
-        await marketplace_with_trust.register_service(
-            make_service(provider_id="unknown", name="Unknown Svc")
-        )
+        await marketplace_with_trust.register_service(make_service(provider_id="unknown", name="Unknown Svc"))
 
         results = await marketplace_with_trust.search()
         assert len(results) == 1
@@ -224,9 +209,7 @@ class TestTrustProviderFallback:
 
         mp = Marketplace(storage=storage, trust_provider=broken_provider)
 
-        await mp.register_service(
-            make_service(provider_id="any", name="Any Svc")
-        )
+        await mp.register_service(make_service(provider_id="any", name="Any Svc"))
 
         results = await mp.search()
         assert len(results) == 1
@@ -237,12 +220,8 @@ class TestTrustProviderFallback:
         trust_scores["known"] = 85.0
         # "unknown" provider not in trust_scores -> returns None
 
-        await marketplace_with_trust.register_service(
-            make_service(provider_id="known", name="Known")
-        )
-        await marketplace_with_trust.register_service(
-            make_service(provider_id="unknown", name="Unknown")
-        )
+        await marketplace_with_trust.register_service(make_service(provider_id="known", name="Known"))
+        await marketplace_with_trust.register_service(make_service(provider_id="unknown", name="Unknown"))
 
         params = ServiceSearchParams(min_trust_score=50.0)
         results = await marketplace_with_trust.search(params)

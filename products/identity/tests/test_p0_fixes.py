@@ -10,16 +10,15 @@ from __future__ import annotations
 import os
 
 import pytest
-import pytest_asyncio
 
-from products.identity.src.api import IdentityAPI, AgentNotFoundError
+from products.identity.src.api import IdentityAPI
 from products.identity.src.crypto import AgentCrypto
 from products.identity.src.storage import IdentityStorage
-
 
 # ---------------------------------------------------------------------------
 # TODO-1: Store blinding factors + reveal_commitment
 # ---------------------------------------------------------------------------
+
 
 class TestBlindingFactorStorage:
     """Blinding factors must be stored so commitments can be opened later."""
@@ -28,9 +27,7 @@ class TestBlindingFactorStorage:
     async def test_submit_metrics_returns_blinding_factors(self, api):
         """submit_metrics should return blinding factors alongside the attestation."""
         await api.register_agent("bot-blind")
-        result = await api.submit_metrics(
-            "bot-blind", {"sharpe_30d": 2.5}
-        )
+        result = await api.submit_metrics("bot-blind", {"sharpe_30d": 2.5})
         # Result should now be a dict/object with attestation AND blinding_factors
         assert hasattr(result, "blinding_factors") or isinstance(result, dict)
         # For backward compat, we'll use a richer return type
@@ -45,13 +42,9 @@ class TestBlindingFactorStorage:
     async def test_blinding_factors_stored_in_db(self, api):
         """Blinding factors should be persisted in commitment_secrets table."""
         await api.register_agent("bot-blind-db")
-        result = await api.submit_metrics(
-            "bot-blind-db", {"sharpe_30d": 1.8, "aum": 50000.0}
-        )
+        result = await api.submit_metrics("bot-blind-db", {"sharpe_30d": 1.8, "aum": 50000.0})
         # Should be retrievable from storage
-        secrets = await api.storage.get_commitment_secrets(
-            "bot-blind-db", "sharpe_30d"
-        )
+        secrets = await api.storage.get_commitment_secrets("bot-blind-db", "sharpe_30d")
         assert len(secrets) >= 1
         assert secrets[0]["blinding_factor"] == result.blinding_factors["sharpe_30d"]
 
@@ -59,15 +52,11 @@ class TestBlindingFactorStorage:
     async def test_reveal_commitment_success(self, api):
         """reveal_commitment should verify and return the revealed value."""
         await api.register_agent("bot-reveal")
-        result = await api.submit_metrics(
-            "bot-reveal", {"sharpe_30d": 2.35}
-        )
+        result = await api.submit_metrics("bot-reveal", {"sharpe_30d": 2.35})
         blinding = result.blinding_factors["sharpe_30d"]
-        commitment_hash = result.attestation.commitment_hashes[0]
+        result.attestation.commitment_hashes[0]
 
-        revealed = await api.reveal_commitment(
-            "bot-reveal", "sharpe_30d", 2.35, blinding
-        )
+        revealed = await api.reveal_commitment("bot-reveal", "sharpe_30d", 2.35, blinding)
         assert revealed["verified"] is True
         assert revealed["metric_name"] == "sharpe_30d"
         assert revealed["value"] == 2.35
@@ -76,33 +65,26 @@ class TestBlindingFactorStorage:
     async def test_reveal_commitment_wrong_value(self, api):
         """reveal_commitment with wrong value should fail verification."""
         await api.register_agent("bot-reveal-bad")
-        result = await api.submit_metrics(
-            "bot-reveal-bad", {"sharpe_30d": 2.35}
-        )
+        result = await api.submit_metrics("bot-reveal-bad", {"sharpe_30d": 2.35})
         blinding = result.blinding_factors["sharpe_30d"]
 
-        revealed = await api.reveal_commitment(
-            "bot-reveal-bad", "sharpe_30d", 9.99, blinding
-        )
+        revealed = await api.reveal_commitment("bot-reveal-bad", "sharpe_30d", 9.99, blinding)
         assert revealed["verified"] is False
 
     @pytest.mark.asyncio
     async def test_reveal_commitment_wrong_blinding(self, api):
         """reveal_commitment with wrong blinding factor should fail."""
         await api.register_agent("bot-reveal-bad2")
-        await api.submit_metrics(
-            "bot-reveal-bad2", {"sharpe_30d": 2.35}
-        )
+        await api.submit_metrics("bot-reveal-bad2", {"sharpe_30d": 2.35})
 
-        revealed = await api.reveal_commitment(
-            "bot-reveal-bad2", "sharpe_30d", 2.35, "ff" * 32
-        )
+        revealed = await api.reveal_commitment("bot-reveal-bad2", "sharpe_30d", 2.35, "ff" * 32)
         assert revealed["verified"] is False
 
 
 # ---------------------------------------------------------------------------
 # TODO-2: Persist auditor keypair
 # ---------------------------------------------------------------------------
+
 
 class TestAuditorKeyPersistence:
     """Auditor keypair should be loadable from env vars."""
@@ -165,6 +147,7 @@ class TestAuditorKeyPersistence:
 # ---------------------------------------------------------------------------
 # TODO-3: Return agent private key on auto-registration
 # ---------------------------------------------------------------------------
+
 
 class TestAgentPrivateKeyReturn:
     """Auto-registration should return the private key to the caller."""

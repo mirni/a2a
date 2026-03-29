@@ -1,15 +1,15 @@
 """Tests for PostgreSQL tool handlers with mocked database client."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from src.tools import (
-    handle_query,
-    handle_execute,
-    handle_list_tables,
-    handle_describe_table,
-    handle_list_schemas,
     _serialize_rows,
+    handle_describe_table,
+    handle_execute,
+    handle_list_schemas,
+    handle_list_tables,
+    handle_query,
 )
 
 
@@ -27,10 +27,13 @@ class TestHandleQuery:
         client = make_mock_client()
         client.query.return_value = [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
 
-        result = await handle_query(client, {
-            "sql": "SELECT * FROM users WHERE id > $1",
-            "params": [0],
-        })
+        result = await handle_query(
+            client,
+            {
+                "sql": "SELECT * FROM users WHERE id > $1",
+                "params": [0],
+            },
+        )
 
         assert result["row_count"] == 2
         assert result["rows"][0]["name"] == "Alice"
@@ -42,10 +45,13 @@ class TestHandleQuery:
         client = make_mock_client()
         client.query.return_value = [{"id": i} for i in range(5)]
 
-        result = await handle_query(client, {
-            "sql": "SELECT * FROM big_table",
-            "max_rows": 5,
-        })
+        result = await handle_query(
+            client,
+            {
+                "sql": "SELECT * FROM big_table",
+                "max_rows": 5,
+            },
+        )
 
         assert result["truncated"] is True
 
@@ -68,10 +74,13 @@ class TestHandleExecute:
         client = make_mock_client(read_only=False)
         client.execute.return_value = "INSERT 0 1"
 
-        result = await handle_execute(client, {
-            "sql": "INSERT INTO users (name) VALUES ($1)",
-            "params": ["Alice"],
-        })
+        result = await handle_execute(
+            client,
+            {
+                "sql": "INSERT INTO users (name) VALUES ($1)",
+                "params": ["Alice"],
+            },
+        )
 
         assert result["status"] == "INSERT 0 1"
 
@@ -107,7 +116,7 @@ class TestHandleListTables:
         client = make_mock_client()
         client.fetch_schema_info.return_value = []
 
-        result = await handle_list_tables(client, {"schema_name": "analytics"})
+        await handle_list_tables(client, {"schema_name": "analytics"})
 
         client.fetch_schema_info.assert_called_with("analytics")
 
@@ -117,10 +126,20 @@ class TestHandleDescribeTable:
     async def test_describes_columns(self):
         client = make_mock_client()
         client.describe_table.return_value = [
-            {"column_name": "id", "data_type": "integer", "is_nullable": "NO",
-             "column_default": "nextval('users_id_seq')", "character_maximum_length": None},
-            {"column_name": "name", "data_type": "character varying", "is_nullable": "YES",
-             "column_default": None, "character_maximum_length": 255},
+            {
+                "column_name": "id",
+                "data_type": "integer",
+                "is_nullable": "NO",
+                "column_default": "nextval('users_id_seq')",
+                "character_maximum_length": None,
+            },
+            {
+                "column_name": "name",
+                "data_type": "character varying",
+                "is_nullable": "YES",
+                "column_default": None,
+                "character_maximum_length": 255,
+            },
         ]
 
         result = await handle_describe_table(client, {"table_name": "users"})
@@ -150,6 +169,7 @@ class TestHandleListSchemas:
 class TestSerializeRows:
     def test_handles_datetime(self):
         from datetime import datetime
+
         rows = [{"created": datetime(2026, 1, 1, 12, 0, 0)}]
         result = _serialize_rows(rows)
         assert result[0]["created"] == "2026-01-01T12:00:00"

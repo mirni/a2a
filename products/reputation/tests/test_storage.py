@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import time
-
 import pytest
-import pytest_asyncio
 
 from products.reputation.src.models import ProbeTarget
 from products.reputation.src.storage import ReputationStorage
@@ -17,9 +14,7 @@ class TestReputationStorageConnect:
         db_path = str(tmp_path / "test.db")
         storage = ReputationStorage(dsn=f"sqlite:///{db_path}")
         await storage.connect()
-        cursor = await storage.db.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='probe_targets'"
-        )
+        cursor = await storage.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='probe_targets'")
         row = await cursor.fetchone()
         assert row is not None
         await storage.close()
@@ -89,9 +84,7 @@ class TestAddTarget:
     @pytest.mark.asyncio
     async def test_add_multiple_targets(self, reputation_storage):
         for i in range(5):
-            await reputation_storage.add_target(
-                ProbeTarget(server_id=f"svc-{i}", url=f"https://svc{i}.com")
-            )
+            await reputation_storage.add_target(ProbeTarget(server_id=f"svc-{i}", url=f"https://svc{i}.com"))
         targets = await reputation_storage.list_targets(active_only=False)
         assert len(targets) == 5
 
@@ -99,9 +92,7 @@ class TestAddTarget:
 class TestRemoveTarget:
     @pytest.mark.asyncio
     async def test_remove_existing(self, reputation_storage):
-        await reputation_storage.add_target(
-            ProbeTarget(server_id="svc-1", url="https://example.com")
-        )
+        await reputation_storage.add_target(ProbeTarget(server_id="svc-1", url="https://example.com"))
         removed = await reputation_storage.remove_target("svc-1")
         assert removed is True
         assert await reputation_storage.get_target("svc-1") is None
@@ -115,9 +106,7 @@ class TestRemoveTarget:
 class TestDeactivateActivate:
     @pytest.mark.asyncio
     async def test_deactivate_target(self, reputation_storage):
-        await reputation_storage.add_target(
-            ProbeTarget(server_id="svc-1", url="https://example.com")
-        )
+        await reputation_storage.add_target(ProbeTarget(server_id="svc-1", url="https://example.com"))
         result = await reputation_storage.deactivate_target("svc-1")
         assert result is True
         target = await reputation_storage.get_target("svc-1")
@@ -130,9 +119,7 @@ class TestDeactivateActivate:
 
     @pytest.mark.asyncio
     async def test_activate_target(self, reputation_storage):
-        await reputation_storage.add_target(
-            ProbeTarget(server_id="svc-1", url="https://example.com", active=False)
-        )
+        await reputation_storage.add_target(ProbeTarget(server_id="svc-1", url="https://example.com", active=False))
         result = await reputation_storage.activate_target("svc-1")
         assert result is True
         target = await reputation_storage.get_target("svc-1")
@@ -145,12 +132,8 @@ class TestDeactivateActivate:
 
     @pytest.mark.asyncio
     async def test_deactivated_not_in_active_list(self, reputation_storage):
-        await reputation_storage.add_target(
-            ProbeTarget(server_id="svc-1", url="https://example.com")
-        )
-        await reputation_storage.add_target(
-            ProbeTarget(server_id="svc-2", url="https://example2.com")
-        )
+        await reputation_storage.add_target(ProbeTarget(server_id="svc-1", url="https://example.com"))
+        await reputation_storage.add_target(ProbeTarget(server_id="svc-2", url="https://example2.com"))
         await reputation_storage.deactivate_target("svc-1")
         active = await reputation_storage.list_targets(active_only=True)
         assert len(active) == 1
@@ -158,9 +141,7 @@ class TestDeactivateActivate:
 
     @pytest.mark.asyncio
     async def test_deactivated_in_full_list(self, reputation_storage):
-        await reputation_storage.add_target(
-            ProbeTarget(server_id="svc-1", url="https://example.com")
-        )
+        await reputation_storage.add_target(ProbeTarget(server_id="svc-1", url="https://example.com"))
         await reputation_storage.deactivate_target("svc-1")
         all_targets = await reputation_storage.list_targets(active_only=False)
         assert len(all_targets) == 1
@@ -169,9 +150,7 @@ class TestDeactivateActivate:
 class TestGetTarget:
     @pytest.mark.asyncio
     async def test_get_existing(self, reputation_storage):
-        await reputation_storage.add_target(
-            ProbeTarget(server_id="svc-1", url="https://example.com")
-        )
+        await reputation_storage.add_target(ProbeTarget(server_id="svc-1", url="https://example.com"))
         target = await reputation_storage.get_target("svc-1")
         assert target is not None
         assert target.server_id == "svc-1"
@@ -190,38 +169,24 @@ class TestListTargets:
 
     @pytest.mark.asyncio
     async def test_list_active_only(self, reputation_storage):
-        await reputation_storage.add_target(
-            ProbeTarget(server_id="svc-1", url="https://a.com", active=True)
-        )
-        await reputation_storage.add_target(
-            ProbeTarget(server_id="svc-2", url="https://b.com", active=False)
-        )
+        await reputation_storage.add_target(ProbeTarget(server_id="svc-1", url="https://a.com", active=True))
+        await reputation_storage.add_target(ProbeTarget(server_id="svc-2", url="https://b.com", active=False))
         active = await reputation_storage.list_targets(active_only=True)
         assert len(active) == 1
         assert active[0].server_id == "svc-1"
 
     @pytest.mark.asyncio
     async def test_list_all(self, reputation_storage):
-        await reputation_storage.add_target(
-            ProbeTarget(server_id="svc-1", url="https://a.com", active=True)
-        )
-        await reputation_storage.add_target(
-            ProbeTarget(server_id="svc-2", url="https://b.com", active=False)
-        )
+        await reputation_storage.add_target(ProbeTarget(server_id="svc-1", url="https://a.com", active=True))
+        await reputation_storage.add_target(ProbeTarget(server_id="svc-2", url="https://b.com", active=False))
         all_targets = await reputation_storage.list_targets(active_only=False)
         assert len(all_targets) == 2
 
     @pytest.mark.asyncio
     async def test_list_ordered_by_server_id(self, reputation_storage):
-        await reputation_storage.add_target(
-            ProbeTarget(server_id="svc-c", url="https://c.com")
-        )
-        await reputation_storage.add_target(
-            ProbeTarget(server_id="svc-a", url="https://a.com")
-        )
-        await reputation_storage.add_target(
-            ProbeTarget(server_id="svc-b", url="https://b.com")
-        )
+        await reputation_storage.add_target(ProbeTarget(server_id="svc-c", url="https://c.com"))
+        await reputation_storage.add_target(ProbeTarget(server_id="svc-a", url="https://a.com"))
+        await reputation_storage.add_target(ProbeTarget(server_id="svc-b", url="https://b.com"))
         targets = await reputation_storage.list_targets()
         ids = [t.server_id for t in targets]
         assert ids == ["svc-a", "svc-b", "svc-c"]
@@ -256,9 +221,7 @@ class TestDueForProbe:
 
     @pytest.mark.asyncio
     async def test_inactive_not_due(self, reputation_storage):
-        await reputation_storage.add_target(
-            ProbeTarget(server_id="svc-1", url="https://example.com", active=False)
-        )
+        await reputation_storage.add_target(ProbeTarget(server_id="svc-1", url="https://example.com", active=False))
         due = await reputation_storage.get_due_for_probe(now=1000.0)
         assert len(due) == 0
 
@@ -303,18 +266,14 @@ class TestDueForScan:
 class TestUpdateTimestamps:
     @pytest.mark.asyncio
     async def test_update_last_probed(self, reputation_storage):
-        await reputation_storage.add_target(
-            ProbeTarget(server_id="svc-1", url="https://example.com")
-        )
+        await reputation_storage.add_target(ProbeTarget(server_id="svc-1", url="https://example.com"))
         await reputation_storage.update_last_probed("svc-1", 12345.0)
         target = await reputation_storage.get_target("svc-1")
         assert target.last_probed == 12345.0
 
     @pytest.mark.asyncio
     async def test_update_last_scanned(self, reputation_storage):
-        await reputation_storage.add_target(
-            ProbeTarget(server_id="svc-1", url="https://example.com")
-        )
+        await reputation_storage.add_target(ProbeTarget(server_id="svc-1", url="https://example.com"))
         await reputation_storage.update_last_scanned("svc-1", 67890.0)
         target = await reputation_storage.get_target("svc-1")
         assert target.last_scanned == 67890.0
@@ -323,9 +282,7 @@ class TestUpdateTimestamps:
 class TestUpdateIntervals:
     @pytest.mark.asyncio
     async def test_update_probe_interval(self, reputation_storage):
-        await reputation_storage.add_target(
-            ProbeTarget(server_id="svc-1", url="https://example.com")
-        )
+        await reputation_storage.add_target(ProbeTarget(server_id="svc-1", url="https://example.com"))
         result = await reputation_storage.update_intervals("svc-1", probe_interval=120.0)
         assert result is True
         target = await reputation_storage.get_target("svc-1")
@@ -333,9 +290,7 @@ class TestUpdateIntervals:
 
     @pytest.mark.asyncio
     async def test_update_scan_interval(self, reputation_storage):
-        await reputation_storage.add_target(
-            ProbeTarget(server_id="svc-1", url="https://example.com")
-        )
+        await reputation_storage.add_target(ProbeTarget(server_id="svc-1", url="https://example.com"))
         result = await reputation_storage.update_intervals("svc-1", scan_interval=7200.0)
         assert result is True
         target = await reputation_storage.get_target("svc-1")
@@ -343,12 +298,8 @@ class TestUpdateIntervals:
 
     @pytest.mark.asyncio
     async def test_update_both_intervals(self, reputation_storage):
-        await reputation_storage.add_target(
-            ProbeTarget(server_id="svc-1", url="https://example.com")
-        )
-        result = await reputation_storage.update_intervals(
-            "svc-1", probe_interval=60.0, scan_interval=1800.0
-        )
+        await reputation_storage.add_target(ProbeTarget(server_id="svc-1", url="https://example.com"))
+        result = await reputation_storage.update_intervals("svc-1", probe_interval=60.0, scan_interval=1800.0)
         assert result is True
         target = await reputation_storage.get_target("svc-1")
         assert target.probe_interval == 60.0
@@ -373,11 +324,7 @@ class TestCountTargets:
 
     @pytest.mark.asyncio
     async def test_count_active(self, reputation_storage):
-        await reputation_storage.add_target(
-            ProbeTarget(server_id="svc-1", url="https://a.com", active=True)
-        )
-        await reputation_storage.add_target(
-            ProbeTarget(server_id="svc-2", url="https://b.com", active=False)
-        )
+        await reputation_storage.add_target(ProbeTarget(server_id="svc-1", url="https://a.com", active=True))
+        await reputation_storage.add_target(ProbeTarget(server_id="svc-2", url="https://b.com", active=False))
         assert await reputation_storage.count_targets(active_only=True) == 1
         assert await reputation_storage.count_targets(active_only=False) == 2

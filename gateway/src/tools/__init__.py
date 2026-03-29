@@ -5,22 +5,23 @@ Each callable receives (ctx: AppContext, params: dict) and returns a result dict
 
 from __future__ import annotations
 
-from typing import Any, Callable, Coroutine
+from collections.abc import Callable, Coroutine
+from typing import Any
 
 from gateway.src.lifespan import AppContext
 from gateway.src.tools.billing import (
+    _create_wallet,
+    _deposit,
     _estimate_cost,
+    _get_agent_leaderboard,
     _get_balance,
     _get_budget_status,
     _get_metrics_timeseries,
-    _get_agent_leaderboard,
     _get_revenue_report,
     _get_service_analytics,
     _get_transactions,
     _get_usage_summary,
     _get_volume_discount,
-    _create_wallet,
-    _deposit,
     _set_budget_cap,
     _withdraw,
 )
@@ -223,9 +224,11 @@ def register_mcp_tools(proxy_manager) -> None:
     from gateway.src.mcp_proxy import _TOOL_MAP
 
     for tool_name in _TOOL_MAP:
+
         def _make_handler(tn: str):
             async def _handler(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
                 return await ctx.mcp_proxy.call_tool(tn, params)
+
             return _handler
 
         TOOL_REGISTRY[tool_name] = _make_handler(tool_name)

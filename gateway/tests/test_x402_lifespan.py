@@ -49,9 +49,7 @@ async def test_x402_nonces_table_exists(app):
     """The x402_nonces table should be created during lifespan startup."""
     ctx = app.state.ctx
     db = ctx.tracker.storage.db
-    cursor = await db.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='x402_nonces'"
-    )
+    cursor = await db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='x402_nonces'")
     row = await cursor.fetchone()
     assert row is not None
     assert row[0] == "x402_nonces"

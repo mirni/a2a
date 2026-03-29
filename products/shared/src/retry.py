@@ -45,7 +45,7 @@ class RetryConfig:
 
 def _compute_delay(attempt: int, config: RetryConfig) -> float:
     """Compute delay for a given attempt number (0-indexed)."""
-    delay = config.base_delay * (config.exponential_base ** attempt)
+    delay = config.base_delay * (config.exponential_base**attempt)
     return min(delay, config.max_delay)
 
 

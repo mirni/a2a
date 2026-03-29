@@ -5,16 +5,13 @@ from __future__ import annotations
 import time
 
 import pytest
-
 from src.storage import StorageBackend
 
 
 class TestStorageConnection:
     async def test_connect_creates_schema(self, storage: StorageBackend):
         # Verify tables exist by querying sqlite_master
-        cursor = await storage.db.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-        )
+        cursor = await storage.db.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         rows = await cursor.fetchall()
         table_names = sorted(r["name"] for r in rows)
         assert "wallets" in table_names
@@ -25,9 +22,7 @@ class TestStorageConnection:
 
     async def test_connect_is_idempotent(self, storage: StorageBackend):
         # Calling connect schema again should not fail
-        await storage.db.executescript(
-            "CREATE TABLE IF NOT EXISTS wallets (agent_id TEXT PRIMARY KEY)"
-        )
+        await storage.db.executescript("CREATE TABLE IF NOT EXISTS wallets (agent_id TEXT PRIMARY KEY)")
 
 
 class TestWalletStorage:
@@ -89,9 +84,7 @@ class TestUsageStorage:
         assert records[0]["tokens"] == 100
 
     async def test_usage_with_metadata(self, storage: StorageBackend):
-        await storage.record_usage(
-            "agent-1", "func", 1.0, metadata={"key": "value"}
-        )
+        await storage.record_usage("agent-1", "func", 1.0, metadata={"key": "value"})
         records = await storage.get_usage("agent-1")
         assert records[0]["metadata"] == {"key": "value"}
 

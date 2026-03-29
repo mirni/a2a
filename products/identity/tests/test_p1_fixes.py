@@ -12,22 +12,16 @@ from __future__ import annotations
 import time
 
 import pytest
-import pytest_asyncio
 
-from products.identity.src.api import IdentityAPI, AgentNotFoundError
-from products.identity.src.crypto import AgentCrypto
 from products.identity.src.models import (
-    AgentIdentity,
     AgentReputation,
     AuditorAttestation,
-    VerifiedClaim,
 )
-from products.identity.src.storage import IdentityStorage
-
 
 # ---------------------------------------------------------------------------
 # TODO-4: attestation_signature round-trip
 # ---------------------------------------------------------------------------
+
 
 class TestAttestationSignatureRoundTrip:
     """Claims retrieved from DB should have attestation_signature populated."""
@@ -61,6 +55,7 @@ class TestAttestationSignatureRoundTrip:
 # TODO-5: Rename dispute_rate to data_source_quality
 # ---------------------------------------------------------------------------
 
+
 class TestReputationFieldRename:
     """AgentReputation should use data_source_quality instead of dispute_rate."""
 
@@ -77,9 +72,7 @@ class TestReputationFieldRename:
     async def test_compute_reputation_uses_data_source_quality(self, api):
         """compute_reputation should populate data_source_quality."""
         await api.register_agent("bot-dsq")
-        await api.submit_metrics(
-            "bot-dsq", {"sharpe_30d": 2.5}, data_source="platform_verified"
-        )
+        await api.submit_metrics("bot-dsq", {"sharpe_30d": 2.5}, data_source="platform_verified")
         rep = await api.compute_reputation("bot-dsq")
         assert hasattr(rep, "data_source_quality")
         assert rep.data_source_quality > 0
@@ -88,6 +81,7 @@ class TestReputationFieldRename:
 # ---------------------------------------------------------------------------
 # TODO-6: store_identity conflict detection
 # ---------------------------------------------------------------------------
+
 
 class TestIdentityConflictDetection:
     """store_identity should raise on duplicate agent_id."""
@@ -116,6 +110,7 @@ class TestIdentityConflictDetection:
 # TODO-7: Index on verified_claims(metric_name)
 # ---------------------------------------------------------------------------
 
+
 class TestMetricNameIndex:
     """verified_claims should have an index on metric_name for search_claims."""
 
@@ -132,6 +127,7 @@ class TestMetricNameIndex:
 # ---------------------------------------------------------------------------
 # TODO-8: version field on AuditorAttestation
 # ---------------------------------------------------------------------------
+
 
 class TestAttestationVersion:
     """AuditorAttestation should have a version field."""

@@ -75,6 +75,7 @@ async def x402_app(tmp_data_dir, monkeypatch):
 @pytest.fixture
 async def x402_client(x402_app):
     import httpx
+
     transport = httpx.ASGITransport(app=x402_app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
@@ -86,10 +87,12 @@ class TestX402Batch:
         """No API key + x402 enabled + no X-PAYMENT → 402 with total cost."""
         resp = await x402_client.post(
             "/v1/batch",
-            json={"calls": [
-                {"tool": "get_balance", "params": {"agent_id": "test"}},
-                {"tool": "get_balance", "params": {"agent_id": "test2"}},
-            ]},
+            json={
+                "calls": [
+                    {"tool": "get_balance", "params": {"agent_id": "test"}},
+                    {"tool": "get_balance", "params": {"agent_id": "test2"}},
+                ]
+            },
         )
         assert resp.status_code == 402
         assert "payment-required" in resp.headers
@@ -120,9 +123,11 @@ class TestX402Batch:
 
             resp = await x402_client.post(
                 "/v1/batch",
-                json={"calls": [
-                    {"tool": "get_balance", "params": {"agent_id": "0xPayerWallet"}},
-                ]},
+                json={
+                    "calls": [
+                        {"tool": "get_balance", "params": {"agent_id": "0xPayerWallet"}},
+                    ]
+                },
                 headers={"X-PAYMENT": encoded},
             )
 
@@ -151,9 +156,11 @@ class TestX402Batch:
 
             resp = await x402_client.post(
                 "/v1/batch",
-                json={"calls": [
-                    {"tool": "get_balance", "params": {"agent_id": "test"}},
-                ]},
+                json={
+                    "calls": [
+                        {"tool": "get_balance", "params": {"agent_id": "test"}},
+                    ]
+                },
                 headers={"X-PAYMENT": encoded},
             )
 

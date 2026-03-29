@@ -7,10 +7,8 @@ from dataclasses import dataclass
 
 import aiosqlite
 import pytest
-
 from src.base_storage import BaseStorage
 from src.migrate import Migration, SchemaVersionMismatchError, get_current_version
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -33,9 +31,7 @@ class TestDBTimeout:
         storage = FastStorage(dsn=f"sqlite:///{tmp_path}/fast_test.db")
         await storage.connect()
 
-        cursor = await storage.db.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='test_t'"
-        )
+        cursor = await storage.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='test_t'")
         row = await cursor.fetchone()
         assert row is not None
         await storage.close()
@@ -98,10 +94,8 @@ class TestDBTimeout:
 # ---------------------------------------------------------------------------
 
 _TEST_MIGRATIONS = (
-    Migration(version=1, description="add col name",
-              sql="ALTER TABLE t1 ADD COLUMN name TEXT"),
-    Migration(version=2, description="add col tag",
-              sql="ALTER TABLE t1 ADD COLUMN tag TEXT"),
+    Migration(version=1, description="add col name", sql="ALTER TABLE t1 ADD COLUMN name TEXT"),
+    Migration(version=2, description="add col tag", sql="ALTER TABLE t1 ADD COLUMN tag TEXT"),
 )
 
 
@@ -120,6 +114,7 @@ class TestSchemaVersionCheck:
             await db.executescript("CREATE TABLE t1 (id INTEGER PRIMARY KEY);")
             await db.commit()
             from src.migrate import run_migrations
+
             await run_migrations(db, _TEST_MIGRATIONS[:1])
 
         storage = MigStorage(dsn=f"sqlite:///{db_path}")

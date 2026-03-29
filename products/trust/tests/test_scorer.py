@@ -8,9 +8,7 @@ from __future__ import annotations
 
 import time
 
-import pytest
-
-from src.models import ProbeResult, SecurityScan, TrustScore, Window
+from src.models import ProbeResult, SecurityScan, Window
 from src.scorer import (
     ONE_HOUR,
     SEVEN_DAYS,
@@ -68,20 +66,14 @@ class TestReliability:
         assert compute_reliability([]) == 0.0
 
     def test_all_successful(self):
-        probes = [
-            ProbeResult(server_id="s", timestamp=time.time(), latency_ms=100, status_code=200)
-            for _ in range(10)
-        ]
+        probes = [ProbeResult(server_id="s", timestamp=time.time(), latency_ms=100, status_code=200) for _ in range(10)]
         score = compute_reliability(probes)
         # 100% uptime (50) + 0% errors (30) + 0% timeouts (20) = 100
         assert score == 100.0
 
     def test_all_errors(self):
         probes = [
-            ProbeResult(
-                server_id="s", timestamp=time.time(), latency_ms=100,
-                status_code=500, error="fail"
-            )
+            ProbeResult(server_id="s", timestamp=time.time(), latency_ms=100, status_code=500, error="fail")
             for _ in range(10)
         ]
         score = compute_reliability(probes)
@@ -92,10 +84,7 @@ class TestReliability:
         probes = [
             ProbeResult(server_id="s", timestamp=time.time(), latency_ms=100, status_code=200),
             ProbeResult(server_id="s", timestamp=time.time(), latency_ms=100, status_code=200),
-            ProbeResult(
-                server_id="s", timestamp=time.time(), latency_ms=6000,
-                status_code=500, error="timeout"
-            ),
+            ProbeResult(server_id="s", timestamp=time.time(), latency_ms=6000, status_code=500, error="timeout"),
         ]
         score = compute_reliability(probes)
         # Uptime: 2/3 * 50 = 33.33
@@ -120,9 +109,12 @@ class TestSecurity:
     def test_perfect_security(self):
         scans = [
             SecurityScan(
-                server_id="s", timestamp=time.time(),
-                tls_enabled=True, auth_required=True,
-                input_validation_score=100.0, cve_count=0,
+                server_id="s",
+                timestamp=time.time(),
+                tls_enabled=True,
+                auth_required=True,
+                input_validation_score=100.0,
+                cve_count=0,
             )
         ]
         # TLS (30) + Auth (25) + Validation (25) + CVE base (20) = 100
@@ -131,9 +123,12 @@ class TestSecurity:
     def test_no_security(self):
         scans = [
             SecurityScan(
-                server_id="s", timestamp=time.time(),
-                tls_enabled=False, auth_required=False,
-                input_validation_score=0.0, cve_count=10,
+                server_id="s",
+                timestamp=time.time(),
+                tls_enabled=False,
+                auth_required=False,
+                input_validation_score=0.0,
+                cve_count=10,
             )
         ]
         # TLS (0) + Auth (0) + Validation (0) + CVE (max(0, 20 - 50) = 0)
@@ -142,9 +137,12 @@ class TestSecurity:
     def test_partial_security(self):
         scans = [
             SecurityScan(
-                server_id="s", timestamp=time.time(),
-                tls_enabled=True, auth_required=False,
-                input_validation_score=50.0, cve_count=2,
+                server_id="s",
+                timestamp=time.time(),
+                tls_enabled=True,
+                auth_required=False,
+                input_validation_score=50.0,
+                cve_count=2,
             )
         ]
         # TLS (30) + Auth (0) + Validation (50/100 * 25 = 12.5) + CVE (20 - 10 = 10)
@@ -155,13 +153,18 @@ class TestSecurity:
         now = time.time()
         scans = [
             SecurityScan(
-                server_id="s", timestamp=now - 100,
-                tls_enabled=False, auth_required=False,
+                server_id="s",
+                timestamp=now - 100,
+                tls_enabled=False,
+                auth_required=False,
             ),
             SecurityScan(
-                server_id="s", timestamp=now,
-                tls_enabled=True, auth_required=True,
-                input_validation_score=100.0, cve_count=0,
+                server_id="s",
+                timestamp=now,
+                tls_enabled=True,
+                auth_required=True,
+                input_validation_score=100.0,
+                cve_count=0,
             ),
         ]
         assert compute_security(scans) == 100.0
@@ -173,23 +176,36 @@ class TestDocumentation:
 
     def test_no_tools(self):
         probes = [
-            ProbeResult(server_id="s", timestamp=time.time(), latency_ms=100,
-                        status_code=200, tools_count=0, tools_documented=0)
+            ProbeResult(
+                server_id="s", timestamp=time.time(), latency_ms=100, status_code=200, tools_count=0, tools_documented=0
+            )
         ]
         assert compute_documentation(probes) == 0.0
 
     def test_all_documented(self):
         probes = [
-            ProbeResult(server_id="s", timestamp=time.time(), latency_ms=100,
-                        status_code=200, tools_count=10, tools_documented=10)
+            ProbeResult(
+                server_id="s",
+                timestamp=time.time(),
+                latency_ms=100,
+                status_code=200,
+                tools_count=10,
+                tools_documented=10,
+            )
         ]
         # Has tools (30) + 100% doc ratio (70) = 100
         assert compute_documentation(probes) == 100.0
 
     def test_partial_documentation(self):
         probes = [
-            ProbeResult(server_id="s", timestamp=time.time(), latency_ms=100,
-                        status_code=200, tools_count=10, tools_documented=5)
+            ProbeResult(
+                server_id="s",
+                timestamp=time.time(),
+                latency_ms=100,
+                status_code=200,
+                tools_count=10,
+                tools_documented=5,
+            )
         ]
         # Has tools (30) + 50% doc ratio (35) = 65
         assert compute_documentation(probes) == 65.0
@@ -197,10 +213,12 @@ class TestDocumentation:
     def test_uses_most_recent_with_tools(self):
         now = time.time()
         probes = [
-            ProbeResult(server_id="s", timestamp=now - 100, latency_ms=100,
-                        status_code=200, tools_count=10, tools_documented=2),
-            ProbeResult(server_id="s", timestamp=now, latency_ms=100,
-                        status_code=200, tools_count=10, tools_documented=8),
+            ProbeResult(
+                server_id="s", timestamp=now - 100, latency_ms=100, status_code=200, tools_count=10, tools_documented=2
+            ),
+            ProbeResult(
+                server_id="s", timestamp=now, latency_ms=100, status_code=200, tools_count=10, tools_documented=8
+            ),
         ]
         # Uses newest: 30 + (8/10) * 70 = 30 + 56 = 86
         assert compute_documentation(probes) == 86.0
@@ -211,17 +229,11 @@ class TestResponsiveness:
         assert compute_responsiveness([]) == 0.0
 
     def test_no_successful_probes(self):
-        probes = [
-            ProbeResult(server_id="s", timestamp=time.time(), latency_ms=100,
-                        status_code=500, error="fail")
-        ]
+        probes = [ProbeResult(server_id="s", timestamp=time.time(), latency_ms=100, status_code=500, error="fail")]
         assert compute_responsiveness(probes) == 0.0
 
     def test_fast_consistent_server(self):
-        probes = [
-            ProbeResult(server_id="s", timestamp=time.time(), latency_ms=50, status_code=200)
-            for _ in range(10)
-        ]
+        probes = [ProbeResult(server_id="s", timestamp=time.time(), latency_ms=50, status_code=200) for _ in range(10)]
         score = compute_responsiveness(probes)
         # p50=50ms: 40*(1-50/2000) = 39.0
         # p95=50ms: 30*(1-50/5000) = 29.7
@@ -231,8 +243,7 @@ class TestResponsiveness:
 
     def test_slow_server(self):
         probes = [
-            ProbeResult(server_id="s", timestamp=time.time(), latency_ms=4000, status_code=200)
-            for _ in range(10)
+            ProbeResult(server_id="s", timestamp=time.time(), latency_ms=4000, status_code=200) for _ in range(10)
         ]
         score = compute_responsiveness(probes)
         # p50=4000ms: 40*(1-4000/2000) = 40*(-1) = 0 (clamped)
@@ -242,9 +253,7 @@ class TestResponsiveness:
         assert 30.0 <= score <= 40.0
 
     def test_single_probe_moderate_consistency(self):
-        probes = [
-            ProbeResult(server_id="s", timestamp=time.time(), latency_ms=100, status_code=200)
-        ]
+        probes = [ProbeResult(server_id="s", timestamp=time.time(), latency_ms=100, status_code=200)]
         score = compute_responsiveness(probes)
         # p50=100: 40*(1-100/2000) = 38.0
         # p95=100: 30*(1-100/5000) = 29.4
@@ -293,19 +302,30 @@ class TestComputeTrustScore:
         now = time.time()
         probes = [
             ProbeResult(
-                server_id="s", timestamp=now - 60, latency_ms=100,
-                status_code=200, tools_count=5, tools_documented=5,
+                server_id="s",
+                timestamp=now - 60,
+                latency_ms=100,
+                status_code=200,
+                tools_count=5,
+                tools_documented=5,
             ),
             ProbeResult(
-                server_id="s", timestamp=now - 30, latency_ms=120,
-                status_code=200, tools_count=5, tools_documented=5,
+                server_id="s",
+                timestamp=now - 30,
+                latency_ms=120,
+                status_code=200,
+                tools_count=5,
+                tools_documented=5,
             ),
         ]
         scans = [
             SecurityScan(
-                server_id="s", timestamp=now,
-                tls_enabled=True, auth_required=True,
-                input_validation_score=100.0, cve_count=0,
+                server_id="s",
+                timestamp=now,
+                tls_enabled=True,
+                auth_required=True,
+                input_validation_score=100.0,
+                cve_count=0,
             ),
         ]
 
@@ -330,13 +350,19 @@ class TestComputeTrustScore:
         """Probes outside the window should be excluded from scoring."""
         now = time.time()
         old_probe = ProbeResult(
-            server_id="s", timestamp=now - 100000,  # ~27 hours ago
-            latency_ms=100, status_code=200,
-            tools_count=10, tools_documented=10,
+            server_id="s",
+            timestamp=now - 100000,  # ~27 hours ago
+            latency_ms=100,
+            status_code=200,
+            tools_count=10,
+            tools_documented=10,
         )
         recent_probe = ProbeResult(
-            server_id="s", timestamp=now - 3600,  # 1 hour ago
-            latency_ms=5000, status_code=500, error="fail",
+            server_id="s",
+            timestamp=now - 3600,  # 1 hour ago
+            latency_ms=5000,
+            status_code=500,
+            error="fail",
         )
 
         # 24h window: only recent_probe included
@@ -349,8 +375,10 @@ class TestComputeTrustScore:
         """Old probes should reduce confidence."""
         now = time.time()
         old_probe = ProbeResult(
-            server_id="s", timestamp=now - 200000,  # ~2.3 days ago
-            latency_ms=100, status_code=200,
+            server_id="s",
+            timestamp=now - 200000,  # ~2.3 days ago
+            latency_ms=100,
+            status_code=200,
         )
         score = compute_trust_score("s", [old_probe], [], Window.D7, now)
         assert score.confidence == 0.5  # Within 7 days
@@ -361,22 +389,26 @@ class TestScoreEngine:
         """ScoreEngine should compute from stored data and persist."""
         now = time.time()
         # Insert some probe data
-        await storage.store_probe_result(ProbeResult(
-            server_id=sample_server.id,
-            timestamp=now - 60,
-            latency_ms=100,
-            status_code=200,
-            tools_count=3,
-            tools_documented=3,
-        ))
-        await storage.store_security_scan(SecurityScan(
-            server_id=sample_server.id,
-            timestamp=now,
-            tls_enabled=True,
-            auth_required=True,
-            input_validation_score=80.0,
-            cve_count=0,
-        ))
+        await storage.store_probe_result(
+            ProbeResult(
+                server_id=sample_server.id,
+                timestamp=now - 60,
+                latency_ms=100,
+                status_code=200,
+                tools_count=3,
+                tools_documented=3,
+            )
+        )
+        await storage.store_security_scan(
+            SecurityScan(
+                server_id=sample_server.id,
+                timestamp=now,
+                tls_enabled=True,
+                auth_required=True,
+                input_validation_score=80.0,
+                cve_count=0,
+            )
+        )
 
         engine = ScoreEngine(storage=storage)
         score = await engine.compute_and_store(sample_server.id, Window.H24, now)

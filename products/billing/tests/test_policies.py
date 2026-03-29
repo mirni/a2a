@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import time
-
 import pytest
-
 from src.policies import RateLimitExceededError, RatePolicyManager, SpendCapExceededError
 from src.storage import StorageBackend
 
@@ -90,17 +87,13 @@ class TestCheckAll:
     async def test_check_all_passes(self, policies: RatePolicyManager):
         await policies.check_all("agent-1", cost=100.0)  # no policy = pass
 
-    async def test_check_all_rate_limit_fails(
-        self, policies: RatePolicyManager, storage: StorageBackend
-    ):
+    async def test_check_all_rate_limit_fails(self, policies: RatePolicyManager, storage: StorageBackend):
         await policies.set_policy("agent-1", max_calls_per_min=1)
         await storage.record_usage("agent-1", "f", 1.0)
         with pytest.raises(RateLimitExceededError):
             await policies.check_all("agent-1", cost=1.0)
 
-    async def test_check_all_spend_cap_fails(
-        self, policies: RatePolicyManager, storage: StorageBackend
-    ):
+    async def test_check_all_spend_cap_fails(self, policies: RatePolicyManager, storage: StorageBackend):
         await policies.set_policy("agent-1", max_spend_per_day=10.0)
         await storage.record_usage("agent-1", "f", 9.0)
         with pytest.raises(SpendCapExceededError):

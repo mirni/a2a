@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import pytest
-
 from src.tiers import (
     TIER_CONFIGS,
-    TierConfig,
     TierName,
     get_tier_config,
     tier_has_access,

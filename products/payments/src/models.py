@@ -8,24 +8,24 @@ from __future__ import annotations
 import time
 import uuid
 from decimal import Decimal
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
-
 
 # ---------------------------------------------------------------------------
 # Enums for status lifecycles
 # ---------------------------------------------------------------------------
 
-class IntentStatus(str, Enum):
+
+class IntentStatus(StrEnum):
     PENDING = "pending"
     CAPTURED = "captured"
     SETTLED = "settled"
     VOIDED = "voided"
 
 
-class EscrowStatus(str, Enum):
+class EscrowStatus(StrEnum):
     HELD = "held"
     RELEASED = "released"
     SETTLED = "settled"
@@ -33,13 +33,13 @@ class EscrowStatus(str, Enum):
     EXPIRED = "expired"
 
 
-class SubscriptionStatus(str, Enum):
+class SubscriptionStatus(StrEnum):
     ACTIVE = "active"
     CANCELLED = "cancelled"
     SUSPENDED = "suspended"
 
 
-class SubscriptionInterval(str, Enum):
+class SubscriptionInterval(StrEnum):
     HOURLY = "hourly"
     DAILY = "daily"
     WEEKLY = "weekly"
@@ -49,6 +49,7 @@ class SubscriptionInterval(str, Enum):
 # ---------------------------------------------------------------------------
 # Domain models
 # ---------------------------------------------------------------------------
+
 
 class PaymentIntent(BaseModel):
     """A payment intent from one agent to another."""

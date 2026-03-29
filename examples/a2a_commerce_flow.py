@@ -20,20 +20,18 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "products", "bi
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "products", "marketplace"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "products", "payments"))
 
-from src.tracker import UsageTracker
-from src.wallet import Wallet
-from src.storage import StorageBackend as BillingStorage
-
 # Marketplace imports use full module path
 from src.marketplace import Marketplace
-from src.storage import MarketplaceStorage
 from src.models import (
+    SLA,
     MatchPreference,
     PricingModel,
     PricingModelType,
-    SLA,
     ServiceCreate,
 )
+from src.storage import MarketplaceStorage
+from src.tracker import UsageTracker
+from src.wallet import Wallet
 
 
 async def main():
@@ -67,17 +65,19 @@ async def main():
     # ========================================
     print("\n=== Provider registers service ===")
 
-    service = await marketplace.register_service(ServiceCreate(
-        provider_id="data-provider",
-        name="Crypto Market Data",
-        description="Real-time price feeds for BTC, ETH, SOL",
-        category="market-data",
-        tools=["get_price", "get_orderbook"],
-        pricing=PricingModel(model=PricingModelType.PER_CALL, cost=2.0),
-        sla=SLA(uptime=99.9, max_latency_ms=200),
-        tags=["crypto", "real-time", "market-data"],
-        endpoint="https://data-provider.example.com/mcp",
-    ))
+    service = await marketplace.register_service(
+        ServiceCreate(
+            provider_id="data-provider",
+            name="Crypto Market Data",
+            description="Real-time price feeds for BTC, ETH, SOL",
+            category="market-data",
+            tools=["get_price", "get_orderbook"],
+            pricing=PricingModel(model=PricingModelType.PER_CALL, cost=2.0),
+            sla=SLA(uptime=99.9, max_latency_ms=200),
+            tags=["crypto", "real-time", "market-data"],
+            endpoint="https://data-provider.example.com/mcp",
+        )
+    )
     print(f"  Registered: {service.name} (id={service.id})")
     print(f"  Pricing: {service.pricing.cost} credits/{service.pricing.model.value}")
 
@@ -93,7 +93,7 @@ async def main():
     )
 
     for i, m in enumerate(matches):
-        print(f"  Match {i+1}: {m.service.name}")
+        print(f"  Match {i + 1}: {m.service.name}")
         print(f"    Cost: {m.service.pricing.cost} credits/call")
         print(f"    Score: {m.rank_score:.1f}")
         print(f"    Reasons: {', '.join(m.match_reasons)}")

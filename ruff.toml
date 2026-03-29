@@ -1,0 +1,37 @@
+line-length = 120
+target-version = "py312"
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "S", "A", "N"]
+ignore = [
+    "E402",   # import not at top (try/except import pattern)
+    "E501",   # line too long
+    "E731",   # lambda assignment
+    "E741",   # ambiguous variable name (l, O, I)
+    "S101",   # assert (used throughout for contracts + tests)
+    "S104",   # hardcoded bind all interfaces
+    "S105",   # hardcoded password (test/env defaults)
+    "S106",   # hardcoded password
+    "S108",   # hardcoded /tmp
+    "S110",   # try/except/pass
+    "S608",   # SQL injection (false positive — parameterized)
+    "SIM101", # duplicate isinstance
+    "SIM105", # contextlib.suppress
+    "SIM108", # ternary preference
+    "SIM115", # context manager open()
+    "SIM117", # combined with statements
+    "SIM103", # return bool directly
+    "SIM118", # use `in` for dict keys
+    "B011",   # assert False
+    "B017",   # assertRaises(Exception)
+    "A001",   # shadow builtin (id, type)
+    "A002",   # shadow builtin argument
+    "A004",   # shadow builtin import
+    "N806",   # non-lowercase variable in function (MockClient, Migration, etc.)
+    "N818",   # exception suffix
+]
+
+[lint.per-file-ignores]
+"e2e_tests.py" = ["F821"]
+"gateway/src/signing.py" = ["F821"]
+"scripts/*" = ["S"]

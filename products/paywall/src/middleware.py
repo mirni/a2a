@@ -26,7 +26,7 @@ logger = logging.getLogger("a2a.paywall")
 
 from .keys import InvalidKeyError, KeyManager
 from .storage import PaywallStorage
-from .tiers import TierName, get_tier_config, tier_has_access
+from .tiers import get_tier_config, tier_has_access
 
 P = ParamSpec("P")
 T = TypeVar("T")
@@ -126,9 +126,7 @@ class PaywallMiddleware:
 
     def _ensure_initialized(self) -> None:
         if not self._initialized:
-            raise RuntimeError(
-                "PaywallMiddleware not initialized. Call await middleware.initialize() first."
-            )
+            raise RuntimeError("PaywallMiddleware not initialized. Call await middleware.initialize() first.")
 
     def gated(
         self,
@@ -228,9 +226,7 @@ class PaywallMiddleware:
                 now = time.time()
                 window_start = now - 3600  # 1 hour sliding window
 
-                current_count = await self.paywall_storage.get_rate_count(
-                    agent_id, window_key, window_start
-                )
+                current_count = await self.paywall_storage.get_rate_count(agent_id, window_key, window_start)
                 if current_count >= tier_config.rate_limit_per_hour:
                     await self.paywall_storage.record_audit(
                         agent_id=agent_id,
@@ -241,9 +237,7 @@ class PaywallMiddleware:
                         allowed=False,
                         reason=f"Rate limit exceeded: {current_count}/{tier_config.rate_limit_per_hour}",
                     )
-                    raise RateLimitError(
-                        agent_id, current_count, tier_config.rate_limit_per_hour
-                    )
+                    raise RateLimitError(agent_id, current_count, tier_config.rate_limit_per_hour)
 
                 # Step 4: Check wallet balance (if tier requires payment)
                 effective_cost = cost if tier_config.cost_per_call > 0 else 0.0
@@ -267,9 +261,7 @@ class PaywallMiddleware:
                 # -- All checks passed, execute the function --
 
                 # Increment rate counter
-                await self.paywall_storage.increment_rate_count(
-                    agent_id, window_key, window_start
-                )
+                await self.paywall_storage.increment_rate_count(agent_id, window_key, window_start)
 
                 # Execute
                 start = time.time()
@@ -291,14 +283,18 @@ class PaywallMiddleware:
                     # Charge wallet
                     try:
                         await self.tracker.wallet.charge(
-                            agent_id, effective_cost,
+                            agent_id,
+                            effective_cost,
                             description=f"paywall:{self.connector}:{fn.__qualname__}",
                         )
                     except Exception as charge_err:
                         # Charge failure should not block response, but must be logged
                         logger.warning(
                             "Charge failed for agent %s on %s:%s — %s",
-                            agent_id, self.connector, fn.__qualname__, charge_err,
+                            agent_id,
+                            self.connector,
+                            fn.__qualname__,
+                            charge_err,
                         )
                         await self.paywall_storage.record_audit(
                             agent_id=agent_id,

@@ -5,63 +5,62 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
-from typing import AsyncGenerator
-
-from starlette.applications import Starlette
-
-# Bootstrap cross-product imports (must happen before importing product modules)
-import gateway.src.bootstrap  # noqa: F401
+from dataclasses import dataclass
 
 # Billing
 from billing_src.tracker import UsageTracker
 
-# Paywall
-from paywall_src.keys import KeyManager
-from paywall_src.storage import PaywallStorage
+# Identity
+from identity_src.api import IdentityAPI
+from identity_src.storage import IdentityStorage
+
+# Marketplace
+from marketplace_src.marketplace import Marketplace
+from marketplace_src.storage import MarketplaceStorage
+
+# Messaging
+from messaging_src.api import MessagingAPI
+from messaging_src.storage import MessageStorage
 
 # Payments
 from payments_src.engine import PaymentEngine
 from payments_src.storage import PaymentStorage
 
-# Marketplace
-from marketplace_src.marketplace import Marketplace
-from marketplace_src.storage import MarketplaceStorage
+# Paywall
+from paywall_src.keys import KeyManager
+from paywall_src.storage import PaywallStorage
+
+# Shared — Event Bus
+from shared_src.event_bus import EventBus
+from starlette.applications import Starlette
 
 # Trust
 from trust_src.api import TrustAPI
 from trust_src.scorer import ScoreEngine
 from trust_src.storage import StorageBackend as TrustStorage
 
-# Identity
-from identity_src.api import IdentityAPI
-from identity_src.storage import IdentityStorage
-
-# Messaging
-from messaging_src.api import MessagingAPI
-from messaging_src.storage import MessageStorage
-
-# Shared — Event Bus
-from shared_src.event_bus import EventBus
-
-# Cross-product event handlers
-from gateway.src.event_handlers import register_all_handlers
-
-# Webhook delivery
-from gateway.src.webhooks import WebhookManager
-
-# Health monitoring
-from gateway.src.health_monitor import HealthMonitor
-
-# Signing
-from gateway.src.signing import SigningManager
+# Bootstrap cross-product imports (must happen before importing product modules)
+import gateway.src.bootstrap  # noqa: F401
 
 # Disputes
 from gateway.src.disputes import DisputeEngine
 
+# Cross-product event handlers
+from gateway.src.event_handlers import register_all_handlers
+
+# Health monitoring
+from gateway.src.health_monitor import HealthMonitor
+
 # Observability
 from gateway.src.middleware import setup_structured_logging
+
+# Signing
+from gateway.src.signing import SigningManager
+
+# Webhook delivery
+from gateway.src.webhooks import WebhookManager
 
 logger = logging.getLogger("a2a.lifespan")
 
@@ -101,17 +100,11 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     billing_dsn = os.environ.get("BILLING_DSN", f"sqlite:///{data_dir}/billing.db")
     paywall_dsn = os.environ.get("PAYWALL_DSN", f"sqlite:///{data_dir}/paywall.db")
     payments_dsn = os.environ.get("PAYMENTS_DSN", f"sqlite:///{data_dir}/payments.db")
-    marketplace_dsn = os.environ.get(
-        "MARKETPLACE_DSN", f"sqlite:///{data_dir}/marketplace.db"
-    )
+    marketplace_dsn = os.environ.get("MARKETPLACE_DSN", f"sqlite:///{data_dir}/marketplace.db")
     trust_dsn = os.environ.get("TRUST_DSN", f"sqlite:///{data_dir}/trust.db")
     identity_dsn = os.environ.get("IDENTITY_DSN", f"sqlite:///{data_dir}/identity.db")
-    event_bus_dsn = os.environ.get(
-        "EVENT_BUS_DSN", f"sqlite:///{data_dir}/event_bus.db"
-    )
-    webhook_dsn = os.environ.get(
-        "WEBHOOK_DSN", f"sqlite:///{data_dir}/webhooks.db"
-    )
+    event_bus_dsn = os.environ.get("EVENT_BUS_DSN", f"sqlite:///{data_dir}/event_bus.db")
+    webhook_dsn = os.environ.get("WEBHOOK_DSN", f"sqlite:///{data_dir}/webhooks.db")
 
     # --- Billing ---
     tracker = UsageTracker(billing_dsn)
@@ -192,9 +185,7 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
         logger.warning("Failed to start subscription scheduler", exc_info=True)
 
     # --- Health Monitor ---
-    health_monitor = HealthMonitor(
-        marketplace=marketplace, event_bus=event_bus, interval=300, timeout=10.0
-    )
+    health_monitor = HealthMonitor(marketplace=marketplace, event_bus=event_bus, interval=300, timeout=10.0)
     health_monitor_task = asyncio.create_task(health_monitor.run())
     logger.info("Health monitor started (interval=300s)")
 

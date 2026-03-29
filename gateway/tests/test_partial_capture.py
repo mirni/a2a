@@ -15,9 +15,7 @@ async def test_partial_capture_basic(client, pro_api_key, app):
     await ctx.tracker.wallet.create("payee-agent", initial_balance=0.0)
 
     # Create a payment intent
-    intent = await ctx.payment_engine.create_intent(
-        payer="payer-agent", payee="payee-agent", amount=100.0
-    )
+    intent = await ctx.payment_engine.create_intent(payer="payer-agent", payee="payee-agent", amount=100.0)
 
     resp = await client.post(
         "/v1/execute",
@@ -42,9 +40,7 @@ async def test_partial_capture_updates_remaining(client, pro_api_key, app):
     await ctx.tracker.wallet.create("payer2", initial_balance=500.0)
     await ctx.tracker.wallet.create("payee2", initial_balance=0.0)
 
-    intent = await ctx.payment_engine.create_intent(
-        payer="payer2", payee="payee2", amount=100.0
-    )
+    intent = await ctx.payment_engine.create_intent(payer="payer2", payee="payee2", amount=100.0)
 
     # Partial capture of 40
     resp = await client.post(
@@ -66,9 +62,7 @@ async def test_partial_capture_full_amount_voids_intent(client, pro_api_key, app
     await ctx.tracker.wallet.create("payer3", initial_balance=500.0)
     await ctx.tracker.wallet.create("payee3", initial_balance=0.0)
 
-    intent = await ctx.payment_engine.create_intent(
-        payer="payer3", payee="payee3", amount=100.0
-    )
+    intent = await ctx.payment_engine.create_intent(payer="payer3", payee="payee3", amount=100.0)
 
     resp = await client.post(
         "/v1/execute",
@@ -93,9 +87,7 @@ async def test_partial_capture_exceeds_amount_fails(client, pro_api_key, app):
     await ctx.tracker.wallet.create("payer4", initial_balance=500.0)
     await ctx.tracker.wallet.create("payee4", initial_balance=0.0)
 
-    intent = await ctx.payment_engine.create_intent(
-        payer="payer4", payee="payee4", amount=50.0
-    )
+    intent = await ctx.payment_engine.create_intent(payer="payer4", payee="payee4", amount=50.0)
 
     resp = await client.post(
         "/v1/execute",

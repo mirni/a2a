@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import os
-
 import pytest
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -145,9 +142,16 @@ async def test_backup_unknown_db_error(client, pro_api_key):
 async def test_check_all_databases_integrity(client, pro_api_key):
     """Loop all known databases and check integrity."""
     databases = [
-        "billing", "paywall", "payments", "marketplace",
-        "trust", "identity", "event_bus", "webhooks",
-        "disputes", "messaging",
+        "billing",
+        "paywall",
+        "payments",
+        "marketplace",
+        "trust",
+        "identity",
+        "event_bus",
+        "webhooks",
+        "disputes",
+        "messaging",
     ]
     for db_name in databases:
         resp = await client.post(

@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import ssl
-import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
 
-from products.reputation.src.models import SecurityHeaders, TLSInfo
 from products.reputation.src.scan_worker import (
     HEADER_WEIGHT,
     SECURITY_HEADERS,
@@ -32,13 +30,15 @@ class TestAnalyzeSecurityHeaders:
         assert result.header_score == 0.0
 
     def test_all_security_headers(self):
-        headers = httpx.Headers({
-            "strict-transport-security": "max-age=31536000",
-            "content-security-policy": "default-src 'self'",
-            "x-frame-options": "DENY",
-            "x-content-type-options": "nosniff",
-            "referrer-policy": "no-referrer",
-        })
+        headers = httpx.Headers(
+            {
+                "strict-transport-security": "max-age=31536000",
+                "content-security-policy": "default-src 'self'",
+                "x-frame-options": "DENY",
+                "x-content-type-options": "nosniff",
+                "referrer-policy": "no-referrer",
+            }
+        )
         result = analyze_security_headers(headers)
         assert result.has_hsts is True
         assert result.has_csp is True
@@ -48,29 +48,35 @@ class TestAnalyzeSecurityHeaders:
         assert result.header_score == 100.0
 
     def test_partial_headers_hsts_only(self):
-        headers = httpx.Headers({
-            "strict-transport-security": "max-age=31536000",
-        })
+        headers = httpx.Headers(
+            {
+                "strict-transport-security": "max-age=31536000",
+            }
+        )
         result = analyze_security_headers(headers)
         assert result.has_hsts is True
         assert result.has_csp is False
         assert result.header_score == pytest.approx(HEADER_WEIGHT, abs=0.01)
 
     def test_partial_headers_two(self):
-        headers = httpx.Headers({
-            "strict-transport-security": "max-age=31536000",
-            "x-frame-options": "SAMEORIGIN",
-        })
+        headers = httpx.Headers(
+            {
+                "strict-transport-security": "max-age=31536000",
+                "x-frame-options": "SAMEORIGIN",
+            }
+        )
         result = analyze_security_headers(headers)
         assert result.has_hsts is True
         assert result.has_x_frame_options is True
         assert result.header_score == pytest.approx(2 * HEADER_WEIGHT, abs=0.01)
 
     def test_unrelated_headers_ignored(self):
-        headers = httpx.Headers({
-            "content-type": "text/html",
-            "server": "nginx",
-        })
+        headers = httpx.Headers(
+            {
+                "content-type": "text/html",
+                "server": "nginx",
+            }
+        )
         result = analyze_security_headers(headers)
         assert result.header_score == 0.0
 
@@ -140,11 +146,13 @@ class TestScanWorkerScan:
     async def test_scan_https_with_headers(self, mock_trust_storage):
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.headers = httpx.Headers({
-            "strict-transport-security": "max-age=31536000",
-            "content-security-policy": "default-src 'self'",
-            "x-frame-options": "DENY",
-        })
+        mock_response.headers = httpx.Headers(
+            {
+                "strict-transport-security": "max-age=31536000",
+                "content-security-policy": "default-src 'self'",
+                "x-frame-options": "DENY",
+            }
+        )
 
         mock_client = AsyncMock(spec=httpx.AsyncClient)
         mock_client.get = AsyncMock(return_value=mock_response)
@@ -193,9 +201,11 @@ class TestScanWorkerScan:
     async def test_scan_stores_trust_security_scan(self, mock_trust_storage):
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.headers = httpx.Headers({
-            "strict-transport-security": "max-age=31536000",
-        })
+        mock_response.headers = httpx.Headers(
+            {
+                "strict-transport-security": "max-age=31536000",
+            }
+        )
 
         mock_client = AsyncMock(spec=httpx.AsyncClient)
         mock_client.get = AsyncMock(return_value=mock_response)
@@ -252,13 +262,15 @@ class TestScanWorkerScan:
     async def test_scan_all_headers_perfect_score(self, mock_trust_storage):
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.headers = httpx.Headers({
-            "strict-transport-security": "max-age=31536000",
-            "content-security-policy": "default-src 'self'",
-            "x-frame-options": "DENY",
-            "x-content-type-options": "nosniff",
-            "referrer-policy": "no-referrer",
-        })
+        mock_response.headers = httpx.Headers(
+            {
+                "strict-transport-security": "max-age=31536000",
+                "content-security-policy": "default-src 'self'",
+                "x-frame-options": "DENY",
+                "x-content-type-options": "nosniff",
+                "referrer-policy": "no-referrer",
+            }
+        )
 
         mock_client = AsyncMock(spec=httpx.AsyncClient)
         mock_client.get = AsyncMock(return_value=mock_response)
@@ -281,10 +293,12 @@ class TestScanWorkerBatch:
         mock_client.get = AsyncMock(return_value=mock_response)
 
         worker = ScanWorker(trust_storage=mock_trust_storage, client=mock_client)
-        results = await worker.scan_batch([
-            ("svc-1", "https://a.com"),
-            ("svc-2", "https://b.com"),
-        ])
+        results = await worker.scan_batch(
+            [
+                ("svc-1", "https://a.com"),
+                ("svc-2", "https://b.com"),
+            ]
+        )
         assert len(results) == 2
 
     @pytest.mark.asyncio

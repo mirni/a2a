@@ -21,9 +21,7 @@ import os
 import sys
 import types
 
-_PRODUCTS_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "products")
-)
+_PRODUCTS_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "products"))
 
 _bootstrapped = False
 

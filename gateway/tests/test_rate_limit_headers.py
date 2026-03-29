@@ -113,9 +113,11 @@ async def test_batch_has_rate_limit_headers(client, api_key):
     """POST /v1/batch should include X-RateLimit-* headers."""
     resp = await client.post(
         "/v1/batch",
-        json={"calls": [
-            {"tool": "get_balance", "params": {"agent_id": "test-agent"}},
-        ]},
+        json={
+            "calls": [
+                {"tool": "get_balance", "params": {"agent_id": "test-agent"}},
+            ]
+        },
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200

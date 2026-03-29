@@ -173,9 +173,7 @@ class ReputationPipeline:
         """
         if server_id is not None:
             return [await self.aggregator.recompute_score(server_id, now=now)]
-        return await self.aggregator.recompute_all_active(
-            self.reputation_storage, now=now
-        )
+        return await self.aggregator.recompute_all_active(self.reputation_storage, now=now)
 
     async def start(self) -> None:
         """Start the continuous monitoring loop.

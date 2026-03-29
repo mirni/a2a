@@ -11,7 +11,7 @@ None if the server is not registered in the trust system.
 
 from __future__ import annotations
 
-from typing import Callable, Awaitable
+from collections.abc import Awaitable, Callable
 
 from trust_src.api import ServerNotFoundError, TrustAPI
 

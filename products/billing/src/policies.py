@@ -17,10 +17,7 @@ class RateLimitExceededError(Exception):
         self.limit_type = limit_type
         self.current = current
         self.limit = limit
-        super().__init__(
-            f"Agent {agent_id}: {limit_type} exceeded. "
-            f"Current: {current}, Limit: {limit}"
-        )
+        super().__init__(f"Agent {agent_id}: {limit_type} exceeded. Current: {current}, Limit: {limit}")
 
 
 class SpendCapExceededError(Exception):
@@ -30,10 +27,7 @@ class SpendCapExceededError(Exception):
         self.agent_id = agent_id
         self.current_spend = current_spend
         self.cap = cap
-        super().__init__(
-            f"Agent {agent_id}: daily spend cap exceeded. "
-            f"Current spend: {current_spend}, Cap: {cap}"
-        )
+        super().__init__(f"Agent {agent_id}: daily spend cap exceeded. Current spend: {current_spend}, Cap: {cap}")
 
 
 @dataclass
@@ -77,9 +71,7 @@ class RatePolicyManager:
             since = time.time() - 60.0
             call_count = await self.storage.count_calls_since(agent_id, since)
             if call_count >= policy["max_calls_per_min"]:
-                raise RateLimitExceededError(
-                    agent_id, "calls_per_min", call_count, policy["max_calls_per_min"]
-                )
+                raise RateLimitExceededError(agent_id, "calls_per_min", call_count, policy["max_calls_per_min"])
 
     async def check_spend_cap(self, agent_id: str, additional_cost: float = 0.0) -> None:
         """Check if agent is within daily spend cap. Raises SpendCapExceededError if not."""
@@ -93,9 +85,7 @@ class RatePolicyManager:
             day_start = now - (now % 86400)
             current_spend = await self.storage.sum_cost_since(agent_id, day_start)
             if current_spend + additional_cost > policy["max_spend_per_day"]:
-                raise SpendCapExceededError(
-                    agent_id, current_spend + additional_cost, policy["max_spend_per_day"]
-                )
+                raise SpendCapExceededError(agent_id, current_spend + additional_cost, policy["max_spend_per_day"])
 
     async def check_all(self, agent_id: str, cost: float = 0.0) -> None:
         """Run all policy checks (rate limit + spend cap)."""

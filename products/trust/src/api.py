@@ -20,6 +20,7 @@ from .storage import StorageBackend
 
 class ServerNotFoundError(Exception):
     """Raised when a server ID is not found in storage."""
+
     pass
 
 

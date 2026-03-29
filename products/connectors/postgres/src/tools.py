@@ -26,6 +26,7 @@ def _get_audit():
     global _audit
     if _audit is None:
         import importlib
+
         _audit = importlib.import_module("shared.src.audit_log")
     return _audit
 
@@ -34,6 +35,7 @@ def _get_errors():
     global _errors
     if _errors is None:
         import importlib
+
         _errors = importlib.import_module("shared.src.errors")
     return _errors
 
@@ -46,7 +48,7 @@ async def handle_query(client, params: dict[str, Any]) -> dict[str, Any]:
     try:
         validated = QueryParams(**params)
     except Exception as e:
-        raise errors.ValidationError(str(e), details={"params": params})
+        raise errors.ValidationError(str(e), details={"params": params}) from e
 
     try:
         rows = await client.query(
@@ -69,7 +71,7 @@ async def handle_query(client, params: dict[str, Any]) -> dict[str, Any]:
             "truncated": len(rows) >= validated.max_rows,
         }
     except PermissionError as e:
-        raise errors.ConnectorError(str(e), code="READ_ONLY", retryable=False)
+        raise errors.ConnectorError(str(e), code="READ_ONLY", retryable=False) from e
     except Exception as e:
         duration = (time.monotonic() - start) * 1000
         audit.log_operation(
@@ -90,7 +92,7 @@ async def handle_execute(client, params: dict[str, Any]) -> dict[str, Any]:
     try:
         validated = ExecuteParams(**params)
     except Exception as e:
-        raise errors.ValidationError(str(e), details={"params": params})
+        raise errors.ValidationError(str(e), details={"params": params}) from e
 
     try:
         result = await client.execute(
@@ -108,7 +110,7 @@ async def handle_execute(client, params: dict[str, Any]) -> dict[str, Any]:
         )
         return {"status": result}
     except PermissionError as e:
-        raise errors.ConnectorError(str(e), code="READ_ONLY", retryable=False)
+        raise errors.ConnectorError(str(e), code="READ_ONLY", retryable=False) from e
     except Exception as e:
         duration = (time.monotonic() - start) * 1000
         audit.log_operation(
@@ -146,7 +148,7 @@ async def handle_describe_table(client, params: dict[str, Any]) -> dict[str, Any
     try:
         validated = DescribeTableParams(**params)
     except Exception as e:
-        raise errors.ValidationError(str(e))
+        raise errors.ValidationError(str(e)) from e
 
     columns = await client.describe_table(validated.table_name, validated.schema_name)
     duration = (time.monotonic() - start) * 1000

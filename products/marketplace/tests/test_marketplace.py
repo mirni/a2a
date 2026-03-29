@@ -1,24 +1,20 @@
 """Tests for the Marketplace API."""
 
 import pytest
-
 from src.marketplace import (
     DuplicateServiceError,
-    Marketplace,
     ServiceNotFoundError,
 )
 from src.models import (
+    SLA,
     MatchPreference,
     PricingModel,
     PricingModelType,
-    SLA,
     ServiceCreate,
     ServiceSearchParams,
     ServiceStatus,
     SortBy,
 )
-
-from src.models import ServiceCreate
 
 
 def make_service(
@@ -175,19 +171,37 @@ class TestDeactivateService:
 
 class TestSearch:
     async def _seed_marketplace(self, marketplace):
-        await marketplace.register_service(make_service(
-            provider_id="a1", name="Crypto Prices", description="Real-time crypto data",
-            category="market-data", tags=["crypto", "real-time"], cost=0.5,
-        ))
-        await marketplace.register_service(make_service(
-            provider_id="a2", name="SQL Analytics", description="Database analytics engine",
-            category="analytics", tags=["analytics", "sql"], cost=2.0,
-        ))
-        await marketplace.register_service(make_service(
-            provider_id="a3", name="Free Ping", description="Free health check tool",
-            category="utilities", tags=["free", "health"], cost=0.0,
-            pricing_model=PricingModelType.FREE,
-        ))
+        await marketplace.register_service(
+            make_service(
+                provider_id="a1",
+                name="Crypto Prices",
+                description="Real-time crypto data",
+                category="market-data",
+                tags=["crypto", "real-time"],
+                cost=0.5,
+            )
+        )
+        await marketplace.register_service(
+            make_service(
+                provider_id="a2",
+                name="SQL Analytics",
+                description="Database analytics engine",
+                category="analytics",
+                tags=["analytics", "sql"],
+                cost=2.0,
+            )
+        )
+        await marketplace.register_service(
+            make_service(
+                provider_id="a3",
+                name="Free Ping",
+                description="Free health check tool",
+                category="utilities",
+                tags=["free", "health"],
+                cost=0.0,
+                pricing_model=PricingModelType.FREE,
+            )
+        )
 
     async def test_search_all(self, marketplace):
         await self._seed_marketplace(marketplace)
@@ -279,18 +293,36 @@ class TestSearchWithTrust:
 
 class TestBestMatch:
     async def _seed(self, marketplace):
-        await marketplace.register_service(make_service(
-            provider_id="a1", name="Crypto Feed", description="Real-time crypto prices",
-            category="market-data", tags=["crypto"], cost=0.5,
-        ))
-        await marketplace.register_service(make_service(
-            provider_id="a2", name="Crypto Premium", description="Premium crypto data",
-            category="market-data", tags=["crypto", "premium"], cost=5.0,
-        ))
-        await marketplace.register_service(make_service(
-            provider_id="a3", name="Stock Data", description="US stock market data",
-            category="market-data", tags=["stocks"], cost=1.0,
-        ))
+        await marketplace.register_service(
+            make_service(
+                provider_id="a1",
+                name="Crypto Feed",
+                description="Real-time crypto prices",
+                category="market-data",
+                tags=["crypto"],
+                cost=0.5,
+            )
+        )
+        await marketplace.register_service(
+            make_service(
+                provider_id="a2",
+                name="Crypto Premium",
+                description="Premium crypto data",
+                category="market-data",
+                tags=["crypto", "premium"],
+                cost=5.0,
+            )
+        )
+        await marketplace.register_service(
+            make_service(
+                provider_id="a3",
+                name="Stock Data",
+                description="US stock market data",
+                category="market-data",
+                tags=["stocks"],
+                cost=1.0,
+            )
+        )
 
     async def test_basic_match(self, marketplace):
         await self._seed(marketplace)
@@ -317,9 +349,7 @@ class TestBestMatch:
 
     async def test_match_prefer_cost(self, marketplace):
         await self._seed(marketplace)
-        matches = await marketplace.best_match(
-            query="crypto", prefer=MatchPreference.COST
-        )
+        matches = await marketplace.best_match(query="crypto", prefer=MatchPreference.COST)
         # Lower cost should rank higher with cost preference
         if len(matches) >= 2:
             assert matches[0].service.pricing.cost <= matches[1].service.pricing.cost
@@ -329,16 +359,24 @@ class TestBestMatch:
         mp._trust_scores["a1"] = 90.0
         mp._trust_scores["a2"] = 30.0
 
-        await mp.register_service(make_service(
-            provider_id="a1", name="Trusted Crypto", tags=["crypto"], cost=1.0,
-        ))
-        await mp.register_service(make_service(
-            provider_id="a2", name="Untrusted Crypto", tags=["crypto"], cost=0.5,
-        ))
-
-        matches = await mp.best_match(
-            query="crypto", prefer=MatchPreference.TRUST
+        await mp.register_service(
+            make_service(
+                provider_id="a1",
+                name="Trusted Crypto",
+                tags=["crypto"],
+                cost=1.0,
+            )
         )
+        await mp.register_service(
+            make_service(
+                provider_id="a2",
+                name="Untrusted Crypto",
+                tags=["crypto"],
+                cost=0.5,
+            )
+        )
+
+        matches = await mp.best_match(query="crypto", prefer=MatchPreference.TRUST)
         # Trusted should rank higher despite higher cost
         assert matches[0].service.provider_id == "a1"
 
@@ -346,12 +384,20 @@ class TestBestMatch:
 class TestListCategories:
     async def test_list_categories(self, marketplace):
         await marketplace.register_service(make_service(category="data", name="S1"))
-        await marketplace.register_service(make_service(
-            provider_id="a2", category="data", name="S2",
-        ))
-        await marketplace.register_service(make_service(
-            provider_id="a3", category="ai", name="S3",
-        ))
+        await marketplace.register_service(
+            make_service(
+                provider_id="a2",
+                category="data",
+                name="S2",
+            )
+        )
+        await marketplace.register_service(
+            make_service(
+                provider_id="a3",
+                category="ai",
+                name="S3",
+            )
+        )
         cats = await marketplace.list_categories()
         assert len(cats) == 2
 
@@ -392,18 +438,14 @@ class TestOwnershipEnforcement:
     async def test_update_own_service_succeeds(self, marketplace):
         spec = make_service(provider_id="agent-1", name="My Service")
         svc = await marketplace.register_service(spec)
-        updated = await marketplace.update_service(
-            svc.id, requester_id="agent-1", name="Updated"
-        )
+        updated = await marketplace.update_service(svc.id, requester_id="agent-1", name="Updated")
         assert updated.name == "Updated"
 
     async def test_update_other_service_raises(self, marketplace):
         spec = make_service(provider_id="agent-1", name="My Service")
         svc = await marketplace.register_service(spec)
         with pytest.raises(PermissionError, match="not the owner"):
-            await marketplace.update_service(
-                svc.id, requester_id="agent-2", name="Hijacked"
-            )
+            await marketplace.update_service(svc.id, requester_id="agent-2", name="Hijacked")
 
     async def test_deactivate_own_service_succeeds(self, marketplace):
         spec = make_service(provider_id="agent-1", name="My Service")
@@ -434,10 +476,14 @@ class TestOwnershipEnforcement:
 class TestSearchPagination:
     async def _seed_many(self, marketplace):
         for i in range(10):
-            await marketplace.register_service(make_service(
-                provider_id=f"prov-{i}", name=f"Service {i}",
-                category="testing", cost=float(i),
-            ))
+            await marketplace.register_service(
+                make_service(
+                    provider_id=f"prov-{i}",
+                    name=f"Service {i}",
+                    category="testing",
+                    cost=float(i),
+                )
+            )
 
     async def test_search_with_offset_and_limit(self, marketplace):
         await self._seed_many(marketplace)
@@ -479,14 +525,22 @@ class TestMaxCostSQLFilter:
         """
         # Cheap services created first (older)
         for i in range(5):
-            await marketplace.register_service(make_service(
-                provider_id=f"cheap-{i}", name=f"Cheap {i}", cost=0.5,
-            ))
+            await marketplace.register_service(
+                make_service(
+                    provider_id=f"cheap-{i}",
+                    name=f"Cheap {i}",
+                    cost=0.5,
+                )
+            )
         # Expensive services created after (newer — will appear first in DESC order)
         for i in range(15):
-            await marketplace.register_service(make_service(
-                provider_id=f"exp-{i}", name=f"Expensive {i}", cost=10.0,
-            ))
+            await marketplace.register_service(
+                make_service(
+                    provider_id=f"exp-{i}",
+                    name=f"Expensive {i}",
+                    cost=10.0,
+                )
+            )
 
         params = ServiceSearchParams(max_cost=1.0, limit=10)
         results = await marketplace.search(params)
@@ -495,13 +549,21 @@ class TestMaxCostSQLFilter:
             assert svc.pricing.cost <= 1.0
 
     async def test_max_cost_zero_returns_only_free(self, marketplace):
-        await marketplace.register_service(make_service(
-            provider_id="a1", name="Paid", cost=1.0,
-        ))
-        await marketplace.register_service(make_service(
-            provider_id="a2", name="Free", cost=0.0,
-            pricing_model=PricingModelType.FREE,
-        ))
+        await marketplace.register_service(
+            make_service(
+                provider_id="a1",
+                name="Paid",
+                cost=1.0,
+            )
+        )
+        await marketplace.register_service(
+            make_service(
+                provider_id="a2",
+                name="Free",
+                cost=0.0,
+                pricing_model=PricingModelType.FREE,
+            )
+        )
         params = ServiceSearchParams(max_cost=0.0)
         results = await marketplace.search(params)
         assert len(results) == 1

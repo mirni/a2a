@@ -21,17 +21,19 @@ import sys
 import time
 import traceback
 import uuid
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Coroutine
-
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Colors
 # ---------------------------------------------------------------------------
 
+
 class _C:
     """ANSI color codes. Disabled when stdout is not a TTY."""
+
     _enabled = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
 
     GREEN = "\033[32m" if _enabled else ""
@@ -46,6 +48,7 @@ class _C:
 # ---------------------------------------------------------------------------
 # Result tracking
 # ---------------------------------------------------------------------------
+
 
 class Status(Enum):
     PASS = "pass"
@@ -118,7 +121,7 @@ PAYEE_AGENT = f"e2e-payee-{RUN_ID}"
 # HTTP helpers
 # ---------------------------------------------------------------------------
 
-_http: "httpx.AsyncClient | None" = None
+_http: httpx.AsyncClient | None = None
 _timeout: float = 15.0
 _verbose: bool = False
 
@@ -132,7 +135,7 @@ async def _get(
     *,
     headers: dict[str, str] | None = None,
     allow_redirects: bool = True,
-) -> "httpx.Response":
+) -> httpx.Response:
     assert _http is not None
     return await _http.get(
         path,
@@ -146,7 +149,7 @@ async def _post(
     *,
     json_body: dict[str, Any] | None = None,
     headers: dict[str, str] | None = None,
-) -> "httpx.Response":
+) -> httpx.Response:
     assert _http is not None
     return await _http.post(
         path,
@@ -159,7 +162,7 @@ async def _execute(
     tool: str,
     params: dict[str, Any],
     api_key: str,
-) -> "httpx.Response":
+) -> httpx.Response:
     """POST /v1/execute with the given tool and params."""
     return await _post(
         "/v1/execute",
@@ -171,6 +174,7 @@ async def _execute(
 # ---------------------------------------------------------------------------
 # Test helpers
 # ---------------------------------------------------------------------------
+
 
 async def _run_test(
     suite: TestSuite,
@@ -196,6 +200,7 @@ async def _run_test(
 
 class _Skip(Exception):
     """Raised to skip a test with a message."""
+
     pass
 
 
@@ -204,12 +209,10 @@ def _assert(condition: bool, msg: str = "assertion failed") -> None:
         raise AssertionError(msg)
 
 
-def _assert_status(resp: "httpx.Response", expected: int) -> None:
+def _assert_status(resp: httpx.Response, expected: int) -> None:
     if resp.status_code != expected:
         body_preview = resp.text[:300] if resp.text else "(empty)"
-        raise AssertionError(
-            f"Expected HTTP {expected}, got {resp.status_code}. Body: {body_preview}"
-        )
+        raise AssertionError(f"Expected HTTP {expected}, got {resp.status_code}. Body: {body_preview}")
 
 
 def _assert_json_key(data: dict, key: str, msg: str = "") -> Any:
@@ -241,6 +244,7 @@ async def _run_cleanup(api_key: str) -> None:
 # Infrastructure Tests
 # ---------------------------------------------------------------------------
 
+
 async def test_health(suite: TestSuite) -> None:
     async def _test() -> None:
         resp = await _get("/v1/health")
@@ -269,8 +273,7 @@ async def test_health_tools_count(suite: TestSuite) -> None:
         _assert_status(resp, 200)
         data = resp.json()
         _assert_json_key(data, "tools")
-        _assert(isinstance(data["tools"], int) and data["tools"] > 0,
-                f"Expected tools > 0, got {data.get('tools')}")
+        _assert(isinstance(data["tools"], int) and data["tools"] > 0, f"Expected tools > 0, got {data.get('tools')}")
 
     await _run_test(suite, "GET /v1/health reports tool count > 0", _test)
 
@@ -281,8 +284,7 @@ async def test_pricing_list(suite: TestSuite) -> None:
         _assert_status(resp, 200)
         data = resp.json()
         tools = _assert_json_key(data, "tools")
-        _assert(isinstance(tools, list) and len(tools) > 0,
-                "Expected non-empty tools array")
+        _assert(isinstance(tools, list) and len(tools) > 0, "Expected non-empty tools array")
         # Verify each tool has required fields
         for t in tools:
             _assert_json_key(t, "name")
@@ -297,8 +299,7 @@ async def test_pricing_single_tool(suite: TestSuite) -> None:
         _assert_status(resp, 200)
         data = resp.json()
         tool = _assert_json_key(data, "tool")
-        _assert(tool["name"] == "get_balance",
-                f"Expected tool name get_balance, got {tool.get('name')}")
+        _assert(tool["name"] == "get_balance", f"Expected tool name get_balance, got {tool.get('name')}")
         _assert_json_key(tool, "pricing")
         _assert_json_key(tool, "tier_required")
 
@@ -319,8 +320,7 @@ async def test_openapi_spec(suite: TestSuite) -> None:
         _assert_status(resp, 200)
         data = resp.json()
         _assert_json_key(data, "openapi")
-        _assert(data["openapi"].startswith("3.1"),
-                f"Expected OpenAPI 3.1.x, got {data['openapi']}")
+        _assert(data["openapi"].startswith("3.1"), f"Expected OpenAPI 3.1.x, got {data['openapi']}")
         _assert_json_key(data, "info")
         _assert_json_key(data, "paths")
         _assert_json_key(data, "components")
@@ -333,13 +333,10 @@ async def test_metrics(suite: TestSuite) -> None:
         resp = await _get("/v1/metrics")
         _assert_status(resp, 200)
         content_type = resp.headers.get("content-type", "")
-        _assert("text/plain" in content_type,
-                f"Expected text/plain content-type, got {content_type}")
+        _assert("text/plain" in content_type, f"Expected text/plain content-type, got {content_type}")
         body = resp.text
-        _assert("a2a_requests_total" in body,
-                "Expected Prometheus metric 'a2a_requests_total' in body")
-        _assert("a2a_errors_total" in body,
-                "Expected Prometheus metric 'a2a_errors_total' in body")
+        _assert("a2a_requests_total" in body, "Expected Prometheus metric 'a2a_requests_total' in body")
+        _assert("a2a_errors_total" in body, "Expected Prometheus metric 'a2a_errors_total' in body")
 
     await _run_test(suite, "GET /v1/metrics returns Prometheus-format metrics", _test)
 
@@ -352,8 +349,7 @@ async def test_signing_key(suite: TestSuite) -> None:
         _assert_json_key(data, "public_key")
         _assert_json_key(data, "algorithm")
         algo = data["algorithm"]
-        _assert(algo in ("crystals-dilithium", "hmac-sha3-256"),
-                f"Unexpected algorithm: {algo}")
+        _assert(algo in ("crystals-dilithium", "hmac-sha3-256"), f"Unexpected algorithm: {algo}")
 
     await _run_test(suite, "GET /v1/signing-key returns key info", _test)
 
@@ -364,8 +360,7 @@ async def test_correlation_id(suite: TestSuite) -> None:
         resp = await _get("/v1/health", headers={"X-Request-ID": custom_id})
         _assert_status(resp, 200)
         echoed = resp.headers.get("x-request-id", "")
-        _assert(echoed == custom_id,
-                f"Expected X-Request-ID={custom_id}, got '{echoed}'")
+        _assert(echoed == custom_id, f"Expected X-Request-ID={custom_id}, got '{echoed}'")
 
     await _run_test(suite, "X-Request-ID correlation header echoed back", _test)
 
@@ -375,8 +370,7 @@ async def test_correlation_id_generated(suite: TestSuite) -> None:
         resp = await _get("/v1/health")
         _assert_status(resp, 200)
         generated = resp.headers.get("x-request-id", "")
-        _assert(len(generated) > 0,
-                "Expected auto-generated X-Request-ID when none sent")
+        _assert(len(generated) > 0, "Expected auto-generated X-Request-ID when none sent")
 
     await _run_test(suite, "X-Request-ID auto-generated when not provided", _test)
 
@@ -386,11 +380,9 @@ async def test_backward_compat_health(suite: TestSuite) -> None:
         assert _http is not None
         # Don't follow redirects to inspect the 301
         resp = await _http.get("/health", follow_redirects=False)
-        _assert(resp.status_code == 301,
-                f"Expected 301 redirect, got {resp.status_code}")
+        _assert(resp.status_code == 301, f"Expected 301 redirect, got {resp.status_code}")
         location = resp.headers.get("location", "")
-        _assert("/v1/health" in location,
-                f"Expected redirect to /v1/health, got location={location}")
+        _assert("/v1/health" in location, f"Expected redirect to /v1/health, got location={location}")
 
     await _run_test(suite, "GET /health redirects to /v1/health (301)", _test)
 
@@ -399,11 +391,9 @@ async def test_backward_compat_pricing(suite: TestSuite) -> None:
     async def _test() -> None:
         assert _http is not None
         resp = await _http.get("/pricing", follow_redirects=False)
-        _assert(resp.status_code == 301,
-                f"Expected 301 redirect, got {resp.status_code}")
+        _assert(resp.status_code == 301, f"Expected 301 redirect, got {resp.status_code}")
         location = resp.headers.get("location", "")
-        _assert("/v1/pricing" in location,
-                f"Expected redirect to /v1/pricing, got location={location}")
+        _assert("/v1/pricing" in location, f"Expected redirect to /v1/pricing, got location={location}")
 
     await _run_test(suite, "GET /pricing redirects to /v1/pricing (301)", _test)
 
@@ -412,11 +402,9 @@ async def test_backward_compat_execute(suite: TestSuite) -> None:
     async def _test() -> None:
         assert _http is not None
         resp = await _http.post("/execute", json={}, follow_redirects=False)
-        _assert(resp.status_code == 307,
-                f"Expected 307 redirect, got {resp.status_code}")
+        _assert(resp.status_code == 307, f"Expected 307 redirect, got {resp.status_code}")
         location = resp.headers.get("location", "")
-        _assert("/v1/execute" in location,
-                f"Expected redirect to /v1/execute, got location={location}")
+        _assert("/v1/execute" in location, f"Expected redirect to /v1/execute, got location={location}")
 
     await _run_test(suite, "POST /execute redirects to /v1/execute (307)", _test)
 
@@ -424,6 +412,7 @@ async def test_backward_compat_execute(suite: TestSuite) -> None:
 # ---------------------------------------------------------------------------
 # Authentication Tests
 # ---------------------------------------------------------------------------
+
 
 async def test_auth_missing(suite: TestSuite) -> None:
     async def _test() -> None:
@@ -456,8 +445,7 @@ async def test_auth_valid_key(suite: TestSuite, api_key: str) -> None:
         # 200 means auth passed (even if balance is 0 or wallet not found, auth was OK)
         # The tool might return 404 for wallet not found, but that is post-auth.
         # We accept 200 or 404 (wallet_not_found) as evidence that auth succeeded.
-        _assert(resp.status_code in (200, 404),
-                f"Expected 200 or 404 (post-auth), got {resp.status_code}")
+        _assert(resp.status_code in (200, 404), f"Expected 200 or 404 (post-auth), got {resp.status_code}")
         if resp.status_code == 200:
             data = resp.json()
             _assert(data.get("success") is True, "Expected success=true")
@@ -469,17 +457,16 @@ async def test_auth_valid_key(suite: TestSuite, api_key: str) -> None:
 # Billing Tests
 # ---------------------------------------------------------------------------
 
+
 async def test_billing_get_balance(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
         resp = await _execute("get_balance", {"agent_id": AGENT_ID}, api_key)
         # Wallet may or may not exist yet; both 200 and 404 are acceptable
-        _assert(resp.status_code in (200, 404),
-                f"Expected 200 or 404, got {resp.status_code}")
+        _assert(resp.status_code in (200, 404), f"Expected 200 or 404, got {resp.status_code}")
         if resp.status_code == 200:
             data = resp.json()
             _assert(data.get("success") is True, "Expected success=true")
-            _assert("balance" in data.get("result", {}),
-                    "Expected 'balance' in result")
+            _assert("balance" in data.get("result", {}), "Expected 'balance' in result")
 
     await _run_test(suite, "get_balance returns balance or wallet_not_found", _test)
 
@@ -496,8 +483,10 @@ async def test_billing_deposit(suite: TestSuite, api_key: str) -> None:
         _assert(data.get("success") is True, "Expected success=true")
         new_balance = data.get("result", {}).get("new_balance")
         _assert(new_balance is not None, "Expected new_balance in result")
-        _assert(isinstance(new_balance, (int, float)) and new_balance >= 100.0,
-                f"Expected new_balance >= 100, got {new_balance}")
+        _assert(
+            isinstance(new_balance, (int, float)) and new_balance >= 100.0,
+            f"Expected new_balance >= 100, got {new_balance}",
+        )
 
     await _run_test(suite, "deposit credits into test agent wallet", _test)
 
@@ -508,8 +497,7 @@ async def test_billing_balance_after_deposit(suite: TestSuite, api_key: str) -> 
         _assert_status(resp, 200)
         data = resp.json()
         balance = data.get("result", {}).get("balance", 0)
-        _assert(balance >= 100.0,
-                f"Expected balance >= 100 after deposit, got {balance}")
+        _assert(balance >= 100.0, f"Expected balance >= 100 after deposit, got {balance}")
 
     await _run_test(suite, "get_balance reflects deposited credits", _test)
 
@@ -522,8 +510,7 @@ async def test_billing_usage_summary(suite: TestSuite, api_key: str) -> None:
         _assert(data.get("success") is True, "Expected success=true")
         result = data.get("result", {})
         # Usage summary should have cost/calls/tokens fields
-        _assert("total_cost" in result or "total_calls" in result,
-                f"Expected usage fields in result: {result}")
+        _assert("total_cost" in result or "total_calls" in result, f"Expected usage fields in result: {result}")
 
     await _run_test(suite, "get_usage_summary returns usage data", _test)
 
@@ -713,6 +700,7 @@ async def test_marketplace_best_match(suite: TestSuite, api_key: str) -> None:
 # Trust Tests
 # ---------------------------------------------------------------------------
 
+
 async def test_trust_score(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
         resp = await _execute(
@@ -721,8 +709,7 @@ async def test_trust_score(suite: TestSuite, api_key: str) -> None:
             api_key,
         )
         # Server may not exist, 200 (with default score) or 404 both acceptable
-        _assert(resp.status_code in (200, 404),
-                f"Expected 200 or 404, got {resp.status_code}")
+        _assert(resp.status_code in (200, 404), f"Expected 200 or 404, got {resp.status_code}")
         if resp.status_code == 200:
             data = resp.json()
             _assert(data.get("success") is True, "Expected success=true")
@@ -783,6 +770,7 @@ async def test_webhook_register(suite: TestSuite, api_key: str) -> None:
                     {"webhook_id": _registered_webhook_id},
                     api_key,
                 )
+
         _register_cleanup(_cleanup_webhook)
 
     await _run_test(suite, "register_webhook creates webhook subscription", _test)
@@ -831,6 +819,7 @@ async def test_webhook_delete(suite: TestSuite, api_key: str) -> None:
 # Event Bus Tests
 # ---------------------------------------------------------------------------
 
+
 async def test_event_publish(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
         resp = await _execute(
@@ -869,13 +858,12 @@ async def test_event_query(suite: TestSuite, api_key: str) -> None:
 # Rate Limiting Tests
 # ---------------------------------------------------------------------------
 
+
 async def test_rate_limit_headers(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
         resp = await _execute("get_balance", {"agent_id": AGENT_ID}, api_key)
         # Rate limit headers are optional; just check if they appear
-        has_ratelimit = any(
-            k.lower().startswith("x-ratelimit") for k in resp.headers.keys()
-        )
+        has_ratelimit = any(k.lower().startswith("x-ratelimit") for k in resp.headers)
         if not has_ratelimit:
             raise _Skip("No X-RateLimit headers present (optional)")
         # If present, validate format
@@ -891,6 +879,7 @@ async def test_rate_limit_headers(suite: TestSuite, api_key: str) -> None:
 # Response Signing Tests
 # ---------------------------------------------------------------------------
 
+
 async def test_response_signing(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
         resp = await _execute("get_balance", {"agent_id": AGENT_ID}, api_key)
@@ -905,6 +894,7 @@ async def test_response_signing(suite: TestSuite, api_key: str) -> None:
 # ---------------------------------------------------------------------------
 # Execute Error Handling Tests
 # ---------------------------------------------------------------------------
+
 
 async def test_execute_missing_tool(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
@@ -950,6 +940,7 @@ async def test_execute_invalid_json(suite: TestSuite, api_key: str) -> None:
 # Free Tier Tests (optional, if A2A_FREE_KEY provided)
 # ---------------------------------------------------------------------------
 
+
 async def test_free_tier_denied_pro_tool(suite: TestSuite, free_key: str) -> None:
     async def _test() -> None:
         # create_escrow requires pro tier
@@ -961,8 +952,7 @@ async def test_free_tier_denied_pro_tool(suite: TestSuite, free_key: str) -> Non
         _assert_status(resp, 403)
         data = resp.json()
         error_code = data.get("error", {}).get("code", "")
-        _assert(error_code == "insufficient_tier",
-                f"Expected error code 'insufficient_tier', got '{error_code}'")
+        _assert(error_code == "insufficient_tier", f"Expected error code 'insufficient_tier', got '{error_code}'")
 
     await _run_test(suite, "Free tier denied access to pro-tier tool (create_escrow)", _test)
 
@@ -971,8 +961,7 @@ async def test_free_tier_allowed_free_tool(suite: TestSuite, free_key: str) -> N
     async def _test() -> None:
         # get_balance is free-tier accessible
         resp = await _execute("get_balance", {"agent_id": "test"}, free_key)
-        _assert(resp.status_code in (200, 404),
-                f"Expected 200 or 404, got {resp.status_code}")
+        _assert(resp.status_code in (200, 404), f"Expected 200 or 404, got {resp.status_code}")
 
     await _run_test(suite, "Free tier can access free-tier tool (get_balance)", _test)
 
@@ -981,12 +970,13 @@ async def test_free_tier_allowed_free_tool(suite: TestSuite, free_key: str) -> N
 # SDK Tests (optional, if SDK is importable)
 # ---------------------------------------------------------------------------
 
+
 async def test_sdk_health(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
         try:
             from a2a_client import A2AClient
         except ImportError:
-            raise _Skip("a2a_client SDK not importable")
+            raise _Skip("a2a_client SDK not importable") from None
 
         async with A2AClient(BASE_URL, api_key=api_key, timeout=_timeout) as client:
             health = await client.health()
@@ -1000,7 +990,7 @@ async def test_sdk_pricing(suite: TestSuite, api_key: str) -> None:
         try:
             from a2a_client import A2AClient
         except ImportError:
-            raise _Skip("a2a_client SDK not importable")
+            raise _Skip("a2a_client SDK not importable") from None
 
         async with A2AClient(BASE_URL, api_key=api_key, timeout=_timeout) as client:
             tools = await client.pricing()
@@ -1014,13 +1004,12 @@ async def test_sdk_get_balance(suite: TestSuite, api_key: str) -> None:
         try:
             from a2a_client import A2AClient
         except ImportError:
-            raise _Skip("a2a_client SDK not importable")
+            raise _Skip("a2a_client SDK not importable") from None
 
         async with A2AClient(BASE_URL, api_key=api_key, timeout=_timeout) as client:
             try:
                 balance = await client.get_balance(AGENT_ID)
-                _assert(isinstance(balance, (int, float)),
-                        f"Expected numeric balance, got {type(balance)}")
+                _assert(isinstance(balance, (int, float)), f"Expected numeric balance, got {type(balance)}")
             except Exception as e:
                 # WalletNotFoundError is acceptable if wallet setup hasn't run
                 if "not_found" in str(e).lower() or "404" in str(e):
@@ -1036,12 +1025,11 @@ async def test_sdk_execute(suite: TestSuite, api_key: str) -> None:
         try:
             from a2a_client import A2AClient
         except ImportError:
-            raise _Skip("a2a_client SDK not importable")
+            raise _Skip("a2a_client SDK not importable") from None
 
         async with A2AClient(BASE_URL, api_key=api_key, timeout=_timeout) as client:
             result = await client.execute("search_services", {"limit": 1})
-            _assert(result.success is True or hasattr(result, "result"),
-                    "Expected valid ExecuteResponse")
+            _assert(result.success is True or hasattr(result, "result"), "Expected valid ExecuteResponse")
 
     await _run_test(suite, "SDK: A2AClient.execute() raw call works", _test)
 
@@ -1049,6 +1037,7 @@ async def test_sdk_execute(suite: TestSuite, api_key: str) -> None:
 # ---------------------------------------------------------------------------
 # Audit Log Test
 # ---------------------------------------------------------------------------
+
 
 async def test_audit_log(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
@@ -1154,6 +1143,7 @@ def print_dry_run() -> None:
 # ---------------------------------------------------------------------------
 # Main runner
 # ---------------------------------------------------------------------------
+
 
 async def run_all(api_key: str, free_key: str | None) -> bool:
     """Run all e2e tests. Returns True if all passed."""
@@ -1261,11 +1251,14 @@ async def run_all(api_key: str, free_key: str | None) -> bool:
             await test_free_tier_allowed_free_tool(suite, free_key)
         else:
             print(f"\n{_C.CYAN}{_C.BOLD}[Free Tier]{_C.RESET}")
-            suite.record(TestResult(
-                "Free tier tests",
-                Status.SKIP, 0,
-                "Set A2A_FREE_KEY env var to enable",
-            ))
+            suite.record(
+                TestResult(
+                    "Free tier tests",
+                    Status.SKIP,
+                    0,
+                    "Set A2A_FREE_KEY env var to enable",
+                )
+            )
 
         # --- Audit ---
         print(f"\n{_C.CYAN}{_C.BOLD}[Audit]{_C.RESET}")

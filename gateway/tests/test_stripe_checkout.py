@@ -421,17 +421,13 @@ class TestStripeWebhook:
         )
         assert resp.status_code == 400
 
-    async def test_webhook_replay_same_session_deposits_only_once(
-        self, client, app, monkeypatch
-    ):
+    async def test_webhook_replay_same_session_deposits_only_once(self, client, app, monkeypatch):
         """Replaying the same webhook event (same session id) must not double-deposit."""
         monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", self._WEBHOOK_SECRET)
         ctx = app.state.ctx
         await ctx.tracker.wallet.create("replay-agent", initial_balance=0.0)
 
-        event = self._checkout_completed_event(
-            "replay-agent", 500, session_id="cs_replay_dedup"
-        )
+        event = self._checkout_completed_event("replay-agent", 500, session_id="cs_replay_dedup")
         payload = json.dumps(event).encode()
         headers = self._signed_headers(payload)
 

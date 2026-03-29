@@ -8,7 +8,7 @@ for testing against mock servers.
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 from .models import ProbeResult
@@ -72,10 +72,7 @@ class Prober:
             error = response.get("error")
             tools = response.get("tools", [])
             tools_count = len(tools)
-            tools_documented = sum(
-                1 for t in tools
-                if t.get("description") and len(t.get("description", "")) > 0
-            )
+            tools_documented = sum(1 for t in tools if t.get("description") and len(t.get("description", "")) > 0)
             latency_ms = response.get("latency_ms", elapsed_ms)
 
         except Exception as exc:

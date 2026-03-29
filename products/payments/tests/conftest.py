@@ -29,9 +29,7 @@ if _billing_root not in sys.path:
 # ---------------------------------------------------------------------------
 # Register shared_src so cross-product imports (db_security) resolve
 # ---------------------------------------------------------------------------
-_shared_src_dir = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "shared", "src")
-)
+_shared_src_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "src"))
 if "shared_src" not in sys.modules:
     _shared_pkg = types.ModuleType("shared_src")
     _shared_pkg.__path__ = [_shared_src_dir]
@@ -55,18 +53,16 @@ if "payments" not in sys.modules:
 # - 'payments.xxx' resolves to payments
 # ---------------------------------------------------------------------------
 import pytest
-
-from src.storage import StorageBackend as BillingStorageBackend
-from src.wallet import Wallet as BillingWallet
-
-from payments.storage import PaymentStorage
 from payments.engine import PaymentEngine
 from payments.scheduler import SubscriptionScheduler
-
+from payments.storage import PaymentStorage
+from src.storage import StorageBackend as BillingStorageBackend
+from src.wallet import Wallet as BillingWallet
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 async def billing_db():

@@ -3,23 +3,24 @@
 from __future__ import annotations
 
 import time
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
 from products.reputation.src.aggregator import Aggregator
 from products.reputation.src.models import ProbeTarget
-from products.reputation.src.storage import ReputationStorage
 from products.trust.src.models import (
     ProbeResult as TrustProbeResult,
+)
+from products.trust.src.models import (
     SecurityScan as TrustSecurityScan,
-    TrustScore,
+)
+from products.trust.src.models import (
     Window,
 )
 
 
-def make_probe(server_id: str, timestamp: float, status_code: int = 200,
-               latency_ms: float = 50.0) -> TrustProbeResult:
+def make_probe(server_id: str, timestamp: float, status_code: int = 200, latency_ms: float = 50.0) -> TrustProbeResult:
     return TrustProbeResult(
         server_id=server_id,
         timestamp=timestamp,
@@ -28,8 +29,7 @@ def make_probe(server_id: str, timestamp: float, status_code: int = 200,
     )
 
 
-def make_scan(server_id: str, timestamp: float, tls: bool = True,
-              auth: bool = True) -> TrustSecurityScan:
+def make_scan(server_id: str, timestamp: float, tls: bool = True, auth: bool = True) -> TrustSecurityScan:
     return TrustSecurityScan(
         server_id=server_id,
         timestamp=timestamp,
@@ -174,10 +174,12 @@ class TestAggregatorRecomputeAllActive:
         mock_trust_storage.store_trust_score = AsyncMock(return_value=1)
 
         mock_rep_storage = AsyncMock()
-        mock_rep_storage.list_targets = AsyncMock(return_value=[
-            ProbeTarget(server_id="svc-1", url="https://a.com"),
-            ProbeTarget(server_id="svc-2", url="https://b.com"),
-        ])
+        mock_rep_storage.list_targets = AsyncMock(
+            return_value=[
+                ProbeTarget(server_id="svc-1", url="https://a.com"),
+                ProbeTarget(server_id="svc-2", url="https://b.com"),
+            ]
+        )
 
         agg = Aggregator(trust_storage=mock_trust_storage)
         scores = await agg.recompute_all_active(mock_rep_storage, now=now)

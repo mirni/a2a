@@ -2,15 +2,13 @@
 
 import json
 
-import httpx
 import pytest
-
+from src.models import ToolResult
 from src.server import (
     _result_to_json,
     _validation_error_result,
     mcp,
 )
-from src.models import ToolResult
 
 
 class TestResultHelpers:

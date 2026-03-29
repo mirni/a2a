@@ -1,10 +1,10 @@
 """Tests for marketplace data models."""
 
 from src.models import (
+    SLA,
     MatchPreference,
     PricingModel,
     PricingModelType,
-    SLA,
     Service,
     ServiceCreate,
     ServiceMatch,
@@ -39,7 +39,7 @@ class TestPricingModel:
         p = PricingModel(model=PricingModelType.FREE)
         try:
             p.cost = 10.0  # type: ignore
-            assert False, "Should be frozen"
+            raise AssertionError("Should be frozen")
         except AttributeError:
             pass
 
@@ -98,9 +98,7 @@ class TestMatchPreference:
 
 class TestServiceCreate:
     def test_defaults(self):
-        sc = ServiceCreate(
-            provider_id="a", name="N", description="D", category="C"
-        )
+        sc = ServiceCreate(provider_id="a", name="N", description="D", category="C")
         assert sc.tools == []
         assert sc.pricing.model == PricingModelType.FREE
         assert sc.tags == []
@@ -149,9 +147,7 @@ class TestServiceSearchParams:
         assert p.offset == 0
 
     def test_custom(self):
-        p = ServiceSearchParams(
-            query="test", category="data", min_trust_score=50.0
-        )
+        p = ServiceSearchParams(query="test", category="data", min_trust_score=50.0)
         assert p.query == "test"
         assert p.min_trust_score == 50.0
 

@@ -6,14 +6,14 @@ layer enforces policies per-agent.
 """
 
 import asyncio
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "products", "billing"))
 
+from src.policies import RateLimitExceededError, RatePolicyManager, SpendCapExceededError
 from src.tracker import UsageTracker
 from src.wallet import Wallet
-from src.policies import RatePolicyManager, RateLimitExceededError, SpendCapExceededError
 
 
 async def main():
@@ -43,8 +43,8 @@ async def main():
     # Pro agent: works fine
     print("--- Pro agent (high limits) ---")
     for i in range(10):
-        result = await api_call(agent_id="pro-agent", endpoint=f"/data/{i}")
-    print(f"Pro agent made 10 calls successfully")
+        await api_call(agent_id="pro-agent", endpoint=f"/data/{i}")
+    print("Pro agent made 10 calls successfully")
     balance = await wallet.get_balance("pro-agent")
     print(f"Pro agent balance: {balance} credits")
 
@@ -54,7 +54,7 @@ async def main():
     for i in range(10):
         try:
             await policies.check_all("free-agent", cost=1)
-            result = await api_call(agent_id="free-agent", endpoint=f"/data/{i}")
+            await api_call(agent_id="free-agent", endpoint=f"/data/{i}")
             calls_made += 1
         except RateLimitExceededError:
             print(f"  Rate limit hit after {calls_made} calls")

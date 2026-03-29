@@ -6,6 +6,7 @@ import json
 from typing import Any
 
 from .models import (
+    SLA,
     MatchPreference,
     PricingModel,
     Service,
@@ -13,7 +14,6 @@ from .models import (
     ServiceMatch,
     ServiceSearchParams,
     ServiceStatus,
-    SLA,
     SortBy,
 )
 from .storage import MarketplaceStorage
@@ -154,9 +154,7 @@ class Marketplace:
             raise RuntimeError(f"Failed to retrieve updated service {service_id}")
         return self._to_service(raw)
 
-    async def deactivate_service(
-        self, service_id: str, *, requester_id: str | None = None
-    ) -> Service:
+    async def deactivate_service(self, service_id: str, *, requester_id: str | None = None) -> Service:
         """Deactivate a service listing.
 
         Args:
@@ -184,9 +182,7 @@ class Marketplace:
         if raw is None:
             raise ServiceNotFoundError(service_id)
         if raw["provider_id"] != requester_id:
-            raise PermissionError(
-                f"Agent '{requester_id}' is not the owner of service '{service_id}'"
-            )
+            raise PermissionError(f"Agent '{requester_id}' is not the owner of service '{service_id}'")
 
     async def search(self, params: ServiceSearchParams | None = None, **kwargs: Any) -> list[Service]:
         """Search for services with filters.
@@ -215,10 +211,7 @@ class Marketplace:
 
         # Filter by min_trust_score
         if params.min_trust_score is not None:
-            services = [
-                s for s in services
-                if s.trust_score is not None and s.trust_score >= params.min_trust_score
-            ]
+            services = [s for s in services if s.trust_score is not None and s.trust_score >= params.min_trust_score]
 
         # Sort
         services = self._sort_services(services, params.sort_by, params.sort_desc)
@@ -298,9 +291,7 @@ class Marketplace:
         except Exception:
             return None
 
-    def _sort_services(
-        self, services: list[Service], sort_by: SortBy, desc: bool
-    ) -> list[Service]:
+    def _sort_services(self, services: list[Service], sort_by: SortBy, desc: bool) -> list[Service]:
         """Sort services by the given field."""
         if sort_by == SortBy.TRUST_SCORE:
             key = lambda s: s.trust_score if s.trust_score is not None else -1
@@ -315,9 +306,7 @@ class Marketplace:
 
         return sorted(services, key=key, reverse=desc)
 
-    def _compute_rank_score(
-        self, svc: Service, prefer: MatchPreference, query: str
-    ) -> tuple[float, list[str]]:
+    def _compute_rank_score(self, svc: Service, prefer: MatchPreference, query: str) -> tuple[float, list[str]]:
         """Compute a ranking score for best_match.
 
         Returns (score, reasons).

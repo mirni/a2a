@@ -23,8 +23,7 @@ TOOL_DEFINITIONS = [
     {
         "name": "list_repos",
         "description": (
-            "List repositories for a user/org or the authenticated user. "
-            "Supports pagination and filtering by type."
+            "List repositories for a user/org or the authenticated user. Supports pagination and filtering by type."
         ),
         "inputSchema": {
             "type": "object",
@@ -67,10 +66,7 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "list_issues",
-        "description": (
-            "List issues for a repository with state, label, and sort filters. "
-            "Supports pagination."
-        ),
+        "description": ("List issues for a repository with state, label, and sort filters. Supports pagination."),
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -130,10 +126,7 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "list_pull_requests",
-        "description": (
-            "List pull requests with state, sort, and branch filters. "
-            "Supports pagination."
-        ),
+        "description": ("List pull requests with state, sort, and branch filters. Supports pagination."),
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -173,8 +166,7 @@ TOOL_DEFINITIONS = [
     {
         "name": "get_pull_request",
         "description": (
-            "Get pull request details including diff stats "
-            "(additions, deletions, changed files) and merge status."
+            "Get pull request details including diff stats (additions, deletions, changed files) and merge status."
         ),
         "inputSchema": {
             "type": "object",
@@ -209,8 +201,7 @@ TOOL_DEFINITIONS = [
     {
         "name": "list_commits",
         "description": (
-            "List commits for a repository with optional branch, path, and date filters. "
-            "Supports pagination."
+            "List commits for a repository with optional branch, path, and date filters. Supports pagination."
         ),
         "inputSchema": {
             "type": "object",
@@ -306,6 +297,7 @@ async def create_server():
     @server.list_tools()
     async def list_tools():
         from mcp.types import Tool
+
         return [Tool(**t) for t in TOOL_DEFINITIONS]
 
     @server.call_tool()
@@ -314,21 +306,32 @@ async def create_server():
 
         handler = TOOL_HANDLERS.get(name)
         if not handler:
-            return [TextContent(type="text", text=json.dumps({
-                "error": True,
-                "code": "UNKNOWN_TOOL",
-                "message": f"Unknown tool: {name}",
-            }))]
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {
+                            "error": True,
+                            "code": "UNKNOWN_TOOL",
+                            "message": f"Unknown tool: {name}",
+                        }
+                    ),
+                )
+            ]
 
         try:
             result = await handler(client, arguments or {})
             return [TextContent(type="text", text=json.dumps(result, default=str))]
         except Exception as e:
-            error_dict = e.to_dict() if hasattr(e, "to_dict") else {
-                "error": True,
-                "code": "INTERNAL_ERROR",
-                "message": str(e),
-            }
+            error_dict = (
+                e.to_dict()
+                if hasattr(e, "to_dict")
+                else {
+                    "error": True,
+                    "code": "INTERNAL_ERROR",
+                    "message": str(e),
+                }
+            )
             return [TextContent(type="text", text=json.dumps(error_dict))]
 
     return server, client
@@ -349,4 +352,5 @@ async def main():
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(main())

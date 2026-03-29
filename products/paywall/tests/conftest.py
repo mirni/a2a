@@ -11,9 +11,7 @@ import types
 import pytest
 
 # Register shared_src so cross-product imports (db_security) resolve
-_shared_src_dir = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "shared", "src")
-)
+_shared_src_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "src"))
 if "shared_src" not in sys.modules:
     _pkg = types.ModuleType("shared_src")
     _pkg.__path__ = [_shared_src_dir]
@@ -26,9 +24,7 @@ if "shared_src" not in sys.modules:
 # module directly via importlib.util to avoid collision.
 # ---------------------------------------------------------------------------
 
-_BILLING_SRC = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "billing", "src")
-)
+_BILLING_SRC = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "billing", "src"))
 
 
 def _import_billing_module(name: str, filepath: str):

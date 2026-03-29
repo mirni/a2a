@@ -147,15 +147,12 @@ class IdentityStorage:
             return ":memory:"
         if dsn.startswith("sqlite://"):
             # Strip 'sqlite://' — remaining path may start with '/' for absolute
-            path = dsn[len("sqlite://"):]
+            path = dsn[len("sqlite://") :]
             # Remove empty authority: sqlite:///path -> /path (leading / preserved)
             return path
         if "://" in dsn:
             scheme = dsn.split("://")[0]
-            raise ValueError(
-                f"Unsupported DSN scheme: '{scheme}'. "
-                "Only 'sqlite://' and bare paths are supported."
-            )
+            raise ValueError(f"Unsupported DSN scheme: '{scheme}'. Only 'sqlite://' and bare paths are supported.")
         return dsn
 
     async def connect(self) -> None:
@@ -191,8 +188,7 @@ class IdentityStorage:
     async def store_identity(self, identity: AgentIdentity) -> AgentIdentity:
         """Insert or replace an agent identity record."""
         await self.db.execute(
-            "INSERT OR REPLACE INTO agent_identities (agent_id, public_key, created_at, org_id) "
-            "VALUES (?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO agent_identities (agent_id, public_key, created_at, org_id) VALUES (?, ?, ?, ?)",
             (identity.agent_id, identity.public_key, identity.created_at, identity.org_id),
         )
         await self.db.commit()
@@ -200,9 +196,7 @@ class IdentityStorage:
 
     async def get_identity(self, agent_id: str) -> AgentIdentity | None:
         """Retrieve an agent identity by agent_id."""
-        cursor = await self.db.execute(
-            "SELECT * FROM agent_identities WHERE agent_id = ?", (agent_id,)
-        )
+        cursor = await self.db.execute("SELECT * FROM agent_identities WHERE agent_id = ?", (agent_id,))
         row = await cursor.fetchone()
         if row is None:
             return None
@@ -235,8 +229,11 @@ class IdentityStorage:
         return cursor.lastrowid  # type: ignore[return-value]
 
     async def get_commitments(
-        self, agent_id: str, since: float | None = None,
-        limit: int = 100, offset: int = 0,
+        self,
+        agent_id: str,
+        since: float | None = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[MetricCommitment]:
         """Retrieve metric commitments for an agent."""
         query = "SELECT * FROM metric_commitments WHERE agent_id = ?"
@@ -285,8 +282,11 @@ class IdentityStorage:
         return cursor.lastrowid  # type: ignore[return-value]
 
     async def get_attestations(
-        self, agent_id: str, valid_only: bool = True,
-        limit: int = 100, offset: int = 0,
+        self,
+        agent_id: str,
+        valid_only: bool = True,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[AuditorAttestation]:
         """Retrieve attestations for an agent, optionally filtering expired/revoked."""
         query = "SELECT * FROM attestations WHERE agent_id = ?"
@@ -315,9 +315,7 @@ class IdentityStorage:
 
     async def get_attestation_by_id(self, attestation_id: int) -> AuditorAttestation | None:
         """Retrieve an attestation by its row ID."""
-        cursor = await self.db.execute(
-            "SELECT * FROM attestations WHERE id = ?", (attestation_id,)
-        )
+        cursor = await self.db.execute("SELECT * FROM attestations WHERE id = ?", (attestation_id,))
         row = await cursor.fetchone()
         if row is None:
             return None
@@ -333,16 +331,13 @@ class IdentityStorage:
             algorithm=row["algorithm"],
         )
 
-    async def revoke_attestation(
-        self, attestation_id: int, reason: str = ""
-    ) -> bool:
+    async def revoke_attestation(self, attestation_id: int, reason: str = "") -> bool:
         """Revoke an attestation by setting revoked_at timestamp.
 
         Returns True if attestation was found and revoked.
         """
         cursor = await self.db.execute(
-            "UPDATE attestations SET revoked_at = ?, revocation_reason = ? "
-            "WHERE id = ? AND revoked_at IS NULL",
+            "UPDATE attestations SET revoked_at = ?, revocation_reason = ? WHERE id = ? AND revoked_at IS NULL",
             (time.time(), reason, attestation_id),
         )
         await self.db.commit()
@@ -350,9 +345,7 @@ class IdentityStorage:
 
     async def get_attestation_id_by_signature(self, signature: str) -> int | None:
         """Look up an attestation row ID by its signature."""
-        cursor = await self.db.execute(
-            "SELECT id FROM attestations WHERE signature = ?", (signature,)
-        )
+        cursor = await self.db.execute("SELECT id FROM attestations WHERE signature = ?", (signature,))
         row = await cursor.fetchone()
         return row["id"] if row else None
 
@@ -378,9 +371,7 @@ class IdentityStorage:
         await self.db.commit()
         return cursor.lastrowid  # type: ignore[return-value]
 
-    async def get_claims(
-        self, agent_id: str, valid_only: bool = True
-    ) -> list[VerifiedClaim]:
+    async def get_claims(self, agent_id: str, valid_only: bool = True) -> list[VerifiedClaim]:
         """Retrieve verified claims for an agent, filtering expired and revoked."""
         query = (
             "SELECT vc.*, a.signature AS attestation_sig "
@@ -488,8 +479,7 @@ class IdentityStorage:
     async def get_latest_reputation(self, agent_id: str) -> AgentReputation | None:
         """Retrieve the most recent reputation record for an agent."""
         cursor = await self.db.execute(
-            "SELECT * FROM agent_reputation WHERE agent_id = ? "
-            "ORDER BY timestamp DESC LIMIT 1",
+            "SELECT * FROM agent_reputation WHERE agent_id = ? ORDER BY timestamp DESC LIMIT 1",
             (agent_id,),
         )
         row = await cursor.fetchone()
@@ -581,17 +571,13 @@ class IdentityStorage:
         await self.db.commit()
         return cursor.lastrowid  # type: ignore[return-value]
 
-    async def get_commitment_secrets(
-        self, agent_id: str, metric_name: str
-    ) -> list[dict]:
+    async def get_commitment_secrets(self, agent_id: str, metric_name: str) -> list[dict]:
         """Retrieve blinding factors for an agent's metric commitments.
 
         Returns newest first.
         """
         cursor = await self.db.execute(
-            "SELECT * FROM commitment_secrets "
-            "WHERE agent_id = ? AND metric_name = ? "
-            "ORDER BY created_at DESC",
+            "SELECT * FROM commitment_secrets WHERE agent_id = ? AND metric_name = ? ORDER BY created_at DESC",
             (agent_id, metric_name),
         )
         rows = await cursor.fetchall()
@@ -608,7 +594,10 @@ class IdentityStorage:
         ]
 
     async def get_claim_chains(
-        self, agent_id: str, limit: int = 10, offset: int = 0,
+        self,
+        agent_id: str,
+        limit: int = 10,
+        offset: int = 0,
     ) -> list[dict]:
         """Retrieve claim chains for an agent, newest first.
 
@@ -622,8 +611,7 @@ class IdentityStorage:
             chain_length, period_start, period_end, created_at.
         """
         cursor = await self.db.execute(
-            "SELECT * FROM claim_chains WHERE agent_id = ? "
-            "ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            "SELECT * FROM claim_chains WHERE agent_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
             (agent_id, limit, offset),
         )
         rows = await cursor.fetchall()
@@ -646,9 +634,7 @@ class IdentityStorage:
 
         Returns a list with 0 or 1 elements (for API consistency).
         """
-        cursor = await self.db.execute(
-            "SELECT * FROM claim_chains WHERE id = ?", (chain_id,)
-        )
+        cursor = await self.db.execute("SELECT * FROM claim_chains WHERE id = ?", (chain_id,))
         rows = await cursor.fetchall()
         return [
             {

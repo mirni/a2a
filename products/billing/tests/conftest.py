@@ -10,18 +10,16 @@ import types
 import pytest
 
 # Register shared_src so cross-product imports (db_security) resolve
-_shared_src_dir = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "shared", "src")
-)
+_shared_src_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "src"))
 if "shared_src" not in sys.modules:
     _pkg = types.ModuleType("shared_src")
     _pkg.__path__ = [_shared_src_dir]
     _pkg.__package__ = "shared_src"
     sys.modules["shared_src"] = _pkg
 
-from src.storage import StorageBackend
 from src.events import BillingEventStream
 from src.policies import RatePolicyManager
+from src.storage import StorageBackend
 from src.tracker import UsageTracker
 from src.wallet import Wallet
 

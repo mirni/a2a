@@ -153,11 +153,7 @@ class ListSchemasParams(BaseModel):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [
-                {}
-            ]
-        },
+        json_schema_extra={"examples": [{}]},
     )
 
 

@@ -2,7 +2,6 @@
 
 import pytest
 from pydantic import ValidationError
-
 from src.models import (
     CreateCustomerInput,
     CreatePaymentIntentInput,
@@ -41,9 +40,7 @@ class TestCreateCustomerInput:
 
 class TestCreatePaymentIntentInput:
     def test_valid(self):
-        m = CreatePaymentIntentInput(
-            amount=5000, currency="usd", idempotency_key="pi-1"
-        )
+        m = CreatePaymentIntentInput(amount=5000, currency="usd", idempotency_key="pi-1")
         assert m.amount == 5000
         assert m.currency == "usd"
 
@@ -83,23 +80,17 @@ class TestListChargesInput:
 
 class TestCreateSubscriptionInput:
     def test_valid(self):
-        m = CreateSubscriptionInput(
-            customer_id="cus_1", price_id="price_1", idempotency_key="sub-1"
-        )
+        m = CreateSubscriptionInput(customer_id="cus_1", price_id="price_1", idempotency_key="sub-1")
         assert m.quantity == 1
 
     def test_quantity_must_be_positive(self):
         with pytest.raises(ValidationError):
-            CreateSubscriptionInput(
-                customer_id="cus_1", price_id="price_1", quantity=0, idempotency_key="sub-2"
-            )
+            CreateSubscriptionInput(customer_id="cus_1", price_id="price_1", quantity=0, idempotency_key="sub-2")
 
 
 class TestCreateRefundInput:
     def test_valid_with_payment_intent(self):
-        m = CreateRefundInput(
-            payment_intent_id="pi_123", idempotency_key="ref-1"
-        )
+        m = CreateRefundInput(payment_intent_id="pi_123", idempotency_key="ref-1")
         assert m.charge_id is None
 
     def test_valid_with_charge(self):
@@ -107,16 +98,12 @@ class TestCreateRefundInput:
         assert m.payment_intent_id is None
 
     def test_partial_amount(self):
-        m = CreateRefundInput(
-            payment_intent_id="pi_123", amount=500, idempotency_key="ref-3"
-        )
+        m = CreateRefundInput(payment_intent_id="pi_123", amount=500, idempotency_key="ref-3")
         assert m.amount == 500
 
     def test_amount_must_be_positive(self):
         with pytest.raises(ValidationError):
-            CreateRefundInput(
-                payment_intent_id="pi_123", amount=0, idempotency_key="ref-4"
-            )
+            CreateRefundInput(payment_intent_id="pi_123", amount=0, idempotency_key="ref-4")
 
 
 class TestListInvoicesInput:

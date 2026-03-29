@@ -88,33 +88,25 @@ class ReputationStorage:
 
     async def remove_target(self, server_id: str) -> bool:
         """Remove a probe target by server_id. Returns True if a row was deleted."""
-        cursor = await self.db.execute(
-            "DELETE FROM probe_targets WHERE server_id = ?", (server_id,)
-        )
+        cursor = await self.db.execute("DELETE FROM probe_targets WHERE server_id = ?", (server_id,))
         await self.db.commit()
         return cursor.rowcount > 0
 
     async def deactivate_target(self, server_id: str) -> bool:
         """Soft-deactivate a target instead of deleting it."""
-        cursor = await self.db.execute(
-            "UPDATE probe_targets SET active = 0 WHERE server_id = ?", (server_id,)
-        )
+        cursor = await self.db.execute("UPDATE probe_targets SET active = 0 WHERE server_id = ?", (server_id,))
         await self.db.commit()
         return cursor.rowcount > 0
 
     async def activate_target(self, server_id: str) -> bool:
         """Re-activate a previously deactivated target."""
-        cursor = await self.db.execute(
-            "UPDATE probe_targets SET active = 1 WHERE server_id = ?", (server_id,)
-        )
+        cursor = await self.db.execute("UPDATE probe_targets SET active = 1 WHERE server_id = ?", (server_id,))
         await self.db.commit()
         return cursor.rowcount > 0
 
     async def get_target(self, server_id: str) -> ProbeTarget | None:
         """Retrieve a probe target by server_id."""
-        cursor = await self.db.execute(
-            "SELECT * FROM probe_targets WHERE server_id = ?", (server_id,)
-        )
+        cursor = await self.db.execute("SELECT * FROM probe_targets WHERE server_id = ?", (server_id,))
         row = await cursor.fetchone()
         if row is None:
             return None
@@ -123,13 +115,9 @@ class ReputationStorage:
     async def list_targets(self, active_only: bool = True) -> list[ProbeTarget]:
         """List probe targets, optionally filtering to active ones only."""
         if active_only:
-            cursor = await self.db.execute(
-                "SELECT * FROM probe_targets WHERE active = 1 ORDER BY server_id"
-            )
+            cursor = await self.db.execute("SELECT * FROM probe_targets WHERE active = 1 ORDER BY server_id")
         else:
-            cursor = await self.db.execute(
-                "SELECT * FROM probe_targets ORDER BY server_id"
-            )
+            cursor = await self.db.execute("SELECT * FROM probe_targets ORDER BY server_id")
         rows = await cursor.fetchall()
         return [self._row_to_target(r) for r in rows]
 
@@ -209,9 +197,7 @@ class ReputationStorage:
     async def count_targets(self, active_only: bool = True) -> int:
         """Count the number of probe targets."""
         if active_only:
-            cursor = await self.db.execute(
-                "SELECT COUNT(*) FROM probe_targets WHERE active = 1"
-            )
+            cursor = await self.db.execute("SELECT COUNT(*) FROM probe_targets WHERE active = 1")
         else:
             cursor = await self.db.execute("SELECT COUNT(*) FROM probe_targets")
         row = await cursor.fetchone()

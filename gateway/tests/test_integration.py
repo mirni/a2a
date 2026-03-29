@@ -11,10 +11,10 @@ import asyncio
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _auth(key: str) -> dict[str, str]:
     """Build an Authorization header dict."""
@@ -33,9 +33,7 @@ async def _exec(client, tool: str, params: dict, key: str):
 async def _exec_ok(client, tool: str, params: dict, key: str) -> dict:
     """Execute a tool and assert success. Return the result dict."""
     resp = await _exec(client, tool, params, key)
-    assert resp.status_code == 200, (
-        f"Expected 200 for {tool}, got {resp.status_code}: {resp.text}"
-    )
+    assert resp.status_code == 200, f"Expected 200 for {tool}, got {resp.status_code}: {resp.text}"
     body = resp.json()
     assert body["success"] is True, f"Tool {tool} failed: {body}"
     return body
@@ -50,9 +48,7 @@ class TestPaywallBillingGateway:
     """Paywall + Billing integration through the gateway."""
 
     @pytest.mark.asyncio
-    async def test_create_key_paid_call_balance_decremented_usage_recorded(
-        self, app, client
-    ):
+    async def test_create_key_paid_call_balance_decremented_usage_recorded(self, app, client):
         """Create API key -> paid tool call -> verify balance decremented -> verify usage."""
         ctx = app.state.ctx
 
@@ -82,9 +78,7 @@ class TestPaywallBillingGateway:
         assert body["result"]["balance"] == 99.9
 
         # Verify usage was recorded
-        body = await _exec_ok(
-            client, "get_usage_summary", {"agent_id": "paywall-agent-1"}, key
-        )
+        body = await _exec_ok(client, "get_usage_summary", {"agent_id": "paywall-agent-1"}, key)
         result = body["result"]
         assert result["total_calls"] >= 1
         assert result["total_cost"] >= 0.1
@@ -96,9 +90,7 @@ class TestPaywallBillingGateway:
 
         # Create free-tier agent
         await ctx.tracker.wallet.create("free-upgrade-agent", initial_balance=5000.0)
-        free_key_info = await ctx.key_manager.create_key(
-            "free-upgrade-agent", tier="free"
-        )
+        free_key_info = await ctx.key_manager.create_key("free-upgrade-agent", tier="free")
         free_key = free_key_info["key"]
 
         # Attempt to use a pro-tier tool (register_service requires pro)
@@ -117,9 +109,7 @@ class TestPaywallBillingGateway:
         assert resp.json()["error"]["code"] == "insufficient_tier"
 
         # Upgrade: create a pro-tier key for the same agent
-        pro_key_info = await ctx.key_manager.create_key(
-            "free-upgrade-agent", tier="pro"
-        )
+        pro_key_info = await ctx.key_manager.create_key("free-upgrade-agent", tier="pro")
         pro_key = pro_key_info["key"]
 
         # Now the pro-tier tool should succeed
@@ -179,9 +169,7 @@ class TestPaymentsBillingE2E:
         per_call_cost = 0.5
 
         # Capture intent
-        body = await _exec_ok(
-            client, "capture_intent", {"intent_id": intent_id}, key
-        )
+        body = await _exec_ok(client, "capture_intent", {"intent_id": intent_id}, key)
         assert body["result"]["status"] == "settled"
         assert body["result"]["amount"] == transfer_amount
 
@@ -239,9 +227,7 @@ class TestPaymentsBillingE2E:
 
         # Release escrow (fee charged at creation, release is free)
         release_fee = 0.0
-        body = await _exec_ok(
-            client, "release_escrow", {"escrow_id": escrow_id}, key
-        )
+        body = await _exec_ok(client, "release_escrow", {"escrow_id": escrow_id}, key)
         assert body["result"]["status"] == "settled"
         assert body["result"]["amount"] == escrow_amount
         assert body["charged"] == release_fee
@@ -337,9 +323,7 @@ class TestMarketplaceGateway:
         # Search for the service (search_services is free-tier)
         # Create a free-tier key for a different agent to search
         await ctx.tracker.wallet.create("mkt-searcher-1", initial_balance=100.0)
-        search_key_info = await ctx.key_manager.create_key(
-            "mkt-searcher-1", tier="free"
-        )
+        search_key_info = await ctx.key_manager.create_key("mkt-searcher-1", tier="free")
         search_key = search_key_info["key"]
 
         body = await _exec_ok(
@@ -398,9 +382,7 @@ class TestMarketplaceGateway:
 
         # Create a free-tier searcher
         await ctx.tracker.wallet.create("mkt-searcher-2", initial_balance=100.0)
-        search_key_info = await ctx.key_manager.create_key(
-            "mkt-searcher-2", tier="free"
-        )
+        search_key_info = await ctx.key_manager.create_key("mkt-searcher-2", tier="free")
         search_key = search_key_info["key"]
 
         # best_match with cost preference
@@ -426,9 +408,7 @@ class TestMarketplaceGateway:
         assert "Translation Basic" in match_names
         basic_idx = match_names.index("Translation Basic")
         # The basic (expensive) service should not be ranked first
-        assert basic_idx > 0, (
-            "Expensive service should not be the top match with cost preference"
-        )
+        assert basic_idx > 0, "Expensive service should not be the top match with cost preference"
 
 
 # ========================================================================
@@ -450,7 +430,7 @@ class TestConcurrentWalletStress:
 
         await ctx.tracker.wallet.create(agent_id, initial_balance=initial_balance)
         key_info = await ctx.key_manager.create_key(agent_id, tier="free")
-        key = key_info["key"]
+        key_info["key"]
 
         # Use get_balance tool which is free (no per_call cost)
         # But we need a paid tool to do "withdrawals" through the gateway.
@@ -520,16 +500,12 @@ class TestRateLimitIntegration:
             if resp.status_code == 429:
                 rate_limited_at = i
                 break
-            assert resp.status_code == 200, (
-                f"Request {i} returned unexpected status {resp.status_code}"
-            )
+            assert resp.status_code == 200, f"Request {i} returned unexpected status {resp.status_code}"
             success_count += 1
 
         # Verify we were rate limited at exactly the limit boundary
         assert rate_limited_at is not None, "Never got rate limited!"
-        assert success_count == rate_limit, (
-            f"Expected {rate_limit} successful requests, got {success_count}"
-        )
+        assert success_count == rate_limit, f"Expected {rate_limit} successful requests, got {success_count}"
 
         # Verify the 429 response has proper error code
         resp = await _exec(client, "get_balance", {"agent_id": agent_id}, key)

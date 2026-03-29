@@ -35,14 +35,16 @@ def _make_proof(
         network=network,
         payload=X402Payload(
             signature="0x" + "ff" * 65,
-            authorization=X402Authorization.model_validate({
-                "from": "0xSender",
-                "to": to,
-                "value": value,
-                "valid_after": valid_after,
-                "valid_before": valid_before,
-                "nonce": nonce,
-            }),
+            authorization=X402Authorization.model_validate(
+                {
+                    "from": "0xSender",
+                    "to": to,
+                    "value": value,
+                    "valid_after": valid_after,
+                    "valid_before": valid_before,
+                    "nonce": nonce,
+                }
+            ),
         ),
     )
 
@@ -105,9 +107,7 @@ class TestValidateProofLocally:
 
 class TestBuildPaymentRequired:
     def test_returns_correct_structure(self, verifier):
-        req = verifier.build_payment_required(
-            cost_value="2000", resource="/v1/execute", network="base"
-        )
+        req = verifier.build_payment_required(cost_value="2000", resource="/v1/execute", network="base")
         assert isinstance(req, X402PaymentRequired)
         assert req.max_amount_required == "2000"
         assert req.pay_to == "0xMerchant"

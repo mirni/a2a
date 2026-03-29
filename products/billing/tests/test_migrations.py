@@ -14,7 +14,6 @@ import tempfile
 
 import aiosqlite
 import pytest
-
 from src.storage import StorageBackend
 
 try:
@@ -119,9 +118,7 @@ class TestBillingMigrations:
         backend = StorageBackend(dsn=old_schema_dsn)
         await backend.connect()  # should NOT raise
         # idempotency_key should now work
-        row_id = await backend.record_usage(
-            agent_id="a1", function="test", cost=1.0, idempotency_key="key-1"
-        )
+        row_id = await backend.record_usage(agent_id="a1", function="test", cost=1.0, idempotency_key="key-1")
         assert row_id is not None
         await backend.close()
 
@@ -137,12 +134,8 @@ class TestBillingMigrations:
         backend = StorageBackend(dsn=old_schema_dsn)
         await backend.connect(apply_migrations=True)
         await backend.create_wallet("a1", 100.0)
-        id1 = await backend.record_usage(
-            agent_id="a1", function="f", cost=1.0, idempotency_key="dup"
-        )
-        id2 = await backend.record_usage(
-            agent_id="a1", function="f", cost=1.0, idempotency_key="dup"
-        )
+        id1 = await backend.record_usage(agent_id="a1", function="f", cost=1.0, idempotency_key="dup")
+        id2 = await backend.record_usage(agent_id="a1", function="f", cost=1.0, idempotency_key="dup")
         assert id1 == id2  # second insert returned existing row
         await backend.close()
 

@@ -4,10 +4,7 @@ from __future__ import annotations
 
 import time
 
-import pytest
-
 from products.messaging.src.models import Message, MessageType, NegotiationState
-
 
 # ---------------------------------------------------------------------------
 # Message CRUD
@@ -72,8 +69,12 @@ class TestStoreMessage:
         assert len(msgs) == 3
 
     async def test_get_messages_ordered_newest_first(self, storage):
-        msg1 = Message(sender="agent-a", recipient="agent-b", message_type=MessageType.TEXT, body="first", created_at=1000.0)
-        msg2 = Message(sender="agent-a", recipient="agent-b", message_type=MessageType.TEXT, body="second", created_at=2000.0)
+        msg1 = Message(
+            sender="agent-a", recipient="agent-b", message_type=MessageType.TEXT, body="first", created_at=1000.0
+        )
+        msg2 = Message(
+            sender="agent-a", recipient="agent-b", message_type=MessageType.TEXT, body="second", created_at=2000.0
+        )
         await storage.store_message(msg1)
         await storage.store_message(msg2)
 
@@ -85,8 +86,12 @@ class TestStoreMessage:
 class TestGetThread:
     async def test_get_thread(self, storage):
         thread = "thread-123"
-        msg1 = Message(sender="a", recipient="b", message_type=MessageType.TEXT, thread_id=thread, body="msg1", created_at=1000.0)
-        msg2 = Message(sender="b", recipient="a", message_type=MessageType.TEXT, thread_id=thread, body="msg2", created_at=2000.0)
+        msg1 = Message(
+            sender="a", recipient="b", message_type=MessageType.TEXT, thread_id=thread, body="msg1", created_at=1000.0
+        )
+        msg2 = Message(
+            sender="b", recipient="a", message_type=MessageType.TEXT, thread_id=thread, body="msg2", created_at=2000.0
+        )
         msg3 = Message(sender="a", recipient="c", message_type=MessageType.TEXT, thread_id="other", body="msg3")
         await storage.store_message(msg1)
         await storage.store_message(msg2)
@@ -176,10 +181,13 @@ class TestNegotiationStorage:
         }
         neg_id = await storage.store_negotiation(data)
 
-        await storage.update_negotiation(neg_id, {
-            "current_amount": 150.0,
-            "status": NegotiationState.COUNTERED.value,
-        })
+        await storage.update_negotiation(
+            neg_id,
+            {
+                "current_amount": 150.0,
+                "status": NegotiationState.COUNTERED.value,
+            },
+        )
 
         neg = await storage.get_negotiation(neg_id)
         assert neg["current_amount"] == 150.0

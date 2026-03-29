@@ -5,10 +5,7 @@ including Pydantic validation and context extraction.
 """
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import httpx
-import pytest
+from unittest.mock import MagicMock, patch
 
 from src.client import StripeClient
 from src.server import (
@@ -22,7 +19,7 @@ from src.server import (
     mcp,
 )
 
-from .conftest import MockTransport, make_error_response, make_stripe_response
+from .conftest import make_stripe_response
 
 
 def _make_mock_context(stripe_client: StripeClient) -> MagicMock:
@@ -62,18 +59,14 @@ class TestCreatePaymentIntentTool:
         mock_transport.add_response(make_stripe_response({"id": "pi_1", "amount": 5000}))
         mock_ctx = _make_mock_context(stripe_client)
         with patch.object(mcp, "get_context", return_value=mock_ctx):
-            raw = await create_payment_intent_tool(
-                amount=5000, currency="usd", idempotency_key="pk1"
-            )
+            raw = await create_payment_intent_tool(amount=5000, currency="usd", idempotency_key="pk1")
         result = json.loads(raw)
         assert result["success"] is True
 
     async def test_validation_error_bad_currency(self, stripe_client):
         mock_ctx = _make_mock_context(stripe_client)
         with patch.object(mcp, "get_context", return_value=mock_ctx):
-            raw = await create_payment_intent_tool(
-                amount=100, currency="x", idempotency_key="pk-bad"
-            )
+            raw = await create_payment_intent_tool(amount=100, currency="x", idempotency_key="pk-bad")
         result = json.loads(raw)
         assert result["success"] is False
         assert result["error"]["code"] == "VALIDATION_ERROR"
@@ -106,13 +99,14 @@ class TestListChargesTool:
         assert result["success"] is True
 
     async def test_with_filters(self, stripe_client, mock_transport):
-        mock_transport.add_response(
-            make_stripe_response({"object": "list", "data": [], "has_more": False})
-        )
+        mock_transport.add_response(make_stripe_response({"object": "list", "data": [], "has_more": False}))
         mock_ctx = _make_mock_context(stripe_client)
         with patch.object(mcp, "get_context", return_value=mock_ctx):
             raw = await list_charges_tool(
-                limit=5, customer="cus_1", created_gte=1000, created_lte=2000,
+                limit=5,
+                customer="cus_1",
+                created_gte=1000,
+                created_lte=2000,
                 starting_after="ch_0",
             )
         result = json.loads(raw)
@@ -132,9 +126,7 @@ class TestCreateSubscriptionTool:
         mock_transport.add_response(make_stripe_response({"id": "sub_1", "status": "active"}))
         mock_ctx = _make_mock_context(stripe_client)
         with patch.object(mcp, "get_context", return_value=mock_ctx):
-            raw = await create_subscription_tool(
-                customer_id="cus_1", price_id="price_1", idempotency_key="sk1"
-            )
+            raw = await create_subscription_tool(customer_id="cus_1", price_id="price_1", idempotency_key="sk1")
         result = json.loads(raw)
         assert result["success"] is True
 
@@ -157,7 +149,9 @@ class TestCreateSubscriptionTool:
         mock_ctx = _make_mock_context(stripe_client)
         with patch.object(mcp, "get_context", return_value=mock_ctx):
             raw = await create_subscription_tool(
-                customer_id="cus_1", price_id="price_1", idempotency_key="sk3",
+                customer_id="cus_1",
+                price_id="price_1",
+                idempotency_key="sk3",
                 quantity=0,  # Invalid: must be >= 1
             )
         result = json.loads(raw)
@@ -168,10 +162,12 @@ class TestCreateSubscriptionTool:
 class TestGetBalanceTool:
     async def test_success(self, stripe_client, mock_transport):
         mock_transport.add_response(
-            make_stripe_response({
-                "object": "balance",
-                "available": [{"amount": 1000, "currency": "usd"}],
-            })
+            make_stripe_response(
+                {
+                    "object": "balance",
+                    "available": [{"amount": 1000, "currency": "usd"}],
+                }
+            )
         )
         mock_ctx = _make_mock_context(stripe_client)
         with patch.object(mcp, "get_context", return_value=mock_ctx):
@@ -186,9 +182,7 @@ class TestCreateRefundTool:
         mock_transport.add_response(make_stripe_response({"id": "re_1", "status": "succeeded"}))
         mock_ctx = _make_mock_context(stripe_client)
         with patch.object(mcp, "get_context", return_value=mock_ctx):
-            raw = await create_refund_tool(
-                idempotency_key="rk1", payment_intent_id="pi_1"
-            )
+            raw = await create_refund_tool(idempotency_key="rk1", payment_intent_id="pi_1")
         result = json.loads(raw)
         assert result["success"] is True
 
@@ -228,9 +222,7 @@ class TestListInvoicesTool:
         assert result["success"] is True
 
     async def test_with_all_filters(self, stripe_client, mock_transport):
-        mock_transport.add_response(
-            make_stripe_response({"object": "list", "data": [], "has_more": False})
-        )
+        mock_transport.add_response(make_stripe_response({"object": "list", "data": [], "has_more": False}))
         mock_ctx = _make_mock_context(stripe_client)
         with patch.object(mcp, "get_context", return_value=mock_ctx):
             raw = await list_invoices_tool(
@@ -262,5 +254,5 @@ class TestServerLifespan:
         async with lifespan(mock_server) as ctx:
             assert "stripe_client" in ctx
             assert isinstance(ctx["stripe_client"], StripeClient)
-            client = ctx["stripe_client"]
+            ctx["stripe_client"]
         # After exit, client should have been closed (no error on exit)

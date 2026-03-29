@@ -42,7 +42,7 @@ async def test_get_webhook_deliveries_returns_delivery_records(client, pro_api_k
     webhook_id = wh["id"]
 
     # Insert a delivery record directly
-    delivery_id = await ctx.webhook_manager._insert_delivery(
+    await ctx.webhook_manager._insert_delivery(
         webhook_id=webhook_id,
         event_type="billing.deposit",
         payload_json='{"type": "billing.deposit"}',

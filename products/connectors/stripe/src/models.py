@@ -6,10 +6,10 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 # ---------------------------------------------------------------------------
 # Inputs
 # ---------------------------------------------------------------------------
+
 
 class CreateCustomerInput(BaseModel):
     """Input for create_customer tool."""
@@ -33,9 +33,7 @@ class CreateCustomerInput(BaseModel):
     name: str | None = Field(None, description="Customer full name")
     description: str | None = Field(None, description="Internal description")
     metadata: dict[str, str] | None = Field(None, description="Arbitrary key-value metadata")
-    idempotency_key: str = Field(
-        ..., description="Unique key to prevent duplicate customer creation"
-    )
+    idempotency_key: str = Field(..., description="Unique key to prevent duplicate customer creation")
 
 
 class CreatePaymentIntentInput(BaseModel):
@@ -62,9 +60,7 @@ class CreatePaymentIntentInput(BaseModel):
     customer_id: str | None = Field(None, description="Stripe customer ID")
     description: str | None = Field(None, description="Payment description")
     metadata: dict[str, str] | None = Field(None, description="Arbitrary key-value metadata")
-    idempotency_key: str = Field(
-        ..., description="Unique key to prevent duplicate payment creation"
-    )
+    idempotency_key: str = Field(..., description="Unique key to prevent duplicate payment creation")
 
 
 class ListChargesInput(BaseModel):
@@ -115,9 +111,7 @@ class CreateSubscriptionInput(BaseModel):
     quantity: int = Field(1, ge=1, description="Number of units")
     trial_period_days: int | None = Field(None, ge=0, description="Trial period in days")
     metadata: dict[str, str] | None = Field(None, description="Arbitrary key-value metadata")
-    idempotency_key: str = Field(
-        ..., description="Unique key to prevent duplicate subscription creation"
-    )
+    idempotency_key: str = Field(..., description="Unique key to prevent duplicate subscription creation")
 
 
 class CreateRefundInput(BaseModel):
@@ -146,9 +140,7 @@ class CreateRefundInput(BaseModel):
         description="Refund reason: duplicate, fraudulent, or requested_by_customer",
     )
     metadata: dict[str, str] | None = Field(None, description="Arbitrary key-value metadata")
-    idempotency_key: str = Field(
-        ..., description="Unique key to prevent duplicate refund"
-    )
+    idempotency_key: str = Field(..., description="Unique key to prevent duplicate refund")
 
 
 class ListInvoicesInput(BaseModel):
@@ -171,9 +163,7 @@ class ListInvoicesInput(BaseModel):
     limit: int = Field(10, ge=1, le=100, description="Number of invoices to return (1-100)")
     starting_after: str | None = Field(None, description="Cursor for pagination (invoice ID)")
     customer: str | None = Field(None, description="Filter by customer ID")
-    status: str | None = Field(
-        None, description="Filter by status: draft, open, paid, uncollectible, void"
-    )
+    status: str | None = Field(None, description="Filter by status: draft, open, paid, uncollectible, void")
     created_gte: int | None = Field(None, description="Filter: created at or after (unix ts)")
     created_lte: int | None = Field(None, description="Filter: created at or before (unix ts)")
 
@@ -181,6 +171,7 @@ class ListInvoicesInput(BaseModel):
 # ---------------------------------------------------------------------------
 # Outputs
 # ---------------------------------------------------------------------------
+
 
 class ToolResult(BaseModel):
     """Standard wrapper for tool results."""

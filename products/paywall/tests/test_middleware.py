@@ -3,17 +3,14 @@
 from __future__ import annotations
 
 import pytest
-
 from src.keys import KeyManager
 from src.middleware import (
     PaywallAuthError,
-    InsufficientBalanceError,
     PaywallMiddleware,
     RateLimitError,
     TierInsufficientError,
 )
 from src.storage import PaywallStorage
-
 
 # ---------------------------------------------------------------------------
 # Helper: a simple async tool function
@@ -63,7 +60,7 @@ class TestMiddlewareInitialization:
 
 class TestAuthenticationCheck:
     async def test_valid_agent_with_key(self, middleware: PaywallMiddleware, key_manager: KeyManager):
-        created = await key_manager.create_key(agent_id="agent-1", tier="free")
+        await key_manager.create_key(agent_id="agent-1", tier="free")
 
         @middleware.gated(tier="free")
         async def my_tool(agent_id: str):
@@ -80,9 +77,7 @@ class TestAuthenticationCheck:
         with pytest.raises(PaywallAuthError, match="No valid API key"):
             await my_tool(agent_id="unknown-agent")
 
-    async def test_revoked_key_agent_fails(
-        self, middleware: PaywallMiddleware, key_manager: KeyManager
-    ):
+    async def test_revoked_key_agent_fails(self, middleware: PaywallMiddleware, key_manager: KeyManager):
         created = await key_manager.create_key(agent_id="agent-1", tier="free")
         await key_manager.revoke_key(created["key"])
 
@@ -93,9 +88,7 @@ class TestAuthenticationCheck:
         with pytest.raises(PaywallAuthError, match="No valid API key"):
             await my_tool(agent_id="agent-1")
 
-    async def test_api_key_param_mode(
-        self, middleware: PaywallMiddleware, key_manager: KeyManager
-    ):
+    async def test_api_key_param_mode(self, middleware: PaywallMiddleware, key_manager: KeyManager):
         created = await key_manager.create_key(agent_id="agent-1", tier="free")
 
         @middleware.gated(tier="free", api_key_param="api_key")
@@ -115,9 +108,7 @@ class TestAuthenticationCheck:
 
 
 class TestTierEnforcement:
-    async def test_matching_tier_allowed(
-        self, middleware: PaywallMiddleware, key_manager: KeyManager
-    ):
+    async def test_matching_tier_allowed(self, middleware: PaywallMiddleware, key_manager: KeyManager):
         await key_manager.create_key(agent_id="agent-1", tier="pro")
 
         @middleware.gated(tier="pro")
@@ -127,9 +118,7 @@ class TestTierEnforcement:
         result = await pro_tool(agent_id="agent-1")
         assert result == {"tier": "pro"}
 
-    async def test_higher_tier_allowed(
-        self, middleware: PaywallMiddleware, key_manager: KeyManager
-    ):
+    async def test_higher_tier_allowed(self, middleware: PaywallMiddleware, key_manager: KeyManager):
         await key_manager.create_key(agent_id="agent-1", tier="enterprise")
 
         @middleware.gated(tier="pro")
@@ -139,9 +128,7 @@ class TestTierEnforcement:
         result = await pro_tool(agent_id="agent-1")
         assert result == {"tier": "pro"}
 
-    async def test_lower_tier_rejected(
-        self, middleware: PaywallMiddleware, key_manager: KeyManager
-    ):
+    async def test_lower_tier_rejected(self, middleware: PaywallMiddleware, key_manager: KeyManager):
         await key_manager.create_key(agent_id="agent-1", tier="free")
 
         @middleware.gated(tier="pro")
@@ -151,9 +138,7 @@ class TestTierEnforcement:
         with pytest.raises(TierInsufficientError, match="insufficient"):
             await pro_tool(agent_id="agent-1")
 
-    async def test_tier_error_contains_details(
-        self, middleware: PaywallMiddleware, key_manager: KeyManager
-    ):
+    async def test_tier_error_contains_details(self, middleware: PaywallMiddleware, key_manager: KeyManager):
         await key_manager.create_key(agent_id="agent-1", tier="free")
 
         @middleware.gated(tier="enterprise")
@@ -170,9 +155,7 @@ class TestTierEnforcement:
 
 
 class TestRateLimiting:
-    async def test_within_rate_limit(
-        self, middleware: PaywallMiddleware, key_manager: KeyManager
-    ):
+    async def test_within_rate_limit(self, middleware: PaywallMiddleware, key_manager: KeyManager):
         await key_manager.create_key(agent_id="agent-1", tier="free")
 
         @middleware.gated(tier="free")
@@ -213,9 +196,7 @@ class TestRateLimiting:
 
         window_start = time.time()
         for _ in range(100):
-            await paywall_storage.increment_rate_count(
-                "agent-1", "hourly_test", window_start
-            )
+            await paywall_storage.increment_rate_count("agent-1", "hourly_test", window_start)
 
         with pytest.raises(RateLimitError, match="rate limit exceeded"):
             await my_tool(agent_id="agent-1")
@@ -244,9 +225,7 @@ class TestRateLimiting:
 
         window_start = time.time()
         for _ in range(100):
-            await paywall_storage.increment_rate_count(
-                "agent-1", "hourly_test", window_start
-            )
+            await paywall_storage.increment_rate_count("agent-1", "hourly_test", window_start)
 
         with pytest.raises(RateLimitError) as exc_info:
             await my_tool(agent_id="agent-1")
@@ -257,9 +236,7 @@ class TestRateLimiting:
 
 
 class TestWalletCheck:
-    async def test_free_tier_no_wallet_check(
-        self, middleware: PaywallMiddleware, key_manager: KeyManager
-    ):
+    async def test_free_tier_no_wallet_check(self, middleware: PaywallMiddleware, key_manager: KeyManager):
         """Free tier with cost=0 should not check wallet."""
         await key_manager.create_key(agent_id="agent-1", tier="free")
 
@@ -270,9 +247,7 @@ class TestWalletCheck:
         result = await free_tool(agent_id="agent-1")
         assert result == {"ok": True}
 
-    async def test_pro_tier_no_per_call_charge(
-        self, middleware: PaywallMiddleware, key_manager: KeyManager, tracker
-    ):
+    async def test_pro_tier_no_per_call_charge(self, middleware: PaywallMiddleware, key_manager: KeyManager, tracker):
         """Pro tier has cost_per_call=0, so middleware does not charge even if cost is declared."""
         await key_manager.create_key(agent_id="agent-1", tier="pro")
         # Create wallet with 0 balance — should still succeed because cost_per_call=0
@@ -285,9 +260,7 @@ class TestWalletCheck:
         result = await paid_tool(agent_id="agent-1")
         assert result == {"ok": True}
 
-    async def test_pro_tier_sufficient_balance(
-        self, middleware: PaywallMiddleware, key_manager: KeyManager, tracker
-    ):
+    async def test_pro_tier_sufficient_balance(self, middleware: PaywallMiddleware, key_manager: KeyManager, tracker):
         """Pro tier with cost_per_call=0 should succeed regardless of balance."""
         await key_manager.create_key(agent_id="agent-1", tier="pro")
         await tracker.wallet.create("agent-1", initial_balance=100.0)
@@ -314,9 +287,7 @@ class TestWalletCheck:
         balance = await tracker.get_balance("agent-1")
         assert balance == 100.0  # No charge because cost_per_call=0
 
-    async def test_free_tier_cost_zero_even_if_declared(
-        self, middleware: PaywallMiddleware, key_manager: KeyManager
-    ):
+    async def test_free_tier_cost_zero_even_if_declared(self, middleware: PaywallMiddleware, key_manager: KeyManager):
         """Free tier should not charge even if cost is declared (cost_per_call=0)."""
         await key_manager.create_key(agent_id="agent-1", tier="free")
 
@@ -346,9 +317,7 @@ class TestAuditLogging:
         assert logs[0]["allowed"] == 1
         assert logs[0]["connector"] == "test_connector"
 
-    async def test_denied_call_logged(
-        self, middleware: PaywallMiddleware, key_manager: KeyManager, paywall_storage
-    ):
+    async def test_denied_call_logged(self, middleware: PaywallMiddleware, key_manager: KeyManager, paywall_storage):
         await key_manager.create_key(agent_id="agent-1", tier="free")
 
         @middleware.gated(tier="pro")
@@ -393,9 +362,7 @@ class TestUsageMetering:
         usage = await tracker.get_usage("agent-1")
         assert len(usage) == 0  # cost_per_call=0, so no billing usage recorded
 
-    async def test_free_tier_no_usage_recorded(
-        self, middleware: PaywallMiddleware, key_manager: KeyManager, tracker
-    ):
+    async def test_free_tier_no_usage_recorded(self, middleware: PaywallMiddleware, key_manager: KeyManager, tracker):
         """Free tier calls (cost=0) should not be recorded in billing."""
         await key_manager.create_key(agent_id="agent-1", tier="free")
 
@@ -410,9 +377,7 @@ class TestUsageMetering:
 
 
 class TestEdgeCases:
-    async def test_agent_id_from_positional_arg(
-        self, middleware: PaywallMiddleware, key_manager: KeyManager
-    ):
+    async def test_agent_id_from_positional_arg(self, middleware: PaywallMiddleware, key_manager: KeyManager):
         """agent_id extracted from first positional argument."""
         await key_manager.create_key(agent_id="agent-1", tier="free")
 
@@ -423,12 +388,10 @@ class TestEdgeCases:
         result = await my_tool("agent-1")
         assert result == {"agent_id": "agent-1"}
 
-    async def test_multiple_keys_uses_first_active(
-        self, middleware: PaywallMiddleware, key_manager: KeyManager
-    ):
+    async def test_multiple_keys_uses_first_active(self, middleware: PaywallMiddleware, key_manager: KeyManager):
         """If agent has multiple keys, use the most recent active one."""
-        created1 = await key_manager.create_key(agent_id="agent-1", tier="free")
-        created2 = await key_manager.create_key(agent_id="agent-1", tier="pro")
+        await key_manager.create_key(agent_id="agent-1", tier="free")
+        await key_manager.create_key(agent_id="agent-1", tier="pro")
 
         @middleware.gated(tier="pro")
         async def pro_tool(agent_id: str):
@@ -447,8 +410,11 @@ class TestChargeFailureHandling:
     """
 
     async def test_no_charge_attempted_when_cost_per_call_zero(
-        self, middleware: PaywallMiddleware, key_manager: KeyManager,
-        tracker, paywall_storage,
+        self,
+        middleware: PaywallMiddleware,
+        key_manager: KeyManager,
+        tracker,
+        paywall_storage,
     ):
         """When cost_per_call=0, no charge or charge_failed audit should be recorded."""
         await key_manager.create_key(agent_id="agent-1", tier="pro")
@@ -467,8 +433,11 @@ class TestChargeFailureHandling:
         assert len(charge_failed_logs) == 0
 
     async def test_tool_succeeds_without_charge(
-        self, middleware: PaywallMiddleware, key_manager: KeyManager,
-        tracker, paywall_storage,
+        self,
+        middleware: PaywallMiddleware,
+        key_manager: KeyManager,
+        tracker,
+        paywall_storage,
     ):
         """Tool result is returned and wallet is not charged when cost_per_call=0."""
         await key_manager.create_key(agent_id="agent-1", tier="pro")

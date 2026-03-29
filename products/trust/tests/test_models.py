@@ -79,6 +79,7 @@ class TestSecurityScan:
     def test_validation_score_bounds(self):
         """input_validation_score must be 0-100."""
         import pytest
+
         with pytest.raises(Exception):
             SecurityScan(
                 server_id="srv-1",

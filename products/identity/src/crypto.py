@@ -33,12 +33,8 @@ class AgentCrypto:
             (private_key_hex, public_key_hex) — raw key bytes encoded as hex.
         """
         private_key = Ed25519PrivateKey.generate()
-        private_bytes = private_key.private_bytes(
-            Encoding.Raw, PrivateFormat.Raw, NoEncryption()
-        )
-        public_bytes = private_key.public_key().public_bytes(
-            Encoding.Raw, PublicFormat.Raw
-        )
+        private_bytes = private_key.private_bytes(Encoding.Raw, PrivateFormat.Raw, NoEncryption())
+        public_bytes = private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
         return private_bytes.hex(), public_bytes.hex()
 
     @staticmethod
@@ -52,9 +48,7 @@ class AgentCrypto:
         Returns:
             Signature as hex string.
         """
-        private_key = Ed25519PrivateKey.from_private_bytes(
-            bytes.fromhex(private_key_hex)
-        )
+        private_key = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(private_key_hex))
         signature = private_key.sign(message)
         return signature.hex()
 
@@ -71,18 +65,14 @@ class AgentCrypto:
             True if the signature is valid, False otherwise.
         """
         try:
-            public_key = Ed25519PublicKey.from_public_bytes(
-                bytes.fromhex(public_key_hex)
-            )
+            public_key = Ed25519PublicKey.from_public_bytes(bytes.fromhex(public_key_hex))
             public_key.verify(bytes.fromhex(signature_hex), message)
             return True
         except Exception:
             return False
 
     @staticmethod
-    def create_commitment(
-        value: float, metric_name: str, scale: int = 10000
-    ) -> tuple[str, str]:
+    def create_commitment(value: float, metric_name: str, scale: int = 10000) -> tuple[str, str]:
         """Create an HMAC-based hiding commitment to a numeric value.
 
         commitment = SHA3-256(value_scaled_bytes || blinding_factor || metric_name)
@@ -97,9 +87,7 @@ class AgentCrypto:
         """
         blinding = os.urandom(32)
         value_bytes = str(int(value * scale)).encode()
-        commitment = hashlib.sha3_256(
-            value_bytes + blinding + metric_name.encode()
-        ).hexdigest()
+        commitment = hashlib.sha3_256(value_bytes + blinding + metric_name.encode()).hexdigest()
         return commitment, blinding.hex()
 
     @staticmethod
@@ -124,9 +112,7 @@ class AgentCrypto:
         """
         blinding = bytes.fromhex(blinding_factor_hex)
         value_bytes = str(int(value * scale)).encode()
-        recomputed = hashlib.sha3_256(
-            value_bytes + blinding + metric_name.encode()
-        ).hexdigest()
+        recomputed = hashlib.sha3_256(value_bytes + blinding + metric_name.encode()).hexdigest()
         return recomputed == commitment_hash
 
     @staticmethod
@@ -194,9 +180,7 @@ class MerkleTree:
     @staticmethod
     def _hash_pair(left: str, right: str) -> str:
         """Hash two hex strings together: SHA3-256(left_bytes || right_bytes)."""
-        return hashlib.sha3_256(
-            bytes.fromhex(left) + bytes.fromhex(right)
-        ).hexdigest()
+        return hashlib.sha3_256(bytes.fromhex(left) + bytes.fromhex(right)).hexdigest()
 
     @staticmethod
     def compute_root(leaf_hashes: list[str]) -> str:
@@ -231,9 +215,7 @@ class MerkleTree:
         return level[0]
 
     @staticmethod
-    def compute_proof(
-        leaf_hashes: list[str], leaf_index: int
-    ) -> list[tuple[str, str]]:
+    def compute_proof(leaf_hashes: list[str], leaf_index: int) -> list[tuple[str, str]]:
         """Compute a Merkle proof (authentication path) for a specific leaf.
 
         Args:
@@ -249,9 +231,7 @@ class MerkleTree:
             IndexError: If leaf_index is out of range or list is empty.
         """
         if not leaf_hashes or leaf_index < 0 or leaf_index >= len(leaf_hashes):
-            raise IndexError(
-                f"leaf_index {leaf_index} out of range for {len(leaf_hashes)} leaves"
-            )
+            raise IndexError(f"leaf_index {leaf_index} out of range for {len(leaf_hashes)} leaves")
 
         if len(leaf_hashes) == 1:
             return []
@@ -285,9 +265,7 @@ class MerkleTree:
         return proof
 
     @staticmethod
-    def verify_proof(
-        leaf_hash: str, proof: list[tuple[str, str]], root: str
-    ) -> bool:
+    def verify_proof(leaf_hash: str, proof: list[tuple[str, str]], root: str) -> bool:
         """Verify a Merkle proof against a known root.
 
         Args:

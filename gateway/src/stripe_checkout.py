@@ -12,7 +12,6 @@ import hmac
 import json
 import logging
 import os
-import time
 from typing import Any
 
 import httpx
@@ -66,9 +65,7 @@ def _verify_stripe_signature(payload: bytes, sig_header: str, secret: str) -> bo
 
     # Compute expected signature
     signed_payload = f"{timestamp}.".encode() + payload
-    expected = hmac.new(
-        secret.encode(), signed_payload, hashlib.sha256
-    ).hexdigest()
+    expected = hmac.new(secret.encode(), signed_payload, hashlib.sha256).hexdigest()
 
     # Timing-safe comparison
     return hmac.compare_digest(expected, v1_sig)
@@ -116,9 +113,7 @@ async def create_checkout(request: Request) -> JSONResponse:
     else:
         credits = body.get("credits")
         if not credits or not isinstance(credits, (int, float)) or credits < 100:
-            return await error_response(
-                400, "Specify 'package' or 'credits' (minimum 100)", "bad_request"
-            )
+            return await error_response(400, "Specify 'package' or 'credits' (minimum 100)", "bad_request")
         credits = int(credits)
         price_cents = int(credits / CREDITS_PER_DOLLAR * 100)
         label = f"{credits:,} credits"
@@ -157,20 +152,20 @@ async def create_checkout(request: Request) -> JSONResponse:
 
         if resp.status_code != 200:
             logger.error("Stripe API error: %s %s", resp.status_code, resp.text)
-            return await error_response(
-                502, "Failed to create checkout session", "stripe_error"
-            )
+            return await error_response(502, "Failed to create checkout session", "stripe_error")
 
         session = resp.json()
-        return JSONResponse({
-            "success": True,
-            "result": {
-                "checkout_url": session["url"],
-                "session_id": session["id"],
-                "credits": credits,
-                "amount_usd": price_cents / 100,
-            },
-        })
+        return JSONResponse(
+            {
+                "success": True,
+                "result": {
+                    "checkout_url": session["url"],
+                    "session_id": session["id"],
+                    "credits": credits,
+                    "amount_usd": price_cents / 100,
+                },
+            }
+        )
 
     except httpx.HTTPError as e:
         logger.error("Stripe request failed: %s", e)
@@ -236,14 +231,17 @@ async def stripe_webhook(request: Request) -> JSONResponse:
 
                 # Deposit credits
                 await ctx.tracker.wallet.deposit(
-                    agent_id, float(credits),
+                    agent_id,
+                    float(credits),
                     description=f"Stripe checkout: {credits} credits",
                 )
                 if session_id:
                     _processed_sessions.add(session_id)
                 logger.info(
                     "Deposited %d credits to %s (session %s)",
-                    credits, agent_id, session_id or "?",
+                    credits,
+                    agent_id,
+                    session_id or "?",
                 )
             except Exception:
                 logger.exception("Failed to deposit credits for %s", agent_id)

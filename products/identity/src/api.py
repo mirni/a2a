@@ -5,8 +5,8 @@ Orchestrates crypto, storage, and attestation workflows.
 
 from __future__ import annotations
 
-import time
 import hashlib
+import time
 from dataclasses import dataclass, field
 
 from .crypto import AgentCrypto, MerkleTree
@@ -25,16 +25,19 @@ from .storage import IdentityStorage
 
 class AgentNotFoundError(Exception):
     """Raised when an agent_id is not found in storage."""
+
     pass
 
 
 class InvalidMetricError(Exception):
     """Raised when a metric name is not in the supported set."""
+
     pass
 
 
 class AgentAlreadyExistsError(Exception):
     """Raised when trying to register an agent_id that already exists."""
+
     pass
 
 
@@ -67,7 +70,7 @@ class IdentityAPI:
             self.auditor_public_key = pub
 
     @classmethod
-    def from_env(cls, storage: IdentityStorage) -> "IdentityAPI":
+    def from_env(cls, storage: IdentityStorage) -> IdentityAPI:
         """Create IdentityAPI loading auditor keys from environment.
 
         Reads AUDITOR_PRIVATE_KEY and AUDITOR_PUBLIC_KEY env vars.
@@ -79,9 +82,7 @@ class IdentityAPI:
         pub = os.environ.get("AUDITOR_PUBLIC_KEY", "")
         return cls(storage=storage, auditor_private_key=priv, auditor_public_key=pub)
 
-    async def register_agent(
-        self, agent_id: str, public_key: str | None = None
-    ) -> RegistrationResult:
+    async def register_agent(self, agent_id: str, public_key: str | None = None) -> RegistrationResult:
         """Register agent identity. Auto-generates keypair if no public_key given.
 
         Args:
@@ -113,9 +114,7 @@ class IdentityAPI:
         """Get the identity for an agent."""
         return await self.storage.get_identity(agent_id)
 
-    async def verify_agent(
-        self, agent_id: str, message: bytes, signature_hex: str
-    ) -> bool:
+    async def verify_agent(self, agent_id: str, message: bytes, signature_hex: str) -> bool:
         """Verify that a message was signed by the claimed agent.
 
         Args:
@@ -166,10 +165,7 @@ class IdentityAPI:
         all_metrics = self.get_supported_metrics()
         for name in metrics:
             if name not in all_metrics:
-                raise InvalidMetricError(
-                    f"Unsupported metric: {name}. "
-                    f"Supported: {sorted(all_metrics)}"
-                )
+                raise InvalidMetricError(f"Unsupported metric: {name}. Supported: {sorted(all_metrics)}")
 
         now = time.time()
         commitment_hashes: list[str] = []
@@ -185,9 +181,7 @@ class IdentityAPI:
                 timestamp=now,
             )
             await self.storage.store_commitment(commitment)
-            await self.storage.store_commitment_secret(
-                agent_id, metric_name, commit_hash, blinding
-            )
+            await self.storage.store_commitment_secret(agent_id, metric_name, commit_hash, blinding)
             commitment_hashes.append(commit_hash)
             blinding_factors[metric_name] = blinding
 
@@ -263,9 +257,7 @@ class IdentityAPI:
         # Try to verify against the most recent commitment
         for secret in secrets:
             commitment_hash = secret["commitment_hash"]
-            if AgentCrypto.verify_commitment(
-                value, metric_name, blinding_factor, commitment_hash
-            ):
+            if AgentCrypto.verify_commitment(value, metric_name, blinding_factor, commitment_hash):
                 return {
                     "verified": True,
                     "metric_name": metric_name,
@@ -275,9 +267,7 @@ class IdentityAPI:
 
         return {"verified": False, "metric_name": metric_name, "value": value}
 
-    async def revoke_attestation(
-        self, attestation_id: int, reason: str = ""
-    ) -> dict:
+    async def revoke_attestation(self, attestation_id: int, reason: str = "") -> dict:
         """Revoke an attestation, invalidating all linked claims.
 
         Args:
@@ -315,10 +305,7 @@ class IdentityAPI:
         """
         all_metrics = self.get_supported_metrics()
         if metric_name not in all_metrics:
-            raise InvalidMetricError(
-                f"Unsupported metric: {metric_name}. "
-                f"Supported: {sorted(all_metrics)}"
-            )
+            raise InvalidMetricError(f"Unsupported metric: {metric_name}. Supported: {sorted(all_metrics)}")
 
         claims = await self.storage.search_claims(
             metric_name=metric_name,
@@ -378,9 +365,7 @@ class IdentityAPI:
             "self_reported": 40.0,
         }
         if attestations:
-            data_source_quality = sum(
-                source_scores.get(a.data_source, 40.0) for a in attestations
-            ) / len(attestations)
+            data_source_quality = sum(source_scores.get(a.data_source, 40.0) for a in attestations) / len(attestations)
         else:
             data_source_quality = 0.0
 
@@ -389,11 +374,7 @@ class IdentityAPI:
         transaction_volume_score = min(len(commitments) * 5.0, 100.0)
 
         # Composite: weighted average
-        composite = (
-            payment_reliability * 0.4
-            + data_source_quality * 0.3
-            + transaction_volume_score * 0.3
-        )
+        composite = payment_reliability * 0.4 + data_source_quality * 0.3 + transaction_volume_score * 0.3
 
         # Confidence: based on data age and volume
         if attestations:
@@ -462,10 +443,7 @@ class IdentityAPI:
         attestations.sort(key=lambda a: a.verified_at)
 
         # Create leaf hashes: SHA3-256 of each attestation's signature
-        leaf_hashes = [
-            hashlib.sha3_256(a.signature.encode()).hexdigest()
-            for a in attestations
-        ]
+        leaf_hashes = [hashlib.sha3_256(a.signature.encode()).hexdigest() for a in attestations]
 
         merkle_root = MerkleTree.compute_root(leaf_hashes)
         period_start = attestations[0].verified_at
@@ -514,10 +492,12 @@ class IdentityAPI:
             The new auditor public key hex.
         """
         # Archive old key
-        self._key_history.append({
-            "public_key": self.auditor_public_key,
-            "retired_at": time.time(),
-        })
+        self._key_history.append(
+            {
+                "public_key": self.auditor_public_key,
+                "retired_at": time.time(),
+            }
+        )
 
         # Generate new keypair
         priv, pub = AgentCrypto.generate_keypair()
@@ -542,12 +522,8 @@ class IdentityAPI:
             "@context": ["https://www.w3.org/2018/credentials/v1"],
             "type": ["VerifiableCredential", "MetricAttestation"],
             "issuer": f"did:a2a:{attestation.auditor_id}",
-            "issuanceDate": time.strftime(
-                "%Y-%m-%dT%H:%M:%SZ", time.gmtime(attestation.verified_at)
-            ),
-            "expirationDate": time.strftime(
-                "%Y-%m-%dT%H:%M:%SZ", time.gmtime(attestation.valid_until)
-            ),
+            "issuanceDate": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(attestation.verified_at)),
+            "expirationDate": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(attestation.valid_until)),
             "credentialSubject": {
                 "id": f"did:a2a:{attestation.agent_id}",
                 "claims": attestation.commitment_hashes,
@@ -555,9 +531,7 @@ class IdentityAPI:
             },
             "proof": {
                 "type": "Ed25519Signature2020",
-                "created": time.strftime(
-                    "%Y-%m-%dT%H:%M:%SZ", time.gmtime(attestation.verified_at)
-                ),
+                "created": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(attestation.verified_at)),
                 "proofPurpose": "assertionMethod",
                 "verificationMethod": f"did:a2a:{attestation.auditor_id}#key-1",
                 "proofValue": attestation.signature,
@@ -569,9 +543,7 @@ class IdentityAPI:
     # TODO-17: Merkle proof endpoint
     # ------------------------------------------------------------------
 
-    async def get_inclusion_proof(
-        self, chain_id: int, attestation_index: int
-    ) -> dict:
+    async def get_inclusion_proof(self, chain_id: int, attestation_index: int) -> dict:
         """Get a Merkle inclusion proof for a specific attestation in a chain.
 
         Args:
@@ -593,15 +565,11 @@ class IdentityAPI:
 
         if attestation_index < 0 or attestation_index >= len(leaf_hashes):
             raise IndexError(
-                f"attestation_index {attestation_index} out of range "
-                f"for chain with {len(leaf_hashes)} leaves"
+                f"attestation_index {attestation_index} out of range for chain with {len(leaf_hashes)} leaves"
             )
 
         proof_tuples = MerkleTree.compute_proof(leaf_hashes, attestation_index)
-        proof = [
-            {"sibling": sibling, "position": position}
-            for sibling, position in proof_tuples
-        ]
+        proof = [{"sibling": sibling, "position": position} for sibling, position in proof_tuples]
 
         return {
             "leaf_hash": leaf_hashes[attestation_index],
@@ -615,9 +583,7 @@ class IdentityAPI:
     # TODO-18: Reputation integration with payment/dispute data
     # ------------------------------------------------------------------
 
-    async def record_payment_signal(
-        self, agent_id: str, signal_type: str, count: int = 1
-    ) -> None:
+    async def record_payment_signal(self, agent_id: str, signal_type: str, count: int = 1) -> None:
         """Record a payment/dispute signal for reputation calculation.
 
         Args:

@@ -2,14 +2,10 @@
 
 from __future__ import annotations
 
-import json
-import os
 from typing import Any
-from unittest.mock import AsyncMock
 
 import httpx
 import pytest
-
 from src.client import StripeClient
 from src.rate_limiter import RateLimiter
 from src.retry import RetryConfig

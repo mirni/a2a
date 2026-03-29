@@ -1,18 +1,18 @@
 """Tests for GitHub tool handlers with mocked client."""
 
-import pytest
 from unittest.mock import AsyncMock
 
+import pytest
 from src.tools import (
-    handle_list_repos,
-    handle_get_repo,
-    handle_list_issues,
     handle_create_issue,
-    handle_list_pull_requests,
-    handle_get_pull_request,
     handle_create_pull_request,
-    handle_list_commits,
     handle_get_file_contents,
+    handle_get_pull_request,
+    handle_get_repo,
+    handle_list_commits,
+    handle_list_issues,
+    handle_list_pull_requests,
+    handle_list_repos,
     handle_search_code,
 )
 
@@ -45,7 +45,11 @@ class TestHandleListRepos:
         assert result["page"] == 3
         assert result["per_page"] == 10
         client.list_repos.assert_called_once_with(
-            owner="", type="all", sort="updated", page=3, per_page=10,
+            owner="",
+            type="all",
+            sort="updated",
+            page=3,
+            per_page=10,
         )
 
     @pytest.mark.asyncio
@@ -99,12 +103,24 @@ class TestHandleListIssues:
     async def test_with_filters(self):
         client = make_mock_client()
         client.list_issues.return_value = []
-        result = await handle_list_issues(client, {
-            "owner": "o", "repo": "r", "state": "closed", "labels": "bug",
-        })
+        await handle_list_issues(
+            client,
+            {
+                "owner": "o",
+                "repo": "r",
+                "state": "closed",
+                "labels": "bug",
+            },
+        )
         client.list_issues.assert_called_once_with(
-            owner="o", repo="r", state="closed", labels="bug",
-            sort="created", direction="desc", page=1, per_page=30,
+            owner="o",
+            repo="r",
+            state="closed",
+            labels="bug",
+            sort="created",
+            direction="desc",
+            page=1,
+            per_page=30,
         )
 
     @pytest.mark.asyncio
@@ -119,14 +135,24 @@ class TestHandleCreateIssue:
     async def test_creates_issue(self):
         client = make_mock_client()
         client.create_issue.return_value = {"number": 42, "title": "Bug report"}
-        result = await handle_create_issue(client, {
-            "owner": "o", "repo": "r", "title": "Bug report",
-            "body": "Detailed description", "labels": ["bug"],
-        })
+        result = await handle_create_issue(
+            client,
+            {
+                "owner": "o",
+                "repo": "r",
+                "title": "Bug report",
+                "body": "Detailed description",
+                "labels": ["bug"],
+            },
+        )
         assert result["number"] == 42
         client.create_issue.assert_called_once_with(
-            owner="o", repo="r", title="Bug report",
-            body="Detailed description", labels=["bug"], assignees=[],
+            owner="o",
+            repo="r",
+            title="Bug report",
+            body="Detailed description",
+            labels=["bug"],
+            assignees=[],
         )
 
     @pytest.mark.asyncio
@@ -157,13 +183,25 @@ class TestHandleListPullRequests:
     async def test_with_branch_filter(self):
         client = make_mock_client()
         client.list_pull_requests.return_value = []
-        await handle_list_pull_requests(client, {
-            "owner": "o", "repo": "r", "head": "user:feature", "base": "main",
-        })
+        await handle_list_pull_requests(
+            client,
+            {
+                "owner": "o",
+                "repo": "r",
+                "head": "user:feature",
+                "base": "main",
+            },
+        )
         client.list_pull_requests.assert_called_once_with(
-            owner="o", repo="r", state="open", sort="created",
-            direction="desc", head="user:feature", base="main",
-            page=1, per_page=30,
+            owner="o",
+            repo="r",
+            state="open",
+            sort="created",
+            direction="desc",
+            head="user:feature",
+            base="main",
+            page=1,
+            per_page=30,
         )
 
 
@@ -172,12 +210,20 @@ class TestHandleGetPullRequest:
     async def test_returns_pr(self):
         client = make_mock_client()
         client.get_pull_request.return_value = {
-            "number": 7, "title": "Feature", "additions": 100,
-            "deletions": 20, "changed_files": 5,
+            "number": 7,
+            "title": "Feature",
+            "additions": 100,
+            "deletions": 20,
+            "changed_files": 5,
         }
-        result = await handle_get_pull_request(client, {
-            "owner": "o", "repo": "r", "pull_number": 7,
-        })
+        result = await handle_get_pull_request(
+            client,
+            {
+                "owner": "o",
+                "repo": "r",
+                "pull_number": 7,
+            },
+        )
         assert result["additions"] == 100
         assert result["changed_files"] == 5
 
@@ -185,9 +231,14 @@ class TestHandleGetPullRequest:
     async def test_invalid_pull_number(self):
         client = make_mock_client()
         with pytest.raises(Exception):
-            await handle_get_pull_request(client, {
-                "owner": "o", "repo": "r", "pull_number": 0,
-            })
+            await handle_get_pull_request(
+                client,
+                {
+                    "owner": "o",
+                    "repo": "r",
+                    "pull_number": 0,
+                },
+            )
 
 
 class TestHandleCreatePullRequest:
@@ -195,34 +246,59 @@ class TestHandleCreatePullRequest:
     async def test_creates_pr(self):
         client = make_mock_client()
         client.create_pull_request.return_value = {
-            "number": 10, "title": "New feature",
+            "number": 10,
+            "title": "New feature",
         }
-        result = await handle_create_pull_request(client, {
-            "owner": "o", "repo": "r", "title": "New feature",
-            "head": "feature", "base": "main",
-        })
+        result = await handle_create_pull_request(
+            client,
+            {
+                "owner": "o",
+                "repo": "r",
+                "title": "New feature",
+                "head": "feature",
+                "base": "main",
+            },
+        )
         assert result["number"] == 10
 
     @pytest.mark.asyncio
     async def test_draft_pr(self):
         client = make_mock_client()
         client.create_pull_request.return_value = {"number": 11}
-        await handle_create_pull_request(client, {
-            "owner": "o", "repo": "r", "title": "WIP",
-            "head": "wip", "base": "main", "draft": True,
-        })
+        await handle_create_pull_request(
+            client,
+            {
+                "owner": "o",
+                "repo": "r",
+                "title": "WIP",
+                "head": "wip",
+                "base": "main",
+                "draft": True,
+            },
+        )
         client.create_pull_request.assert_called_once_with(
-            owner="o", repo="r", title="WIP",
-            head="wip", base="main", body="", draft=True,
+            owner="o",
+            repo="r",
+            title="WIP",
+            head="wip",
+            base="main",
+            body="",
+            draft=True,
         )
 
     @pytest.mark.asyncio
     async def test_missing_head(self):
         client = make_mock_client()
         with pytest.raises(Exception):
-            await handle_create_pull_request(client, {
-                "owner": "o", "repo": "r", "title": "T", "base": "main",
-            })
+            await handle_create_pull_request(
+                client,
+                {
+                    "owner": "o",
+                    "repo": "r",
+                    "title": "T",
+                    "base": "main",
+                },
+            )
 
 
 class TestHandleListCommits:
@@ -241,13 +317,26 @@ class TestHandleListCommits:
     async def test_with_filters(self):
         client = make_mock_client()
         client.list_commits.return_value = []
-        await handle_list_commits(client, {
-            "owner": "o", "repo": "r", "sha": "main", "path": "src/",
-            "since": "2026-01-01", "until": "2026-03-01",
-        })
+        await handle_list_commits(
+            client,
+            {
+                "owner": "o",
+                "repo": "r",
+                "sha": "main",
+                "path": "src/",
+                "since": "2026-01-01",
+                "until": "2026-03-01",
+            },
+        )
         client.list_commits.assert_called_once_with(
-            owner="o", repo="r", sha="main", path="src/",
-            since="2026-01-01", until="2026-03-01", page=1, per_page=30,
+            owner="o",
+            repo="r",
+            sha="main",
+            path="src/",
+            since="2026-01-01",
+            until="2026-03-01",
+            page=1,
+            per_page=30,
         )
 
 
@@ -256,12 +345,20 @@ class TestHandleGetFileContents:
     async def test_returns_file(self):
         client = make_mock_client()
         client.get_file_contents.return_value = {
-            "name": "main.py", "path": "src/main.py", "type": "file",
-            "content": "print('hello')", "encoding": "utf-8",
+            "name": "main.py",
+            "path": "src/main.py",
+            "type": "file",
+            "content": "print('hello')",
+            "encoding": "utf-8",
         }
-        result = await handle_get_file_contents(client, {
-            "owner": "o", "repo": "r", "path": "src/main.py",
-        })
+        result = await handle_get_file_contents(
+            client,
+            {
+                "owner": "o",
+                "repo": "r",
+                "path": "src/main.py",
+            },
+        )
         assert result["content"] == "print('hello')"
 
     @pytest.mark.asyncio
@@ -271,20 +368,34 @@ class TestHandleGetFileContents:
             "type": "directory",
             "entries": [{"name": "main.py", "path": "src/main.py", "type": "file"}],
         }
-        result = await handle_get_file_contents(client, {
-            "owner": "o", "repo": "r", "path": "src/",
-        })
+        result = await handle_get_file_contents(
+            client,
+            {
+                "owner": "o",
+                "repo": "r",
+                "path": "src/",
+            },
+        )
         assert result["type"] == "directory"
 
     @pytest.mark.asyncio
     async def test_with_ref(self):
         client = make_mock_client()
         client.get_file_contents.return_value = {"type": "file", "content": "x"}
-        await handle_get_file_contents(client, {
-            "owner": "o", "repo": "r", "path": "README.md", "ref": "v1.0",
-        })
+        await handle_get_file_contents(
+            client,
+            {
+                "owner": "o",
+                "repo": "r",
+                "path": "README.md",
+                "ref": "v1.0",
+            },
+        )
         client.get_file_contents.assert_called_once_with(
-            owner="o", repo="r", path="README.md", ref="v1.0",
+            owner="o",
+            repo="r",
+            path="README.md",
+            ref="v1.0",
         )
 
     @pytest.mark.asyncio
@@ -299,12 +410,16 @@ class TestHandleSearchCode:
     async def test_returns_results(self):
         client = make_mock_client()
         client.search_code.return_value = {
-            "total_count": 42, "incomplete_results": False,
+            "total_count": 42,
+            "incomplete_results": False,
             "items": [{"name": "main.py", "path": "src/main.py"}],
         }
-        result = await handle_search_code(client, {
-            "query": "class HTTPClient language:python",
-        })
+        result = await handle_search_code(
+            client,
+            {
+                "query": "class HTTPClient language:python",
+            },
+        )
         assert result["total_count"] == 42
         assert len(result["items"]) == 1
 
@@ -318,9 +433,13 @@ class TestHandleSearchCode:
     async def test_pagination(self):
         client = make_mock_client()
         client.search_code.return_value = {
-            "total_count": 100, "incomplete_results": False, "items": [],
+            "total_count": 100,
+            "incomplete_results": False,
+            "items": [],
         }
         await handle_search_code(client, {"query": "test", "page": 2, "per_page": 50})
         client.search_code.assert_called_once_with(
-            query="test", page=2, per_page=50,
+            query="test",
+            page=2,
+            per_page=50,
         )

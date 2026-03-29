@@ -60,9 +60,7 @@ class UsageAPI:
         """Get usage history for an agent."""
         return await self.tracker.get_usage(agent_id, since, until, limit)
 
-    async def get_projected_cost(
-        self, agent_id: str, hours: float = 24.0
-    ) -> dict[str, Any]:
+    async def get_projected_cost(self, agent_id: str, hours: float = 24.0) -> dict[str, Any]:
         """Get projected cost based on recent usage patterns."""
         projection = await self.tracker.get_projected_cost(agent_id, hours)
 

@@ -17,10 +17,9 @@ if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 # Bootstrap product imports before anything else
-import gateway.src.bootstrap  # noqa: F401
-
 import httpx
 
+import gateway.src.bootstrap  # noqa: F401
 from gateway.src.app import create_app
 from gateway.src.lifespan import lifespan
 

@@ -12,11 +12,11 @@ from dataclasses import dataclass
 
 # Import trust scorer and models
 try:
-    from src.scorer import compute_trust_score
     from src.models import Window
+    from src.scorer import compute_trust_score
 except ImportError:
-    from products.trust.src.scorer import compute_trust_score
     from products.trust.src.models import Window
+    from products.trust.src.scorer import compute_trust_score
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +81,9 @@ class Aggregator:
 
         logger.debug(
             "Recomputed score for %s: composite=%.2f confidence=%.2f",
-            server_id, score.composite_score, score.confidence,
+            server_id,
+            score.composite_score,
+            score.confidence,
         )
 
         return score

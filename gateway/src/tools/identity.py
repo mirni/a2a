@@ -45,9 +45,7 @@ async def _submit_metrics(ctx: AppContext, params: dict[str, Any]) -> dict[str, 
     }
 
 
-async def _get_agent_identity(
-    ctx: AppContext, params: dict[str, Any]
-) -> dict[str, Any]:
+async def _get_agent_identity(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     identity = await ctx.identity_api.get_identity(params["agent_id"])
     if identity is None:
         return {"agent_id": params["agent_id"], "found": False}
@@ -60,9 +58,7 @@ async def _get_agent_identity(
     }
 
 
-async def _get_verified_claims(
-    ctx: AppContext, params: dict[str, Any]
-) -> dict[str, Any]:
+async def _get_verified_claims(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     claims = await ctx.identity_api.get_verified_claims(params["agent_id"])
     return {
         "claims": [
@@ -78,9 +74,7 @@ async def _get_verified_claims(
     }
 
 
-async def _search_agents_by_metrics(
-    ctx: AppContext, params: dict[str, Any]
-) -> dict[str, Any]:
+async def _search_agents_by_metrics(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     agents = await ctx.identity_api.search_agents_by_metrics(
         metric_name=params["metric_name"],
         min_value=params.get("min_value"),
@@ -90,9 +84,7 @@ async def _search_agents_by_metrics(
     return {"agents": agents}
 
 
-async def _get_agent_reputation(
-    ctx: AppContext, params: dict[str, Any]
-) -> dict[str, Any]:
+async def _get_agent_reputation(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     reputation = await ctx.identity_api.get_reputation(params["agent_id"])
     if reputation is None:
         return {"agent_id": params["agent_id"], "found": False}
@@ -117,9 +109,7 @@ async def _build_claim_chain(ctx: AppContext, params: dict[str, Any]) -> dict[st
 
 
 async def _get_claim_chains(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
-    chains = await ctx.identity_api.storage.get_claim_chains(
-        params["agent_id"], limit=params.get("limit", 10)
-    )
+    chains = await ctx.identity_api.storage.get_claim_chains(params["agent_id"], limit=params.get("limit", 10))
     return {"chains": chains}
 
 
@@ -176,9 +166,7 @@ async def _get_org(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     if row is None:
         return {"error": f"Org not found: {org_id}"}
 
-    cursor2 = await db.execute(
-        "SELECT agent_id FROM agent_identities WHERE org_id = ?", (org_id,)
-    )
+    cursor2 = await db.execute("SELECT agent_id FROM agent_identities WHERE org_id = ?", (org_id,))
     members = [{"agent_id": r["agent_id"]} for r in await cursor2.fetchall()]
 
     return {

@@ -7,7 +7,6 @@ Monetary values (cost) are stored as INTEGER in atomic units (1 credit = 10^8 at
 
 from __future__ import annotations
 
-import json
 import time
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -111,14 +110,17 @@ class PaywallStorage:
     # -----------------------------------------------------------------------
 
     async def store_key(
-        self, key_hash: str, agent_id: str, tier: str, connector: str = "",
+        self,
+        key_hash: str,
+        agent_id: str,
+        tier: str,
+        connector: str = "",
         org_id: str = "default",
     ) -> dict[str, Any]:
         """Store a hashed API key."""
         now = time.time()
         await self.db.execute(
-            "INSERT INTO api_keys (key_hash, agent_id, tier, connector, org_id, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO api_keys (key_hash, agent_id, tier, connector, org_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
             (key_hash, agent_id, tier, connector, org_id, now),
         )
         await self.db.commit()
@@ -135,8 +137,7 @@ class PaywallStorage:
     async def lookup_key(self, key_hash: str) -> dict[str, Any] | None:
         """Look up an API key by its hash. Returns None if not found."""
         cursor = await self.db.execute(
-            "SELECT key_hash, agent_id, tier, connector, org_id, created_at, revoked "
-            "FROM api_keys WHERE key_hash = ?",
+            "SELECT key_hash, agent_id, tier, connector, org_id, created_at, revoked FROM api_keys WHERE key_hash = ?",
             (key_hash,),
         )
         row = await cursor.fetchone()
@@ -168,8 +169,7 @@ class PaywallStorage:
     async def get_rate_count(self, agent_id: str, window_key: str, window_start: float) -> int:
         """Get the current call count for a rate window. Resets if window expired."""
         cursor = await self.db.execute(
-            "SELECT count, window_start FROM rate_windows "
-            "WHERE agent_id = ? AND window_key = ?",
+            "SELECT count, window_start FROM rate_windows WHERE agent_id = ? AND window_key = ?",
             (agent_id, window_key),
         )
         row = await cursor.fetchone()
@@ -188,8 +188,7 @@ class PaywallStorage:
     async def increment_rate_count(self, agent_id: str, window_key: str, window_start: float) -> int:
         """Increment rate counter, creating or resetting the window as needed. Returns new count."""
         cursor = await self.db.execute(
-            "SELECT count, window_start FROM rate_windows "
-            "WHERE agent_id = ? AND window_key = ?",
+            "SELECT count, window_start FROM rate_windows WHERE agent_id = ? AND window_key = ?",
             (agent_id, window_key),
         )
         row = await cursor.fetchone()
@@ -197,8 +196,7 @@ class PaywallStorage:
         if row is None or row["window_start"] < window_start:
             # New window or expired
             await self.db.execute(
-                "INSERT OR REPLACE INTO rate_windows (agent_id, window_key, count, window_start) "
-                "VALUES (?, ?, 1, ?)",
+                "INSERT OR REPLACE INTO rate_windows (agent_id, window_key, count, window_start) VALUES (?, ?, 1, ?)",
                 (agent_id, window_key, window_start),
             )
             await self.db.commit()
@@ -216,52 +214,40 @@ class PaywallStorage:
     # Sliding window rate limiting
     # -----------------------------------------------------------------------
 
-    async def record_rate_event(
-        self, agent_id: str, window_key: str, tool_name: str = ""
-    ) -> None:
+    async def record_rate_event(self, agent_id: str, window_key: str, tool_name: str = "") -> None:
         """Record a rate event for sliding window tracking."""
         now = time.time()
         await self.db.execute(
-            "INSERT INTO rate_events (agent_id, window_key, tool_name, timestamp) "
-            "VALUES (?, ?, ?, ?)",
+            "INSERT INTO rate_events (agent_id, window_key, tool_name, timestamp) VALUES (?, ?, ?, ?)",
             (agent_id, window_key, tool_name, now),
         )
         await self.db.commit()
 
-    async def get_sliding_window_count(
-        self, agent_id: str, window_key: str, window_seconds: float = 3600.0
-    ) -> int:
+    async def get_sliding_window_count(self, agent_id: str, window_key: str, window_seconds: float = 3600.0) -> int:
         """Count events within a sliding window (default: 1 hour)."""
         cutoff = time.time() - window_seconds
         cursor = await self.db.execute(
-            "SELECT COUNT(*) FROM rate_events "
-            "WHERE agent_id = ? AND window_key = ? AND timestamp >= ?",
+            "SELECT COUNT(*) FROM rate_events WHERE agent_id = ? AND window_key = ? AND timestamp >= ?",
             (agent_id, window_key, cutoff),
         )
         row = await cursor.fetchone()
         return row[0] if row else 0
 
-    async def get_tool_rate_count(
-        self, agent_id: str, tool_name: str, window_seconds: float = 3600.0
-    ) -> int:
+    async def get_tool_rate_count(self, agent_id: str, tool_name: str, window_seconds: float = 3600.0) -> int:
         """Count events for a specific tool within a sliding window."""
         cutoff = time.time() - window_seconds
         cursor = await self.db.execute(
-            "SELECT COUNT(*) FROM rate_events "
-            "WHERE agent_id = ? AND tool_name = ? AND timestamp >= ?",
+            "SELECT COUNT(*) FROM rate_events WHERE agent_id = ? AND tool_name = ? AND timestamp >= ?",
             (agent_id, tool_name, cutoff),
         )
         row = await cursor.fetchone()
         return row[0] if row else 0
 
-    async def get_burst_count(
-        self, agent_id: str, window_key: str, burst_window_seconds: float = 60.0
-    ) -> int:
+    async def get_burst_count(self, agent_id: str, window_key: str, burst_window_seconds: float = 60.0) -> int:
         """Count events within a burst window (default: 1 minute)."""
         cutoff = time.time() - burst_window_seconds
         cursor = await self.db.execute(
-            "SELECT COUNT(*) FROM rate_events "
-            "WHERE agent_id = ? AND window_key = ? AND timestamp >= ?",
+            "SELECT COUNT(*) FROM rate_events WHERE agent_id = ? AND window_key = ? AND timestamp >= ?",
             (agent_id, window_key, cutoff),
         )
         row = await cursor.fetchone()
@@ -270,9 +256,7 @@ class PaywallStorage:
     async def cleanup_old_rate_events(self, max_age_seconds: float = 7200.0) -> int:
         """Remove rate events older than max_age_seconds. Returns count deleted."""
         cutoff = time.time() - max_age_seconds
-        cursor = await self.db.execute(
-            "DELETE FROM rate_events WHERE timestamp < ?", (cutoff,)
-        )
+        cursor = await self.db.execute("DELETE FROM rate_events WHERE timestamp < ?", (cutoff,))
         await self.db.commit()
         return cursor.rowcount
 
@@ -345,8 +329,6 @@ class PaywallStorage:
 
     async def purge_audit_log(self, before: float) -> int:
         """Delete audit log entries older than the given timestamp. Returns count deleted."""
-        cursor = await self.db.execute(
-            "DELETE FROM audit_log WHERE created_at < ?", (before,)
-        )
+        cursor = await self.db.execute("DELETE FROM audit_log WHERE created_at < ?", (before,))
         await self.db.commit()
         return cursor.rowcount

@@ -1,10 +1,8 @@
 """Tests for GitHub MCP server setup."""
 
-import json
+from unittest.mock import patch
 
 import pytest
-from unittest.mock import AsyncMock, patch
-
 from src.server import TOOL_DEFINITIONS, TOOL_HANDLERS
 
 
@@ -12,9 +10,16 @@ class TestToolDefinitions:
     def test_all_tools_defined(self):
         tool_names = {t["name"] for t in TOOL_DEFINITIONS}
         expected = {
-            "list_repos", "get_repo", "list_issues", "create_issue",
-            "list_pull_requests", "get_pull_request", "create_pull_request",
-            "list_commits", "get_file_contents", "search_code",
+            "list_repos",
+            "get_repo",
+            "list_issues",
+            "create_issue",
+            "list_pull_requests",
+            "get_pull_request",
+            "create_pull_request",
+            "list_commits",
+            "get_file_contents",
+            "search_code",
         }
         assert tool_names == expected
 
@@ -71,6 +76,7 @@ class TestCreateServer:
     async def test_create_server(self):
         with patch.dict("os.environ", {"GITHUB_TOKEN": "ghp_test"}):
             from src.server import create_server
+
             server, client = await create_server()
             assert server is not None
             assert client is not None

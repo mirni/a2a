@@ -173,7 +173,10 @@ class ScanWorker:
 
             logger.debug(
                 "Scan %s: tls=%s auth=%s header_score=%.1f",
-                server_id, tls_info.valid, auth_required, security_headers.header_score,
+                server_id,
+                tls_info.valid,
+                auth_required,
+                security_headers.header_score,
             )
 
             return scan_result
@@ -182,9 +185,7 @@ class ScanWorker:
             if should_close:
                 await client.aclose()
 
-    async def scan_batch(
-        self, targets: list[tuple[str, str]]
-    ) -> list[ScanResult]:
+    async def scan_batch(self, targets: list[tuple[str, str]]) -> list[ScanResult]:
         """Scan a batch of targets sequentially.
 
         Args:

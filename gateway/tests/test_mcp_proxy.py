@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -27,7 +27,7 @@ class TestToolMap:
     """Verify the gateway tool name → (connector, mcp_tool_name) mapping."""
 
     def test_stripe_tools_mapped(self):
-        from gateway.src.mcp_proxy import STRIPE_MCP_TOOLS, _TOOL_MAP
+        from gateway.src.mcp_proxy import _TOOL_MAP, STRIPE_MCP_TOOLS
 
         for tool in STRIPE_MCP_TOOLS:
             assert tool in _TOOL_MAP
@@ -36,7 +36,7 @@ class TestToolMap:
             assert mcp_name == tool.replace("stripe_", "", 1)
 
     def test_github_tools_mapped(self):
-        from gateway.src.mcp_proxy import GITHUB_MCP_TOOLS, _TOOL_MAP
+        from gateway.src.mcp_proxy import _TOOL_MAP, GITHUB_MCP_TOOLS
 
         for tool in GITHUB_MCP_TOOLS:
             assert tool in _TOOL_MAP
@@ -45,7 +45,7 @@ class TestToolMap:
             assert mcp_name == tool.replace("github_", "", 1)
 
     def test_postgres_tools_mapped(self):
-        from gateway.src.mcp_proxy import POSTGRES_MCP_TOOLS, _TOOL_MAP
+        from gateway.src.mcp_proxy import _TOOL_MAP, POSTGRES_MCP_TOOLS
 
         for tool in POSTGRES_MCP_TOOLS:
             assert tool in _TOOL_MAP
@@ -55,10 +55,10 @@ class TestToolMap:
 
     def test_total_tool_count(self):
         from gateway.src.mcp_proxy import (
+            _TOOL_MAP,
             GITHUB_MCP_TOOLS,
             POSTGRES_MCP_TOOLS,
             STRIPE_MCP_TOOLS,
-            _TOOL_MAP,
         )
 
         expected = len(STRIPE_MCP_TOOLS) + len(GITHUB_MCP_TOOLS) + len(POSTGRES_MCP_TOOLS)
@@ -116,7 +116,7 @@ def _make_fake_process(responses: list[dict]):
     async def fake_read(n):
         try:
             return await asyncio.wait_for(ready_queue.get(), timeout=5.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return b""
 
     process.stdout = MagicMock()
@@ -166,9 +166,7 @@ class TestMCPConnection:
             {
                 "jsonrpc": "2.0",
                 "id": 2,
-                "result": {
-                    "content": [{"type": "text", "text": '{"customers": []}'}]
-                },
+                "result": {"content": [{"type": "text", "text": '{"customers": []}'}]},
             },
         ]
         process = _make_fake_process(responses)
@@ -192,9 +190,7 @@ class TestMCPConnection:
             {
                 "jsonrpc": "2.0",
                 "id": 2,
-                "result": {
-                    "content": [{"type": "text", "text": "not json, just text"}]
-                },
+                "result": {"content": [{"type": "text", "text": "not json, just text"}]},
             },
         ]
         process = _make_fake_process(responses)

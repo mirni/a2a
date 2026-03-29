@@ -9,9 +9,7 @@ from typing import Any
 import httpx
 
 from .errors import (
-    A2AError,
     RETRYABLE_STATUS_CODES,
-    RateLimitError,
     raise_for_status,
 )
 from .models import ExecuteResponse, HealthResponse, ToolPricing
@@ -45,6 +43,7 @@ class A2AClient:
         pricing_cache_ttl: float = 300.0,
     ) -> None:
         import os
+
         self.base_url = (base_url or os.environ.get("A2A_BASE_URL", "http://localhost:8000")).rstrip("/")
         self.api_key = api_key or os.environ.get("A2A_API_KEY")
         self.max_retries = max_retries
@@ -83,7 +82,6 @@ class A2AClient:
         **kwargs: Any,
     ) -> httpx.Response:
         """Execute an HTTP request with retry logic for transient failures."""
-        last_error: Exception | None = None
 
         for attempt in range(self.max_retries + 1):
             try:
@@ -93,15 +91,14 @@ class A2AClient:
                 # Retryable HTTP status — treat as error for retry
                 if attempt == self.max_retries:
                     return resp  # Return the response on last attempt
-            except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.ConnectError) as e:
-                last_error = e
+            except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.ConnectError):
                 if attempt == self.max_retries:
                     raise
             else:
-                last_error = None
+                pass
 
             # Compute delay
-            delay = self.retry_base_delay * (2 ** attempt)
+            delay = self.retry_base_delay * (2**attempt)
 
             # Respect Retry-After header for 429
             if resp.status_code == 429:
@@ -128,11 +125,7 @@ class A2AClient:
     async def pricing(self, use_cache: bool = True) -> list[ToolPricing]:
         """GET /v1/pricing — full catalog with optional caching."""
         now = time.time()
-        if (
-            use_cache
-            and self._pricing_cache is not None
-            and (now - self._pricing_cache_time) < self.pricing_cache_ttl
-        ):
+        if use_cache and self._pricing_cache is not None and (now - self._pricing_cache_time) < self.pricing_cache_ttl:
             return self._pricing_cache
 
         resp = await self._request_with_retry("GET", "/v1/pricing")
@@ -154,9 +147,7 @@ class A2AClient:
         tool_data = data.get("tool", data)
         return ToolPricing.from_dict(tool_data)
 
-    async def execute(
-        self, tool: str, params: dict[str, Any] | None = None
-    ) -> ExecuteResponse:
+    async def execute(self, tool: str, params: dict[str, Any] | None = None) -> ExecuteResponse:
         """POST /v1/execute — run a tool."""
         resp = await self._request_with_retry(
             "POST",
@@ -181,18 +172,12 @@ class A2AClient:
         result = await self.execute("get_balance", {"agent_id": agent_id})
         return result.result["balance"]
 
-    async def deposit(
-        self, agent_id: str, amount: float, description: str = ""
-    ) -> float:
+    async def deposit(self, agent_id: str, amount: float, description: str = "") -> float:
         """Deposit credits into a wallet. Returns new balance."""
-        result = await self.execute(
-            "deposit", {"agent_id": agent_id, "amount": amount, "description": description}
-        )
+        result = await self.execute("deposit", {"agent_id": agent_id, "amount": amount, "description": description})
         return result.result["new_balance"]
 
-    async def get_usage_summary(
-        self, agent_id: str, since: float | None = None
-    ) -> dict[str, Any]:
+    async def get_usage_summary(self, agent_id: str, since: float | None = None) -> dict[str, Any]:
         """Get usage summary for an agent."""
         params: dict[str, Any] = {"agent_id": agent_id}
         if since is not None:
@@ -301,9 +286,7 @@ class A2AClient:
         )
         return result.result
 
-    async def get_payment_history(
-        self, agent_id: str, limit: int = 100, offset: int = 0
-    ) -> list[dict[str, Any]]:
+    async def get_payment_history(self, agent_id: str, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
         """Get payment history for an agent."""
         result = await self.execute(
             "get_payment_history",
@@ -313,9 +296,7 @@ class A2AClient:
 
     # ----- Batch execution -----
 
-    async def batch_execute(
-        self, calls: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
+    async def batch_execute(self, calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """POST /v1/batch — execute multiple tool calls in one request.
 
         Args:

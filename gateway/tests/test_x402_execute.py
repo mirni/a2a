@@ -75,6 +75,7 @@ async def x402_app(tmp_data_dir, monkeypatch):
 @pytest.fixture
 async def x402_client(x402_app):
     import httpx
+
     transport = httpx.ASGITransport(app=x402_app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         yield c

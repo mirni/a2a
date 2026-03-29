@@ -166,8 +166,11 @@ class StripeClient:
 # Helpers
 # ------------------------------------------------------------------
 
+
 def _flatten_dict(
-    d: dict[str, Any], parent_key: str = "", sep: str = "[",
+    d: dict[str, Any],
+    parent_key: str = "",
+    sep: str = "[",
 ) -> dict[str, str]:
     """Flatten nested dicts for Stripe form-encoded POST bodies.
 
@@ -205,6 +208,7 @@ def _translate_error(exc: Exception) -> ConnectorError:
 
     if isinstance(exc, (httpx.ConnectTimeout, httpx.ReadTimeout)):
         from src.errors import TimeoutError as ConnTimeoutError
+
         return ConnTimeoutError(str(exc))
 
     return UpstreamError(str(exc), retryable=False)

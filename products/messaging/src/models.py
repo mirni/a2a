@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import time
 import uuid
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class MessageType(str, Enum):
+class MessageType(StrEnum):
     TEXT = "text"
     PRICE_NEGOTIATION = "price_negotiation"
     TASK_SPECIFICATION = "task_specification"
@@ -48,7 +48,7 @@ class Message(BaseModel):
     read_at: float | None = None
 
 
-class NegotiationState(str, Enum):
+class NegotiationState(StrEnum):
     PROPOSED = "proposed"
     COUNTERED = "countered"
     ACCEPTED = "accepted"

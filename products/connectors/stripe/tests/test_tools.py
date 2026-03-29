@@ -1,8 +1,6 @@
 """Tests for tool handler business logic."""
 
 import pytest
-
-from src.client import StripeClient
 from src.errors import ValidationError
 from src.models import (
     CreateCustomerInput,
@@ -22,23 +20,19 @@ from src.tools import (
     list_invoices,
 )
 
-from .conftest import MockTransport, make_error_response, make_stripe_response
+from .conftest import make_error_response, make_stripe_response
 
 
 class TestCreateCustomer:
     async def test_success(self, stripe_client, mock_transport):
-        mock_transport.add_response(
-            make_stripe_response({"id": "cus_new", "object": "customer", "email": "a@b.com"})
-        )
+        mock_transport.add_response(make_stripe_response({"id": "cus_new", "object": "customer", "email": "a@b.com"}))
         input_model = CreateCustomerInput(email="a@b.com", idempotency_key="k1")
         result = await create_customer(stripe_client, input_model)
         assert result.success is True
         assert result.data["id"] == "cus_new"
 
     async def test_with_metadata(self, stripe_client, mock_transport):
-        mock_transport.add_response(
-            make_stripe_response({"id": "cus_meta", "object": "customer"})
-        )
+        mock_transport.add_response(make_stripe_response({"id": "cus_meta", "object": "customer"}))
         input_model = CreateCustomerInput(
             email="a@b.com",
             name="Alice",
@@ -59,25 +53,23 @@ class TestCreateCustomer:
 class TestCreatePaymentIntent:
     async def test_success(self, stripe_client, mock_transport):
         mock_transport.add_response(
-            make_stripe_response({
-                "id": "pi_1",
-                "object": "payment_intent",
-                "amount": 5000,
-                "currency": "usd",
-                "status": "requires_payment_method",
-            })
+            make_stripe_response(
+                {
+                    "id": "pi_1",
+                    "object": "payment_intent",
+                    "amount": 5000,
+                    "currency": "usd",
+                    "status": "requires_payment_method",
+                }
+            )
         )
-        input_model = CreatePaymentIntentInput(
-            amount=5000, currency="usd", idempotency_key="pi-k1"
-        )
+        input_model = CreatePaymentIntentInput(amount=5000, currency="usd", idempotency_key="pi-k1")
         result = await create_payment_intent(stripe_client, input_model)
         assert result.success is True
         assert result.data["amount"] == 5000
 
     async def test_with_customer(self, stripe_client, mock_transport):
-        mock_transport.add_response(
-            make_stripe_response({"id": "pi_2", "object": "payment_intent"})
-        )
+        mock_transport.add_response(make_stripe_response({"id": "pi_2", "object": "payment_intent"}))
         input_model = CreatePaymentIntentInput(
             amount=1000,
             currency="eur",
@@ -92,11 +84,13 @@ class TestCreatePaymentIntent:
 class TestListCharges:
     async def test_success(self, stripe_client, mock_transport):
         mock_transport.add_response(
-            make_stripe_response({
-                "object": "list",
-                "data": [{"id": "ch_1"}, {"id": "ch_2"}],
-                "has_more": False,
-            })
+            make_stripe_response(
+                {
+                    "object": "list",
+                    "data": [{"id": "ch_1"}, {"id": "ch_2"}],
+                    "has_more": False,
+                }
+            )
         )
         input_model = ListChargesInput(limit=10)
         result = await list_charges(stripe_client, input_model)
@@ -104,22 +98,20 @@ class TestListCharges:
         assert len(result.data["data"]) == 2
 
     async def test_with_filters(self, stripe_client, mock_transport):
-        mock_transport.add_response(
-            make_stripe_response({"object": "list", "data": [], "has_more": False})
-        )
-        input_model = ListChargesInput(
-            limit=5, customer="cus_1", created_gte=1000000
-        )
+        mock_transport.add_response(make_stripe_response({"object": "list", "data": [], "has_more": False}))
+        input_model = ListChargesInput(limit=5, customer="cus_1", created_gte=1000000)
         result = await list_charges(stripe_client, input_model)
         assert result.success is True
 
     async def test_pagination(self, stripe_client, mock_transport):
         mock_transport.add_response(
-            make_stripe_response({
-                "object": "list",
-                "data": [{"id": "ch_3"}],
-                "has_more": True,
-            })
+            make_stripe_response(
+                {
+                    "object": "list",
+                    "data": [{"id": "ch_3"}],
+                    "has_more": True,
+                }
+            )
         )
         input_model = ListChargesInput(limit=1, starting_after="ch_2")
         result = await list_charges(stripe_client, input_model)
@@ -130,11 +122,13 @@ class TestListCharges:
 class TestCreateSubscription:
     async def test_success(self, stripe_client, mock_transport):
         mock_transport.add_response(
-            make_stripe_response({
-                "id": "sub_1",
-                "object": "subscription",
-                "status": "active",
-            })
+            make_stripe_response(
+                {
+                    "id": "sub_1",
+                    "object": "subscription",
+                    "status": "active",
+                }
+            )
         )
         input_model = CreateSubscriptionInput(
             customer_id="cus_1",
@@ -162,11 +156,13 @@ class TestCreateSubscription:
 class TestGetBalance:
     async def test_success(self, stripe_client, mock_transport):
         mock_transport.add_response(
-            make_stripe_response({
-                "object": "balance",
-                "available": [{"amount": 1000, "currency": "usd"}],
-                "pending": [{"amount": 500, "currency": "usd"}],
-            })
+            make_stripe_response(
+                {
+                    "object": "balance",
+                    "available": [{"amount": 1000, "currency": "usd"}],
+                    "pending": [{"amount": 500, "currency": "usd"}],
+                }
+            )
         )
         result = await get_balance(stripe_client)
         assert result.success is True
@@ -182,27 +178,23 @@ class TestGetBalance:
 class TestCreateRefund:
     async def test_success_with_payment_intent(self, stripe_client, mock_transport):
         mock_transport.add_response(
-            make_stripe_response({
-                "id": "re_1",
-                "object": "refund",
-                "amount": 5000,
-                "status": "succeeded",
-            })
+            make_stripe_response(
+                {
+                    "id": "re_1",
+                    "object": "refund",
+                    "amount": 5000,
+                    "status": "succeeded",
+                }
+            )
         )
-        input_model = CreateRefundInput(
-            payment_intent_id="pi_1", idempotency_key="ref-k1"
-        )
+        input_model = CreateRefundInput(payment_intent_id="pi_1", idempotency_key="ref-k1")
         result = await create_refund(stripe_client, input_model)
         assert result.success is True
         assert result.data["status"] == "succeeded"
 
     async def test_success_with_charge(self, stripe_client, mock_transport):
-        mock_transport.add_response(
-            make_stripe_response({"id": "re_2", "object": "refund"})
-        )
-        input_model = CreateRefundInput(
-            charge_id="ch_1", amount=500, reason="duplicate", idempotency_key="ref-k2"
-        )
+        mock_transport.add_response(make_stripe_response({"id": "re_2", "object": "refund"}))
+        input_model = CreateRefundInput(charge_id="ch_1", amount=500, reason="duplicate", idempotency_key="ref-k2")
         result = await create_refund(stripe_client, input_model)
         assert result.success is True
 
@@ -216,11 +208,13 @@ class TestCreateRefund:
 class TestListInvoices:
     async def test_success(self, stripe_client, mock_transport):
         mock_transport.add_response(
-            make_stripe_response({
-                "object": "list",
-                "data": [{"id": "in_1", "status": "paid"}],
-                "has_more": False,
-            })
+            make_stripe_response(
+                {
+                    "object": "list",
+                    "data": [{"id": "in_1", "status": "paid"}],
+                    "has_more": False,
+                }
+            )
         )
         input_model = ListInvoicesInput()
         result = await list_invoices(stripe_client, input_model)
@@ -228,9 +222,7 @@ class TestListInvoices:
         assert result.data["data"][0]["status"] == "paid"
 
     async def test_with_all_filters(self, stripe_client, mock_transport):
-        mock_transport.add_response(
-            make_stripe_response({"object": "list", "data": [], "has_more": False})
-        )
+        mock_transport.add_response(make_stripe_response({"object": "list", "data": [], "has_more": False}))
         input_model = ListInvoicesInput(
             limit=20,
             customer="cus_1",

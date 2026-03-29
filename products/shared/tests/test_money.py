@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 import pytest
-
 from src.money import (
     SCALE,
-    credits_to_atomic,
     atomic_to_credits,
     atomic_to_float,
+    credits_to_atomic,
     validate_non_negative,
 )
 

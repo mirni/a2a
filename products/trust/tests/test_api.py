@@ -5,11 +5,8 @@ from __future__ import annotations
 import time
 
 import pytest
-
-from src.api import ServerNotFoundError, TrustAPI
-from src.models import ProbeResult, SecurityScan, Server, TransportType, TrustScore, Window
-from src.scorer import ScoreEngine
-from src.storage import StorageBackend
+from src.api import ServerNotFoundError
+from src.models import ProbeResult, SecurityScan, TransportType, TrustScore, Window
 
 
 class TestRegisterServer:
@@ -40,7 +37,7 @@ class TestRegisterServer:
         assert server.transport_type == TransportType.STDIO
 
     async def test_registered_server_persisted(self, api, storage):
-        server = await api.register_server(
+        await api.register_server(
             name="Persisted",
             url="https://persisted.com",
             server_id="persist-001",
@@ -52,74 +49,84 @@ class TestRegisterServer:
 
 class TestGetScore:
     async def test_get_score_computes_on_first_call(self, api, storage):
-        server = await api.register_server(
+        await api.register_server(
             name="Scored",
             url="https://scored.com",
             server_id="scored-001",
         )
         now = time.time()
-        await storage.store_probe_result(ProbeResult(
-            server_id="scored-001",
-            timestamp=now - 60,
-            latency_ms=100,
-            status_code=200,
-            tools_count=5,
-            tools_documented=5,
-        ))
-        await storage.store_security_scan(SecurityScan(
-            server_id="scored-001",
-            timestamp=now,
-            tls_enabled=True,
-            auth_required=True,
-            input_validation_score=100.0,
-            cve_count=0,
-        ))
+        await storage.store_probe_result(
+            ProbeResult(
+                server_id="scored-001",
+                timestamp=now - 60,
+                latency_ms=100,
+                status_code=200,
+                tools_count=5,
+                tools_documented=5,
+            )
+        )
+        await storage.store_security_scan(
+            SecurityScan(
+                server_id="scored-001",
+                timestamp=now,
+                tls_enabled=True,
+                auth_required=True,
+                input_validation_score=100.0,
+                cve_count=0,
+            )
+        )
 
         score = await api.get_score("scored-001")
         assert score.composite_score > 0
         assert score.confidence > 0
 
     async def test_get_score_returns_cached(self, api, storage):
-        server = await api.register_server(
+        await api.register_server(
             name="Cached",
             url="https://cached.com",
             server_id="cached-001",
         )
         # Store a pre-computed score
-        await storage.store_trust_score(TrustScore(
-            server_id="cached-001",
-            timestamp=time.time(),
-            window=Window.H24,
-            composite_score=77.0,
-            confidence=0.9,
-        ))
+        await storage.store_trust_score(
+            TrustScore(
+                server_id="cached-001",
+                timestamp=time.time(),
+                window=Window.H24,
+                composite_score=77.0,
+                confidence=0.9,
+            )
+        )
 
         score = await api.get_score("cached-001")
         assert score.composite_score == 77.0
 
     async def test_get_score_recompute(self, api, storage):
-        server = await api.register_server(
+        await api.register_server(
             name="Recompute",
             url="https://recompute.com",
             server_id="recomp-001",
         )
         now = time.time()
-        await storage.store_probe_result(ProbeResult(
-            server_id="recomp-001",
-            timestamp=now - 30,
-            latency_ms=100,
-            status_code=200,
-            tools_count=3,
-            tools_documented=3,
-        ))
+        await storage.store_probe_result(
+            ProbeResult(
+                server_id="recomp-001",
+                timestamp=now - 30,
+                latency_ms=100,
+                status_code=200,
+                tools_count=3,
+                tools_documented=3,
+            )
+        )
         # Store a stale cached score
-        await storage.store_trust_score(TrustScore(
-            server_id="recomp-001",
-            timestamp=now - 86400,
-            window=Window.H24,
-            composite_score=10.0,
-            confidence=0.5,
-        ))
+        await storage.store_trust_score(
+            TrustScore(
+                server_id="recomp-001",
+                timestamp=now - 86400,
+                window=Window.H24,
+                composite_score=10.0,
+                confidence=0.5,
+            )
+        )
 
         score = await api.get_score("recomp-001", recompute=True)
         # Fresh computation should differ from the stale 10.0
@@ -132,20 +139,22 @@ class TestGetScore:
 
 class TestGetHistory:
     async def test_get_history(self, api, storage):
-        server = await api.register_server(
+        await api.register_server(
             name="History",
             url="https://history.com",
             server_id="hist-001",
         )
         now = time.time()
         for i in range(5):
-            await storage.store_trust_score(TrustScore(
-                server_id="hist-001",
-                timestamp=now + i,
-                window=Window.H24,
-                composite_score=60.0 + i,
-                confidence=1.0,
-            ))
+            await storage.store_trust_score(
+                TrustScore(
+                    server_id="hist-001",
+                    timestamp=now + i,
+                    window=Window.H24,
+                    composite_score=60.0 + i,
+                    confidence=1.0,
+                )
+            )
 
         history = await api.get_history("hist-001")
         assert len(history) == 5
@@ -153,20 +162,22 @@ class TestGetHistory:
         assert history[0].composite_score == 64.0
 
     async def test_get_history_with_since(self, api, storage):
-        server = await api.register_server(
+        await api.register_server(
             name="HistSince",
             url="https://histsince.com",
             server_id="histsince-001",
         )
         now = time.time()
         for i in range(5):
-            await storage.store_trust_score(TrustScore(
-                server_id="histsince-001",
-                timestamp=now + i * 3600,
-                window=Window.H24,
-                composite_score=70.0 + i,
-                confidence=1.0,
-            ))
+            await storage.store_trust_score(
+                TrustScore(
+                    server_id="histsince-001",
+                    timestamp=now + i * 3600,
+                    window=Window.H24,
+                    composite_score=70.0 + i,
+                    confidence=1.0,
+                )
+            )
 
         history = await api.get_history("histsince-001", since=now + 7200)
         assert len(history) == 3
@@ -189,20 +200,24 @@ class TestSearchServers:
         await api.register_server(name="High", url="https://high.com", server_id="high")
         await api.register_server(name="Low", url="https://low.com", server_id="low")
 
-        await storage.store_trust_score(TrustScore(
-            server_id="high",
-            timestamp=time.time(),
-            window=Window.H24,
-            composite_score=90.0,
-            confidence=1.0,
-        ))
-        await storage.store_trust_score(TrustScore(
-            server_id="low",
-            timestamp=time.time(),
-            window=Window.H24,
-            composite_score=30.0,
-            confidence=0.5,
-        ))
+        await storage.store_trust_score(
+            TrustScore(
+                server_id="high",
+                timestamp=time.time(),
+                window=Window.H24,
+                composite_score=90.0,
+                confidence=1.0,
+            )
+        )
+        await storage.store_trust_score(
+            TrustScore(
+                server_id="low",
+                timestamp=time.time(),
+                window=Window.H24,
+                composite_score=30.0,
+                confidence=0.5,
+            )
+        )
 
         results = await api.search_servers(min_score=50.0)
         assert len(results) == 1
@@ -218,8 +233,10 @@ class TestSearchServers:
 
 class TestDeleteServer:
     async def test_delete_server_removes_server(self, api, storage):
-        server = await api.register_server(
-            name="Doomed", url="https://doomed.com", server_id="doom-001",
+        await api.register_server(
+            name="Doomed",
+            url="https://doomed.com",
+            server_id="doom-001",
         )
         await api.delete_server("doom-001")
         fetched = await storage.get_server("doom-001")
@@ -227,32 +244,40 @@ class TestDeleteServer:
 
     async def test_delete_server_removes_scores(self, api, storage):
         await api.register_server(
-            name="Doomed", url="https://doomed.com", server_id="doom-002",
+            name="Doomed",
+            url="https://doomed.com",
+            server_id="doom-002",
         )
         now = time.time()
-        await storage.store_trust_score(TrustScore(
-            server_id="doom-002",
-            timestamp=now,
-            window=Window.H24,
-            composite_score=80.0,
-            confidence=1.0,
-        ))
-        await storage.store_probe_result(ProbeResult(
-            server_id="doom-002",
-            timestamp=now,
-            latency_ms=50,
-            status_code=200,
-            tools_count=3,
-            tools_documented=3,
-        ))
-        await storage.store_security_scan(SecurityScan(
-            server_id="doom-002",
-            timestamp=now,
-            tls_enabled=True,
-            auth_required=True,
-            input_validation_score=100.0,
-            cve_count=0,
-        ))
+        await storage.store_trust_score(
+            TrustScore(
+                server_id="doom-002",
+                timestamp=now,
+                window=Window.H24,
+                composite_score=80.0,
+                confidence=1.0,
+            )
+        )
+        await storage.store_probe_result(
+            ProbeResult(
+                server_id="doom-002",
+                timestamp=now,
+                latency_ms=50,
+                status_code=200,
+                tools_count=3,
+                tools_documented=3,
+            )
+        )
+        await storage.store_security_scan(
+            SecurityScan(
+                server_id="doom-002",
+                timestamp=now,
+                tls_enabled=True,
+                auth_required=True,
+                input_validation_score=100.0,
+                cve_count=0,
+            )
+        )
 
         await api.delete_server("doom-002")
 
@@ -272,7 +297,9 @@ class TestDeleteServer:
 class TestUpdateServer:
     async def test_update_server_name(self, api, storage):
         await api.register_server(
-            name="Old Name", url="https://old.com", server_id="upd-001",
+            name="Old Name",
+            url="https://old.com",
+            server_id="upd-001",
         )
         updated = await api.update_server("upd-001", name="New Name")
         assert updated.name == "New Name"
@@ -280,7 +307,9 @@ class TestUpdateServer:
 
     async def test_update_server_url(self, api, storage):
         await api.register_server(
-            name="My Server", url="https://old.com", server_id="upd-002",
+            name="My Server",
+            url="https://old.com",
+            server_id="upd-002",
         )
         updated = await api.update_server("upd-002", url="https://new.com")
         assert updated.url == "https://new.com"
@@ -288,7 +317,9 @@ class TestUpdateServer:
 
     async def test_update_server_name_and_url(self, api, storage):
         await api.register_server(
-            name="Old", url="https://old.com", server_id="upd-003",
+            name="Old",
+            url="https://old.com",
+            server_id="upd-003",
         )
         updated = await api.update_server("upd-003", name="New", url="https://new.com")
         assert updated.name == "New"

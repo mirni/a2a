@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import ssl
-import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -164,9 +163,7 @@ class TestProbeWorkerProbe:
     @pytest.mark.asyncio
     async def test_connection_refused_probe(self, mock_trust_storage):
         mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_client.get = AsyncMock(
-            side_effect=httpx.ConnectError("Connection refused")
-        )
+        mock_client.get = AsyncMock(side_effect=httpx.ConnectError("Connection refused"))
 
         worker = ProbeWorker(trust_storage=mock_trust_storage, client=mock_client)
         result, error_type = await worker.probe("svc-1", "https://example.com")
@@ -176,9 +173,7 @@ class TestProbeWorkerProbe:
     @pytest.mark.asyncio
     async def test_dns_error_probe(self, mock_trust_storage):
         mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_client.get = AsyncMock(
-            side_effect=httpx.ConnectError("Name resolution failed")
-        )
+        mock_client.get = AsyncMock(side_effect=httpx.ConnectError("Name resolution failed"))
 
         worker = ProbeWorker(trust_storage=mock_trust_storage, client=mock_client)
         result, error_type = await worker.probe("svc-1", "https://example.com")

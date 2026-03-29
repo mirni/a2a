@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import aiosqlite
 
@@ -53,7 +53,7 @@ async def backup_database(source_path: str, dest_path: str) -> dict:
     return {
         "path": dest_path,
         "size_bytes": os.path.getsize(dest_path),
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
         "source": source_path,
     }
 
@@ -83,7 +83,7 @@ async def restore_database(backup_path: str, target_path: str) -> dict:
     return {
         "path": target_path,
         "size_bytes": os.path.getsize(target_path),
-        "restored_at": datetime.now(timezone.utc).isoformat(),
+        "restored_at": datetime.now(UTC).isoformat(),
         "source_backup": backup_path,
     }
 
@@ -118,13 +118,11 @@ async def integrity_check(db_path: str) -> dict:
 
     info = await asyncio.to_thread(_do_check)
     info["path"] = db_path
-    info["checked_at"] = datetime.now(timezone.utc).isoformat()
+    info["checked_at"] = datetime.now(UTC).isoformat()
     return info
 
 
-async def encrypt_backup(
-    source_path: str, dest_path: str, key: str | None = None
-) -> dict:
+async def encrypt_backup(source_path: str, dest_path: str, key: str | None = None) -> dict:
     """Encrypt a file using Fernet symmetric encryption.
 
     Auto-generates a key if none provided.
@@ -153,7 +151,7 @@ async def encrypt_backup(
         "path": dest_path,
         "size_bytes": os.path.getsize(dest_path),
         "key": key,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -181,5 +179,5 @@ async def decrypt_backup(source_path: str, dest_path: str, key: str) -> dict:
     return {
         "path": dest_path,
         "size_bytes": os.path.getsize(dest_path),
-        "decrypted_at": datetime.now(timezone.utc).isoformat(),
+        "decrypted_at": datetime.now(UTC).isoformat(),
     }

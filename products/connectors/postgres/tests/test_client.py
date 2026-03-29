@@ -1,9 +1,9 @@
 """Tests for PostgreSQL client (connection config and read-only enforcement)."""
 
 import os
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
+import pytest
 from src.client import PostgresClient
 from src.models import ConnectionConfig
 

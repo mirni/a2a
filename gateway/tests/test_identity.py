@@ -7,7 +7,6 @@ get_agent_reputation, and tier enforcement through the /v1/execute endpoint.
 from __future__ import annotations
 
 import pytest
-
 from identity_src.crypto import AgentCrypto
 
 

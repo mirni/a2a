@@ -26,11 +26,6 @@ async def test_openapi_has_tools(client):
     execute_path = data["paths"].get("/execute", {})
     post = execute_path.get("post", {})
     # Should have examples for each tool
-    examples = (
-        post.get("requestBody", {})
-        .get("content", {})
-        .get("application/json", {})
-        .get("examples", {})
-    )
+    examples = post.get("requestBody", {}).get("content", {}).get("application/json", {}).get("examples", {})
     assert len(examples) > 0
     assert "get_balance" in examples

@@ -9,11 +9,9 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any
 
 from payments.engine import PaymentEngine
-from payments.models import Settlement, SubscriptionStatus
-from payments.storage import PaymentStorage
+from payments.models import Settlement
 
 from src.wallet import InsufficientCreditsError
 
@@ -87,13 +85,16 @@ class SubscriptionScheduler:
                 result.suspended += 1
                 logger.warning(
                     "Subscription %s suspended: insufficient balance for %s",
-                    sub_id, sub_data["payer"],
+                    sub_id,
+                    sub_data["payer"],
                 )
             except Exception as e:
                 charge_result.error = str(e)
                 result.failed += 1
                 logger.error(
-                    "Subscription %s charge failed: %s", sub_id, e,
+                    "Subscription %s charge failed: %s",
+                    sub_id,
+                    e,
                 )
 
             result.results.append(charge_result)

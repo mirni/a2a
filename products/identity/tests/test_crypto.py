@@ -95,9 +95,7 @@ class TestCommitments:
         # Recompute manually
         value_bytes = str(int(value * scale)).encode()
         blinding_bytes = bytes.fromhex(blinding)
-        expected = hashlib.sha3_256(
-            value_bytes + blinding_bytes + metric_name.encode()
-        ).hexdigest()
+        expected = hashlib.sha3_256(value_bytes + blinding_bytes + metric_name.encode()).hexdigest()
         assert commit_hash == expected
 
     def test_verify_commitment_roundtrip(self):
@@ -105,16 +103,12 @@ class TestCommitments:
         value = 5.67
         metric_name = "pnl_30d"
         commit_hash, blinding = AgentCrypto.create_commitment(value, metric_name)
-        assert AgentCrypto.verify_commitment(
-            value, metric_name, blinding, commit_hash
-        ) is True
+        assert AgentCrypto.verify_commitment(value, metric_name, blinding, commit_hash) is True
 
     def test_verify_commitment_fails_with_wrong_value(self):
         """verify_commitment should return False for a different value."""
         commit_hash, blinding = AgentCrypto.create_commitment(2.35, "sharpe_30d")
-        assert AgentCrypto.verify_commitment(
-            9.99, "sharpe_30d", blinding, commit_hash
-        ) is False
+        assert AgentCrypto.verify_commitment(9.99, "sharpe_30d", blinding, commit_hash) is False
 
     def test_commitment_hides_value(self):
         """Same metric name with different values should produce different hashes."""
@@ -144,25 +138,24 @@ class TestAttestationSigning:
             valid_until=2000.0,
             data_source="self_reported",
         )
-        assert AgentCrypto.verify_attestation(
-            pub,
-            agent_id="agent-1",
-            commitment_hashes=["aabb", "ccdd"],
-            verified_at=1000.0,
-            valid_until=2000.0,
-            data_source="self_reported",
-            signature_hex=sig,
-        ) is True
+        assert (
+            AgentCrypto.verify_attestation(
+                pub,
+                agent_id="agent-1",
+                commitment_hashes=["aabb", "ccdd"],
+                verified_at=1000.0,
+                valid_until=2000.0,
+                data_source="self_reported",
+                signature_hex=sig,
+            )
+            is True
+        )
 
     def test_verify_attestation_fails_with_tampered_agent_id(self):
         """Changing the agent_id should invalidate the attestation."""
         priv, pub = AgentCrypto.generate_keypair()
-        sig = AgentCrypto.sign_attestation(
-            priv, "agent-1", ["hash1"], 1000.0, 2000.0, "self_reported"
-        )
-        assert AgentCrypto.verify_attestation(
-            pub, "agent-2", ["hash1"], 1000.0, 2000.0, "self_reported", sig
-        ) is False
+        sig = AgentCrypto.sign_attestation(priv, "agent-1", ["hash1"], 1000.0, 2000.0, "self_reported")
+        assert AgentCrypto.verify_attestation(pub, "agent-2", ["hash1"], 1000.0, 2000.0, "self_reported", sig) is False
 
 
 class TestMerkleTreeComputeRoot:
@@ -192,9 +185,7 @@ class TestMerkleTreeComputeRoot:
 
         leaf0 = "aa" * 32
         leaf1 = "bb" * 32
-        expected = hashlib.sha3_256(
-            bytes.fromhex(leaf0) + bytes.fromhex(leaf1)
-        ).hexdigest()
+        expected = hashlib.sha3_256(bytes.fromhex(leaf0) + bytes.fromhex(leaf1)).hexdigest()
         assert MerkleTree.compute_root([leaf0, leaf1]) == expected
 
     def test_three_leaves_duplicates_last(self):
@@ -207,16 +198,10 @@ class TestMerkleTreeComputeRoot:
         leaf1 = "bb" * 32
         leaf2 = "cc" * 32
         # Level 1: H(leaf0||leaf1), H(leaf2||leaf2)
-        h01 = hashlib.sha3_256(
-            bytes.fromhex(leaf0) + bytes.fromhex(leaf1)
-        ).hexdigest()
-        h22 = hashlib.sha3_256(
-            bytes.fromhex(leaf2) + bytes.fromhex(leaf2)
-        ).hexdigest()
+        h01 = hashlib.sha3_256(bytes.fromhex(leaf0) + bytes.fromhex(leaf1)).hexdigest()
+        h22 = hashlib.sha3_256(bytes.fromhex(leaf2) + bytes.fromhex(leaf2)).hexdigest()
         # Root: H(h01||h22)
-        expected = hashlib.sha3_256(
-            bytes.fromhex(h01) + bytes.fromhex(h22)
-        ).hexdigest()
+        expected = hashlib.sha3_256(bytes.fromhex(h01) + bytes.fromhex(h22)).hexdigest()
         assert MerkleTree.compute_root([leaf0, leaf1, leaf2]) == expected
 
     def test_four_leaves(self):
@@ -226,15 +211,9 @@ class TestMerkleTreeComputeRoot:
         from products.identity.src.crypto import MerkleTree
 
         leaves = [f"{chr(ord('a') + i):02s}" * 32 for i in range(4)]
-        h01 = hashlib.sha3_256(
-            bytes.fromhex(leaves[0]) + bytes.fromhex(leaves[1])
-        ).hexdigest()
-        h23 = hashlib.sha3_256(
-            bytes.fromhex(leaves[2]) + bytes.fromhex(leaves[3])
-        ).hexdigest()
-        expected = hashlib.sha3_256(
-            bytes.fromhex(h01) + bytes.fromhex(h23)
-        ).hexdigest()
+        h01 = hashlib.sha3_256(bytes.fromhex(leaves[0]) + bytes.fromhex(leaves[1])).hexdigest()
+        h23 = hashlib.sha3_256(bytes.fromhex(leaves[2]) + bytes.fromhex(leaves[3])).hexdigest()
+        expected = hashlib.sha3_256(bytes.fromhex(h01) + bytes.fromhex(h23)).hexdigest()
         assert MerkleTree.compute_root(leaves) == expected
 
     def test_root_is_deterministic(self):
@@ -379,7 +358,7 @@ class TestMerkleTreeVerifyProof:
         from products.identity.src.crypto import MerkleTree
 
         leaves = ["aa" * 32, "bb" * 32]
-        root = MerkleTree.compute_root(leaves)
+        MerkleTree.compute_root(leaves)
         proof = MerkleTree.compute_proof(leaves, 0)
         assert MerkleTree.verify_proof(leaves[0], proof, "00" * 32) is False
 
@@ -400,9 +379,7 @@ class TestMerkleTreeVerifyProof:
 
         from products.identity.src.crypto import MerkleTree
 
-        leaves = [
-            hashlib.sha3_256(f"leaf-{i}".encode()).hexdigest() for i in range(7)
-        ]
+        leaves = [hashlib.sha3_256(f"leaf-{i}".encode()).hexdigest() for i in range(7)]
         root = MerkleTree.compute_root(leaves)
         for i in range(7):
             proof = MerkleTree.compute_proof(leaves, i)

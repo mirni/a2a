@@ -6,13 +6,14 @@ Intervals are in seconds.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class ProbeErrorType(str, Enum):
+class ProbeErrorType(StrEnum):
     """Classification of probe error types."""
+
     SUCCESS = "success"
     TIMEOUT = "timeout"
     CONNECTION_REFUSED = "connection_refused"

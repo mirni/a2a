@@ -130,7 +130,6 @@ async def test_execute_insufficient_tier(client, api_key):
 async def test_execute_pro_tier_access(client, pro_api_key, app):
     """Pro tier should be able to access pro-tier tools."""
     # First create wallets for payer and payee
-    ctx = app.state.ctx
 
     resp = await client.post(
         "/v1/execute",
@@ -209,7 +208,9 @@ async def test_execute_delete_server(client, pro_api_key, app):
 
     # Register a server first
     await ctx.trust_api.register_server(
-        name="To Delete", url="https://delete.com", server_id="del-001",
+        name="To Delete",
+        url="https://delete.com",
+        server_id="del-001",
     )
 
     resp = await client.post(
@@ -258,7 +259,9 @@ async def test_execute_update_server(client, pro_api_key, app):
 
     # Register a server first
     await ctx.trust_api.register_server(
-        name="Old Name", url="https://old.com", server_id="upd-001",
+        name="Old Name",
+        url="https://old.com",
+        server_id="upd-001",
     )
 
     resp = await client.post(
@@ -297,10 +300,14 @@ async def test_execute_global_audit_log(client, pro_api_key, app):
 
     # Record some audit entries
     await ctx.paywall_storage.record_audit(
-        agent_id="agent-x", function="test_fn", tier="pro",
+        agent_id="agent-x",
+        function="test_fn",
+        tier="pro",
     )
     await ctx.paywall_storage.record_audit(
-        agent_id="agent-y", function="other_fn", tier="free",
+        agent_id="agent-y",
+        function="other_fn",
+        tier="free",
     )
 
     resp = await client.post(

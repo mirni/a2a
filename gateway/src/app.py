@@ -13,17 +13,17 @@ from gateway.src.openapi import openapi_handler
 from gateway.src.routes.batch import routes as batch_routes
 from gateway.src.routes.execute import routes as execute_routes
 from gateway.src.routes.health import routes as health_routes
-from gateway.src.routes.pricing import routes as pricing_routes
-from gateway.src.signing import signing_key_handler
-from gateway.src.routes.sse import routes as sse_routes
 from gateway.src.routes.onboarding import routes as onboarding_routes
+from gateway.src.routes.pricing import routes as pricing_routes
+from gateway.src.routes.sse import routes as sse_routes
+from gateway.src.signing import signing_key_handler
 from gateway.src.stripe_checkout import routes as checkout_routes
 from gateway.src.swagger import swagger_ui_handler
-
 
 # ---------------------------------------------------------------------------
 # Backward-compatibility redirects: old paths -> /v1/ paths (301)
 # ---------------------------------------------------------------------------
+
 
 async def _redirect_health(request: Request) -> Response:
     return RedirectResponse(url="/v1/health", status_code=301)

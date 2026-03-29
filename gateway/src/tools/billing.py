@@ -14,9 +14,7 @@ async def _get_balance(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any
 
 
 async def _get_usage_summary(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
-    summary = await ctx.tracker.get_usage_summary(
-        params["agent_id"], since=params.get("since")
-    )
+    summary = await ctx.tracker.get_usage_summary(params["agent_id"], since=params.get("since"))
     return summary
 
 
@@ -87,7 +85,7 @@ async def _get_metrics_timeseries(ctx: AppContext, params: dict[str, Any]) -> di
         query += " AND created_at >= ?"
         query_params.append(since)
 
-    query += f" GROUP BY bucket ORDER BY bucket DESC LIMIT ?"
+    query += " GROUP BY bucket ORDER BY bucket DESC LIMIT ?"
     query_params.append(limit)
 
     db = ctx.tracker.storage.db
@@ -96,11 +94,13 @@ async def _get_metrics_timeseries(ctx: AppContext, params: dict[str, Any]) -> di
 
     buckets = []
     for row in rows:
-        buckets.append({
-            "timestamp": row[0],
-            "calls": row[1],
-            "cost": round(row[2], 6),
-        })
+        buckets.append(
+            {
+                "timestamp": row[0],
+                "calls": row[1],
+                "cost": round(row[2], 6),
+            }
+        )
 
     buckets.reverse()
     return {"buckets": buckets}
@@ -124,22 +124,15 @@ async def _get_agent_leaderboard(ctx: AppContext, params: dict[str, Any]) -> dic
             (limit,),
         )
         rows = await cursor.fetchall()
-        leaderboard = [
-            {"rank": i + 1, "agent_id": row[0], "value": round(row[1], 6)}
-            for i, row in enumerate(rows)
-        ]
+        leaderboard = [{"rank": i + 1, "agent_id": row[0], "value": round(row[1], 6)} for i, row in enumerate(rows)]
     elif metric == "calls":
         db = ctx.tracker.storage.db
         cursor = await db.execute(
-            "SELECT agent_id, COUNT(*) AS value "
-            "FROM usage_records GROUP BY agent_id ORDER BY value DESC LIMIT ?",
+            "SELECT agent_id, COUNT(*) AS value FROM usage_records GROUP BY agent_id ORDER BY value DESC LIMIT ?",
             (limit,),
         )
         rows = await cursor.fetchall()
-        leaderboard = [
-            {"rank": i + 1, "agent_id": row[0], "value": row[1]}
-            for i, row in enumerate(rows)
-        ]
+        leaderboard = [{"rank": i + 1, "agent_id": row[0], "value": row[1]} for i, row in enumerate(rows)]
     elif metric == "trust_score":
         try:
             db = ctx.identity_api.storage.db
@@ -151,10 +144,7 @@ async def _get_agent_leaderboard(ctx: AppContext, params: dict[str, Any]) -> dic
                 (limit,),
             )
             rows = await cursor.fetchall()
-            leaderboard = [
-                {"rank": i + 1, "agent_id": row[0], "value": round(row[1], 6)}
-                for i, row in enumerate(rows)
-            ]
+            leaderboard = [{"rank": i + 1, "agent_id": row[0], "value": round(row[1], 6)} for i, row in enumerate(rows)]
         except (RuntimeError, OSError, AttributeError):
             leaderboard = []
     else:
@@ -182,14 +172,13 @@ async def _get_volume_discount(ctx: AppContext, params: dict[str, Any]) -> dict[
     """Calculate volume discount based on historical usage."""
     agent_id = params["agent_id"]
     tool_name = params["tool_name"]
-    quantity = int(params["quantity"])
+    int(params["quantity"])
 
-    usage = await ctx.tracker.storage.get_usage(
-        agent_id, function=tool_name, limit=100000
-    )
+    usage = await ctx.tracker.storage.get_usage(agent_id, function=tool_name, limit=100000)
     historical_calls = len(usage)
 
     from gateway.src.catalog import get_tool
+
     tool_def = get_tool(tool_name)
     unit_price = 0.0
     if tool_def:
@@ -221,6 +210,7 @@ async def _estimate_cost(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
     agent_id = params.get("agent_id")
 
     from gateway.src.catalog import get_tool
+
     tool_def = get_tool(tool_name)
     unit_price = 0.0
     if tool_def:
@@ -231,9 +221,7 @@ async def _estimate_cost(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
 
     discount_pct = 0
     if agent_id:
-        usage = await ctx.tracker.storage.get_usage(
-            agent_id, function=tool_name, limit=100000
-        )
+        usage = await ctx.tracker.storage.get_usage(agent_id, function=tool_name, limit=100000)
         historical_calls = len(usage)
         discount_pct = _get_discount_tier(historical_calls)
 
@@ -287,9 +275,7 @@ async def _get_budget_status(ctx: AppContext, params: dict[str, Any]) -> dict[st
     agent_id = params["agent_id"]
     db = ctx.tracker.storage.db
 
-    cursor = await db.execute(
-        "SELECT * FROM budget_caps WHERE agent_id = ?", (agent_id,)
-    )
+    cursor = await db.execute("SELECT * FROM budget_caps WHERE agent_id = ?", (agent_id,))
     row = await cursor.fetchone()
 
     daily_cap = row["daily_cap"] if row and row["daily_cap"] is not None else None
@@ -341,9 +327,7 @@ async def _get_budget_status(ctx: AppContext, params: dict[str, Any]) -> dict[st
 
 async def _get_service_analytics(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     """Get usage analytics for an agent."""
-    summary = await ctx.tracker.get_usage_summary(
-        params["agent_id"], since=params.get("since")
-    )
+    summary = await ctx.tracker.get_usage_summary(params["agent_id"], since=params.get("since"))
     return {
         "agent_id": params["agent_id"],
         "total_calls": summary.get("total_calls", 0),
@@ -362,5 +346,5 @@ async def _get_revenue_report(ctx: AppContext, params: dict[str, Any]) -> dict[s
         "agent_id": agent_id,
         "total_revenue": total_revenue,
         "payment_count": len(incoming),
-        "history": incoming[:params.get("limit", 50)],
+        "history": incoming[: params.get("limit", 50)],
     }

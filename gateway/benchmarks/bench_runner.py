@@ -15,8 +15,9 @@ import os
 import platform
 import sys
 import time
-from dataclasses import dataclass, field, asdict
-from typing import Any, Callable, Coroutine
+from collections.abc import Callable, Coroutine
+from dataclasses import asdict, dataclass, field
+from typing import Any
 
 import httpx
 
@@ -69,9 +70,7 @@ class BenchmarkReport:
             "summary": {
                 "total_scenarios": len(self.results),
                 "total_errors": sum(r.error_count for r in self.results),
-                "scenarios_passed": sum(
-                    1 for r in self.results if r.error_rate < 1.0
-                ),
+                "scenarios_passed": sum(1 for r in self.results if r.error_rate < 1.0),
             },
         }
 
@@ -118,9 +117,7 @@ async def run_benchmark(
     run_id = generate_run_id(time.time(), run_params)
 
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(
-        transport=transport, base_url="http://bench"
-    ) as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://bench") as client:
         if setup_func is not None:
             await setup_func(client, app)
 

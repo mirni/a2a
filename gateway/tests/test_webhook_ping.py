@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-
 pytestmark = pytest.mark.asyncio
 
 
@@ -91,7 +90,7 @@ class TestWebhookPing:
             headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 200
-        result = resp.json()["result"]
+        resp.json()["result"]
 
         # Verify delivery record exists
         deliveries = await ctx.webhook_manager.get_delivery_history(webhook_id)

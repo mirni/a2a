@@ -129,7 +129,7 @@ class UsageTracker:
                     try:
                         balance = await self._wallet.get_balance(str(agent_id))
                     except WalletNotFoundError:
-                        raise InsufficientCreditsError(str(agent_id), cost, 0.0)
+                        raise InsufficientCreditsError(str(agent_id), cost, 0.0) from None
                     if balance < cost:
                         raise InsufficientCreditsError(str(agent_id), cost, balance)
 
@@ -150,9 +150,7 @@ class UsageTracker:
 
                 # Charge wallet if required
                 if require_balance:
-                    await self._wallet.charge(
-                        str(agent_id), cost, description=f"metered:{func_name}"
-                    )
+                    await self._wallet.charge(str(agent_id), cost, description=f"metered:{func_name}")
 
                 # Emit usage event
                 await self._events.emit(
@@ -187,9 +185,7 @@ class UsageTracker:
         """Query usage history for an agent, optionally filtered by function name."""
         return await self._storage.get_usage(agent_id, since, until, limit, function=function)
 
-    async def get_usage_summary(
-        self, agent_id: str, since: float | None = None
-    ) -> dict[str, Any]:
+    async def get_usage_summary(self, agent_id: str, since: float | None = None) -> dict[str, Any]:
         """Get aggregated usage summary for an agent."""
         return await self._storage.get_usage_summary(agent_id, since)
 
@@ -197,9 +193,7 @@ class UsageTracker:
         """Get current balance for an agent."""
         return await self._wallet.get_balance(agent_id)
 
-    async def get_projected_cost(
-        self, agent_id: str, hours: float = 24.0
-    ) -> dict[str, Any]:
+    async def get_projected_cost(self, agent_id: str, hours: float = 24.0) -> dict[str, Any]:
         """Project future cost based on recent usage patterns.
 
         Looks at usage from the last `hours` period and extrapolates.

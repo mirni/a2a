@@ -10,20 +10,16 @@ TODO-18: Integrate reputation with payment/dispute data
 
 from __future__ import annotations
 
-import time
-
 import pytest
-import pytest_asyncio
 
-from products.identity.src.api import IdentityAPI, AgentNotFoundError, InvalidMetricError
+from products.identity.src.api import InvalidMetricError
 from products.identity.src.crypto import AgentCrypto, MerkleTree
 from products.identity.src.models import AuditorAttestation
-from products.identity.src.storage import IdentityStorage
-
 
 # ---------------------------------------------------------------------------
 # TODO-13: Algorithm field on attestation schema
 # ---------------------------------------------------------------------------
+
 
 class TestAlgorithmField:
     """Attestations should carry an algorithm identifier for crypto agility."""
@@ -57,7 +53,7 @@ class TestAlgorithmField:
     async def test_algorithm_persisted(self, api):
         """Algorithm field should round-trip through storage."""
         await api.register_agent("bot-algo")
-        result = await api.submit_metrics("bot-algo", {"sharpe_30d": 2.0})
+        await api.submit_metrics("bot-algo", {"sharpe_30d": 2.0})
 
         attestations = await api.storage.get_attestations("bot-algo")
         assert attestations[0].algorithm == "ed25519-sha3-256"
@@ -66,6 +62,7 @@ class TestAlgorithmField:
 # ---------------------------------------------------------------------------
 # TODO-14: Configurable metric set
 # ---------------------------------------------------------------------------
+
 
 class TestConfigurableMetrics:
     """Metric set should be configurable, not hardcoded."""
@@ -76,9 +73,7 @@ class TestConfigurableMetrics:
         api.register_custom_metric("custom_alpha_30d")
 
         await api.register_agent("bot-custom")
-        result = await api.submit_metrics(
-            "bot-custom", {"custom_alpha_30d": 1.5}
-        )
+        result = await api.submit_metrics("bot-custom", {"custom_alpha_30d": 1.5})
         assert "custom_alpha_30d" in result.blinding_factors
 
     @pytest.mark.asyncio
@@ -86,9 +81,7 @@ class TestConfigurableMetrics:
         """Unregistered metrics should still be rejected."""
         await api.register_agent("bot-no-custom")
         with pytest.raises(InvalidMetricError):
-            await api.submit_metrics(
-                "bot-no-custom", {"completely_unknown_metric": 1.0}
-            )
+            await api.submit_metrics("bot-no-custom", {"completely_unknown_metric": 1.0})
 
     @pytest.mark.asyncio
     async def test_deregister_custom_metric(self, api):
@@ -110,6 +103,7 @@ class TestConfigurableMetrics:
 # ---------------------------------------------------------------------------
 # TODO-15: Auditor key rotation
 # ---------------------------------------------------------------------------
+
 
 class TestAuditorKeyRotation:
     """Auditor keys should be rotatable with version tracking."""
@@ -160,6 +154,7 @@ class TestAuditorKeyRotation:
 # TODO-16: W3C VC alignment
 # ---------------------------------------------------------------------------
 
+
 class TestW3CVCAlignment:
     """Attestations should be exportable in W3C Verifiable Credential format."""
 
@@ -167,9 +162,7 @@ class TestW3CVCAlignment:
     async def test_export_as_vc(self, api):
         """export_as_vc should produce a W3C-aligned structure."""
         await api.register_agent("bot-vc")
-        result = await api.submit_metrics(
-            "bot-vc", {"sharpe_30d": 2.5}, data_source="platform_verified"
-        )
+        result = await api.submit_metrics("bot-vc", {"sharpe_30d": 2.5}, data_source="platform_verified")
 
         vc = api.export_attestation_as_vc(result.attestation)
 
@@ -187,6 +180,7 @@ class TestW3CVCAlignment:
 # ---------------------------------------------------------------------------
 # TODO-17: Merkle proof endpoint
 # ---------------------------------------------------------------------------
+
 
 class TestMerkleProofEndpoint:
     """API should provide inclusion proofs for claim chains."""
@@ -236,6 +230,7 @@ class TestMerkleProofEndpoint:
 # TODO-18: Integrate reputation with payment/dispute data
 # ---------------------------------------------------------------------------
 
+
 class TestReputationIntegration:
     """Reputation should accept external payment/dispute signals."""
 
@@ -246,9 +241,7 @@ class TestReputationIntegration:
         await api.submit_metrics("bot-pay-rep", {"sharpe_30d": 2.0})
 
         # Inject payment signal
-        await api.record_payment_signal(
-            "bot-pay-rep", signal_type="payment_completed", count=10
-        )
+        await api.record_payment_signal("bot-pay-rep", signal_type="payment_completed", count=10)
 
         rep = await api.compute_reputation("bot-pay-rep")
         assert rep.payment_reliability > 0
@@ -260,12 +253,8 @@ class TestReputationIntegration:
         await api.submit_metrics("bot-disp-rep", {"sharpe_30d": 2.0})
 
         # Inject dispute signal — high dispute count should lower reputation
-        await api.record_payment_signal(
-            "bot-disp-rep", signal_type="dispute_opened", count=5
-        )
-        await api.record_payment_signal(
-            "bot-disp-rep", signal_type="payment_completed", count=10
-        )
+        await api.record_payment_signal("bot-disp-rep", signal_type="dispute_opened", count=5)
+        await api.record_payment_signal("bot-disp-rep", signal_type="payment_completed", count=10)
 
         rep = await api.compute_reputation("bot-disp-rep")
         # Dispute rate should be 5/(5+10) = 33%, so composite should be lower
@@ -275,9 +264,7 @@ class TestReputationIntegration:
     async def test_no_signals_uses_attestation_proxy(self, api):
         """Without payment signals, reputation should use attestation-based proxies."""
         await api.register_agent("bot-no-signals")
-        await api.submit_metrics(
-            "bot-no-signals", {"sharpe_30d": 2.0}, data_source="platform_verified"
-        )
+        await api.submit_metrics("bot-no-signals", {"sharpe_30d": 2.0}, data_source="platform_verified")
 
         rep = await api.compute_reputation("bot-no-signals")
         assert rep.payment_reliability > 0  # Attestation count proxy still works

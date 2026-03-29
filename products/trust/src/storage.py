@@ -5,8 +5,6 @@ All database access is async via aiosqlite. Schema is auto-created on first conn
 
 from __future__ import annotations
 
-import json
-import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -116,17 +114,21 @@ class StorageBackend:
         await self.db.execute(
             "INSERT INTO servers (id, name, url, transport_type, registered_at, last_probed_at) "
             "VALUES (?, ?, ?, ?, ?, ?)",
-            (server.id, server.name, server.url, server.transport_type.value,
-             server.registered_at, server.last_probed_at),
+            (
+                server.id,
+                server.name,
+                server.url,
+                server.transport_type.value,
+                server.registered_at,
+                server.last_probed_at,
+            ),
         )
         await self.db.commit()
         return server
 
     async def get_server(self, server_id: str) -> Server | None:
         """Retrieve a server by ID."""
-        cursor = await self.db.execute(
-            "SELECT * FROM servers WHERE id = ?", (server_id,)
-        )
+        cursor = await self.db.execute("SELECT * FROM servers WHERE id = ?", (server_id,))
         row = await cursor.fetchone()
         if row is None:
             return None
@@ -184,26 +186,16 @@ class StorageBackend:
 
         Returns True if the server existed and was deleted.
         """
-        cursor = await self.db.execute(
-            "DELETE FROM servers WHERE id = ?", (server_id,)
-        )
+        cursor = await self.db.execute("DELETE FROM servers WHERE id = ?", (server_id,))
         if cursor.rowcount == 0:
             return False
-        await self.db.execute(
-            "DELETE FROM probe_results WHERE server_id = ?", (server_id,)
-        )
-        await self.db.execute(
-            "DELETE FROM security_scans WHERE server_id = ?", (server_id,)
-        )
-        await self.db.execute(
-            "DELETE FROM trust_scores WHERE server_id = ?", (server_id,)
-        )
+        await self.db.execute("DELETE FROM probe_results WHERE server_id = ?", (server_id,))
+        await self.db.execute("DELETE FROM security_scans WHERE server_id = ?", (server_id,))
+        await self.db.execute("DELETE FROM trust_scores WHERE server_id = ?", (server_id,))
         await self.db.commit()
         return True
 
-    async def update_server(
-        self, server_id: str, name: str | None = None, url: str | None = None
-    ) -> Server | None:
+    async def update_server(self, server_id: str, name: str | None = None, url: str | None = None) -> Server | None:
         """Update a server's name and/or url. Returns updated Server or None if not found."""
         existing = await self.get_server(server_id)
         if existing is None:
@@ -238,8 +230,15 @@ class StorageBackend:
             "INSERT INTO probe_results "
             "(server_id, timestamp, latency_ms, status_code, error, tools_count, tools_documented) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (probe.server_id, probe.timestamp, probe.latency_ms,
-             probe.status_code, probe.error, probe.tools_count, probe.tools_documented),
+            (
+                probe.server_id,
+                probe.timestamp,
+                probe.latency_ms,
+                probe.status_code,
+                probe.error,
+                probe.tools_count,
+                probe.tools_documented,
+            ),
         )
         await self.db.commit()
         return cursor.lastrowid  # type: ignore[return-value]
@@ -302,8 +301,14 @@ class StorageBackend:
             "INSERT INTO security_scans "
             "(server_id, timestamp, tls_enabled, auth_required, input_validation_score, cve_count) "
             "VALUES (?, ?, ?, ?, ?, ?)",
-            (scan.server_id, scan.timestamp, int(scan.tls_enabled),
-             int(scan.auth_required), scan.input_validation_score, scan.cve_count),
+            (
+                scan.server_id,
+                scan.timestamp,
+                int(scan.tls_enabled),
+                int(scan.auth_required),
+                scan.input_validation_score,
+                scan.cve_count,
+            ),
         )
         await self.db.commit()
         return cursor.lastrowid  # type: ignore[return-value]
@@ -365,21 +370,25 @@ class StorageBackend:
             "(server_id, timestamp, window, reliability_score, security_score, "
             "documentation_score, responsiveness_score, composite_score, confidence) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (score.server_id, score.timestamp, score.window.value,
-             score.reliability_score, score.security_score,
-             score.documentation_score, score.responsiveness_score,
-             score.composite_score, score.confidence),
+            (
+                score.server_id,
+                score.timestamp,
+                score.window.value,
+                score.reliability_score,
+                score.security_score,
+                score.documentation_score,
+                score.responsiveness_score,
+                score.composite_score,
+                score.confidence,
+            ),
         )
         await self.db.commit()
         return cursor.lastrowid  # type: ignore[return-value]
 
-    async def get_latest_trust_score(
-        self, server_id: str, window: Window = Window.H24
-    ) -> TrustScore | None:
+    async def get_latest_trust_score(self, server_id: str, window: Window = Window.H24) -> TrustScore | None:
         """Retrieve the most recent trust score for a server and window."""
         cursor = await self.db.execute(
-            "SELECT * FROM trust_scores WHERE server_id = ? AND window = ? "
-            "ORDER BY timestamp DESC LIMIT 1",
+            "SELECT * FROM trust_scores WHERE server_id = ? AND window = ? ORDER BY timestamp DESC LIMIT 1",
             (server_id, window.value),
         )
         row = await cursor.fetchone()

@@ -166,19 +166,23 @@ class PaymentStorage:
             "settlement_id, created_at, updated_at, metadata) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                data["id"], data["payer"], data["payee"], amount,
-                data.get("description", ""), data.get("idempotency_key"),
-                data.get("status", "pending"), data.get("settlement_id"),
-                data["created_at"], data["updated_at"],
+                data["id"],
+                data["payer"],
+                data["payee"],
+                amount,
+                data.get("description", ""),
+                data.get("idempotency_key"),
+                data.get("status", "pending"),
+                data.get("settlement_id"),
+                data["created_at"],
+                data["updated_at"],
                 json.dumps(data.get("metadata", {})),
             ),
         )
         await self.db.commit()
 
     async def get_intent(self, intent_id: str) -> dict[str, Any] | None:
-        cursor = await self.db.execute(
-            "SELECT * FROM payment_intents WHERE id = ?", (intent_id,)
-        )
+        cursor = await self.db.execute("SELECT * FROM payment_intents WHERE id = ?", (intent_id,))
         row = await cursor.fetchone()
         if row is None:
             return None
@@ -187,9 +191,7 @@ class PaymentStorage:
         return self._convert_amount(d)
 
     async def get_intent_by_idempotency_key(self, key: str) -> dict[str, Any] | None:
-        cursor = await self.db.execute(
-            "SELECT * FROM payment_intents WHERE idempotency_key = ?", (key,)
-        )
+        cursor = await self.db.execute("SELECT * FROM payment_intents WHERE idempotency_key = ?", (key,))
         row = await cursor.fetchone()
         if row is None:
             return None
@@ -197,14 +199,11 @@ class PaymentStorage:
         d["metadata"] = json.loads(d["metadata"])
         return self._convert_amount(d)
 
-    async def update_intent_status(
-        self, intent_id: str, status: str, settlement_id: str | None = None
-    ) -> None:
+    async def update_intent_status(self, intent_id: str, status: str, settlement_id: str | None = None) -> None:
         now = time.time()
         if settlement_id is not None:
             await self.db.execute(
-                "UPDATE payment_intents SET status = ?, settlement_id = ?, updated_at = ? "
-                "WHERE id = ?",
+                "UPDATE payment_intents SET status = ?, settlement_id = ?, updated_at = ? WHERE id = ?",
                 (status, settlement_id, now, intent_id),
             )
         else:
@@ -214,9 +213,7 @@ class PaymentStorage:
             )
         await self.db.commit()
 
-    async def update_intent_amount(
-        self, intent_id: str, amount: float
-    ) -> None:
+    async def update_intent_amount(self, intent_id: str, amount: float) -> None:
         now = time.time()
         amt_atomic = credits_to_atomic(Decimal(str(amount)))
         await self.db.execute(
@@ -265,19 +262,23 @@ class PaymentStorage:
             "timeout_at, created_at, updated_at, metadata) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                data["id"], data["payer"], data["payee"], amount,
-                data.get("description", ""), data.get("status", "held"),
-                data.get("settlement_id"), data.get("timeout_at"),
-                data["created_at"], data["updated_at"],
+                data["id"],
+                data["payer"],
+                data["payee"],
+                amount,
+                data.get("description", ""),
+                data.get("status", "held"),
+                data.get("settlement_id"),
+                data.get("timeout_at"),
+                data["created_at"],
+                data["updated_at"],
                 json.dumps(data.get("metadata", {})),
             ),
         )
         await self.db.commit()
 
     async def get_escrow(self, escrow_id: str) -> dict[str, Any] | None:
-        cursor = await self.db.execute(
-            "SELECT * FROM escrows WHERE id = ?", (escrow_id,)
-        )
+        cursor = await self.db.execute("SELECT * FROM escrows WHERE id = ?", (escrow_id,))
         row = await cursor.fetchone()
         if row is None:
             return None
@@ -285,9 +286,7 @@ class PaymentStorage:
         d["metadata"] = json.loads(d["metadata"])
         return self._convert_amount(d)
 
-    async def update_escrow_status(
-        self, escrow_id: str, status: str, settlement_id: str | None = None
-    ) -> None:
+    async def update_escrow_status(self, escrow_id: str, status: str, settlement_id: str | None = None) -> None:
         now = time.time()
         if settlement_id is not None:
             await self.db.execute(
@@ -357,21 +356,26 @@ class PaymentStorage:
             "next_charge_at, last_charged_at, charge_count, created_at, updated_at, metadata) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                data["id"], data["payer"], data["payee"], amount,
-                data["interval"], data.get("description", ""),
-                data.get("status", "active"), data.get("cancelled_by"),
-                data["next_charge_at"], data.get("last_charged_at"),
+                data["id"],
+                data["payer"],
+                data["payee"],
+                amount,
+                data["interval"],
+                data.get("description", ""),
+                data.get("status", "active"),
+                data.get("cancelled_by"),
+                data["next_charge_at"],
+                data.get("last_charged_at"),
                 data.get("charge_count", 0),
-                data["created_at"], data["updated_at"],
+                data["created_at"],
+                data["updated_at"],
                 json.dumps(data.get("metadata", {})),
             ),
         )
         await self.db.commit()
 
     async def get_subscription(self, sub_id: str) -> dict[str, Any] | None:
-        cursor = await self.db.execute(
-            "SELECT * FROM subscriptions WHERE id = ?", (sub_id,)
-        )
+        cursor = await self.db.execute("SELECT * FROM subscriptions WHERE id = ?", (sub_id,))
         row = await cursor.fetchone()
         if row is None:
             return None
@@ -379,11 +383,22 @@ class PaymentStorage:
         d["metadata"] = json.loads(d["metadata"])
         return self._convert_amount(d)
 
-    _SUBSCRIPTION_COLUMNS = frozenset({
-        "payer", "payee", "amount", "interval", "description", "status",
-        "cancelled_by", "next_charge_at", "last_charged_at", "charge_count",
-        "updated_at", "metadata",
-    })
+    _SUBSCRIPTION_COLUMNS = frozenset(
+        {
+            "payer",
+            "payee",
+            "amount",
+            "interval",
+            "description",
+            "status",
+            "cancelled_by",
+            "next_charge_at",
+            "last_charged_at",
+            "charge_count",
+            "updated_at",
+            "metadata",
+        }
+    )
 
     async def update_subscription(self, sub_id: str, updates: dict[str, Any]) -> None:
         now = time.time()
@@ -464,17 +479,20 @@ class PaymentStorage:
             "(id, payer, payee, amount, source_type, source_id, description, created_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                data["id"], data["payer"], data["payee"], amount,
-                data["source_type"], data["source_id"],
-                data.get("description", ""), data["created_at"],
+                data["id"],
+                data["payer"],
+                data["payee"],
+                amount,
+                data["source_type"],
+                data["source_id"],
+                data.get("description", ""),
+                data["created_at"],
             ),
         )
         await self.db.commit()
 
     async def get_settlement(self, settlement_id: str) -> dict[str, Any] | None:
-        cursor = await self.db.execute(
-            "SELECT * FROM settlements WHERE id = ?", (settlement_id,)
-        )
+        cursor = await self.db.execute("SELECT * FROM settlements WHERE id = ?", (settlement_id,))
         row = await cursor.fetchone()
         if row is None:
             return None
@@ -523,59 +541,67 @@ class PaymentStorage:
         # Payment intents
         intents = await self.list_intents(agent_id=agent_id, limit=fetch_limit)
         for intent in intents:
-            history.append({
-                "type": "intent",
-                "id": intent["id"],
-                "payer": intent["payer"],
-                "payee": intent["payee"],
-                "amount": intent["amount"],
-                "status": intent["status"],
-                "description": intent["description"],
-                "created_at": intent["created_at"],
-            })
+            history.append(
+                {
+                    "type": "intent",
+                    "id": intent["id"],
+                    "payer": intent["payer"],
+                    "payee": intent["payee"],
+                    "amount": intent["amount"],
+                    "status": intent["status"],
+                    "description": intent["description"],
+                    "created_at": intent["created_at"],
+                }
+            )
 
         # Escrows
         escrows = await self.list_escrows(agent_id=agent_id, limit=fetch_limit)
         for escrow in escrows:
-            history.append({
-                "type": "escrow",
-                "id": escrow["id"],
-                "payer": escrow["payer"],
-                "payee": escrow["payee"],
-                "amount": escrow["amount"],
-                "status": escrow["status"],
-                "description": escrow["description"],
-                "created_at": escrow["created_at"],
-            })
+            history.append(
+                {
+                    "type": "escrow",
+                    "id": escrow["id"],
+                    "payer": escrow["payer"],
+                    "payee": escrow["payee"],
+                    "amount": escrow["amount"],
+                    "status": escrow["status"],
+                    "description": escrow["description"],
+                    "created_at": escrow["created_at"],
+                }
+            )
 
         # Subscriptions
         subscriptions = await self.list_subscriptions(agent_id=agent_id, limit=fetch_limit)
         for sub in subscriptions:
-            history.append({
-                "type": "subscription",
-                "id": sub["id"],
-                "payer": sub["payer"],
-                "payee": sub["payee"],
-                "amount": sub["amount"],
-                "status": sub["status"],
-                "description": sub["description"],
-                "created_at": sub["created_at"],
-            })
+            history.append(
+                {
+                    "type": "subscription",
+                    "id": sub["id"],
+                    "payer": sub["payer"],
+                    "payee": sub["payee"],
+                    "amount": sub["amount"],
+                    "status": sub["status"],
+                    "description": sub["description"],
+                    "created_at": sub["created_at"],
+                }
+            )
 
         # Settlements
         settlements = await self.list_settlements(agent_id=agent_id, limit=fetch_limit)
         for settlement in settlements:
-            history.append({
-                "type": "settlement",
-                "id": settlement["id"],
-                "payer": settlement["payer"],
-                "payee": settlement["payee"],
-                "amount": settlement["amount"],
-                "status": "completed",
-                "description": settlement["description"],
-                "created_at": settlement["created_at"],
-            })
+            history.append(
+                {
+                    "type": "settlement",
+                    "id": settlement["id"],
+                    "payer": settlement["payer"],
+                    "payee": settlement["payee"],
+                    "amount": settlement["amount"],
+                    "status": "completed",
+                    "description": settlement["description"],
+                    "created_at": settlement["created_at"],
+                }
+            )
 
         # Sort by created_at descending
         history.sort(key=lambda x: x["created_at"], reverse=True)
-        return history[offset:offset + limit]
+        return history[offset : offset + limit]

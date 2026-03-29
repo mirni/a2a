@@ -65,9 +65,17 @@ class AuditEntry:
 # Substrings that indicate a key is sensitive (case-insensitive matching).
 # A key is redacted if ANY of these appear as a substring in the lowered key.
 _SENSITIVE_SUBSTRINGS = (
-    "api_key", "apikey", "secret", "password", "token",
-    "authorization", "private_key", "credit_card",
-    "card_number", "cvv", "ssn",
+    "api_key",
+    "apikey",
+    "secret",
+    "password",
+    "token",
+    "authorization",
+    "private_key",
+    "credit_card",
+    "card_number",
+    "cvv",
+    "ssn",
 )
 
 

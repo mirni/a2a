@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from products.identity.src.api import AgentNotFoundError, IdentityAPI, InvalidMetricError
+from products.identity.src.api import AgentNotFoundError, InvalidMetricError
 from products.identity.src.crypto import AgentCrypto
 
 
@@ -202,15 +202,13 @@ class TestBuildClaimChain:
     @pytest.mark.asyncio
     async def test_build_claim_chain_from_attestations(self, api):
         """build_claim_chain should build a Merkle tree from valid attestations."""
-        from products.identity.src.crypto import MerkleTree
 
         await api.register_agent("bot-chain")
         # Submit multiple rounds of metrics to create multiple attestations
-        att1 = await api.submit_metrics(
-            "bot-chain", {"sharpe_30d": 2.5}, data_source="platform_verified"
-        )
-        att2 = await api.submit_metrics(
-            "bot-chain", {"sharpe_30d": 2.8, "max_drawdown_30d": 3.0},
+        await api.submit_metrics("bot-chain", {"sharpe_30d": 2.5}, data_source="platform_verified")
+        await api.submit_metrics(
+            "bot-chain",
+            {"sharpe_30d": 2.8, "max_drawdown_30d": 3.0},
             data_source="exchange_api",
         )
 
@@ -269,11 +267,9 @@ class TestBuildClaimChain:
         import json
 
         await api.register_agent("bot-leaf-check")
-        att = await api.submit_metrics(
-            "bot-leaf-check", {"sharpe_30d": 3.0}
-        )
+        att = await api.submit_metrics("bot-leaf-check", {"sharpe_30d": 3.0})
 
-        result = await api.build_claim_chain("bot-leaf-check")
+        await api.build_claim_chain("bot-leaf-check")
 
         # The leaf hash should be SHA3-256 of the attestation signature
         expected_leaf = hashlib.sha3_256(att.signature.encode()).hexdigest()

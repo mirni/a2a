@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import json
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 from pydantic import ValidationError as PydanticValidationError
@@ -22,11 +22,23 @@ from src.models import (
 )
 from src.tools import (
     create_customer as _create_customer,
+)
+from src.tools import (
     create_payment_intent as _create_payment_intent,
+)
+from src.tools import (
     create_refund as _create_refund,
+)
+from src.tools import (
     create_subscription as _create_subscription,
+)
+from src.tools import (
     get_balance as _get_balance,
+)
+from src.tools import (
     list_charges as _list_charges,
+)
+from src.tools import (
     list_invoices as _list_invoices,
 )
 
@@ -57,9 +69,7 @@ def _validation_error_result(exc: PydanticValidationError) -> str:
     details = {"validation_errors": exc.errors(include_url=False, include_input=False)}
     result = ToolResult(
         success=False,
-        error=ValidationError(
-            "Input validation failed", details=details
-        ).to_dict(),
+        error=ValidationError("Input validation failed", details=details).to_dict(),
     )
     return result.model_dump_json()
 
@@ -77,8 +87,7 @@ def _result_to_json(result: ToolResult) -> str:
 @mcp.tool(
     name="create_customer",
     description=(
-        "Create a Stripe customer. Requires email and idempotency_key. "
-        "Optional: name, description, metadata."
+        "Create a Stripe customer. Requires email and idempotency_key. Optional: name, description, metadata."
     ),
 )
 async def create_customer_tool(

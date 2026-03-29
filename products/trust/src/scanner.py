@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Protocol
 
 from .models import SecurityScan
 from .storage import StorageBackend

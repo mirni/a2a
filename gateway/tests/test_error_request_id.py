@@ -64,11 +64,14 @@ async def test_tier_error_has_request_id(client, api_key):
     """Tier insufficient error should include request_id."""
     resp = await client.post(
         "/v1/execute",
-        json={"tool": "register_webhook", "params": {
-            "agent_id": "test-agent",
-            "url": "https://example.com",
-            "event_types": ["test"],
-        }},
+        json={
+            "tool": "register_webhook",
+            "params": {
+                "agent_id": "test-agent",
+                "url": "https://example.com",
+                "event_types": ["test"],
+            },
+        },
         headers={"Authorization": f"Bearer {api_key}"},
     )
     # register_webhook requires pro tier

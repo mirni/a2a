@@ -253,7 +253,7 @@ class ScoreEngine:
     Wraps the pure computation functions with I/O.
     """
 
-    storage: "StorageBackend"  # noqa: F821 — forward reference
+    storage: StorageBackend  # noqa: F821 — forward reference
 
     async def compute_and_store(
         self,

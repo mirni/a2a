@@ -15,36 +15,43 @@ class A2AError(Exception):
 
 class AuthenticationError(A2AError):
     """401 — invalid or missing API key."""
+
     pass
 
 
 class InsufficientBalanceError(A2AError):
     """402 — not enough credits."""
+
     pass
 
 
 class InsufficientTierError(A2AError):
     """403 — tier too low for this tool."""
+
     pass
 
 
 class ToolNotFoundError(A2AError):
     """400/404 — unknown tool name."""
+
     pass
 
 
 class RateLimitError(A2AError):
     """429 — rate limit exceeded."""
+
     pass
 
 
 class ServerError(A2AError):
     """5xx — gateway internal error."""
+
     pass
 
 
 class RetryableError(A2AError):
     """Error that can be retried (429, 5xx)."""
+
     pass
 
 

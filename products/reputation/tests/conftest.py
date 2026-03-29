@@ -6,15 +6,13 @@ import os
 import sys
 import time
 import types
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
 
 # Register shared_src so cross-product imports (db_security) resolve
-_shared_src_dir = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "shared", "src")
-)
+_shared_src_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "src"))
 if "shared_src" not in sys.modules:
     _pkg = types.ModuleType("shared_src")
     _pkg.__path__ = [_shared_src_dir]
@@ -23,29 +21,18 @@ if "shared_src" not in sys.modules:
 
 from products.reputation.src.models import (
     PipelineConfig,
-    ProbeErrorType,
     ProbeSchedule,
     ProbeTarget,
-    ScanResult,
     ScanSchedule,
-    SecurityHeaders,
-    TLSInfo,
 )
 from products.reputation.src.storage import ReputationStorage
-from products.reputation.src.probe_worker import ProbeWorker
-from products.reputation.src.scan_worker import ScanWorker
-from products.reputation.src.aggregator import Aggregator
-from products.reputation.src.pipeline import ReputationPipeline
-
-from products.trust.src.storage import StorageBackend as TrustStorageBackend
 from products.trust.src.models import (
     ProbeResult as TrustProbeResult,
-    SecurityScan as TrustSecurityScan,
-    Server as TrustServer,
-    TransportType,
-    TrustScore,
-    Window,
 )
+from products.trust.src.models import (
+    SecurityScan as TrustSecurityScan,
+)
+from products.trust.src.storage import StorageBackend as TrustStorageBackend
 
 
 @pytest_asyncio.fixture

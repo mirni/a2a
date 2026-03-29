@@ -167,14 +167,10 @@ class X402Verifier:
         now = time.time()
 
         if auth.to != self._merchant_address:
-            raise X402VerificationError(
-                f"Wrong recipient: expected {self._merchant_address}, got {auth.to}"
-            )
+            raise X402VerificationError(f"Wrong recipient: expected {self._merchant_address}, got {auth.to}")
 
         if int(auth.value) < int(required_value):
-            raise X402VerificationError(
-                f"Insufficient value: {auth.value} < {required_value}"
-            )
+            raise X402VerificationError(f"Insufficient value: {auth.value} < {required_value}")
 
         if auth.valid_before <= now:
             raise X402VerificationError("Payment authorization has expired")
@@ -183,9 +179,7 @@ class X402Verifier:
             raise X402VerificationError("Payment authorization is not yet valid")
 
         if proof.network not in self._supported_networks:
-            raise X402VerificationError(
-                f"Unsupported network: {proof.network}"
-            )
+            raise X402VerificationError(f"Unsupported network: {proof.network}")
 
         self.check_replay(auth.nonce)
 
@@ -201,9 +195,7 @@ class X402Verifier:
             )
 
         if resp.status_code != 200:
-            raise X402VerificationError(
-                f"Facilitator verification failed ({resp.status_code}): {resp.text}"
-            )
+            raise X402VerificationError(f"Facilitator verification failed ({resp.status_code}): {resp.text}")
         return resp.json()
 
     async def settle_with_facilitator(self, proof: X402PaymentProof) -> dict:
@@ -241,9 +233,7 @@ class X402Verifier:
         self.pending_settlements = remaining
         return settled, failed
 
-    def build_payment_required(
-        self, cost_value: str, resource: str, network: str = "base"
-    ) -> X402PaymentRequired:
+    def build_payment_required(self, cost_value: str, resource: str, network: str = "base") -> X402PaymentRequired:
         """Build the payment requirements object for a 402 response."""
         return X402PaymentRequired(
             max_amount_required=cost_value,

@@ -23,11 +23,10 @@ if _project_root not in sys.path:
 
 # Bootstrap product imports
 import gateway.src.bootstrap  # noqa: F401
-
-from gateway.src.app import create_app
-from gateway.src.lifespan import lifespan
 from gateway.benchmarks.bench_runner import BenchmarkReport, BenchmarkResult, build_system_info
 from gateway.benchmarks.scenarios import ALL_SCENARIOS
+from gateway.src.app import create_app
+from gateway.src.lifespan import lifespan
 
 
 async def run_scenario_with_fresh_app(

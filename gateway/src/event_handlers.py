@@ -22,6 +22,7 @@ logger = logging.getLogger("a2a.events")
 # Handler: trust score drop -> publish trust.score_drop event
 # ---------------------------------------------------------------------------
 
+
 def make_trust_drop_handler(event_bus: EventBus, threshold: float = 50.0):
     """Create a handler that publishes ``trust.score_drop`` when a score
     falls below *threshold*.
@@ -56,6 +57,7 @@ def make_trust_drop_handler(event_bus: EventBus, threshold: float = 50.0):
 # Handler: trust.score_drop -> deactivate marketplace services
 # ---------------------------------------------------------------------------
 
+
 def make_marketplace_suspend_handler(marketplace: Any):
     """Create a handler that deactivates marketplace services when a
     ``trust.score_drop`` event fires.
@@ -81,9 +83,7 @@ def make_marketplace_suspend_handler(marketplace: Any):
                         server_id,
                     )
         except (RuntimeError, LookupError):
-            logger.exception(
-                "Failed to suspend services for provider %s", server_id
-            )
+            logger.exception("Failed to suspend services for provider %s", server_id)
 
     return marketplace_suspend_handler
 
@@ -91,6 +91,7 @@ def make_marketplace_suspend_handler(marketplace: Any):
 # ---------------------------------------------------------------------------
 # Handler: payment.settled -> publish audit event
 # ---------------------------------------------------------------------------
+
 
 def make_payment_settlement_handler(event_bus: EventBus):
     """Create a handler that publishes an ``audit.payment_settled`` event
@@ -113,6 +114,7 @@ def make_payment_settlement_handler(event_bus: EventBus):
 # ---------------------------------------------------------------------------
 # Handler: billing.* -> log for webhook dispatch
 # ---------------------------------------------------------------------------
+
 
 def make_billing_webhook_handler(webhook_manager: Any = None):
     """Create a handler that dispatches billing events via WebhookManager.
@@ -144,6 +146,7 @@ def make_billing_webhook_handler(webhook_manager: Any = None):
 # ---------------------------------------------------------------------------
 # Registration helper
 # ---------------------------------------------------------------------------
+
 
 async def register_all_handlers(
     event_bus: EventBus,

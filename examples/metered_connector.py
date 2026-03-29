@@ -7,8 +7,8 @@ This is the pattern for monetizing connectors as a service.
 """
 
 import asyncio
-import sys
 import os
+import sys
 
 # Add package paths
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "products", "billing"))

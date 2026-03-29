@@ -53,21 +53,25 @@ async def pricing_summary(request: Request) -> JSONResponse:
     by_service: dict[str, list[dict]] = defaultdict(list)
     for tool in catalog:
         svc = tool.get("service", "unknown")
-        by_service[svc].append({
-            "name": tool["name"],
-            "description": tool.get("description", ""),
-            "pricing": tool.get("pricing", {}),
-            "tier_required": tool.get("tier_required", "free"),
-        })
+        by_service[svc].append(
+            {
+                "name": tool["name"],
+                "description": tool.get("description", ""),
+                "pricing": tool.get("pricing", {}),
+                "tier_required": tool.get("tier_required", "free"),
+            }
+        )
 
     services = []
     for svc_name in sorted(by_service.keys()):
         tools = by_service[svc_name]
-        services.append({
-            "service": svc_name,
-            "tool_count": len(tools),
-            "tools": tools,
-        })
+        services.append(
+            {
+                "service": svc_name,
+                "tool_count": len(tools),
+                "tools": tools,
+            }
+        )
 
     return JSONResponse({"services": services})
 

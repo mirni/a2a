@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class ServiceStatus(str, Enum):
+class ServiceStatus(StrEnum):
     """Status of a service listing."""
 
     ACTIVE = "active"
@@ -15,7 +15,7 @@ class ServiceStatus(str, Enum):
     SUSPENDED = "suspended"
 
 
-class PricingModelType(str, Enum):
+class PricingModelType(StrEnum):
     """Supported pricing models."""
 
     PER_CALL = "per_call"
@@ -24,7 +24,7 @@ class PricingModelType(str, Enum):
     FREE = "free"
 
 
-class SortBy(str, Enum):
+class SortBy(StrEnum):
     """Sort options for search results."""
 
     TRUST_SCORE = "trust_score"
@@ -33,7 +33,7 @@ class SortBy(str, Enum):
     NAME = "name"
 
 
-class MatchPreference(str, Enum):
+class MatchPreference(StrEnum):
     """Preference for best_match ranking."""
 
     COST = "cost"

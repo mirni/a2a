@@ -16,7 +16,6 @@ import hashlib
 import json
 import os
 import sys
-import time
 
 import pytest
 
@@ -24,26 +23,23 @@ _project_root = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
+
 import gateway.src.bootstrap  # noqa: F401
-
-import httpx
-
-from gateway.src.app import create_app
-from gateway.src.lifespan import lifespan
 from gateway.benchmarks.bench_runner import (
     BenchmarkResult,
-    generate_run_id,
     build_system_info,
+    generate_run_id,
 )
 from gateway.benchmarks.scenarios import (
+    scenario_execute_paid_tools,
+    scenario_execute_pipeline,
     scenario_health_throughput,
     scenario_pricing_throughput,
-    scenario_execute_pipeline,
-    scenario_execute_paid_tools,
-    scenario_wallet_stress,
     scenario_rate_limiter_burst,
+    scenario_wallet_stress,
 )
-
+from gateway.src.app import create_app
+from gateway.src.lifespan import lifespan
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -135,9 +131,7 @@ def _assert_valid_results(results: list[BenchmarkResult]) -> None:
 @pytest.mark.asyncio
 async def test_scenario_health_throughput(app):
     """Smoke test: health endpoint throughput."""
-    results = await scenario_health_throughput(
-        app, total_requests=20, concurrency_levels=[1, 5]
-    )
+    results = await scenario_health_throughput(app, total_requests=20, concurrency_levels=[1, 5])
     _assert_valid_results(results)
     for r in results:
         assert r.error_count == 0, f"Health checks should not error: {r.error_count}"
@@ -146,9 +140,7 @@ async def test_scenario_health_throughput(app):
 @pytest.mark.asyncio
 async def test_scenario_pricing_throughput(app):
     """Smoke test: pricing endpoint throughput."""
-    results = await scenario_pricing_throughput(
-        app, total_requests=20, concurrency_levels=[1, 5]
-    )
+    results = await scenario_pricing_throughput(app, total_requests=20, concurrency_levels=[1, 5])
     _assert_valid_results(results)
     for r in results:
         assert r.error_count == 0, f"Pricing should not error: {r.error_count}"
@@ -157,9 +149,7 @@ async def test_scenario_pricing_throughput(app):
 @pytest.mark.asyncio
 async def test_scenario_execute_pipeline(app):
     """Smoke test: execute pipeline (get_balance)."""
-    results = await scenario_execute_pipeline(
-        app, total_requests=20, concurrency_levels=[1, 5]
-    )
+    results = await scenario_execute_pipeline(app, total_requests=20, concurrency_levels=[1, 5])
     _assert_valid_results(results)
     for r in results:
         assert r.error_count == 0, f"Execute pipeline should not error: {r.error_count}"

@@ -40,7 +40,7 @@ def parse_dsn(dsn: str) -> dict:
         If *dsn* does not match a supported scheme.
     """
     if dsn.startswith("sqlite:///"):
-        path = dsn[len("sqlite://"):]  # keep the leading '/'
+        path = dsn[len("sqlite://") :]  # keep the leading '/'
         return {"backend": "sqlite", "path": path}
 
     if dsn.startswith("postgresql://") or dsn.startswith("postgres://"):
@@ -55,8 +55,7 @@ def parse_dsn(dsn: str) -> dict:
         }
 
     raise ValueError(
-        f"Unknown DSN format: {dsn!r}. "
-        "Expected a DSN starting with 'sqlite:///', 'postgresql://', or 'postgres://'."
+        f"Unknown DSN format: {dsn!r}. Expected a DSN starting with 'sqlite:///', 'postgresql://', or 'postgres://'."
     )
 
 

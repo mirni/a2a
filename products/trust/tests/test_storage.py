@@ -5,7 +5,6 @@ from __future__ import annotations
 import time
 
 import pytest
-
 from src.models import ProbeResult, SecurityScan, Server, TransportType, TrustScore, Window
 from src.storage import StorageBackend
 
@@ -189,16 +188,20 @@ class TestSecurityScanCRUD:
 
     async def test_get_latest_scan(self, storage, sample_server):
         now = time.time()
-        await storage.store_security_scan(SecurityScan(
-            server_id=sample_server.id,
-            timestamp=now - 100,
-            tls_enabled=False,
-        ))
-        await storage.store_security_scan(SecurityScan(
-            server_id=sample_server.id,
-            timestamp=now,
-            tls_enabled=True,
-        ))
+        await storage.store_security_scan(
+            SecurityScan(
+                server_id=sample_server.id,
+                timestamp=now - 100,
+                tls_enabled=False,
+            )
+        )
+        await storage.store_security_scan(
+            SecurityScan(
+                server_id=sample_server.id,
+                timestamp=now,
+                tls_enabled=True,
+            )
+        )
 
         latest = await storage.get_latest_security_scan(sample_server.id)
         assert latest is not None
@@ -259,22 +262,22 @@ class TestTrustScoreCRUD:
             )
             await storage.store_trust_score(score)
 
-        history = await storage.get_score_history(
-            sample_server.id, Window.D7, since=now + 7200
-        )
+        history = await storage.get_score_history(sample_server.id, Window.D7, since=now + 7200)
         assert len(history) == 3
 
     async def test_window_isolation(self, storage, sample_server):
         """Scores from different windows should not overlap."""
         now = time.time()
         for w in [Window.H24, Window.D7, Window.D30]:
-            await storage.store_trust_score(TrustScore(
-                server_id=sample_server.id,
-                timestamp=now,
-                window=w,
-                composite_score=50.0,
-                confidence=0.8,
-            ))
+            await storage.store_trust_score(
+                TrustScore(
+                    server_id=sample_server.id,
+                    timestamp=now,
+                    window=w,
+                    composite_score=50.0,
+                    confidence=0.8,
+                )
+            )
 
         h24 = await storage.get_score_history(sample_server.id, Window.H24)
         d7 = await storage.get_score_history(sample_server.id, Window.D7)

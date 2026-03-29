@@ -9,17 +9,13 @@ from __future__ import annotations
 import time
 
 import pytest
-
-from src.keys import InvalidKeyError, KeyManager
+from src.keys import KeyManager
 from src.middleware import (
     PaywallAuthError,
-    InsufficientBalanceError,
     PaywallMiddleware,
     RateLimitError,
-    TierInsufficientError,
 )
 from src.storage import PaywallStorage
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -42,9 +38,7 @@ async def dummy_tool_with_key(api_key: str, params: dict | None = None) -> dict:
 class TestGatedAgentIdParam:
     """Call gated function providing agent_id directly (no API key param)."""
 
-    async def test_agent_id_param_with_valid_key(
-        self, middleware: PaywallMiddleware, key_manager: KeyManager
-    ):
+    async def test_agent_id_param_with_valid_key(self, middleware: PaywallMiddleware, key_manager: KeyManager):
         await key_manager.create_key(agent_id="agent-edge", tier="free")
 
         @middleware.gated(tier="free", agent_id_param="agent_id")
@@ -58,9 +52,7 @@ class TestGatedAgentIdParam:
 class TestGatedApiKeyParam:
     """Call gated function providing API key directly."""
 
-    async def test_api_key_param_resolves_agent(
-        self, middleware: PaywallMiddleware, key_manager: KeyManager
-    ):
+    async def test_api_key_param_resolves_agent(self, middleware: PaywallMiddleware, key_manager: KeyManager):
         created = await key_manager.create_key(agent_id="agent-key", tier="free")
 
         @middleware.gated(tier="free", api_key_param="api_key")
@@ -70,9 +62,7 @@ class TestGatedApiKeyParam:
         result = await my_tool(api_key=created["key"])
         assert result == {"status": "ok"}
 
-    async def test_api_key_param_invalid_key_raises(
-        self, middleware: PaywallMiddleware
-    ):
+    async def test_api_key_param_invalid_key_raises(self, middleware: PaywallMiddleware):
         @middleware.gated(tier="free", api_key_param="api_key")
         async def my_tool(api_key: str):
             return {"status": "ok"}
@@ -89,9 +79,7 @@ class TestGatedApiKeyParam:
 class TestGatedCostZero:
     """gated(cost=0) should not check balance at all."""
 
-    async def test_cost_zero_no_balance_check(
-        self, middleware: PaywallMiddleware, key_manager: KeyManager
-    ):
+    async def test_cost_zero_no_balance_check(self, middleware: PaywallMiddleware, key_manager: KeyManager):
         """With cost=0 on free tier, no wallet is needed."""
         await key_manager.create_key(agent_id="no-wallet-agent", tier="free")
 
@@ -161,9 +149,7 @@ class TestRevokedKey:
         with pytest.raises(PaywallAuthError, match="revoked"):
             await my_tool(api_key=raw_key)
 
-    async def test_revoked_key_via_agent_id_param(
-        self, middleware: PaywallMiddleware, key_manager: KeyManager
-    ):
+    async def test_revoked_key_via_agent_id_param(self, middleware: PaywallMiddleware, key_manager: KeyManager):
         """When using agent_id_param, middleware looks up keys for that agent.
         If all keys are revoked, it should fail with PaywallAuthError."""
         created = await key_manager.create_key(agent_id="agent-rev2", tier="free")
@@ -186,9 +172,7 @@ class TestRateLimitExactBoundary:
     """Make exactly rate_limit_per_hour requests — last should succeed.
     One more should fail."""
 
-    async def test_exact_boundary_succeeds(
-        self, tracker, paywall_storage: PaywallStorage, key_manager: KeyManager
-    ):
+    async def test_exact_boundary_succeeds(self, tracker, paywall_storage: PaywallStorage, key_manager: KeyManager):
         """Free tier has 100 calls/hour. Seed counter to 99, then call once — should succeed."""
         await key_manager.create_key(agent_id="agent-rl", tier="free")
 
@@ -207,17 +191,13 @@ class TestRateLimitExactBoundary:
         # Seed rate counter to 99 (1 below the limit)
         window_start = time.time()
         for _ in range(99):
-            await paywall_storage.increment_rate_count(
-                "agent-rl", "hourly_test_edge", window_start
-            )
+            await paywall_storage.increment_rate_count("agent-rl", "hourly_test_edge", window_start)
 
         # 100th call should still succeed
         result = await my_tool(agent_id="agent-rl")
         assert result == {"ok": True}
 
-    async def test_one_past_boundary_fails(
-        self, tracker, paywall_storage: PaywallStorage, key_manager: KeyManager
-    ):
+    async def test_one_past_boundary_fails(self, tracker, paywall_storage: PaywallStorage, key_manager: KeyManager):
         """Free tier has 100 calls/hour. Seed counter to 100, then call — should fail."""
         await key_manager.create_key(agent_id="agent-rl2", tier="free")
 
@@ -236,9 +216,7 @@ class TestRateLimitExactBoundary:
         # Seed rate counter to exactly 100
         window_start = time.time()
         for _ in range(100):
-            await paywall_storage.increment_rate_count(
-                "agent-rl2", "hourly_test_edge", window_start
-            )
+            await paywall_storage.increment_rate_count("agent-rl2", "hourly_test_edge", window_start)
 
         with pytest.raises(RateLimitError):
             await my_tool(agent_id="agent-rl2")

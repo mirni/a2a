@@ -1,9 +1,7 @@
 """Tests for retry logic."""
 
-import pytest
-
 import httpx
-
+import pytest
 from src.retry import RetryConfig, RetryExhausted, _compute_delay, is_retryable_error, retry_async
 
 
@@ -76,12 +74,8 @@ class TestRetryAsync:
             nonlocal call_count
             call_count += 1
             if call_count < 3:
-                response = httpx.Response(
-                    500, request=httpx.Request("GET", "https://example.com")
-                )
-                raise httpx.HTTPStatusError(
-                    "error", request=response.request, response=response
-                )
+                response = httpx.Response(500, request=httpx.Request("GET", "https://example.com"))
+                raise httpx.HTTPStatusError("error", request=response.request, response=response)
             return "ok"
 
         config = RetryConfig(max_retries=3, base_delay=0.01)

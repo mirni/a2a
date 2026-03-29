@@ -8,7 +8,6 @@ import pytest
 
 from products.messaging.src.models import MessageType, NegotiationState
 
-
 # ---------------------------------------------------------------------------
 # send_message / get_messages
 # ---------------------------------------------------------------------------
@@ -44,14 +43,14 @@ class TestSendMessage:
         assert msgs[0]["metadata"]["doc_id"] == "X"
 
     async def test_send_message_with_thread(self, api):
-        msg1 = await api.send_message(
+        await api.send_message(
             sender="agent-a",
             recipient="agent-b",
             message_type=MessageType.TEXT,
             body="First",
             thread_id="thread-abc",
         )
-        msg2 = await api.send_message(
+        await api.send_message(
             sender="agent-b",
             recipient="agent-a",
             message_type=MessageType.TEXT,
@@ -80,7 +79,9 @@ class TestGetMessages:
         assert len(msgs) == 2
 
     async def test_get_messages_by_thread(self, api):
-        await api.send_message(sender="a", recipient="b", message_type=MessageType.TEXT, thread_id="t1", body="in-thread")
+        await api.send_message(
+            sender="a", recipient="b", message_type=MessageType.TEXT, thread_id="t1", body="in-thread"
+        )
         await api.send_message(sender="a", recipient="b", message_type=MessageType.TEXT, body="no-thread")
 
         msgs = await api.get_messages("b", thread_id="t1")

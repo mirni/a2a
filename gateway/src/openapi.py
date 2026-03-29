@@ -54,14 +54,16 @@ def generate_openapi_spec() -> dict:
     # ── Tool pricing items for GET /pricing response ─────────────────
     tool_pricing_examples = []
     for tool in catalog:
-        tool_pricing_examples.append({
-            "name": tool["name"],
-            "service": tool["service"],
-            "description": tool.get("description", ""),
-            "pricing": tool.get("pricing", {}),
-            "sla": tool.get("sla", {}),
-            "tier_required": tool.get("tier_required", "free"),
-        })
+        tool_pricing_examples.append(
+            {
+                "name": tool["name"],
+                "service": tool["service"],
+                "description": tool.get("description", ""),
+                "pricing": tool.get("pricing", {}),
+                "sla": tool.get("sla", {}),
+                "tier_required": tool.get("tier_required", "free"),
+            }
+        )
 
     spec: dict = {
         "openapi": "3.1.0",
@@ -87,11 +89,7 @@ def generate_openapi_spec() -> dict:
                         "200": {
                             "description": "Gateway is healthy.",
                             "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "$ref": "#/components/schemas/HealthResponse"
-                                    }
-                                }
+                                "application/json": {"schema": {"$ref": "#/components/schemas/HealthResponse"}}
                             },
                         }
                     },
@@ -110,9 +108,7 @@ def generate_openapi_spec() -> dict:
                                 "application/json": {
                                     "schema": {
                                         "type": "array",
-                                        "items": {
-                                            "$ref": "#/components/schemas/ToolPricing"
-                                        },
+                                        "items": {"$ref": "#/components/schemas/ToolPricing"},
                                     },
                                     "example": tool_pricing_examples,
                                 }
@@ -139,23 +135,11 @@ def generate_openapi_spec() -> dict:
                     "responses": {
                         "200": {
                             "description": "Tool pricing details.",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "$ref": "#/components/schemas/ToolPricing"
-                                    }
-                                }
-                            },
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ToolPricing"}}},
                         },
                         "404": {
                             "description": "Tool not found.",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "$ref": "#/components/schemas/ErrorResponse"
-                                    }
-                                }
-                            },
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}},
                         },
                     },
                 }
@@ -173,9 +157,7 @@ def generate_openapi_spec() -> dict:
                         "required": True,
                         "content": {
                             "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ExecuteRequest"
-                                },
+                                "schema": {"$ref": "#/components/schemas/ExecuteRequest"},
                                 "examples": execute_examples,
                             }
                         },
@@ -184,52 +166,24 @@ def generate_openapi_spec() -> dict:
                         "200": {
                             "description": "Tool executed successfully.",
                             "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "$ref": "#/components/schemas/ExecuteResponse"
-                                    }
-                                }
+                                "application/json": {"schema": {"$ref": "#/components/schemas/ExecuteResponse"}}
                             },
                         },
                         "400": {
                             "description": "Invalid request (missing tool, bad params).",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "$ref": "#/components/schemas/ErrorResponse"
-                                    }
-                                }
-                            },
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}},
                         },
                         "402": {
                             "description": "Insufficient balance.",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "$ref": "#/components/schemas/ErrorResponse"
-                                    }
-                                }
-                            },
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}},
                         },
                         "404": {
                             "description": "Tool not found.",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "$ref": "#/components/schemas/ErrorResponse"
-                                    }
-                                }
-                            },
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}},
                         },
                         "500": {
                             "description": "Internal execution error.",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "$ref": "#/components/schemas/ErrorResponse"
-                                    }
-                                }
-                            },
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}},
                         },
                     },
                 }
@@ -243,11 +197,7 @@ def generate_openapi_spec() -> dict:
                     "responses": {
                         "200": {
                             "description": "OpenAPI spec.",
-                            "content": {
-                                "application/json": {
-                                    "schema": {"type": "object"}
-                                }
-                            },
+                            "content": {"application/json": {"schema": {"type": "object"}}},
                         }
                     },
                 }
@@ -261,11 +211,7 @@ def generate_openapi_spec() -> dict:
                     "responses": {
                         "200": {
                             "description": "Prometheus metrics in text exposition format.",
-                            "content": {
-                                "text/plain": {
-                                    "schema": {"type": "string"}
-                                }
-                            },
+                            "content": {"text/plain": {"schema": {"type": "string"}}},
                         }
                     },
                 }

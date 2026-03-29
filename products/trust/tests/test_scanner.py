@@ -5,10 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import pytest
-
-from src.models import Server, TransportType
 from src.scanner import Scanner
-from src.storage import StorageBackend
 
 
 @dataclass

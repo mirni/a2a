@@ -128,7 +128,9 @@ async def _try_x402_payment(
         return await error_response(402, str(exc), "payment_verification_failed", request=request)
     except Exception as exc:
         logger.error("Facilitator verification error: %s", exc, exc_info=True)
-        return await error_response(402, f"Facilitator unavailable: {exc}", "payment_verification_failed", request=request)
+        return await error_response(
+            402, f"Facilitator unavailable: {exc}", "payment_verification_failed", request=request
+        )
 
     return (proof.payload.authorization.from_address, proof)
 
@@ -225,14 +227,10 @@ async def execute(request: Request) -> JSONResponse:
         window_key = "gateway"
         try:
             # Global sliding window check (1 hour)
-            rate_count = await ctx.paywall_storage.get_sliding_window_count(
-                agent_id, window_key, window_seconds=3600.0
-            )
+            rate_count = await ctx.paywall_storage.get_sliding_window_count(agent_id, window_key, window_seconds=3600.0)
             if rate_count >= tier_config.rate_limit_per_hour:
                 # Check burst allowance (1-minute window)
-                burst_count = await ctx.paywall_storage.get_burst_count(
-                    agent_id, window_key, burst_window_seconds=60.0
-                )
+                burst_count = await ctx.paywall_storage.get_burst_count(agent_id, window_key, burst_window_seconds=60.0)
                 burst_limit = tier_config.rate_limit_per_hour // 60 + tier_config.burst_allowance
                 if burst_count >= burst_limit:
                     rl_headers = _rate_limit_headers(tier_config.rate_limit_per_hour, rate_count)
@@ -263,9 +261,7 @@ async def execute(request: Request) -> JSONResponse:
                     return resp
         except (RuntimeError, OSError):
             logger.error("Rate limit check failed for agent %s", agent_id, exc_info=True)
-            return await error_response(
-                503, "Rate limit service unavailable", "service_error", request=request
-            )
+            return await error_response(503, "Rate limit service unavailable", "service_error", request=request)
 
         # --- 5. Check balance if tool costs credits ---
         if cost > 0:
@@ -328,13 +324,17 @@ async def execute(request: Request) -> JSONResponse:
                 # Publish settlement event
                 try:
                     auth = x402_proof.payload.authorization
-                    await ctx.event_bus.publish("x402.payment_settled", "gateway", {
-                        "nonce": auth.nonce,
-                        "network": x402_proof.network,
-                        "amount": auth.value,
-                        "payer": auth.from_address,
-                        "tool": tool_name,
-                    })
+                    await ctx.event_bus.publish(
+                        "x402.payment_settled",
+                        "gateway",
+                        {
+                            "nonce": auth.nonce,
+                            "network": x402_proof.network,
+                            "amount": auth.value,
+                            "payer": auth.from_address,
+                            "tool": tool_name,
+                        },
+                    )
                 except Exception:
                     logger.warning("x402 event publish failed", exc_info=True)
         else:
@@ -357,6 +357,7 @@ async def execute(request: Request) -> JSONResponse:
     # Add rate limit headers (skip for x402)
     if not x402_agent_id:
         from paywall_src.tiers import get_tier_config as _get_tier_config
+
         _tc = _get_tier_config(agent_tier)
         headers.update(_rate_limit_headers(_tc.rate_limit_per_hour, rate_count))
 

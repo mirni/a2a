@@ -5,22 +5,14 @@ from __future__ import annotations
 import time
 
 import pytest
-
-from payments.models import (
-    EscrowStatus,
-    IntentStatus,
-    SubscriptionInterval,
-    SubscriptionStatus,
-)
 from payments.storage import PaymentStorage
-
 
 # ---------------------------------------------------------------------------
 # Connection / lifecycle
 # ---------------------------------------------------------------------------
 
-class TestStorageLifecycle:
 
+class TestStorageLifecycle:
     async def test_connect_and_close(self, payment_db):
         storage = PaymentStorage(dsn=payment_db)
         await storage.connect()
@@ -48,8 +40,8 @@ class TestStorageLifecycle:
 # Payment Intents CRUD
 # ---------------------------------------------------------------------------
 
-class TestIntentStorage:
 
+class TestIntentStorage:
     async def test_insert_and_get(self, payment_storage):
         now = time.time()
         data = {
@@ -229,8 +221,8 @@ class TestIntentStorage:
 # Escrow CRUD
 # ---------------------------------------------------------------------------
 
-class TestEscrowStorage:
 
+class TestEscrowStorage:
     async def test_insert_and_get(self, payment_storage):
         now = time.time()
         data = {
@@ -378,8 +370,8 @@ class TestEscrowStorage:
 # Subscription CRUD
 # ---------------------------------------------------------------------------
 
-class TestSubscriptionStorage:
 
+class TestSubscriptionStorage:
     async def test_insert_and_get(self, payment_storage):
         now = time.time()
         data = {
@@ -423,10 +415,13 @@ class TestSubscriptionStorage:
             "updated_at": now,
         }
         await payment_storage.insert_subscription(data)
-        await payment_storage.update_subscription("sub-upd", {
-            "status": "cancelled",
-            "cancelled_by": "a",
-        })
+        await payment_storage.update_subscription(
+            "sub-upd",
+            {
+                "status": "cancelled",
+                "cancelled_by": "a",
+            },
+        )
         result = await payment_storage.get_subscription("sub-upd")
         assert result["status"] == "cancelled"
         assert result["cancelled_by"] == "a"
@@ -447,11 +442,14 @@ class TestSubscriptionStorage:
             "updated_at": now,
         }
         await payment_storage.insert_subscription(data)
-        await payment_storage.update_subscription("sub-chg", {
-            "charge_count": 1,
-            "last_charged_at": now,
-            "next_charge_at": now + 86400,
-        })
+        await payment_storage.update_subscription(
+            "sub-chg",
+            {
+                "charge_count": 1,
+                "last_charged_at": now,
+                "next_charge_at": now + 86400,
+            },
+        )
         result = await payment_storage.get_subscription("sub-chg")
         assert result["charge_count"] == 1
         assert result["last_charged_at"] == now
@@ -544,8 +542,8 @@ class TestSubscriptionStorage:
 # Settlement CRUD
 # ---------------------------------------------------------------------------
 
-class TestSettlementStorage:
 
+class TestSettlementStorage:
     async def test_insert_and_get(self, payment_storage):
         now = time.time()
         data = {
@@ -611,8 +609,8 @@ class TestSettlementStorage:
 # Payment History
 # ---------------------------------------------------------------------------
 
-class TestPaymentHistory:
 
+class TestPaymentHistory:
     async def test_empty_history(self, payment_storage):
         history = await payment_storage.get_payment_history("agent-x")
         assert history == []
@@ -620,35 +618,41 @@ class TestPaymentHistory:
     async def test_mixed_history(self, payment_storage):
         now = time.time()
         # Insert intent
-        await payment_storage.insert_intent({
-            "id": "ph-i1",
-            "payer": "a",
-            "payee": "b",
-            "amount": 10.0,
-            "status": "settled",
-            "created_at": now,
-            "updated_at": now,
-        })
+        await payment_storage.insert_intent(
+            {
+                "id": "ph-i1",
+                "payer": "a",
+                "payee": "b",
+                "amount": 10.0,
+                "status": "settled",
+                "created_at": now,
+                "updated_at": now,
+            }
+        )
         # Insert escrow
-        await payment_storage.insert_escrow({
-            "id": "ph-e1",
-            "payer": "a",
-            "payee": "b",
-            "amount": 50.0,
-            "status": "held",
-            "created_at": now + 1,
-            "updated_at": now + 1,
-        })
+        await payment_storage.insert_escrow(
+            {
+                "id": "ph-e1",
+                "payer": "a",
+                "payee": "b",
+                "amount": 50.0,
+                "status": "held",
+                "created_at": now + 1,
+                "updated_at": now + 1,
+            }
+        )
         # Insert settlement
-        await payment_storage.insert_settlement({
-            "id": "ph-s1",
-            "payer": "a",
-            "payee": "b",
-            "amount": 10.0,
-            "source_type": "intent",
-            "source_id": "ph-i1",
-            "created_at": now + 2,
-        })
+        await payment_storage.insert_settlement(
+            {
+                "id": "ph-s1",
+                "payer": "a",
+                "payee": "b",
+                "amount": 10.0,
+                "source_type": "intent",
+                "source_id": "ph-i1",
+                "created_at": now + 2,
+            }
+        )
 
         history = await payment_storage.get_payment_history("a")
         assert len(history) == 3
@@ -660,15 +664,17 @@ class TestPaymentHistory:
     async def test_history_pagination(self, payment_storage):
         now = time.time()
         for i in range(5):
-            await payment_storage.insert_intent({
-                "id": f"php-{i}",
-                "payer": "a",
-                "payee": "b",
-                "amount": 1.0,
-                "status": "pending",
-                "created_at": now + i,
-                "updated_at": now + i,
-            })
+            await payment_storage.insert_intent(
+                {
+                    "id": f"php-{i}",
+                    "payer": "a",
+                    "payee": "b",
+                    "amount": 1.0,
+                    "status": "pending",
+                    "created_at": now + i,
+                    "updated_at": now + i,
+                }
+            )
         history = await payment_storage.get_payment_history("a", limit=2, offset=0)
         assert len(history) == 2
         history = await payment_storage.get_payment_history("a", limit=2, offset=3)
@@ -676,24 +682,28 @@ class TestPaymentHistory:
 
     async def test_history_filters_by_agent(self, payment_storage):
         now = time.time()
-        await payment_storage.insert_intent({
-            "id": "phf-1",
-            "payer": "a",
-            "payee": "b",
-            "amount": 10.0,
-            "status": "pending",
-            "created_at": now,
-            "updated_at": now,
-        })
-        await payment_storage.insert_intent({
-            "id": "phf-2",
-            "payer": "c",
-            "payee": "d",
-            "amount": 10.0,
-            "status": "pending",
-            "created_at": now,
-            "updated_at": now,
-        })
+        await payment_storage.insert_intent(
+            {
+                "id": "phf-1",
+                "payer": "a",
+                "payee": "b",
+                "amount": 10.0,
+                "status": "pending",
+                "created_at": now,
+                "updated_at": now,
+            }
+        )
+        await payment_storage.insert_intent(
+            {
+                "id": "phf-2",
+                "payer": "c",
+                "payee": "d",
+                "amount": 10.0,
+                "status": "pending",
+                "created_at": now,
+                "updated_at": now,
+            }
+        )
         history_a = await payment_storage.get_payment_history("a")
         assert len(history_a) == 1
         history_c = await payment_storage.get_payment_history("c")
@@ -705,6 +715,7 @@ class TestPaymentHistory:
 # ---------------------------------------------------------------------------
 # SQL Column Injection Prevention
 # ---------------------------------------------------------------------------
+
 
 class TestSubscriptionUpdateAllowlist:
     """Tests that update_subscription rejects invalid column names."""
@@ -724,10 +735,13 @@ class TestSubscriptionUpdateAllowlist:
         }
         await payment_storage.insert_subscription(data)
         # These are all valid columns
-        await payment_storage.update_subscription("sub-allow-1", {
-            "status": "cancelled",
-            "cancelled_by": "a",
-        })
+        await payment_storage.update_subscription(
+            "sub-allow-1",
+            {
+                "status": "cancelled",
+                "cancelled_by": "a",
+            },
+        )
         result = await payment_storage.get_subscription("sub-allow-1")
         assert result["status"] == "cancelled"
 
@@ -746,9 +760,12 @@ class TestSubscriptionUpdateAllowlist:
         }
         await payment_storage.insert_subscription(data)
         with pytest.raises(ValueError, match="Invalid column"):
-            await payment_storage.update_subscription("sub-allow-2", {
-                "status = 'active'; DROP TABLE subscriptions; --": "hacked",
-            })
+            await payment_storage.update_subscription(
+                "sub-allow-2",
+                {
+                    "status = 'active'; DROP TABLE subscriptions; --": "hacked",
+                },
+            )
 
     async def test_sql_injection_in_key_rejected(self, payment_storage):
         now = time.time()
@@ -765,7 +782,10 @@ class TestSubscriptionUpdateAllowlist:
         }
         await payment_storage.insert_subscription(data)
         with pytest.raises(ValueError, match="Invalid column"):
-            await payment_storage.update_subscription("sub-allow-3", {
-                "amount": 0,
-                "nonexistent_column": "value",
-            })
+            await payment_storage.update_subscription(
+                "sub-allow-3",
+                {
+                    "amount": 0,
+                    "nonexistent_column": "value",
+                },
+            )

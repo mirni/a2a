@@ -31,8 +31,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import json
-import math
 import os
 import random
 import statistics
@@ -218,31 +216,48 @@ class CustomerAgent:
                     except Exception:
                         error = resp.text[:200]
 
-                self.metrics.record(RequestResult(
-                    tool=tool,
-                    status_code=resp.status_code,
-                    latency_ms=latency_ms,
-                    success=success,
-                    error=error,
-                ))
+                self.metrics.record(
+                    RequestResult(
+                        tool=tool,
+                        status_code=resp.status_code,
+                        latency_ms=latency_ms,
+                        success=success,
+                        error=error,
+                    )
+                )
             except httpx.TimeoutException:
                 latency_ms = (time.monotonic() - start) * 1000
-                self.metrics.record(RequestResult(
-                    tool=tool, status_code=0, latency_ms=latency_ms,
-                    success=False, error="timeout",
-                ))
+                self.metrics.record(
+                    RequestResult(
+                        tool=tool,
+                        status_code=0,
+                        latency_ms=latency_ms,
+                        success=False,
+                        error="timeout",
+                    )
+                )
             except httpx.ConnectError as e:
                 latency_ms = (time.monotonic() - start) * 1000
-                self.metrics.record(RequestResult(
-                    tool=tool, status_code=0, latency_ms=latency_ms,
-                    success=False, error=f"connect_error: {e}",
-                ))
+                self.metrics.record(
+                    RequestResult(
+                        tool=tool,
+                        status_code=0,
+                        latency_ms=latency_ms,
+                        success=False,
+                        error=f"connect_error: {e}",
+                    )
+                )
             except Exception as e:
                 latency_ms = (time.monotonic() - start) * 1000
-                self.metrics.record(RequestResult(
-                    tool=tool, status_code=0, latency_ms=latency_ms,
-                    success=False, error=str(e),
-                ))
+                self.metrics.record(
+                    RequestResult(
+                        tool=tool,
+                        status_code=0,
+                        latency_ms=latency_ms,
+                        success=False,
+                        error=str(e),
+                    )
+                )
 
             # Small random delay between requests (50-200ms) to simulate real usage
             await asyncio.sleep(random.uniform(0.05, 0.2))
@@ -282,18 +297,25 @@ async def run_batch_stress(
                 timeout=30.0,
             )
             latency_ms = (time.monotonic() - start) * 1000
-            metrics.record(RequestResult(
-                tool="BATCH(3)",
-                status_code=resp.status_code,
-                latency_ms=latency_ms,
-                success=resp.status_code == 200,
-            ))
+            metrics.record(
+                RequestResult(
+                    tool="BATCH(3)",
+                    status_code=resp.status_code,
+                    latency_ms=latency_ms,
+                    success=resp.status_code == 200,
+                )
+            )
         except Exception as e:
             latency_ms = (time.monotonic() - start) * 1000
-            metrics.record(RequestResult(
-                tool="BATCH(3)", status_code=0, latency_ms=latency_ms,
-                success=False, error=str(e),
-            ))
+            metrics.record(
+                RequestResult(
+                    tool="BATCH(3)",
+                    status_code=0,
+                    latency_ms=latency_ms,
+                    success=False,
+                    error=str(e),
+                )
+            )
         await asyncio.sleep(random.uniform(0.1, 0.3))
 
 
@@ -302,9 +324,7 @@ async def run_batch_stress(
 # ---------------------------------------------------------------------------
 
 
-async def health_baseline(
-    base_url: str, client: httpx.AsyncClient, samples: int = 10
-) -> dict[str, float]:
+async def health_baseline(base_url: str, client: httpx.AsyncClient, samples: int = 10) -> dict[str, float]:
     """Measure baseline health endpoint latency."""
     latencies = []
     for _ in range(samples):
@@ -408,9 +428,9 @@ def generate_report(
     lines.append("## 1. Health Baseline")
     lines.append("")
     if health.get("status") == "ok":
-        lines.append(f"| Metric | Value |")
-        lines.append(f"|--------|-------|")
-        lines.append(f"| Status | OK |")
+        lines.append("| Metric | Value |")
+        lines.append("|--------|-------|")
+        lines.append("| Status | OK |")
         lines.append(f"| Avg latency | {health['avg_ms']:.1f} ms |")
         lines.append(f"| Min latency | {health['min_ms']:.1f} ms |")
         lines.append(f"| Max latency | {health['max_ms']:.1f} ms |")
@@ -484,8 +504,6 @@ def generate_report(
     lines.append("")
     # Split results into time buckets to show throughput over time
     if metrics.results:
-        bucket_size = 5  # 5-second buckets
-        min_time = metrics.start_time
         buckets: dict[int, list[RequestResult]] = {}
         for r in metrics.results:
             # Approximate time from latency accumulation
@@ -560,7 +578,7 @@ async def main(args: argparse.Namespace) -> int:
         "ramp_up": ramp_up,
     }
 
-    print(f"=== A2A Stress Test ===")
+    print("=== A2A Stress Test ===")
     print(f"Target:    {base_url}")
     print(f"Customers: {customers}")
     print(f"Duration:  {duration}s (ramp-up: {ramp_up}s)")
@@ -633,8 +651,10 @@ async def main(args: argparse.Namespace) -> int:
             elapsed += progress_interval
             if metrics.total_requests > 0:
                 current_rps = metrics.total_requests / max(0.001, time.monotonic() - metrics.start_time)
-                print(f"  [{min(elapsed, duration):3d}s] {metrics.total_requests:,} requests, "
-                      f"{metrics.error_rate:.1f}% errors, {current_rps:.1f} req/s")
+                print(
+                    f"  [{min(elapsed, duration):3d}s] {metrics.total_requests:,} requests, "
+                    f"{metrics.error_rate:.1f}% errors, {current_rps:.1f} req/s"
+                )
 
         # Wait for all tasks to complete
         for agent in customer_agents:
@@ -665,12 +685,7 @@ async def main(args: argparse.Namespace) -> int:
 
     # Exit code: 0 = pass, 1 = fail
     stats = metrics.latency_stats()
-    passed = (
-        metrics.error_rate < 5
-        and stats["p95"] < 5000
-        and stats["p99"] < 10000
-        and metrics.rps >= 5
-    )
+    passed = metrics.error_rate < 5 and stats["p95"] < 5000 and stats["p99"] < 10000 and metrics.rps >= 5
 
     # If no admin key, don't fail on auth errors (401s are expected)
     if not args.admin_key:

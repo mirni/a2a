@@ -32,17 +32,13 @@ async def create_customer(client: StripeClient, input: CreateCustomerInput) -> T
         data["metadata"] = input.metadata
 
     try:
-        result = await client.post(
-            "customers", data, idempotency_key=input.idempotency_key
-        )
+        result = await client.post("customers", data, idempotency_key=input.idempotency_key)
         return ToolResult(success=True, data=result)
     except ConnectorError as exc:
         return ToolResult(success=False, error=exc.to_dict())
 
 
-async def create_payment_intent(
-    client: StripeClient, input: CreatePaymentIntentInput
-) -> ToolResult:
+async def create_payment_intent(client: StripeClient, input: CreatePaymentIntentInput) -> ToolResult:
     """Create a Stripe PaymentIntent with idempotency protection."""
     data: dict[str, Any] = {
         "amount": input.amount,
@@ -56,9 +52,7 @@ async def create_payment_intent(
         data["metadata"] = input.metadata
 
     try:
-        result = await client.post(
-            "payment_intents", data, idempotency_key=input.idempotency_key
-        )
+        result = await client.post("payment_intents", data, idempotency_key=input.idempotency_key)
         return ToolResult(success=True, data=result)
     except ConnectorError as exc:
         return ToolResult(success=False, error=exc.to_dict())
@@ -83,9 +77,7 @@ async def list_charges(client: StripeClient, input: ListChargesInput) -> ToolRes
         return ToolResult(success=False, error=exc.to_dict())
 
 
-async def create_subscription(
-    client: StripeClient, input: CreateSubscriptionInput
-) -> ToolResult:
+async def create_subscription(client: StripeClient, input: CreateSubscriptionInput) -> ToolResult:
     """Create a Stripe subscription with idempotency protection."""
     data: dict[str, Any] = {
         "customer": input.customer_id,
@@ -97,9 +89,7 @@ async def create_subscription(
         data["metadata"] = input.metadata
 
     try:
-        result = await client.post(
-            "subscriptions", data, idempotency_key=input.idempotency_key
-        )
+        result = await client.post("subscriptions", data, idempotency_key=input.idempotency_key)
         return ToolResult(success=True, data=result)
     except ConnectorError as exc:
         return ToolResult(success=False, error=exc.to_dict())
@@ -135,9 +125,7 @@ async def create_refund(client: StripeClient, input: CreateRefundInput) -> ToolR
         data["metadata"] = input.metadata
 
     try:
-        result = await client.post(
-            "refunds", data, idempotency_key=input.idempotency_key
-        )
+        result = await client.post("refunds", data, idempotency_key=input.idempotency_key)
         return ToolResult(success=True, data=result)
     except ConnectorError as exc:
         return ToolResult(success=False, error=exc.to_dict())

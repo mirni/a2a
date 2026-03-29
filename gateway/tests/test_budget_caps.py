@@ -86,9 +86,7 @@ async def test_get_budget_status_with_spending(client, api_key, app):
 
     # Record some usage (6 credits = 60% of daily cap)
     for _ in range(6):
-        await ctx.tracker.storage.record_usage(
-            agent_id="test-agent", function="some_tool", cost=1.0
-        )
+        await ctx.tracker.storage.record_usage(agent_id="test-agent", function="some_tool", cost=1.0)
 
     resp = await client.post(
         "/v1/execute",
@@ -128,9 +126,7 @@ async def test_budget_cap_exceeded(client, api_key, app):
 
     # Record 10 credits of usage (exceeds daily cap of 5)
     for _ in range(10):
-        await ctx.tracker.storage.record_usage(
-            agent_id="test-agent", function="expensive_tool", cost=1.0
-        )
+        await ctx.tracker.storage.record_usage(agent_id="test-agent", function="expensive_tool", cost=1.0)
 
     resp = await client.post(
         "/v1/execute",

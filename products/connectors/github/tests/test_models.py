@@ -2,7 +2,6 @@
 
 import pytest
 from pydantic import ValidationError as PydanticValidationError
-
 from src.models import (
     CreateIssueParams,
     CreatePullRequestParams,
@@ -97,8 +96,12 @@ class TestCreateIssueParams:
 
     def test_with_all_fields(self):
         p = CreateIssueParams(
-            owner="o", repo="r", title="Bug",
-            body="Details here", labels=["bug"], assignees=["user1"],
+            owner="o",
+            repo="r",
+            title="Bug",
+            body="Details here",
+            labels=["bug"],
+            assignees=["user1"],
         )
         assert p.body == "Details here"
         assert p.labels == ["bug"]
@@ -130,7 +133,10 @@ class TestListPullRequestsParams:
 
     def test_with_filters(self):
         p = ListPullRequestsParams(
-            owner="o", repo="r", head="user:feature", base="main",
+            owner="o",
+            repo="r",
+            head="user:feature",
+            base="main",
         )
         assert p.head == "user:feature"
         assert p.base == "main"
@@ -149,29 +155,44 @@ class TestGetPullRequestParams:
 class TestCreatePullRequestParams:
     def test_valid(self):
         p = CreatePullRequestParams(
-            owner="o", repo="r", title="New feature",
-            head="feature-branch", base="main",
+            owner="o",
+            repo="r",
+            title="New feature",
+            head="feature-branch",
+            base="main",
         )
         assert p.title == "New feature"
         assert p.draft is False
 
     def test_draft_pr(self):
         p = CreatePullRequestParams(
-            owner="o", repo="r", title="WIP",
-            head="wip-branch", base="main", draft=True,
+            owner="o",
+            repo="r",
+            title="WIP",
+            head="wip-branch",
+            base="main",
+            draft=True,
         )
         assert p.draft is True
 
     def test_head_required(self):
         with pytest.raises(PydanticValidationError):
             CreatePullRequestParams(
-                owner="o", repo="r", title="T", head="", base="main",
+                owner="o",
+                repo="r",
+                title="T",
+                head="",
+                base="main",
             )
 
     def test_base_required(self):
         with pytest.raises(PydanticValidationError):
             CreatePullRequestParams(
-                owner="o", repo="r", title="T", head="branch", base="",
+                owner="o",
+                repo="r",
+                title="T",
+                head="branch",
+                base="",
             )
 
 
@@ -185,8 +206,12 @@ class TestListCommitsParams:
 
     def test_with_filters(self):
         p = ListCommitsParams(
-            owner="o", repo="r", sha="main", path="src/",
-            since="2026-01-01", until="2026-03-01",
+            owner="o",
+            repo="r",
+            sha="main",
+            path="src/",
+            since="2026-01-01",
+            until="2026-03-01",
         )
         assert p.sha == "main"
         assert p.path == "src/"

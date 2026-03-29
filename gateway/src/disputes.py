@@ -16,11 +16,13 @@ import aiosqlite
 
 class DisputeNotFoundError(Exception):
     """Raised when a dispute ID is not found."""
+
     pass
 
 
 class DisputeStateError(Exception):
     """Raised when a dispute operation is invalid for the current state."""
+
     pass
 
 
@@ -64,16 +66,12 @@ class DisputeEngine:
         if self.db:
             await self.db.close()
 
-    async def open_dispute(
-        self, escrow_id: str, opener: str, reason: str = ""
-    ) -> dict[str, Any]:
+    async def open_dispute(self, escrow_id: str, opener: str, reason: str = "") -> dict[str, Any]:
         """Open a dispute against an escrow."""
         # Verify escrow exists and is held
         escrow = await self.payment_engine.get_escrow(escrow_id)
         if escrow.status.value != "held":
-            raise DisputeStateError(
-                f"Cannot dispute escrow in '{escrow.status.value}' state"
-            )
+            raise DisputeStateError(f"Cannot dispute escrow in '{escrow.status.value}' state")
 
         dispute_id = uuid.uuid4().hex
         now = time.time()
@@ -93,9 +91,7 @@ class DisputeEngine:
             "created_at": now,
         }
 
-    async def respond_to_dispute(
-        self, dispute_id: str, respondent: str, response: str
-    ) -> dict[str, Any]:
+    async def respond_to_dispute(self, dispute_id: str, respondent: str, response: str) -> dict[str, Any]:
         """Respondent adds their response to the dispute."""
         dispute = await self._get_dispute(dispute_id)
         if dispute["status"] != "open":

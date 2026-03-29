@@ -26,6 +26,7 @@ REPO_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
 # Lightweight import helpers — no bootstrap(), no product __init__.py
 # ---------------------------------------------------------------------------
 
+
 def _ensure_shared_src():
     """Register shared_src package so migrate.py can be imported."""
     if "shared_src" in sys.modules:
@@ -95,6 +96,7 @@ def _load_migrations(product_name: str):
 
     # Dedent — the assignment is inside a class body
     import textwrap
+
     code = textwrap.dedent("\n".join(mig_lines))
     exec(code, ns)  # noqa: S102
     return ns.get("_MIGRATIONS", ())
@@ -116,6 +118,7 @@ _PRODUCTS = [
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
+
 
 def cmd_list_products():
     """Print product:env_var:default_path:expected_version for each product."""

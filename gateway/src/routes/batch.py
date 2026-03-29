@@ -98,13 +98,9 @@ async def batch(request: Request) -> JSONResponse:
         tier_config = get_tier_config(agent_tier)
         window_key = "gateway"
         try:
-            rate_count = await ctx.paywall_storage.get_sliding_window_count(
-                agent_id, window_key, window_seconds=3600.0
-            )
+            rate_count = await ctx.paywall_storage.get_sliding_window_count(agent_id, window_key, window_seconds=3600.0)
             if rate_count >= tier_config.rate_limit_per_hour:
-                burst_count = await ctx.paywall_storage.get_burst_count(
-                    agent_id, window_key, burst_window_seconds=60.0
-                )
+                burst_count = await ctx.paywall_storage.get_burst_count(agent_id, window_key, burst_window_seconds=60.0)
                 burst_limit = tier_config.rate_limit_per_hour // 60 + tier_config.burst_allowance
                 if burst_count >= burst_limit:
                     return await error_response(
@@ -115,9 +111,7 @@ async def batch(request: Request) -> JSONResponse:
                     )
         except (RuntimeError, OSError):
             logger.error("Rate limit check failed for agent %s", agent_id, exc_info=True)
-            return await error_response(
-                503, "Rate limit service unavailable", "service_error", request=request
-            )
+            return await error_response(503, "Rate limit service unavailable", "service_error", request=request)
 
         # --- Check balance ---
         if total_cost > 0:
@@ -138,39 +132,47 @@ async def batch(request: Request) -> JSONResponse:
 
     for call in calls:
         if not isinstance(call, dict):
-            results.append({
-                "success": False,
-                "error": {"code": "bad_request", "message": "Each call must be a JSON object"},
-            })
+            results.append(
+                {
+                    "success": False,
+                    "error": {"code": "bad_request", "message": "Each call must be a JSON object"},
+                }
+            )
             continue
 
         tool_name = call.get("tool")
         params = call.get("params", {})
 
         if not tool_name:
-            results.append({
-                "success": False,
-                "error": {"code": "bad_request", "message": "Missing 'tool' field in call"},
-            })
+            results.append(
+                {
+                    "success": False,
+                    "error": {"code": "bad_request", "message": "Missing 'tool' field in call"},
+                }
+            )
             continue
 
         # Look up tool in catalog
         tool_def = get_tool(tool_name)
         if tool_def is None:
-            results.append({
-                "success": False,
-                "error": {"code": "unknown_tool", "message": f"Unknown tool: {tool_name}"},
-            })
+            results.append(
+                {
+                    "success": False,
+                    "error": {"code": "unknown_tool", "message": f"Unknown tool: {tool_name}"},
+                }
+            )
             continue
 
         if tool_name not in TOOL_REGISTRY:
-            results.append({
-                "success": False,
-                "error": {
-                    "code": "not_implemented",
-                    "message": f"Tool '{tool_name}' is not implemented",
-                },
-            })
+            results.append(
+                {
+                    "success": False,
+                    "error": {
+                        "code": "not_implemented",
+                        "message": f"Tool '{tool_name}' is not implemented",
+                    },
+                }
+            )
             continue
 
         # Check required parameters
@@ -178,13 +180,15 @@ async def batch(request: Request) -> JSONResponse:
         required_params = input_schema.get("required", [])
         missing = [p for p in required_params if p not in params]
         if missing:
-            results.append({
-                "success": False,
-                "error": {
-                    "code": "missing_parameter",
-                    "message": f"Missing required parameter(s): {', '.join(missing)}",
-                },
-            })
+            results.append(
+                {
+                    "success": False,
+                    "error": {
+                        "code": "missing_parameter",
+                        "message": f"Missing required parameter(s): {', '.join(missing)}",
+                    },
+                }
+            )
             continue
 
         # Check tier access (skip for x402)
@@ -193,13 +197,15 @@ async def batch(request: Request) -> JSONResponse:
 
             required_tier = tool_def.get("tier_required", "free")
             if not _tier_check(agent_tier, required_tier):
-                results.append({
-                    "success": False,
-                    "error": {
-                        "code": "insufficient_tier",
-                        "message": f"Tier '{agent_tier}' cannot access '{tool_name}'",
-                    },
-                })
+                results.append(
+                    {
+                        "success": False,
+                        "error": {
+                            "code": "insufficient_tier",
+                            "message": f"Tier '{agent_tier}' cannot access '{tool_name}'",
+                        },
+                    }
+                )
                 continue
 
             # Per-tool rate limit check
@@ -214,20 +220,26 @@ async def batch(request: Request) -> JSONResponse:
                             f"Per-tool rate limit exceeded for '{tool_name}': "
                             f"{tool_rate_count}/{tool_rate_limit} per hour"
                         )
-                        results.append({
-                            "success": False,
-                            "error": {"code": "rate_limit_exceeded", "message": msg},
-                        })
+                        results.append(
+                            {
+                                "success": False,
+                                "error": {"code": "rate_limit_exceeded", "message": msg},
+                            }
+                        )
                         continue
                 except (RuntimeError, OSError):
                     logger.error(
                         "Per-tool rate limit check failed for %s/%s",
-                        agent_id, tool_name, exc_info=True,
+                        agent_id,
+                        tool_name,
+                        exc_info=True,
                     )
-                    results.append({
-                        "success": False,
-                        "error": {"code": "service_error", "message": "Rate limit service unavailable"},
-                    })
+                    results.append(
+                        {
+                            "success": False,
+                            "error": {"code": "service_error", "message": "Rate limit service unavailable"},
+                        }
+                    )
                     continue
 
         # Dispatch to tool function
@@ -274,13 +286,17 @@ async def batch(request: Request) -> JSONResponse:
             logger.warning("x402 batch settlement failed for %s", agent_id, exc_info=True)
         try:
             auth = x402_proof.payload.authorization
-            await ctx.event_bus.publish("x402.payment_settled", "gateway", {
-                "nonce": auth.nonce,
-                "network": x402_proof.network,
-                "amount": auth.value,
-                "payer": auth.from_address,
-                "tool": "batch",
-            })
+            await ctx.event_bus.publish(
+                "x402.payment_settled",
+                "gateway",
+                {
+                    "nonce": auth.nonce,
+                    "network": x402_proof.network,
+                    "amount": auth.value,
+                    "payer": auth.from_address,
+                    "tool": "batch",
+                },
+            )
         except Exception:
             logger.warning("x402 batch event publish failed", exc_info=True)
 
@@ -295,9 +311,7 @@ async def batch(request: Request) -> JSONResponse:
 
         _tc = _get_tier_config(agent_tier)
         try:
-            rate_count = await ctx.paywall_storage.get_sliding_window_count(
-                agent_id, "gateway", window_seconds=3600.0
-            )
+            rate_count = await ctx.paywall_storage.get_sliding_window_count(agent_id, "gateway", window_seconds=3600.0)
         except (RuntimeError, OSError):
             rate_count = 0
         headers.update(_rate_limit_headers(_tc.rate_limit_per_hour, rate_count))

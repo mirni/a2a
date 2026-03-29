@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import asyncio
 import os
 import sqlite3
 
 import aiosqlite
 import pytest
-
 from src.db_security import (
     backup_database,
     decrypt_backup,
@@ -17,7 +15,6 @@ from src.db_security import (
     integrity_check,
     restore_database,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

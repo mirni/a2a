@@ -8,20 +8,14 @@ TODO-12: Harden DSN parsing
 
 from __future__ import annotations
 
-import time
-
 import pytest
-import pytest_asyncio
 
-from products.identity.src.api import IdentityAPI, AgentNotFoundError
-from products.identity.src.crypto import AgentCrypto
-from products.identity.src.models import AuditorAttestation
 from products.identity.src.storage import IdentityStorage
-
 
 # ---------------------------------------------------------------------------
 # TODO-9: Attestation revocation
 # ---------------------------------------------------------------------------
+
 
 class TestAttestationRevocation:
     """Attestations should be revocable before expiry."""
@@ -33,9 +27,7 @@ class TestAttestationRevocation:
         result = await api.submit_metrics("bot-revoke", {"sharpe_30d": 2.0})
 
         attestations = await api.storage.get_attestations("bot-revoke")
-        att_id = await api.storage.get_attestation_id_by_signature(
-            result.attestation.signature
-        )
+        att_id = await api.storage.get_attestation_id_by_signature(result.attestation.signature)
 
         revoked = await api.revoke_attestation(att_id, reason="data was incorrect")
         assert revoked["revoked"] is True
@@ -49,9 +41,7 @@ class TestAttestationRevocation:
         """Revoked attestations should appear when valid_only=False."""
         await api.register_agent("bot-revoke2")
         result = await api.submit_metrics("bot-revoke2", {"sharpe_30d": 3.0})
-        att_id = await api.storage.get_attestation_id_by_signature(
-            result.attestation.signature
-        )
+        att_id = await api.storage.get_attestation_id_by_signature(result.attestation.signature)
 
         await api.revoke_attestation(att_id, reason="test")
 
@@ -63,9 +53,7 @@ class TestAttestationRevocation:
         """Claims linked to revoked attestations should not appear in valid claims."""
         await api.register_agent("bot-revoke-claims")
         result = await api.submit_metrics("bot-revoke-claims", {"sharpe_30d": 2.5})
-        att_id = await api.storage.get_attestation_id_by_signature(
-            result.attestation.signature
-        )
+        att_id = await api.storage.get_attestation_id_by_signature(result.attestation.signature)
 
         # Before revocation
         claims = await api.get_verified_claims("bot-revoke-claims")
@@ -82,6 +70,7 @@ class TestAttestationRevocation:
 # TODO-11: Pagination
 # ---------------------------------------------------------------------------
 
+
 class TestPagination:
     """Search and list endpoints should support offset + limit pagination."""
 
@@ -90,9 +79,7 @@ class TestPagination:
         """search_claims should support offset for pagination."""
         await api.register_agent("bot-page")
         for i in range(5):
-            await api.submit_metrics(
-                "bot-page", {"sharpe_30d": float(i + 1)}
-            )
+            await api.submit_metrics("bot-page", {"sharpe_30d": float(i + 1)})
 
         # Get first 2
         page1 = await api.storage.search_claims("sharpe_30d", limit=2, offset=0)
@@ -114,14 +101,10 @@ class TestPagination:
         for _ in range(4):
             await api.submit_metrics("bot-att-page", {"sharpe_30d": 2.0})
 
-        page1 = await api.storage.get_attestations(
-            "bot-att-page", valid_only=True, limit=2, offset=0
-        )
+        page1 = await api.storage.get_attestations("bot-att-page", valid_only=True, limit=2, offset=0)
         assert len(page1) == 2
 
-        page2 = await api.storage.get_attestations(
-            "bot-att-page", valid_only=True, limit=2, offset=2
-        )
+        page2 = await api.storage.get_attestations("bot-att-page", valid_only=True, limit=2, offset=2)
         assert len(page2) == 2
 
     @pytest.mark.asyncio
@@ -155,6 +138,7 @@ class TestPagination:
 # ---------------------------------------------------------------------------
 # TODO-12: DSN parsing
 # ---------------------------------------------------------------------------
+
 
 class TestDSNParsing:
     """Storage should handle various DSN formats."""

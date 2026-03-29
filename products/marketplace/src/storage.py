@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import aiosqlite
@@ -116,7 +116,7 @@ class MarketplaceStorage:
     ) -> str:
         """Insert a new service and return its ID."""
         service_id = self._generate_id()
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         await self.db.execute(
             """INSERT INTO services (id, provider_id, name, description, category,
                pricing_json, sla_json, endpoint, status, metadata_json, created_at, updated_at)
@@ -187,7 +187,7 @@ class MarketplaceStorage:
 
         updates: list[str] = []
         values: list[Any] = []
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         if name is not None:
             updates.append("name = ?")
@@ -268,9 +268,7 @@ class MarketplaceStorage:
 
         if tags:
             placeholders = ", ".join("?" for _ in tags)
-            conditions.append(
-                f"s.id IN (SELECT service_id FROM service_tags WHERE tag IN ({placeholders}))"
-            )
+            conditions.append(f"s.id IN (SELECT service_id FROM service_tags WHERE tag IN ({placeholders}))")
             params.extend(tags)
 
         if pricing_model:
@@ -278,9 +276,7 @@ class MarketplaceStorage:
             params.append(pricing_model)
 
         if max_cost is not None:
-            conditions.append(
-                "CAST(json_extract(s.pricing_json, '$.cost') AS REAL) <= ?"
-            )
+            conditions.append("CAST(json_extract(s.pricing_json, '$.cost') AS REAL) <= ?")
             params.append(max_cost)
 
         where = " AND ".join(conditions)
@@ -335,9 +331,7 @@ class MarketplaceStorage:
 
         if tags:
             placeholders = ", ".join("?" for _ in tags)
-            conditions.append(
-                f"s.id IN (SELECT service_id FROM service_tags WHERE tag IN ({placeholders}))"
-            )
+            conditions.append(f"s.id IN (SELECT service_id FROM service_tags WHERE tag IN ({placeholders}))")
             params.extend(tags)
 
         if pricing_model:
@@ -345,9 +339,7 @@ class MarketplaceStorage:
             params.append(pricing_model)
 
         if max_cost is not None:
-            conditions.append(
-                "CAST(json_extract(s.pricing_json, '$.cost') AS REAL) <= ?"
-            )
+            conditions.append("CAST(json_extract(s.pricing_json, '$.cost') AS REAL) <= ?")
             params.append(max_cost)
 
         where = " AND ".join(conditions)
@@ -359,23 +351,17 @@ class MarketplaceStorage:
 
     async def count_services(self, status: str = "active") -> int:
         """Count services with given status."""
-        cursor = await self.db.execute(
-            "SELECT COUNT(*) as cnt FROM services WHERE status = ?", (status,)
-        )
+        cursor = await self.db.execute("SELECT COUNT(*) as cnt FROM services WHERE status = ?", (status,))
         row = await cursor.fetchone()
         return row["cnt"] if row else 0
 
     async def _enrich_service(self, svc: dict[str, Any]) -> dict[str, Any]:
         """Add tools and tags to a service dict."""
         sid = svc["id"]
-        cursor = await self.db.execute(
-            "SELECT tool_name FROM service_tools WHERE service_id = ?", (sid,)
-        )
+        cursor = await self.db.execute("SELECT tool_name FROM service_tools WHERE service_id = ?", (sid,))
         tools = [r["tool_name"] for r in await cursor.fetchall()]
 
-        cursor = await self.db.execute(
-            "SELECT tag FROM service_tags WHERE service_id = ?", (sid,)
-        )
+        cursor = await self.db.execute("SELECT tag FROM service_tags WHERE service_id = ?", (sid,))
         tags = [r["tag"] for r in await cursor.fetchall()]
 
         svc["tools"] = tools

@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class TierName(str, Enum):
+class TierName(StrEnum):
     """Supported subscription tiers."""
 
     FREE = "free"
@@ -78,9 +78,7 @@ def get_tier_config(tier: str | TierName) -> TierConfig:
         try:
             tier = TierName(tier)
         except ValueError:
-            raise ValueError(
-                f"Unknown tier '{tier}'. Valid tiers: {[t.value for t in TierName]}"
-            ) from None
+            raise ValueError(f"Unknown tier '{tier}'. Valid tiers: {[t.value for t in TierName]}") from None
     config = TIER_CONFIGS.get(tier)
     if config is None:
         raise ValueError(f"No configuration for tier '{tier}'")

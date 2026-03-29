@@ -121,8 +121,7 @@ class PostgresClient:
         """
         if self._config.read_only:
             raise PermissionError(
-                "Database is in read-only mode. "
-                "Set PG_READ_ONLY=false or config.read_only=False to enable writes."
+                "Database is in read-only mode. Set PG_READ_ONLY=false or config.read_only=False to enable writes."
             )
 
         if not self._pool:
@@ -153,9 +152,7 @@ class PostgresClient:
 
         return [dict(row) for row in rows]
 
-    async def describe_table(
-        self, table_name: str, schema_name: str = "public"
-    ) -> list[dict[str, Any]]:
+    async def describe_table(self, table_name: str, schema_name: str = "public") -> list[dict[str, Any]]:
         """Get column details for a table."""
         if not self._pool:
             raise RuntimeError("Not connected. Call connect() first.")

@@ -2,7 +2,6 @@ import asyncio
 import logging
 
 import httpx
-
 from marketplace_src.models import ServiceSearchParams
 
 logger = logging.getLogger("a2a.health_monitor")

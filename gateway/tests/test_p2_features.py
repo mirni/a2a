@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import pytest
 
-
 pytestmark = pytest.mark.asyncio
 
 
@@ -86,10 +85,7 @@ async def test_send_message_via_gateway(client, pro_api_key):
 async def test_get_messages_via_gateway(client, pro_api_key, app):
     """Get messages for an agent."""
     ctx = app.state.ctx
-    await ctx.messaging_api.send_message(
-        sender="sender-x", recipient="pro-agent",
-        message_type="text", body="Hello"
-    )
+    await ctx.messaging_api.send_message(sender="sender-x", recipient="pro-agent", message_type="text", body="Hello")
 
     resp = await client.post(
         "/v1/execute",
@@ -135,6 +131,7 @@ async def test_check_sla_compliance_via_gateway(client, pro_api_key, app):
     ctx = app.state.ctx
     # Register a trust server
     from trust_src.models import TransportType
+
     server = await ctx.trust_api.register_server(
         name="test-svc", url="http://example.com", transport_type=TransportType.HTTP
     )
@@ -224,9 +221,7 @@ async def test_get_revenue_report_via_gateway(client, pro_api_key, app):
     ctx = app.state.ctx
     await ctx.tracker.wallet.create("customer-x", initial_balance=1000.0)
     # Create a payment to pro-agent
-    await ctx.payment_engine.create_intent(
-        payer="customer-x", payee="pro-agent", amount=100.0
-    )
+    await ctx.payment_engine.create_intent(payer="customer-x", payee="pro-agent", amount=100.0)
 
     resp = await client.post(
         "/v1/execute",
