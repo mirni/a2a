@@ -12,8 +12,10 @@ from typing import Any
 
 try:
     from shared_src.base_storage import BaseStorage
+    from shared_src.migrate import Migration
 except ImportError:
     from src.base_storage import BaseStorage
+    from src.migrate import Migration
 
 
 @dataclass
@@ -36,8 +38,7 @@ CREATE TABLE IF NOT EXISTS usage_records (
     cost            REAL NOT NULL,
     tokens          INTEGER NOT NULL DEFAULT 0,
     metadata        TEXT,
-    created_at      REAL NOT NULL,
-    idempotency_key TEXT UNIQUE
+    created_at      REAL NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_usage_agent   ON usage_records(agent_id);
@@ -80,20 +81,15 @@ CREATE TABLE IF NOT EXISTS budget_caps (
 );
 """
 
-    # Migrations for columns added after initial schema release.
-    # Each entry is idempotent (ALTER TABLE fails silently if column exists).
-    _MIGRATIONS: tuple[str, ...] = (
-        "ALTER TABLE usage_records ADD COLUMN idempotency_key TEXT UNIQUE",
+    _MIGRATIONS: tuple[Migration, ...] = (
+        Migration(
+            1,
+            "add idempotency_key to usage_records",
+            "ALTER TABLE usage_records ADD COLUMN idempotency_key TEXT;\n"
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_usage_idempotency "
+            "ON usage_records(idempotency_key);",
+        ),
     )
-
-    async def connect(self) -> None:  # noqa: D102
-        await super().connect()
-        for stmt in self._MIGRATIONS:
-            try:
-                await self.db.execute(stmt)
-                await self.db.commit()
-            except Exception:
-                pass  # Column already exists — expected on fresh databases
 
     # -----------------------------------------------------------------------
     # Wallet operations

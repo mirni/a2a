@@ -3005,3 +3005,66 @@ Regressions:   0
 ```
 
 ---
+
+## Session 14 — 2026-03-29: Schema Migration Framework
+
+### Prompt
+
+> Implement the following plan: Schema Migration Framework
+>
+> Production crash: `sqlite3.OperationalError: no such column: idempotency_key`. Root cause: `CREATE TABLE IF NOT EXISTS` is a no-op on existing databases — new columns added to the DDL never reach production DBs created before the change. We need schema versioning + ordered migrations so this class of bug is caught at startup, not on the first request.
+
+### Response
+
+Implemented a 4-step TDD plan for a proper schema migration framework.
+
+#### Step 1: Migration Runner — `products/shared/src/migrate.py`
+
+New module with:
+- `Migration(NamedTuple)` — version, description, sql
+- `MigrationError(Exception)` — version, description, cause
+- `get_current_version(db)` — returns highest applied version (0 if none)
+- `run_migrations(db, migrations)` — applies pending migrations with per-migration transactions
+
+Behavior:
+- Auto-creates `schema_migrations` tracking table
+- Validates versions are unique, ascending, and positive
+- Each migration runs in a transaction — rollback + `MigrationError` on failure
+- Idempotent: re-running on already-migrated DB applies 0
+- Records version + description + timestamp per migration
+
+Tests: 14 in `products/shared/tests/test_migrate.py`
+
+#### Step 2: Wire into BaseStorage — `products/shared/src/base_storage.py`
+
+- Added `_MIGRATIONS: tuple = ()` class variable
+- After `executescript(_SCHEMA)` in `connect()`, calls `run_migrations()` if `_MIGRATIONS` is non-empty
+- Any `BaseStorage` subclass just defines `_MIGRATIONS` — no need to override `connect()`
+
+#### Step 3: Fix Billing — `products/billing/src/storage.py`
+
+- Removed `idempotency_key TEXT UNIQUE` from `_SCHEMA` DDL (migration handles it)
+- Removed the silent try/except `connect()` override hack
+- Replaced with proper `Migration(1, "add idempotency_key to usage_records", ...)`
+
+**Bug discovered:** SQLite doesn't support `ALTER TABLE ADD COLUMN ... UNIQUE`. The original hack was silently swallowing this error — meaning it never actually worked on old DBs. Fixed by splitting into `ALTER TABLE ADD COLUMN` + `CREATE UNIQUE INDEX`.
+
+Tests: 3 in `products/billing/tests/test_migrations.py` (old-schema → new-schema CI pattern)
+
+#### Files Changed
+
+| File | Action | Description |
+|------|--------|-------------|
+| `products/shared/src/migrate.py` | CREATE | Migration runner: Migration, MigrationError, run_migrations, get_current_version |
+| `products/shared/src/base_storage.py` | MODIFY | Call run_migrations in connect() when _MIGRATIONS defined |
+| `products/billing/src/storage.py` | MODIFY | Replace hack with proper Migration list, remove idempotency_key from DDL |
+| `products/shared/tests/test_migrate.py` | CREATE | 14 tests for migration runner |
+| `products/billing/tests/test_migrations.py` | CREATE | 3 old-schema→new-schema CI regression tests |
+
+#### Test Results
+
+```
+10/10 modules pass. 1,411 tests, 0 failures.
+```
+
+---

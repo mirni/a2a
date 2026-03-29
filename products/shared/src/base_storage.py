@@ -27,6 +27,9 @@ class BaseStorage:
     # Subclasses override with their CREATE TABLE statements
     _SCHEMA: str = ""
 
+    # Subclasses override with a tuple of Migration objects for schema changes
+    _MIGRATIONS: tuple = ()
+
     async def connect(self) -> None:
         """Open the database connection and ensure schema exists."""
         try:
@@ -40,6 +43,13 @@ class BaseStorage:
         await harden_connection(self._db)
         await self._db.executescript(self._SCHEMA)
         await self._db.commit()
+
+        if self._MIGRATIONS:
+            try:
+                from shared_src.migrate import run_migrations
+            except ImportError:
+                from src.migrate import run_migrations
+            await run_migrations(self._db, self._MIGRATIONS)
 
     async def close(self) -> None:
         """Close the database connection."""
