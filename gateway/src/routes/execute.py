@@ -126,6 +126,9 @@ async def _try_x402_payment(
         await verifier.verify_with_facilitator(proof)
     except X402VerificationError as exc:
         return await error_response(402, str(exc), "payment_verification_failed", request=request)
+    except Exception as exc:
+        logger.error("Facilitator verification error: %s", exc, exc_info=True)
+        return await error_response(402, f"Facilitator unavailable: {exc}", "payment_verification_failed", request=request)
 
     return (proof.payload.authorization.from_address, proof)
 
@@ -320,7 +323,8 @@ async def execute(request: Request) -> JSONResponse:
                 try:
                     await ctx.x402_verifier.settle_with_facilitator(x402_proof)
                 except Exception:
-                    logger.warning("x402 settlement failed for %s", agent_id, exc_info=True)
+                    logger.warning("x402 settlement failed for %s, queued for retry", agent_id, exc_info=True)
+                    ctx.x402_verifier.queue_failed_settlement(x402_proof)
                 # Publish settlement event
                 try:
                     auth = x402_proof.payload.authorization

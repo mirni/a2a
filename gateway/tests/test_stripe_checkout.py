@@ -237,12 +237,17 @@ class TestStripeWebhook:
 
     _WEBHOOK_SECRET = "whsec_test_secret_for_webhook"
 
-    def _checkout_completed_event(self, agent_id: str, credits: int) -> dict:
+    _session_counter = 0
+
+    def _checkout_completed_event(self, agent_id: str, credits: int, *, session_id: str | None = None) -> dict:
+        if session_id is None:
+            TestStripeWebhook._session_counter += 1
+            session_id = f"cs_test_{TestStripeWebhook._session_counter}"
         return {
             "type": "checkout.session.completed",
             "data": {
                 "object": {
-                    "id": "cs_test_123",
+                    "id": session_id,
                     "metadata": {
                         "agent_id": agent_id,
                         "credits": str(credits),
@@ -415,3 +420,29 @@ class TestStripeWebhook:
             headers=self._signed_headers(payload),
         )
         assert resp.status_code == 400
+
+    async def test_webhook_replay_same_session_deposits_only_once(
+        self, client, app, monkeypatch
+    ):
+        """Replaying the same webhook event (same session id) must not double-deposit."""
+        monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", self._WEBHOOK_SECRET)
+        ctx = app.state.ctx
+        await ctx.tracker.wallet.create("replay-agent", initial_balance=0.0)
+
+        event = self._checkout_completed_event(
+            "replay-agent", 500, session_id="cs_replay_dedup"
+        )
+        payload = json.dumps(event).encode()
+        headers = self._signed_headers(payload)
+
+        # First delivery — should deposit
+        resp1 = await client.post("/v1/stripe-webhook", content=payload, headers=headers)
+        assert resp1.status_code == 200
+
+        # Second delivery (replay) — should be idempotent
+        resp2 = await client.post("/v1/stripe-webhook", content=payload, headers=headers)
+        assert resp2.status_code == 200
+
+        # Balance must be 500, NOT 1000
+        balance = await ctx.tracker.wallet.get_balance("replay-agent")
+        assert balance == 500.0

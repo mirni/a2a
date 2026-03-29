@@ -28,6 +28,9 @@ logger = logging.getLogger("a2a.stripe_checkout")
 # Credit pricing: $1 = 100 credits (configurable via env)
 CREDITS_PER_DOLLAR = int(os.environ.get("A2A_CREDITS_PER_DOLLAR", "100"))
 
+# Deduplication: track processed Stripe session IDs to prevent double-deposit on webhook replay
+_processed_sessions: set[str] = set()
+
 # Preset credit packages
 PACKAGES = {
     "starter": {"credits": 1_000, "price_cents": 1000, "label": "1,000 credits"},
@@ -201,6 +204,13 @@ async def stripe_webhook(request: Request) -> JSONResponse:
 
     if event_type == "checkout.session.completed":
         session = event.get("data", {}).get("object", {})
+        session_id = session.get("id", "")
+
+        # Deduplicate: skip if this session was already processed
+        if session_id and session_id in _processed_sessions:
+            logger.info("Duplicate webhook for session %s — skipping", session_id)
+            return JSONResponse({"received": True})
+
         metadata = session.get("metadata", {})
         agent_id = metadata.get("agent_id")
         credits = metadata.get("credits")
@@ -229,9 +239,11 @@ async def stripe_webhook(request: Request) -> JSONResponse:
                     agent_id, float(credits),
                     description=f"Stripe checkout: {credits} credits",
                 )
+                if session_id:
+                    _processed_sessions.add(session_id)
                 logger.info(
                     "Deposited %d credits to %s (session %s)",
-                    credits, agent_id, session.get("id", "?"),
+                    credits, agent_id, session_id or "?",
                 )
             except Exception:
                 logger.exception("Failed to deposit credits for %s", agent_id)

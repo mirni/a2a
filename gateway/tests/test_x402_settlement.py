@@ -167,6 +167,130 @@ class TestEventPublishing:
         assert payload["payer"] == "0xPayerWallet"
 
 
+class TestSettlementRetryQueue:
+    @pytest.mark.asyncio
+    async def test_failed_settlement_queued_for_retry(self, x402_client, x402_app):
+        """When settlement fails, the proof should be queued for retry."""
+        proof = _make_proof_dict(nonce="0x" + "f1" * 32)
+        encoded = _encode_proof(proof)
+
+        # Mock verify to succeed but settle to fail
+        verify_resp = MagicMock()
+        verify_resp.status_code = 200
+        verify_resp.json.return_value = {"valid": True}
+
+        settle_resp = MagicMock()
+        settle_resp.status_code = 500
+        settle_resp.raise_for_status.side_effect = Exception("Settlement failed")
+
+        def _pick_response(*args, **kwargs):
+            url = args[0] if args else kwargs.get("url", "")
+            if "settle" in str(url):
+                return settle_resp
+            return verify_resp
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post = AsyncMock(side_effect=_pick_response)
+
+        with patch("gateway.src.x402.httpx.AsyncClient", return_value=mock_client):
+            ctx = x402_app.state.ctx
+            await ctx.tracker.wallet.create("0xPayerWallet", initial_balance=0.0)
+
+            resp = await x402_client.post(
+                "/v1/execute",
+                json={"tool": "get_balance", "params": {"agent_id": "0xPayerWallet"}},
+                headers={"X-PAYMENT": encoded},
+            )
+
+        assert resp.status_code == 200
+        # The failed settlement should be queued
+        verifier = x402_app.state.ctx.x402_verifier
+        assert len(verifier.pending_settlements) == 1
+        queued = verifier.pending_settlements[0]
+        assert queued.payload.authorization.nonce == "0x" + "f1" * 32
+
+    @pytest.mark.asyncio
+    async def test_retry_settles_pending(self, x402_app):
+        """retry_pending_settlements() should attempt settlement again."""
+        from gateway.src.x402 import X402PaymentProof
+
+        verifier = x402_app.state.ctx.x402_verifier
+        proof_dict = _make_proof_dict(nonce="0x" + "f2" * 32)
+        proof = X402PaymentProof.model_validate(proof_dict)
+
+        # Manually queue a failed settlement
+        verifier.queue_failed_settlement(proof)
+        assert len(verifier.pending_settlements) == 1
+
+        # Mock facilitator to succeed on retry
+        settle_resp = MagicMock()
+        settle_resp.status_code = 200
+        settle_resp.json.return_value = {"settled": True}
+        settle_resp.raise_for_status = lambda: None
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post = AsyncMock(return_value=settle_resp)
+
+        with patch("gateway.src.x402.httpx.AsyncClient", return_value=mock_client):
+            settled, failed = await verifier.retry_pending_settlements()
+
+        assert settled == 1
+        assert failed == 0
+        assert len(verifier.pending_settlements) == 0
+
+
+class TestFacilitatorTimeout:
+    @pytest.mark.asyncio
+    async def test_facilitator_verify_timeout_returns_error(self, x402_client, x402_app):
+        """If the facilitator /verify call times out, return a 402 error."""
+        proof = _make_proof_dict(nonce="0x" + "f3" * 32)
+        encoded = _encode_proof(proof)
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post = AsyncMock(side_effect=Exception("Connection timed out"))
+
+        with patch("gateway.src.x402.httpx.AsyncClient", return_value=mock_client):
+            ctx = x402_app.state.ctx
+            await ctx.tracker.wallet.create("0xPayerWallet", initial_balance=0.0)
+
+            resp = await x402_client.post(
+                "/v1/execute",
+                json={"tool": "get_balance", "params": {"agent_id": "0xPayerWallet"}},
+                headers={"X-PAYMENT": encoded},
+            )
+
+        assert resp.status_code == 402
+        assert "verification_failed" in resp.json()["error"]["code"]
+
+
+class TestFreeTool:
+    @pytest.mark.asyncio
+    async def test_free_tool_with_x402_costs_zero(self, x402_client, x402_app):
+        """A free tool (per_call=0) should work via x402 with value=0."""
+        proof = _make_proof_dict(nonce="0x" + "f4" * 32, value="0")
+        encoded = _encode_proof(proof)
+
+        patcher, mock_client = _mock_facilitator()
+        with patcher:
+            ctx = x402_app.state.ctx
+            await ctx.tracker.wallet.create("0xPayerWallet", initial_balance=0.0)
+
+            resp = await x402_client.post(
+                "/v1/execute",
+                json={"tool": "get_balance", "params": {"agent_id": "0xPayerWallet"}},
+                headers={"X-PAYMENT": encoded},
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["charged"] == 0.0
+
+
 class TestSettlementFailureHandling:
     @pytest.mark.asyncio
     async def test_settlement_failure_does_not_break_response(self, x402_client, x402_app):

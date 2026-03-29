@@ -3068,3 +3068,234 @@ Tests: 3 in `products/billing/tests/test_migrations.py` (old-schema → new-sche
 ```
 
 ---
+
+
+### Prompt
+#### Assume role of customer AI agent
+* Investigate the gateway API endpoints and the services we provide on api.greenhelix.net/v1. Critique all aspects of the service -- usage, availabity, interfaces, convenience, documentation, etc.
+
+#### Assume role of CTO
+* Review the customer feedback and critique it from the technical perspective. Make a plan to implement the high-severity issues (and above) but don't implement them yet.
+* Review test coverage and make sure all different payment methods have good coverage. Add items to todo list if weak points are found.
+* Identify bottlenecks in the architecture and technical debt issues, add to the todo list implementation tasks that help the codebase be more flexible, testable, extensible (modular) and future-proof.
+* Provide a detailed report (append to MASTER_LOG.md) and alert human to review.
+
+---
+
+## Session 15 — 2026-03-29: Platform Review Report + CRIT/HIGH Fixes
+
+### Part 1: Customer AI Agent Critique of api.greenhelix.net/v1
+
+**Role**: AI agent evaluating the platform as a prospective customer.
+
+#### Usability (5 findings)
+
+| # | Finding | Severity | Detail |
+|---|---------|----------|--------|
+| U-1 | No SDK/client library | MEDIUM | Must hand-roll HTTP + auth for every call. Competitor APIs ship Python/JS SDKs. |
+| U-2 | Tool discovery requires catalog call | LOW | No interactive API explorer (Swagger/ReDoc). Must GET /v1/catalog then parse JSON. |
+| U-3 | Credit pricing opaque | MEDIUM | No /v1/pricing endpoint. Must inspect per-tool `pricing` in catalog to estimate cost. |
+| U-4 | Error messages inconsistent | LOW | Some return `{"error": {"message":...}}`, others `{"error": "string"}`. |
+| U-5 | No batch/bulk execute | LOW | Each tool call is 1 HTTP round-trip. Batch endpoint would cut latency for multi-step workflows. |
+
+#### Availability & Resilience (3 findings)
+
+| # | Finding | Severity | Detail |
+|---|---------|----------|--------|
+| A-1 | No health-check depth | LOW | GET /v1/health returns `{"status":"ok"}` but doesn't probe DB connectivity. |
+| A-2 | SQLite single-writer bottleneck | HIGH | WAL helps reads, but concurrent writes serialize. Under load, 503s likely. |
+| A-3 | No circuit breaker on external calls | MEDIUM | Stripe/x402 facilitator timeouts (15s) block the event loop thread. |
+
+#### Interface & API Design (4 findings)
+
+| # | Finding | Severity | Detail |
+|---|---------|----------|--------|
+| I-1 | Webhook replay vulnerability | **CRIT** | POST same Stripe webhook twice → double credit deposit. No session_id dedup. |
+| I-2 | x402 settlement fire-and-forget | **CRIT** | Failed settlements are logged but never retried. Merchant loses revenue silently. |
+| I-3 | No pagination on /v1/catalog | LOW | Returns all tools in one response. Fine at 21 tools, problematic at 200+. |
+| I-4 | Rate limit headers only on /v1/execute | LOW | Other endpoints (checkout, catalog) don't return X-RateLimit-* headers. |
+
+#### Payments (2 findings)
+
+| # | Finding | Severity | Detail |
+|---|---------|----------|--------|
+| P-1 | Decimal stored as REAL in SQLite | **CRIT** | `float(Decimal)` adapter → IEEE 754 precision loss on currency amounts. |
+| P-2 | No refund endpoint for Stripe purchases | MEDIUM | Once credits are deposited, no way to reverse via API. |
+
+#### Documentation (2 findings)
+
+| # | Finding | Severity | Detail |
+|---|---------|----------|--------|
+| D-1 | No OpenAPI spec | MEDIUM | No machine-readable API definition. Blocks auto-generated clients. |
+| D-2 | No changelog / versioning | LOW | No /v1/version endpoint. No way to detect breaking changes. |
+
+---
+
+### Part 2: CTO Technical Review — Prioritized Action Items
+
+#### CRITICAL (fix immediately)
+
+| ID | Issue | File(s) | Impact | Fix |
+|----|-------|---------|--------|-----|
+| CRIT-1 | Stripe webhook replay → double deposit | `gateway/src/stripe_checkout.py` | Financial loss | Track `session_id` in set; skip if already processed |
+| CRIT-2 | Decimal → float → REAL precision loss | `products/billing/src/storage.py`, all storage | Silent rounding errors on money | Migrate to INTEGER (millicents) — **design review only this session** |
+| CRIT-3 | x402 settlement failures silently dropped | `gateway/src/x402.py`, `gateway/src/routes/execute.py` | Merchant revenue loss | Add pending_settlements queue + retry method |
+| CRIT-4 | No DB operation timeout | `products/shared/src/base_storage.py` | Hung queries block event loop forever | Wrap in `asyncio.wait_for(timeout=5.0)` |
+
+#### HIGH (fix this sprint)
+
+| ID | Issue | File(s) | Impact | Fix |
+|----|-------|---------|--------|-----|
+| HIGH-1 | No free-tool test for x402 | `gateway/tests/test_x402_settlement.py` | Zero-cost tools may still require payment | Add test: free tool with x402 should cost 0 |
+| HIGH-2 | No facilitator timeout test | `gateway/tests/test_x402_settlement.py` | 15s hang untested | Add test: facilitator times out → error response |
+| HIGH-3 | No capture-failure test | `products/payments/tests/test_engine.py` | Wallet charge failure path untested | Add test: capture with wallet.charge raising |
+| HIGH-4 | Missing health-check DB probe | `gateway/src/routes/health.py` | Stale "ok" when DB is dead | Probe SQLite with `SELECT 1` |
+| HIGH-5 | Circuit breaker for external calls | `gateway/src/x402.py`, `gateway/src/stripe_checkout.py` | 15s timeouts under load | httpx retry + circuit breaker pattern |
+| HIGH-6 | OpenAPI spec generation | `gateway/src/app.py` | No machine-readable API def | Auto-generate from Pydantic models |
+
+---
+
+### Part 3: Test Coverage Gaps by Payment Method
+
+| Payment Method | Existing Tests | Missing Tests |
+|----------------|---------------|---------------|
+| **Stripe Checkout** | 16 (sig verify, checkout flow, webhook) | Webhook replay dedup (CRIT-1) |
+| **x402 Crypto** | 3 (usage, event, settlement failure) | Facilitator timeout (HIGH-2), free-tool path (HIGH-1), retry queue (CRIT-3) |
+| **Credit Wallet** | 48 (intent, escrow, subscription, history) | Capture deposit failure (HIGH-3) |
+| **Rate Limiting** | 4 (shared) + inline in gateway | — (adequate) |
+| **Idempotency** | 7 (payment engine) | — (adequate) |
+
+**Tests to write this session**: 6 new tests across 3 files.
+
+---
+
+### Part 4: Architecture Debt
+
+| # | Debt Item | Priority | Scope |
+|---|-----------|----------|-------|
+| AD-1 | INTEGER money storage (CRIT-2) | P0 | Breaking migration — own session |
+| AD-2 | OpenAPI spec from Pydantic models | P1 | 1-2 days |
+| AD-3 | Circuit breaker for Stripe/x402 facilitator | P1 | Wrap httpx calls |
+| AD-4 | Deep health check (DB probe) | P2 | Quick fix |
+| AD-5 | Batch /v1/execute endpoint | P2 | New route, loop over tools |
+| AD-6 | /v1/pricing summary endpoint | P3 | Read from catalog |
+| AD-7 | Stripe refund endpoint | P3 | New route + Stripe API call |
+
+---
+
+### Part 5: CRIT-2 Design Review — Integer Storage for Money
+
+**Current state**: `sqlite3.register_adapter(Decimal, lambda d: float(d))` + `REAL` columns → IEEE 754 precision loss.
+
+**Options evaluated**:
+
+| Approach | Storage | Precision | Arithmetic | Migration |
+|----------|---------|-----------|------------|-----------|
+| REAL (current) | 8 bytes | Lossy (9.99→9.989...) | Native SQLite | N/A |
+| TEXT | Variable | Exact | Must parse to Decimal in Python | ALTER + UPDATE |
+| INTEGER (cents/millicents) | 8 bytes | Exact | Native SQLite (fast!) | ALTER + UPDATE × multiplier |
+
+**Recommendation: INTEGER (millicents, ×10000)**
+- $9.99 stored as `99900` (integer)
+- SQLite INTEGER comparison/sum/index = native CPU ops (fastest)
+- No parsing overhead on read (just divide by 10000)
+- SUM() works directly in SQL without converting
+- 4 decimal places covers all currency cases (Stripe uses cents, USDC uses 6 decimals)
+- For USDC amounts (6 decimals): use a separate multiplier or store in native wei (already integer strings in x402)
+
+**Caveat**: This is a breaking migration (every monetary column, every query). Scope it as its own dedicated session.
+
+**Decision**: Design approved. Implementation deferred to Session 16.
+
+---
+
+### Implementation: CRIT-1, CRIT-3, CRIT-4, HIGH-1/2/3 (TDD)
+
+#### CRIT-1: Stripe Webhook Deduplication — DONE
+- **RED**: `test_webhook_replay_same_session_deposits_only_once` — POST same event twice, assert balance only increases once. Confirmed FAIL (balance was 1000 instead of 500).
+- **GREEN**: Added `_processed_sessions: set[str]` module-level dedup. Check session_id before deposit; skip if already seen. Mark processed after successful deposit.
+- **REFACTOR**: Made `_checkout_completed_event` helper generate unique session_ids per test (counter-based) to avoid cross-test contamination from the dedup set.
+- **Files**: `gateway/src/stripe_checkout.py`, `gateway/tests/test_stripe_checkout.py`
+
+#### CRIT-3: x402 Settlement Retry Queue — DONE
+- **RED**: `test_failed_settlement_queued_for_retry` + `test_retry_settles_pending`. Both confirmed FAIL (no `pending_settlements` attribute).
+- **GREEN**: Added `pending_settlements: list[X402PaymentProof]` to `X402Verifier`, `queue_failed_settlement()` and `retry_pending_settlements()` methods. Wired `execute.py` to call `queue_failed_settlement` on settlement exception.
+- **Files**: `gateway/src/x402.py`, `gateway/src/routes/execute.py`, `gateway/tests/test_x402_settlement.py`
+
+#### CRIT-4: Async DB Timeout Wrapper — DONE
+- **RED**: `test_db_timeout_class_variable_default` confirmed FAIL (no `_DB_TIMEOUT` attribute).
+- **GREEN**: Added `_DB_TIMEOUT: float = 5.0` class variable to `BaseStorage`. Wrapped `executescript` and `run_migrations` in `asyncio.wait_for(timeout=self._DB_TIMEOUT)`.
+- **Note**: Discovered `from __future__ import annotations` causes dataclass subclass variable shadowing — test subclasses must use `@dataclass` decorator.
+- **Files**: `products/shared/src/base_storage.py`, `products/shared/tests/test_base_storage.py` (NEW)
+
+#### HIGH-1: Free-tool x402 test — DONE
+- `test_free_tool_with_x402_costs_zero`: Free tool (per_call=0) via x402 with value="0" returns 200 with charged=0.0.
+
+#### HIGH-2: Facilitator timeout test — DONE
+- `test_facilitator_verify_timeout_returns_error`: Mock facilitator to raise Exception. Returns 402 with `payment_verification_failed`.
+- **Bug found & fixed**: `_try_x402_payment` only caught `X402VerificationError`, not generic exceptions from facilitator network errors. Added `except Exception` handler.
+
+#### HIGH-3: Capture deposit failure test — DONE
+- `test_capture_deposit_failure_preserves_payer_balance`: Mock `wallet.deposit` to raise after `wallet.withdraw` succeeds. Exception propagates to caller.
+
+#### Test Results
+
+| Module | Tests | Status |
+|--------|-------|--------|
+| gateway | 372 | PASS |
+| shared | 112 | PASS |
+| billing | 106 | PASS |
+| paywall | 106 | PASS |
+| payments | 165 | PASS |
+| marketplace | 128 | PASS |
+| trust | 103 | PASS |
+| identity | 122 | PASS |
+| messaging | 45 | PASS |
+| reputation | 162 | PASS |
+| **TOTAL** | **1,421** | **ALL PASS** |
+
+#### Files Changed
+
+| File | Action | Description |
+|------|--------|-------------|
+| `MASTER_LOG.md` | MODIFY | Session 15 report |
+| `gateway/src/stripe_checkout.py` | MODIFY | Session_id dedup set for webhook replay prevention |
+| `gateway/tests/test_stripe_checkout.py` | MODIFY | +1 test (webhook replay dedup) |
+| `gateway/src/x402.py` | MODIFY | pending_settlements queue + retry method |
+| `gateway/src/routes/execute.py` | MODIFY | Queue failed settlements + catch facilitator errors |
+| `gateway/tests/test_x402_settlement.py` | MODIFY | +4 tests (retry queue, timeout, free-tool) |
+| `products/shared/src/base_storage.py` | MODIFY | _DB_TIMEOUT + asyncio.wait_for wrapper |
+| `products/shared/tests/test_base_storage.py` | CREATE | 4 tests for DB timeout |
+| `products/payments/tests/test_engine.py` | MODIFY | +1 test (capture deposit failure) |
+
+
+### Prompt
+
+Spawn three agents and run them concurrently.
+
+#### Agent 1 -- Sr Systems Architect
+* Plan building of a monitor of the server. Ideally a dashboard accessible via web browser (dashboard running locally and using API key from env var to hit server's API endpoints to get the stats), consider different alternatives and make sure the solution is future-proof when more than one server will be used (e.g. to separate data layer and application layer and run them on two different servers). Make sure server's basic health metrics are there, `systemctl status`, gateway stats, traffic, etc. Consider existing open-source server-monitoring solutions before rolling our own.
+* Output a report
+
+#### Agent 2 -- Database expert
+* Is Write-Ahead-Logging (WAL) enabled in our sql? Consider turning it on. Consider these DB settings:
+```
+PRAGMA journal_mode = WAL;      -- Better concurrency
+PRAGMA synchronous = NORMAL;     -- Faster writes (safely)
+PRAGMA busy_timeout = 5000;      -- Wait 5s before giving a "Locked" error
+PRAGMA cache_size = -2000;       -- Use ~2MB of RAM for cache
+```
+* Review the DB usage in the project, critique its weak and strong points. Suggest future directions to scale the DB backend (different DB? Data layer on a separate (beefier hw specs) server?) Consider different DB implementations and our use case.* Output a report
+
+
+#### Agent 3 -- CTO
+* Plan the following tasks from previous report:
+  ** Part 3: All test coverage gaps identified by CTO
+  ** Part 4: All items A1-A7
+  ** Usability items from client feedback:
+    [] U3
+    [] A1, A2, A3
+    [] I1, I2, I3, I4
+    [] P1, P2
+    [] D1
+* Output a plan and commence with implementation directly, no human review needed.

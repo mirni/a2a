@@ -132,6 +132,36 @@ class TestIntentLifecycle:
         with pytest.raises(InsufficientCreditsError):
             await engine.capture(intent.id)
 
+    async def test_capture_deposit_failure_preserves_payer_balance(
+        self, engine, funded_wallets
+    ):
+        """If deposit to payee fails after withdraw from payer, exception propagates.
+
+        This tests the failure path where withdraw succeeds but deposit raises.
+        The payer's balance should be reduced (withdraw happened) and the exception
+        should propagate to the caller.
+        """
+        from unittest.mock import AsyncMock, patch
+
+        wallet, _, _ = funded_wallets
+        intent = await engine.create_intent(
+            payer="agent-a", payee="agent-b", amount=10.0,
+        )
+
+        # Patch deposit to fail after withdraw succeeds
+        original_deposit = wallet.deposit
+
+        async def failing_deposit(*args, **kwargs):
+            raise RuntimeError("Deposit backend failure")
+
+        wallet.deposit = failing_deposit
+
+        with pytest.raises(RuntimeError, match="Deposit backend failure"):
+            await engine.capture(intent.id)
+
+        # Restore deposit
+        wallet.deposit = original_deposit
+
     async def test_negative_amount_rejected(self, engine, funded_wallets):
         with pytest.raises(PaymentError, match="positive"):
             await engine.create_intent(

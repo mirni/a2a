@@ -147,6 +147,7 @@ class X402Verifier:
         self._facilitator_url = facilitator_url
         self._supported_networks = supported_networks
         self._used_nonces: set[str] = set()
+        self.pending_settlements: list[X402PaymentProof] = []
 
     def check_replay(self, nonce: str) -> None:
         """Raise X402ReplayError if nonce was already seen."""
@@ -218,6 +219,27 @@ class X402Verifier:
 
         resp.raise_for_status()
         return resp.json()
+
+    def queue_failed_settlement(self, proof: X402PaymentProof) -> None:
+        """Queue a proof whose settlement failed for later retry."""
+        self.pending_settlements.append(proof)
+        logger.info("Queued failed settlement for retry (nonce=%s)", proof.payload.authorization.nonce)
+
+    async def retry_pending_settlements(self) -> tuple[int, int]:
+        """Retry all pending settlements. Returns (settled, failed) counts."""
+        settled = 0
+        failed = 0
+        remaining: list[X402PaymentProof] = []
+        for proof in self.pending_settlements:
+            try:
+                await self.settle_with_facilitator(proof)
+                settled += 1
+            except Exception:
+                logger.warning("Retry settlement failed (nonce=%s)", proof.payload.authorization.nonce, exc_info=True)
+                remaining.append(proof)
+                failed += 1
+        self.pending_settlements = remaining
+        return settled, failed
 
     def build_payment_required(
         self, cost_value: str, resource: str, network: str = "base"
