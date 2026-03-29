@@ -9,40 +9,40 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
+# Bootstrap cross-product imports — MUST happen before any *_src imports
+import gateway.src.bootstrap  # noqa: F401, E402
+
 # Billing
-from billing_src.tracker import UsageTracker
+from billing_src.tracker import UsageTracker  # noqa: E402
 
 # Identity
-from identity_src.api import IdentityAPI
-from identity_src.storage import IdentityStorage
+from identity_src.api import IdentityAPI  # noqa: E402
+from identity_src.storage import IdentityStorage  # noqa: E402
 
 # Marketplace
-from marketplace_src.marketplace import Marketplace
-from marketplace_src.storage import MarketplaceStorage
+from marketplace_src.marketplace import Marketplace  # noqa: E402
+from marketplace_src.storage import MarketplaceStorage  # noqa: E402
 
 # Messaging
-from messaging_src.api import MessagingAPI
-from messaging_src.storage import MessageStorage
+from messaging_src.api import MessagingAPI  # noqa: E402
+from messaging_src.storage import MessageStorage  # noqa: E402
 
 # Payments
-from payments_src.engine import PaymentEngine
-from payments_src.storage import PaymentStorage
+from payments_src.engine import PaymentEngine  # noqa: E402
+from payments_src.storage import PaymentStorage  # noqa: E402
 
 # Paywall
-from paywall_src.keys import KeyManager
-from paywall_src.storage import PaywallStorage
+from paywall_src.keys import KeyManager  # noqa: E402
+from paywall_src.storage import PaywallStorage  # noqa: E402
 
 # Shared — Event Bus
-from shared_src.event_bus import EventBus
+from shared_src.event_bus import EventBus  # noqa: E402
 from starlette.applications import Starlette
 
 # Trust
-from trust_src.api import TrustAPI
-from trust_src.scorer import ScoreEngine
-from trust_src.storage import StorageBackend as TrustStorage
-
-# Bootstrap cross-product imports (must happen before importing product modules)
-import gateway.src.bootstrap  # noqa: F401
+from trust_src.api import TrustAPI  # noqa: E402
+from trust_src.scorer import ScoreEngine  # noqa: E402
+from trust_src.storage import StorageBackend as TrustStorage  # noqa: E402
 
 # Disputes
 from gateway.src.disputes import DisputeEngine
