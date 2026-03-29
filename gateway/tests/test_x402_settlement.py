@@ -113,7 +113,7 @@ class TestUsageRecording:
         patcher, mock_client = _mock_facilitator()
         with patcher:
             ctx = x402_app.state.ctx
-            await ctx.tracker.wallet.create("0xPayerWallet", initial_balance=0.0)
+            await ctx.tracker.wallet.create("0xPayerWallet", initial_balance=0.0, signup_bonus=False)
 
             resp = await x402_client.post(
                 "/v1/execute",
@@ -146,7 +146,7 @@ class TestEventPublishing:
         patcher, mock_client = _mock_facilitator()
         with patcher:
             ctx = x402_app.state.ctx
-            await ctx.tracker.wallet.create("0xPayerWallet", initial_balance=0.0)
+            await ctx.tracker.wallet.create("0xPayerWallet", initial_balance=0.0, signup_bonus=False)
 
             resp = await x402_client.post(
                 "/v1/execute",
@@ -195,7 +195,7 @@ class TestSettlementRetryQueue:
 
         with patch("gateway.src.x402.httpx.AsyncClient", return_value=mock_client):
             ctx = x402_app.state.ctx
-            await ctx.tracker.wallet.create("0xPayerWallet", initial_balance=0.0)
+            await ctx.tracker.wallet.create("0xPayerWallet", initial_balance=0.0, signup_bonus=False)
 
             resp = await x402_client.post(
                 "/v1/execute",
@@ -256,7 +256,7 @@ class TestFacilitatorTimeout:
 
         with patch("gateway.src.x402.httpx.AsyncClient", return_value=mock_client):
             ctx = x402_app.state.ctx
-            await ctx.tracker.wallet.create("0xPayerWallet", initial_balance=0.0)
+            await ctx.tracker.wallet.create("0xPayerWallet", initial_balance=0.0, signup_bonus=False)
 
             resp = await x402_client.post(
                 "/v1/execute",
@@ -278,7 +278,7 @@ class TestFreeTool:
         patcher, mock_client = _mock_facilitator()
         with patcher:
             ctx = x402_app.state.ctx
-            await ctx.tracker.wallet.create("0xPayerWallet", initial_balance=0.0)
+            await ctx.tracker.wallet.create("0xPayerWallet", initial_balance=0.0, signup_bonus=False)
 
             resp = await x402_client.post(
                 "/v1/execute",
@@ -319,7 +319,7 @@ class TestSettlementFailureHandling:
 
         with patch("gateway.src.x402.httpx.AsyncClient", return_value=mock_client):
             ctx = x402_app.state.ctx
-            await ctx.tracker.wallet.create("0xPayerWallet", initial_balance=0.0)
+            await ctx.tracker.wallet.create("0xPayerWallet", initial_balance=0.0, signup_bonus=False)
 
             resp = await x402_client.post(
                 "/v1/execute",

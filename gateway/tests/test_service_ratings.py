@@ -126,10 +126,10 @@ async def test_get_service_ratings_average(client, api_key, app):
 
     # We need multiple agents to rate — directly insert via the tool function
     # First, create additional wallets/keys for different agents
-    await ctx.tracker.wallet.create("agent-a", initial_balance=100)
+    await ctx.tracker.wallet.create("agent-a", initial_balance=100, signup_bonus=False)
     key_a = await ctx.key_manager.create_key("agent-a", tier="free")
 
-    await ctx.tracker.wallet.create("agent-b", initial_balance=100)
+    await ctx.tracker.wallet.create("agent-b", initial_balance=100, signup_bonus=False)
     key_b = await ctx.key_manager.create_key("agent-b", tier="free")
 
     # Rate with agent-a: 4

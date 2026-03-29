@@ -14,10 +14,22 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from gateway.src.openapi import generate_openapi_spec
+from shared_src.pricing_config import load_pricing_config
+
+_pricing = load_pricing_config()
 
 
 def _build_onboarding_extension() -> dict:
     """Build the x-onboarding extension with quickstart guide and tier info."""
+    # Tier info loaded from pricing.json — single source of truth.
+    tiers_section = {
+        name: {
+            "rate_limit_per_hour": vals["rate_limit_per_hour"],
+            "description": vals.get("description", ""),
+        }
+        for name, vals in _pricing.tiers.items()
+    }
+
     return {
         "quickstart": [
             {
@@ -53,24 +65,7 @@ def _build_onboarding_extension() -> dict:
             "alternative_header": "X-API-Key: <api_key>",
             "description": "Include your API key in the Authorization header using Bearer scheme.",
         },
-        "tiers": {
-            "free": {
-                "rate_limit_per_hour": 100,
-                "description": "Basic access for evaluation and small workloads.",
-            },
-            "starter": {
-                "rate_limit_per_hour": 500,
-                "description": "For individual agents with moderate usage.",
-            },
-            "pro": {
-                "rate_limit_per_hour": 2000,
-                "description": "For production agents with higher throughput needs.",
-            },
-            "enterprise": {
-                "rate_limit_per_hour": 10000,
-                "description": "Unlimited access with priority support.",
-            },
-        },
+        "tiers": tiers_section,
         "support": {
             "docs": "/docs",
             "openapi_spec": "/v1/openapi.json",

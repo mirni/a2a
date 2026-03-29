@@ -24,8 +24,8 @@ class TestProcessDueEdges:
     async def test_insufficient_balance_handled_gracefully(self, scheduler, engine, billing_wallet):
         """When payer has insufficient balance, process_due should not crash;
         it should record the failure as a suspension."""
-        await billing_wallet.create("poor-payer", initial_balance=1.0)
-        await billing_wallet.create("payee-x", initial_balance=0.0)
+        await billing_wallet.create("poor-payer", initial_balance=1.0, signup_bonus=False)
+        await billing_wallet.create("payee-x", initial_balance=0.0, signup_bonus=False)
 
         sub = await engine.create_subscription(
             payer="poor-payer",

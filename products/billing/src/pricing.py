@@ -1,24 +1,15 @@
 """Pricing utilities — volume discounts and cost calculations.
 
-Extracted from gateway tools to keep business logic in the product layer.
+Values are loaded from the canonical pricing.json at the repo root.
 """
 
 from __future__ import annotations
 
+from shared_src.pricing_config import load_pricing_config
+
+_pricing = load_pricing_config()
+
 
 def get_discount_tier(call_count: int) -> int:
-    """Return discount percentage based on historical call count.
-
-    Tiers:
-        >= 1000 calls → 15%
-        >= 500 calls  → 10%
-        >= 100 calls  → 5%
-        < 100 calls   → 0%
-    """
-    if call_count >= 1000:
-        return 15
-    if call_count >= 500:
-        return 10
-    if call_count >= 100:
-        return 5
-    return 0
+    """Return discount percentage based on historical call count."""
+    return _pricing.get_volume_discount(call_count)

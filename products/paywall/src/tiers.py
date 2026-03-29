@@ -1,9 +1,16 @@
-"""Tier definitions: free, pro, enterprise with rate limits and features."""
+"""Tier definitions: free, pro, enterprise with rate limits and features.
+
+Values are loaded from the canonical pricing.json at the repo root.
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
+from typing import Any
+
+from shared_src.pricing_config import load_pricing_config
 
 
 class TierName(StrEnum):
@@ -32,44 +39,28 @@ class TierConfig:
         return max(1, self.rate_limit_per_hour // 60)
 
 
+def _load_tier_configs() -> dict[TierName, TierConfig]:
+    """Build TIER_CONFIGS from pricing.json."""
+    cfg = load_pricing_config()
+    result: dict[TierName, TierConfig] = {}
+    for name_str, vals in cfg.tiers.items():
+        tier_name = TierName(name_str)
+        result[tier_name] = TierConfig(
+            name=tier_name,
+            rate_limit_per_hour=vals["rate_limit_per_hour"],
+            cost_per_call=vals["cost_per_call"],
+            audit_log_retention_days=vals.get("audit_log_retention_days"),
+            support_level=vals["support_level"],
+            burst_allowance=vals.get("burst_allowance", 10),
+        )
+    return result
+
+
 # ---------------------------------------------------------------------------
-# Tier registry
+# Tier registry — loaded from pricing.json
 # ---------------------------------------------------------------------------
 
-TIER_CONFIGS: dict[TierName, TierConfig] = {
-    TierName.FREE: TierConfig(
-        name=TierName.FREE,
-        rate_limit_per_hour=100,
-        cost_per_call=0,
-        audit_log_retention_days=None,
-        support_level="none",
-        burst_allowance=10,
-    ),
-    TierName.STARTER: TierConfig(
-        name=TierName.STARTER,
-        rate_limit_per_hour=1_000,
-        cost_per_call=0,
-        audit_log_retention_days=7,
-        support_level="community",
-        burst_allowance=25,
-    ),
-    TierName.PRO: TierConfig(
-        name=TierName.PRO,
-        rate_limit_per_hour=10_000,
-        cost_per_call=0,
-        audit_log_retention_days=30,
-        support_level="email",
-        burst_allowance=100,
-    ),
-    TierName.ENTERPRISE: TierConfig(
-        name=TierName.ENTERPRISE,
-        rate_limit_per_hour=100_000,
-        cost_per_call=0,
-        audit_log_retention_days=90,
-        support_level="priority",
-        burst_allowance=1000,
-    ),
-}
+TIER_CONFIGS: dict[TierName, TierConfig] = _load_tier_configs()
 
 
 def get_tier_config(tier: str | TierName) -> TierConfig:

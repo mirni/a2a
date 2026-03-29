@@ -24,8 +24,8 @@ class TestAgentLeaderboard:
         """Should rank agents by total spend."""
         ctx = app.state.ctx
         # Create wallets and record usage for multiple agents
-        await ctx.tracker.wallet.create("agent-a", initial_balance=500.0)
-        await ctx.tracker.wallet.create("agent-b", initial_balance=500.0)
+        await ctx.tracker.wallet.create("agent-a", initial_balance=500.0, signup_bonus=False)
+        await ctx.tracker.wallet.create("agent-b", initial_balance=500.0, signup_bonus=False)
         await ctx.tracker.storage.record_usage("agent-a", "tool1", 10.0)
         await ctx.tracker.storage.record_usage("agent-a", "tool1", 5.0)
         await ctx.tracker.storage.record_usage("agent-b", "tool1", 20.0)
@@ -51,8 +51,8 @@ class TestAgentLeaderboard:
     async def test_leaderboard_by_calls(self, client, api_key, app):
         """Should rank agents by total calls."""
         ctx = app.state.ctx
-        await ctx.tracker.wallet.create("caller-a", initial_balance=100.0)
-        await ctx.tracker.wallet.create("caller-b", initial_balance=100.0)
+        await ctx.tracker.wallet.create("caller-a", initial_balance=100.0, signup_bonus=False)
+        await ctx.tracker.wallet.create("caller-b", initial_balance=100.0, signup_bonus=False)
         await ctx.tracker.storage.record_usage("caller-a", "t1", 0.0)
         await ctx.tracker.storage.record_usage("caller-a", "t2", 0.0)
         await ctx.tracker.storage.record_usage("caller-a", "t3", 0.0)
@@ -89,7 +89,7 @@ class TestAgentLeaderboard:
         ctx = app.state.ctx
         for i in range(5):
             agent = f"lim-agent-{i}"
-            await ctx.tracker.wallet.create(agent, initial_balance=100.0)
+            await ctx.tracker.wallet.create(agent, initial_balance=100.0, signup_bonus=False)
             await ctx.tracker.storage.record_usage(agent, "t1", float(i))
 
         resp = await client.post(
@@ -118,7 +118,7 @@ class TestAgentLeaderboard:
     async def test_leaderboard_entries_have_rank(self, client, api_key, app):
         """Each entry should have rank, agent_id, and value fields."""
         ctx = app.state.ctx
-        await ctx.tracker.wallet.create("rank-agent", initial_balance=100.0)
+        await ctx.tracker.wallet.create("rank-agent", initial_balance=100.0, signup_bonus=False)
         await ctx.tracker.storage.record_usage("rank-agent", "t1", 5.0)
 
         resp = await client.post(

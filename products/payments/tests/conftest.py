@@ -132,6 +132,6 @@ async def funded_wallets(billing_wallet):
     - agent-a: 1000.0 credits
     - agent-b: 500.0 credits
     """
-    await billing_wallet.create("agent-a", initial_balance=1000.0)
-    await billing_wallet.create("agent-b", initial_balance=500.0)
+    await billing_wallet.create("agent-a", initial_balance=1000.0, signup_bonus=False)
+    await billing_wallet.create("agent-b", initial_balance=500.0, signup_bonus=False)
     return billing_wallet, "agent-a", "agent-b"

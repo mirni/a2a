@@ -219,7 +219,7 @@ async def test_get_service_analytics_via_gateway(client, api_key, app):
 async def test_get_revenue_report_via_gateway(client, pro_api_key, app):
     """Get revenue report for a provider agent."""
     ctx = app.state.ctx
-    await ctx.tracker.wallet.create("customer-x", initial_balance=1000.0)
+    await ctx.tracker.wallet.create("customer-x", initial_balance=1000.0, signup_bonus=False)
     # Create a payment to pro-agent
     await ctx.payment_engine.create_intent(payer="customer-x", payee="pro-agent", amount=100.0)
 
@@ -245,9 +245,9 @@ async def test_get_revenue_report_via_gateway(client, pro_api_key, app):
 async def test_create_split_intent(client, pro_api_key, app):
     """Create a split payment across multiple payees."""
     ctx = app.state.ctx
-    await ctx.tracker.wallet.create("payee-a", initial_balance=0.0)
-    await ctx.tracker.wallet.create("payee-b", initial_balance=0.0)
-    await ctx.tracker.wallet.create("platform-fee", initial_balance=0.0)
+    await ctx.tracker.wallet.create("payee-a", initial_balance=0.0, signup_bonus=False)
+    await ctx.tracker.wallet.create("payee-b", initial_balance=0.0, signup_bonus=False)
+    await ctx.tracker.wallet.create("platform-fee", initial_balance=0.0, signup_bonus=False)
 
     resp = await client.post(
         "/v1/execute",

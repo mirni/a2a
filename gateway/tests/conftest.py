@@ -71,7 +71,7 @@ async def api_key(app, client):
     ctx = app.state.ctx
 
     # Create a wallet with credits
-    await ctx.tracker.wallet.create("test-agent", initial_balance=1000.0)
+    await ctx.tracker.wallet.create("test-agent", initial_balance=1000.0, signup_bonus=False)
 
     # Create an API key
     key_info = await ctx.key_manager.create_key("test-agent", tier="free")
@@ -82,6 +82,6 @@ async def api_key(app, client):
 async def pro_api_key(app, client):
     """Create a pro-tier API key with a funded wallet."""
     ctx = app.state.ctx
-    await ctx.tracker.wallet.create("pro-agent", initial_balance=5000.0)
+    await ctx.tracker.wallet.create("pro-agent", initial_balance=5000.0, signup_bonus=False)
     key_info = await ctx.key_manager.create_key("pro-agent", tier="pro")
     return key_info["key"]

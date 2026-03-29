@@ -119,7 +119,7 @@ class TestX402Batch:
             MockClient.return_value = mock_client
 
             ctx = x402_app.state.ctx
-            await ctx.tracker.wallet.create("0xPayerWallet", initial_balance=0.0)
+            await ctx.tracker.wallet.create("0xPayerWallet", initial_balance=0.0, signup_bonus=False)
 
             resp = await x402_client.post(
                 "/v1/batch",

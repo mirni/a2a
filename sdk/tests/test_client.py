@@ -69,7 +69,7 @@ async def sdk_client(gateway_app):
 async def setup_agent(gateway_app, sdk_client):
     """Set up a test agent with wallet and API key, return the key."""
     ctx = gateway_app.state.ctx
-    await ctx.tracker.wallet.create("sdk-agent", initial_balance=1000.0)
+    await ctx.tracker.wallet.create("sdk-agent", initial_balance=1000.0, signup_bonus=False)
     key_info = await ctx.key_manager.create_key("sdk-agent", tier="free")
     sdk_client.api_key = key_info["key"]
     return key_info["key"]
@@ -146,7 +146,7 @@ async def test_insufficient_tier(sdk_client, setup_agent):
 @pytest.mark.asyncio
 async def test_create_payment_intent(sdk_client, setup_agent, gateway_app):
     ctx = gateway_app.state.ctx
-    await ctx.tracker.wallet.create("payee-sdk", initial_balance=0.0)
+    await ctx.tracker.wallet.create("payee-sdk", initial_balance=0.0, signup_bonus=False)
 
     intent = await sdk_client.create_payment_intent(
         payer="sdk-agent", payee="payee-sdk", amount=10.0, description="sdk test"

@@ -2,12 +2,19 @@
 
 All tunable parameters are defined here as a frozen dataclass,
 loaded from environment variables with sensible defaults.
+
+Pricing values (credits, packages, discounts) are loaded from the
+canonical pricing.json at the repo root via shared_src.pricing_config.
 """
 
 from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+
+from shared_src.pricing_config import load_pricing_config
+
+_pricing = load_pricing_config()
 
 
 @dataclass(frozen=True)
@@ -17,10 +24,10 @@ class GatewayConfig:
     # --- Batch endpoint ---
     max_batch_size: int = 10
 
-    # --- Stripe/pricing ---
-    credits_per_dollar: int = 100
-    min_credits_purchase: int = 100
-    max_credits_per_transaction: int = 1_000_000
+    # --- Stripe/pricing (from pricing.json) ---
+    credits_per_dollar: int = _pricing.credits["per_dollar"]
+    min_credits_purchase: int = _pricing.credits["min_purchase"]
+    max_credits_per_transaction: int = _pricing.credits["max_per_transaction"]
 
     # --- Webhook delivery ---
     webhook_max_attempts: int = 3
@@ -42,12 +49,11 @@ class GatewayConfig:
 
     # --- Tool defaults ---
     default_page_limit: int = 100
-    budget_alert_threshold: float = 0.8
+    budget_alert_threshold: float = _pricing.budget["alert_threshold"]
     volume_discount_tiers: dict[int, int] = field(
         default_factory=lambda: {
-            100: 5,
-            500: 10,
-            1000: 15,
+            d["min_calls"]: d["discount_percent"]
+            for d in _pricing.volume_discounts
         }
     )
 
@@ -60,13 +66,11 @@ class GatewayConfig:
     # --- Stripe checkout ---
     stripe_timeout: float = 15.0
 
-    # --- Stripe packages (credits, price in cents) ---
+    # --- Stripe packages (credits, price in cents) — from pricing.json ---
     stripe_packages: dict[str, tuple[int, int]] = field(
         default_factory=lambda: {
-            "starter": (1000, 1000),
-            "growth": (5000, 4500),
-            "scale": (25000, 20000),
-            "enterprise": (100000, 75000),
+            name: (pkg["credits"], pkg["price_cents"])
+            for name, pkg in _pricing.stripe_packages.items()
         }
     )
 

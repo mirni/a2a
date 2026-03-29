@@ -130,7 +130,7 @@ class TestX402ExecuteNoApiKey:
 
             # Create wallet for the payer so get_balance works
             ctx = x402_app.state.ctx
-            await ctx.tracker.wallet.create("0xPayerWallet", initial_balance=0.0)
+            await ctx.tracker.wallet.create("0xPayerWallet", initial_balance=0.0, signup_bonus=False)
 
             resp = await x402_client.post(
                 "/v1/execute",
@@ -219,7 +219,7 @@ class TestX402ExecuteWithApiKey:
     async def test_api_key_present_skips_x402(self, x402_client, x402_app):
         """API key present → normal auth flow, x402 not used."""
         ctx = x402_app.state.ctx
-        await ctx.tracker.wallet.create("test-agent", initial_balance=1000.0)
+        await ctx.tracker.wallet.create("test-agent", initial_balance=1000.0, signup_bonus=False)
         key_info = await ctx.key_manager.create_key("test-agent", tier="free")
 
         resp = await x402_client.post(

@@ -85,7 +85,7 @@ class TestMeteredDecorator:
 
 class TestMeteredWithBalance:
     async def test_require_balance_charges_wallet(self, tracker: UsageTracker):
-        await tracker.wallet.create("agent-1", 100.0)
+        await tracker.wallet.create("agent-1", 100.0, signup_bonus=False)
 
         @tracker.metered(cost=10.0, require_balance=True)
         async def my_func(agent_id):
@@ -98,7 +98,7 @@ class TestMeteredWithBalance:
         assert balance == 90.0
 
     async def test_require_balance_insufficient_raises(self, tracker: UsageTracker):
-        await tracker.wallet.create("agent-1", 5.0)
+        await tracker.wallet.create("agent-1", 5.0, signup_bonus=False)
 
         @tracker.metered(cost=10.0, require_balance=True)
         async def my_func(agent_id):
@@ -209,7 +209,7 @@ class TestUsageFunctionFilter:
 
 class TestRequireCreditsDecorator:
     async def test_require_credits_decorator(self, tracker: UsageTracker):
-        await tracker.wallet.create("agent-1", 50.0)
+        await tracker.wallet.create("agent-1", 50.0, signup_bonus=False)
 
         @require_credits(tracker, cost=5.0)
         async def expensive_func(agent_id):
@@ -222,7 +222,7 @@ class TestRequireCreditsDecorator:
         assert balance == 45.0
 
     async def test_require_credits_insufficient(self, tracker: UsageTracker):
-        await tracker.wallet.create("agent-1", 2.0)
+        await tracker.wallet.create("agent-1", 2.0, signup_bonus=False)
 
         @require_credits(tracker, cost=5.0)
         async def expensive_func(agent_id):

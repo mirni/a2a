@@ -13,7 +13,7 @@ async def test_create_wallet_via_gateway(client, api_key):
         "/v1/execute",
         json={
             "tool": "create_wallet",
-            "params": {"agent_id": "new-agent-123"},
+            "params": {"agent_id": "new-agent-123", "signup_bonus": False},
         },
         headers={"Authorization": f"Bearer {api_key}"},
     )
@@ -29,7 +29,7 @@ async def test_create_wallet_with_initial_balance(client, pro_api_key):
         "/v1/execute",
         json={
             "tool": "create_wallet",
-            "params": {"agent_id": "funded-agent", "initial_balance": 500.0},
+            "params": {"agent_id": "funded-agent", "initial_balance": 500.0, "signup_bonus": False},
         },
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )

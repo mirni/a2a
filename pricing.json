@@ -1,0 +1,95 @@
+{
+  "$schema": "pricing-schema",
+  "$comment": "A2A Commerce Platform — Centralized Pricing Config. All monetary values in this file are the single source of truth. Do NOT hardcode prices in application code.",
+
+  "tiers": {
+    "free": {
+      "rate_limit_per_hour": 100,
+      "cost_per_call": 0,
+      "audit_log_retention_days": null,
+      "support_level": "none",
+      "burst_allowance": 10,
+      "description": "Basic access for evaluation and small workloads."
+    },
+    "starter": {
+      "rate_limit_per_hour": 1000,
+      "cost_per_call": 0,
+      "audit_log_retention_days": 7,
+      "support_level": "community",
+      "burst_allowance": 25,
+      "description": "For individual agents with moderate usage."
+    },
+    "pro": {
+      "rate_limit_per_hour": 10000,
+      "cost_per_call": 0,
+      "audit_log_retention_days": 30,
+      "support_level": "email",
+      "burst_allowance": 100,
+      "description": "For production agents with higher throughput needs."
+    },
+    "enterprise": {
+      "rate_limit_per_hour": 100000,
+      "cost_per_call": 0,
+      "audit_log_retention_days": 90,
+      "support_level": "priority",
+      "burst_allowance": 1000,
+      "description": "Unlimited access with priority support and SLA."
+    }
+  },
+
+  "subscription_plans": {
+    "starter_monthly": {
+      "tier": "starter",
+      "price_cents": 2900,
+      "credits_included": 3500,
+      "billing_period": "monthly",
+      "features": ["priority_support"]
+    },
+    "pro_monthly": {
+      "tier": "pro",
+      "price_cents": 19900,
+      "credits_included": 25000,
+      "billing_period": "monthly",
+      "features": ["sla", "dedicated_support"]
+    },
+    "enterprise_annual": {
+      "tier": "enterprise",
+      "price_cents_min": 500000,
+      "price_cents_max": 5000000,
+      "credits_included": null,
+      "billing_period": "annual",
+      "features": ["sla", "dedicated_support", "custom_contract"],
+      "custom": true
+    }
+  },
+
+  "credits": {
+    "per_dollar": 100,
+    "min_purchase": 100,
+    "max_per_transaction": 1000000,
+    "signup_bonus": 500
+  },
+
+  "stripe_packages": {
+    "starter":    { "credits": 1000,   "price_cents": 1000 },
+    "growth":     { "credits": 5000,   "price_cents": 4500 },
+    "scale":      { "credits": 25000,  "price_cents": 20000 },
+    "enterprise": { "credits": 100000, "price_cents": 75000 }
+  },
+
+  "volume_discounts": [
+    { "min_calls": 1000, "discount_percent": 15 },
+    { "min_calls": 500,  "discount_percent": 10 },
+    { "min_calls": 100,  "discount_percent": 5 }
+  ],
+
+  "auto_reload": {
+    "default_threshold_credits": 100,
+    "default_reload_credits": 1000,
+    "enabled_by_default": false
+  },
+
+  "budget": {
+    "alert_threshold": 0.8
+  }
+}

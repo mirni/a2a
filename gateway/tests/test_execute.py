@@ -158,7 +158,7 @@ async def test_execute_insufficient_balance(client, app):
     ctx = app.state.ctx
 
     # Create wallet with zero balance
-    await ctx.tracker.wallet.create("broke-agent", initial_balance=0.0)
+    await ctx.tracker.wallet.create("broke-agent", initial_balance=0.0, signup_bonus=False)
     key_info = await ctx.key_manager.create_key("broke-agent", tier="free")
 
     resp = await client.post(
@@ -344,7 +344,7 @@ async def test_execute_create_and_capture_intent(client, api_key, app):
     ctx = app.state.ctx
 
     # Create payee wallet
-    await ctx.tracker.wallet.create("payee-agent", initial_balance=0.0)
+    await ctx.tracker.wallet.create("payee-agent", initial_balance=0.0, signup_bonus=False)
 
     # Create intent
     resp = await client.post(

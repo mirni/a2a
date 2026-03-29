@@ -53,7 +53,7 @@ class TestPaywallBillingGateway:
         ctx = app.state.ctx
 
         # Setup: create a wallet and API key for the agent
-        await ctx.tracker.wallet.create("paywall-agent-1", initial_balance=100.0)
+        await ctx.tracker.wallet.create("paywall-agent-1", initial_balance=100.0, signup_bonus=False)
         key_info = await ctx.key_manager.create_key("paywall-agent-1", tier="free")
         key = key_info["key"]
 
@@ -63,7 +63,7 @@ class TestPaywallBillingGateway:
 
         # Make a paid tool call (create_intent: 2% of amount, min $0.01, max $5.00)
         # 2% of $5.0 = $0.10
-        await ctx.tracker.wallet.create("paywall-payee-1", initial_balance=0.0)
+        await ctx.tracker.wallet.create("paywall-payee-1", initial_balance=0.0, signup_bonus=False)
         body = await _exec_ok(
             client,
             "create_intent",
@@ -89,7 +89,7 @@ class TestPaywallBillingGateway:
         ctx = app.state.ctx
 
         # Create free-tier agent
-        await ctx.tracker.wallet.create("free-upgrade-agent", initial_balance=5000.0)
+        await ctx.tracker.wallet.create("free-upgrade-agent", initial_balance=5000.0, signup_bonus=False)
         free_key_info = await ctx.key_manager.create_key("free-upgrade-agent", tier="free")
         free_key = free_key_info["key"]
 
@@ -148,8 +148,8 @@ class TestPaymentsBillingE2E:
         transfer_amount = 50.0
 
         # Create wallets
-        await ctx.tracker.wallet.create(payer_id, initial_balance=payer_initial)
-        await ctx.tracker.wallet.create(payee_id, initial_balance=payee_initial)
+        await ctx.tracker.wallet.create(payer_id, initial_balance=payer_initial, signup_bonus=False)
+        await ctx.tracker.wallet.create(payee_id, initial_balance=payee_initial, signup_bonus=False)
 
         # Create API key for payer
         key_info = await ctx.key_manager.create_key(payer_id, tier="free")
@@ -196,8 +196,8 @@ class TestPaymentsBillingE2E:
         escrow_amount = 200.0
 
         # Create wallets
-        await ctx.tracker.wallet.create(payer_id, initial_balance=payer_initial)
-        await ctx.tracker.wallet.create(payee_id, initial_balance=payee_initial)
+        await ctx.tracker.wallet.create(payer_id, initial_balance=payer_initial, signup_bonus=False)
+        await ctx.tracker.wallet.create(payee_id, initial_balance=payee_initial, signup_bonus=False)
 
         # Pro key required for escrow
         key_info = await ctx.key_manager.create_key(payer_id, tier="pro")
@@ -252,8 +252,8 @@ class TestPaymentsBillingE2E:
         intent_amount = 75.0
 
         # Create wallets
-        await ctx.tracker.wallet.create(payer_id, initial_balance=payer_initial)
-        await ctx.tracker.wallet.create(payee_id, initial_balance=payee_initial)
+        await ctx.tracker.wallet.create(payer_id, initial_balance=payer_initial, signup_bonus=False)
+        await ctx.tracker.wallet.create(payee_id, initial_balance=payee_initial, signup_bonus=False)
 
         # Create API key
         key_info = await ctx.key_manager.create_key(payer_id, tier="free")
@@ -297,7 +297,7 @@ class TestMarketplaceGateway:
         ctx = app.state.ctx
 
         provider_id = "mkt-provider-1"
-        await ctx.tracker.wallet.create(provider_id, initial_balance=5000.0)
+        await ctx.tracker.wallet.create(provider_id, initial_balance=5000.0, signup_bonus=False)
         key_info = await ctx.key_manager.create_key(provider_id, tier="pro")
         key = key_info["key"]
 
@@ -322,7 +322,7 @@ class TestMarketplaceGateway:
 
         # Search for the service (search_services is free-tier)
         # Create a free-tier key for a different agent to search
-        await ctx.tracker.wallet.create("mkt-searcher-1", initial_balance=100.0)
+        await ctx.tracker.wallet.create("mkt-searcher-1", initial_balance=100.0, signup_bonus=False)
         search_key_info = await ctx.key_manager.create_key("mkt-searcher-1", tier="free")
         search_key = search_key_info["key"]
 
@@ -345,7 +345,7 @@ class TestMarketplaceGateway:
         ctx = app.state.ctx
 
         provider_id = "mkt-provider-2"
-        await ctx.tracker.wallet.create(provider_id, initial_balance=5000.0)
+        await ctx.tracker.wallet.create(provider_id, initial_balance=5000.0, signup_bonus=False)
         key_info = await ctx.key_manager.create_key(provider_id, tier="pro")
         pro_key = key_info["key"]
 
@@ -381,7 +381,7 @@ class TestMarketplaceGateway:
             await _exec_ok(client, "register_service", svc, pro_key)
 
         # Create a free-tier searcher
-        await ctx.tracker.wallet.create("mkt-searcher-2", initial_balance=100.0)
+        await ctx.tracker.wallet.create("mkt-searcher-2", initial_balance=100.0, signup_bonus=False)
         search_key_info = await ctx.key_manager.create_key("mkt-searcher-2", tier="free")
         search_key = search_key_info["key"]
 
@@ -428,7 +428,7 @@ class TestConcurrentWalletStress:
         initial_balance = 30.0  # Only 30 credits, 50 withdrawals of 1 each
         withdrawal_amount = 1.0
 
-        await ctx.tracker.wallet.create(agent_id, initial_balance=initial_balance)
+        await ctx.tracker.wallet.create(agent_id, initial_balance=initial_balance, signup_bonus=False)
         key_info = await ctx.key_manager.create_key(agent_id, tier="free")
         key_info["key"]
 
@@ -480,7 +480,7 @@ class TestRateLimitIntegration:
         ctx = app.state.ctx
 
         agent_id = "ratelimit-agent-1"
-        await ctx.tracker.wallet.create(agent_id, initial_balance=10000.0)
+        await ctx.tracker.wallet.create(agent_id, initial_balance=10000.0, signup_bonus=False)
         key_info = await ctx.key_manager.create_key(agent_id, tier="free")
         key = key_info["key"]
 
@@ -538,14 +538,14 @@ class TestFullAgentFlow:
         # -- Setup provider agent --
         provider_id = "agent-provider-1"
         provider_initial = 5000.0
-        await ctx.tracker.wallet.create(provider_id, initial_balance=provider_initial)
+        await ctx.tracker.wallet.create(provider_id, initial_balance=provider_initial, signup_bonus=False)
         provider_key_info = await ctx.key_manager.create_key(provider_id, tier="pro")
         provider_key = provider_key_info["key"]
 
         # -- Setup buyer agent --
         buyer_id = "agent-buyer-1"
         buyer_initial = 1000.0
-        await ctx.tracker.wallet.create(buyer_id, initial_balance=buyer_initial)
+        await ctx.tracker.wallet.create(buyer_id, initial_balance=buyer_initial, signup_bonus=False)
         buyer_key_info = await ctx.key_manager.create_key(buyer_id, tier="free")
         buyer_key = buyer_key_info["key"]
 
@@ -666,8 +666,8 @@ class TestEdgeCases:
 
         payer_id = "double-cap-payer"
         payee_id = "double-cap-payee"
-        await ctx.tracker.wallet.create(payer_id, initial_balance=1000.0)
-        await ctx.tracker.wallet.create(payee_id, initial_balance=0.0)
+        await ctx.tracker.wallet.create(payer_id, initial_balance=1000.0, signup_bonus=False)
+        await ctx.tracker.wallet.create(payee_id, initial_balance=0.0, signup_bonus=False)
         key_info = await ctx.key_manager.create_key(payer_id, tier="free")
         key = key_info["key"]
 
@@ -695,7 +695,7 @@ class TestEdgeCases:
         ctx = app.state.ctx
 
         agent_id = "revoked-key-agent"
-        await ctx.tracker.wallet.create(agent_id, initial_balance=100.0)
+        await ctx.tracker.wallet.create(agent_id, initial_balance=100.0, signup_bonus=False)
         key_info = await ctx.key_manager.create_key(agent_id, tier="free")
         key = key_info["key"]
 
@@ -738,8 +738,8 @@ class TestEdgeCases:
 
         payer_id = "history-payer"
         payee_id = "history-payee"
-        await ctx.tracker.wallet.create(payer_id, initial_balance=5000.0)
-        await ctx.tracker.wallet.create(payee_id, initial_balance=0.0)
+        await ctx.tracker.wallet.create(payer_id, initial_balance=5000.0, signup_bonus=False)
+        await ctx.tracker.wallet.create(payee_id, initial_balance=0.0, signup_bonus=False)
         key_info = await ctx.key_manager.create_key(payer_id, tier="pro")
         key = key_info["key"]
 

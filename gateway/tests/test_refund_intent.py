@@ -11,11 +11,11 @@ async def _setup_agents(app):
     """Helper: create wallets for payer and payee."""
     ctx = app.state.ctx
     try:
-        await ctx.tracker.wallet.create("ri-payer", initial_balance=1000.0)
+        await ctx.tracker.wallet.create("ri-payer", initial_balance=1000.0, signup_bonus=False)
     except Exception:
         pass
     try:
-        await ctx.tracker.wallet.create("ri-payee", initial_balance=500.0)
+        await ctx.tracker.wallet.create("ri-payee", initial_balance=500.0, signup_bonus=False)
     except Exception:
         pass
 

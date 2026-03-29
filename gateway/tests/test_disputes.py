@@ -10,8 +10,8 @@ pytestmark = pytest.mark.asyncio
 async def test_open_dispute(client, pro_api_key, app):
     """Open a dispute on an escrow."""
     ctx = app.state.ctx
-    await ctx.tracker.wallet.create("disputer", initial_balance=1000.0)
-    await ctx.tracker.wallet.create("disputed-party", initial_balance=0.0)
+    await ctx.tracker.wallet.create("disputer", initial_balance=1000.0, signup_bonus=False)
+    await ctx.tracker.wallet.create("disputed-party", initial_balance=0.0, signup_bonus=False)
     disputer_key = await ctx.key_manager.create_key("disputer", tier="pro")
 
     # Create escrow first
@@ -39,8 +39,8 @@ async def test_open_dispute(client, pro_api_key, app):
 async def test_respond_to_dispute(client, pro_api_key, app):
     """Respondent can reply to an open dispute."""
     ctx = app.state.ctx
-    await ctx.tracker.wallet.create("buyer-d", initial_balance=1000.0)
-    await ctx.tracker.wallet.create("seller-d", initial_balance=0.0)
+    await ctx.tracker.wallet.create("buyer-d", initial_balance=1000.0, signup_bonus=False)
+    await ctx.tracker.wallet.create("seller-d", initial_balance=0.0, signup_bonus=False)
     seller_key = await ctx.key_manager.create_key("seller-d", tier="pro")
 
     escrow = await ctx.payment_engine.create_escrow(payer="buyer-d", payee="seller-d", amount=50.0)
@@ -69,8 +69,8 @@ async def test_respond_to_dispute(client, pro_api_key, app):
 async def test_resolve_dispute_refund(client, pro_api_key, app):
     """Admin can resolve a dispute with refund."""
     ctx = app.state.ctx
-    await ctx.tracker.wallet.create("buyer-e", initial_balance=1000.0)
-    await ctx.tracker.wallet.create("seller-e", initial_balance=0.0)
+    await ctx.tracker.wallet.create("buyer-e", initial_balance=1000.0, signup_bonus=False)
+    await ctx.tracker.wallet.create("seller-e", initial_balance=0.0, signup_bonus=False)
 
     escrow = await ctx.payment_engine.create_escrow(payer="buyer-e", payee="seller-e", amount=75.0)
 
@@ -102,8 +102,8 @@ async def test_resolve_dispute_refund(client, pro_api_key, app):
 async def test_resolve_dispute_release(client, pro_api_key, app):
     """Admin can resolve a dispute by releasing funds to payee."""
     ctx = app.state.ctx
-    await ctx.tracker.wallet.create("buyer-f", initial_balance=1000.0)
-    await ctx.tracker.wallet.create("seller-f", initial_balance=0.0)
+    await ctx.tracker.wallet.create("buyer-f", initial_balance=1000.0, signup_bonus=False)
+    await ctx.tracker.wallet.create("seller-f", initial_balance=0.0, signup_bonus=False)
 
     escrow = await ctx.payment_engine.create_escrow(payer="buyer-f", payee="seller-f", amount=60.0)
 

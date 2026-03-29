@@ -10,8 +10,8 @@ pytestmark = pytest.mark.asyncio
 async def test_create_performance_escrow(client, pro_api_key, app):
     """Create an escrow that auto-releases when metric threshold is met."""
     ctx = app.state.ctx
-    await ctx.tracker.wallet.create("signal-buyer", initial_balance=1000.0)
-    await ctx.tracker.wallet.create("signal-seller", initial_balance=0.0)
+    await ctx.tracker.wallet.create("signal-buyer", initial_balance=1000.0, signup_bonus=False)
+    await ctx.tracker.wallet.create("signal-seller", initial_balance=0.0, signup_bonus=False)
     buyer_key = await ctx.key_manager.create_key("signal-buyer", tier="pro")
 
     # Register the seller identity
@@ -42,8 +42,8 @@ async def test_create_performance_escrow(client, pro_api_key, app):
 async def test_check_performance_escrow_releases(client, pro_api_key, app):
     """Escrow auto-releases when metric exceeds threshold."""
     ctx = app.state.ctx
-    await ctx.tracker.wallet.create("buyer-a", initial_balance=1000.0)
-    await ctx.tracker.wallet.create("seller-a", initial_balance=0.0)
+    await ctx.tracker.wallet.create("buyer-a", initial_balance=1000.0, signup_bonus=False)
+    await ctx.tracker.wallet.create("seller-a", initial_balance=0.0, signup_bonus=False)
     buyer_key = await ctx.key_manager.create_key("buyer-a", tier="pro")
 
     await ctx.identity_api.register_agent("seller-a")
@@ -89,8 +89,8 @@ async def test_check_performance_escrow_releases(client, pro_api_key, app):
 async def test_check_performance_escrow_not_met(client, pro_api_key, app):
     """Escrow stays held when metric below threshold."""
     ctx = app.state.ctx
-    await ctx.tracker.wallet.create("buyer-b", initial_balance=1000.0)
-    await ctx.tracker.wallet.create("seller-b", initial_balance=0.0)
+    await ctx.tracker.wallet.create("buyer-b", initial_balance=1000.0, signup_bonus=False)
+    await ctx.tracker.wallet.create("seller-b", initial_balance=0.0, signup_bonus=False)
     buyer_key = await ctx.key_manager.create_key("buyer-b", tier="pro")
 
     await ctx.identity_api.register_agent("seller-b")

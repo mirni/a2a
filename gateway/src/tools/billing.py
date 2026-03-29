@@ -40,6 +40,7 @@ async def _create_wallet(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
     wallet = await ctx.tracker.wallet.create(
         params["agent_id"],
         initial_balance=params.get("initial_balance", 0.0),
+        signup_bonus=params.get("signup_bonus", True),
     )
     return wallet
 

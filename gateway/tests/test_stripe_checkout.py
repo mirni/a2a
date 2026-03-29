@@ -273,7 +273,7 @@ class TestStripeWebhook:
     async def test_webhook_deposits_credits(self, client, app, monkeypatch):
         monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", self._WEBHOOK_SECRET)
         ctx = app.state.ctx
-        await ctx.tracker.wallet.create("webhook-agent", initial_balance=0.0)
+        await ctx.tracker.wallet.create("webhook-agent", initial_balance=0.0, signup_bonus=False)
 
         event = self._checkout_completed_event("webhook-agent", 5000)
         payload = json.dumps(event).encode()
@@ -303,7 +303,7 @@ class TestStripeWebhook:
 
         ctx = app.state.ctx
         balance = await ctx.tracker.wallet.get_balance("new-webhook-agent")
-        assert balance == 1000.0
+        assert balance == 1500.0  # 1000 deposit + 500 signup bonus
 
     async def test_webhook_refuses_without_secret(self, client, monkeypatch):
         """When STRIPE_WEBHOOK_SECRET is not set, refuse all webhooks."""
@@ -373,7 +373,7 @@ class TestStripeWebhook:
         secret = "whsec_test_secret_for_webhook"
         monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", secret)
 
-        await app.state.ctx.tracker.wallet.create("sig-agent", initial_balance=0.0)
+        await app.state.ctx.tracker.wallet.create("sig-agent", initial_balance=0.0, signup_bonus=False)
         event = self._checkout_completed_event("sig-agent", 500)
         payload = json.dumps(event).encode()
 
@@ -398,7 +398,7 @@ class TestStripeWebhook:
     async def test_webhook_rejects_excessive_credits(self, client, app, monkeypatch):
         """Credits above 1,000,000 should be rejected."""
         monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", self._WEBHOOK_SECRET)
-        await app.state.ctx.tracker.wallet.create("greedy-agent", initial_balance=0.0)
+        await app.state.ctx.tracker.wallet.create("greedy-agent", initial_balance=0.0, signup_bonus=False)
         event = self._checkout_completed_event("greedy-agent", 2_000_000)
         payload = json.dumps(event).encode()
         resp = await client.post(
@@ -425,7 +425,7 @@ class TestStripeWebhook:
         """Replaying the same webhook event (same session id) must not double-deposit."""
         monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", self._WEBHOOK_SECRET)
         ctx = app.state.ctx
-        await ctx.tracker.wallet.create("replay-agent", initial_balance=0.0)
+        await ctx.tracker.wallet.create("replay-agent", initial_balance=0.0, signup_bonus=False)
 
         event = self._checkout_completed_event("replay-agent", 500, session_id="cs_replay_dedup")
         payload = json.dumps(event).encode()

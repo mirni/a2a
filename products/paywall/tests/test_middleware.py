@@ -251,7 +251,7 @@ class TestWalletCheck:
         """Pro tier has cost_per_call=0, so middleware does not charge even if cost is declared."""
         await key_manager.create_key(agent_id="agent-1", tier="pro")
         # Create wallet with 0 balance — should still succeed because cost_per_call=0
-        await tracker.wallet.create("agent-1", initial_balance=0.0)
+        await tracker.wallet.create("agent-1", initial_balance=0.0, signup_bonus=False)
 
         @middleware.gated(tier="free", cost=1)
         async def paid_tool(agent_id: str):
@@ -263,7 +263,7 @@ class TestWalletCheck:
     async def test_pro_tier_sufficient_balance(self, middleware: PaywallMiddleware, key_manager: KeyManager, tracker):
         """Pro tier with cost_per_call=0 should succeed regardless of balance."""
         await key_manager.create_key(agent_id="agent-1", tier="pro")
-        await tracker.wallet.create("agent-1", initial_balance=100.0)
+        await tracker.wallet.create("agent-1", initial_balance=100.0, signup_bonus=False)
 
         @middleware.gated(tier="free", cost=1)
         async def paid_tool(agent_id: str):
@@ -277,7 +277,7 @@ class TestWalletCheck:
     ):
         """With cost_per_call=0, wallet should not be charged even if cost is declared."""
         await key_manager.create_key(agent_id="agent-1", tier="pro")
-        await tracker.wallet.create("agent-1", initial_balance=100.0)
+        await tracker.wallet.create("agent-1", initial_balance=100.0, signup_bonus=False)
 
         @middleware.gated(tier="free", cost=5)
         async def paid_tool(agent_id: str):
@@ -351,7 +351,7 @@ class TestUsageMetering:
     ):
         """Pro tier with cost_per_call=0 should not record usage in billing layer."""
         await key_manager.create_key(agent_id="agent-1", tier="pro")
-        await tracker.wallet.create("agent-1", initial_balance=100.0)
+        await tracker.wallet.create("agent-1", initial_balance=100.0, signup_bonus=False)
 
         @middleware.gated(tier="free", cost=1)
         async def paid_tool(agent_id: str):
@@ -418,7 +418,7 @@ class TestChargeFailureHandling:
     ):
         """When cost_per_call=0, no charge or charge_failed audit should be recorded."""
         await key_manager.create_key(agent_id="agent-1", tier="pro")
-        await tracker.wallet.create("agent-1", initial_balance=5.0)
+        await tracker.wallet.create("agent-1", initial_balance=5.0, signup_bonus=False)
 
         @middleware.gated(tier="free", cost=5)
         async def paid_tool(agent_id: str):
@@ -441,7 +441,7 @@ class TestChargeFailureHandling:
     ):
         """Tool result is returned and wallet is not charged when cost_per_call=0."""
         await key_manager.create_key(agent_id="agent-1", tier="pro")
-        await tracker.wallet.create("agent-1", initial_balance=10.0)
+        await tracker.wallet.create("agent-1", initial_balance=10.0, signup_bonus=False)
 
         @middleware.gated(tier="free", cost=5)
         async def paid_tool(agent_id: str):

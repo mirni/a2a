@@ -5,7 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from shared_src.pricing_config import load_pricing_config
+
 from .storage import StorageBackend
+
+_pricing = load_pricing_config()
 
 
 class InsufficientCreditsError(Exception):
@@ -32,25 +36,36 @@ class Wallet:
 
     storage: StorageBackend
 
-    async def create(self, agent_id: str, initial_balance: float = 0.0) -> dict[str, Any]:
-        """Create a new wallet for an agent. Returns wallet dict."""
+    async def create(
+        self,
+        agent_id: str,
+        initial_balance: float = 0.0,
+        signup_bonus: bool = True,
+    ) -> dict[str, Any]:
+        """Create a new wallet for an agent. Returns wallet dict.
+
+        Args:
+            agent_id: Unique agent identifier.
+            initial_balance: Optional extra credits on top of signup bonus.
+            signup_bonus: If True (default), grant signup bonus from pricing.json.
+        """
         existing = await self.storage.get_wallet(agent_id)
         if existing is not None:
             raise ValueError(f"Wallet already exists for agent {agent_id}")
-        wallet = await self.storage.create_wallet(agent_id, initial_balance)
+
+        bonus = float(_pricing.credits["signup_bonus"]) if signup_bonus else 0.0
+        total_initial = initial_balance + bonus
+
+        wallet = await self.storage.create_wallet(agent_id, total_initial)
+
+        if bonus > 0:
+            await self.storage.record_transaction(agent_id, bonus, "signup_bonus", "Signup bonus credits")
+            await self.storage.emit_event("wallet.signup_bonus", agent_id, {"amount": bonus})
+
         if initial_balance > 0:
             await self.storage.record_transaction(agent_id, initial_balance, "deposit", "Initial deposit")
-            await self.storage.emit_event(
-                "wallet.created",
-                agent_id,
-                {"balance": initial_balance},
-            )
-        else:
-            await self.storage.emit_event(
-                "wallet.created",
-                agent_id,
-                {"balance": 0.0},
-            )
+
+        await self.storage.emit_event("wallet.created", agent_id, {"balance": total_initial})
         return wallet
 
     async def get_balance(self, agent_id: str) -> float:

@@ -82,7 +82,7 @@ class TestMultipleApiKeysSameAgent:
         ctx = app.state.ctx
 
         # Create one agent with two keys
-        await ctx.tracker.wallet.create("multi-key-agent", initial_balance=1000.0)
+        await ctx.tracker.wallet.create("multi-key-agent", initial_balance=1000.0, signup_bonus=False)
         key_info_1 = await ctx.key_manager.create_key("multi-key-agent", tier="free")
         key_info_2 = await ctx.key_manager.create_key("multi-key-agent", tier="free")
 
@@ -115,7 +115,7 @@ class TestRateLimitSlidingWindow:
         """Seed rate events older than 1 hour. They should not affect the current window."""
         ctx = app.state.ctx
 
-        await ctx.tracker.wallet.create("rate-agent", initial_balance=1000.0)
+        await ctx.tracker.wallet.create("rate-agent", initial_balance=1000.0, signup_bonus=False)
         key_info = await ctx.key_manager.create_key("rate-agent", tier="free")
 
         # Insert old rate events (>1 hour ago) directly into DB
@@ -142,7 +142,7 @@ class TestRateLimitExceeded:
     async def test_rate_limit_exceeded(self, app, client):
         ctx = app.state.ctx
 
-        await ctx.tracker.wallet.create("rate-blocked", initial_balance=1000.0)
+        await ctx.tracker.wallet.create("rate-blocked", initial_balance=1000.0, signup_bonus=False)
         key_info = await ctx.key_manager.create_key("rate-blocked", tier="free")
 
         # Free tier has 100 calls/hour limit + 10 burst allowance

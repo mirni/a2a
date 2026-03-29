@@ -13,7 +13,7 @@ class TestFullWorkflow:
     async def test_full_lifecycle(self, tmp_db):
         async with UsageTracker(storage=tmp_db) as tracker:
             # 1. Create wallet with initial credits
-            await tracker.wallet.create("agent-A", initial_balance=1000.0)
+            await tracker.wallet.create("agent-A", initial_balance=1000.0, signup_bonus=False)
             assert await tracker.get_balance("agent-A") == 1000.0
 
             # 2. Set rate policy
@@ -58,8 +58,8 @@ class TestFullWorkflow:
 
     async def test_multiple_agents(self, tmp_db):
         async with UsageTracker(storage=tmp_db) as tracker:
-            await tracker.wallet.create("agent-A", 100.0)
-            await tracker.wallet.create("agent-B", 200.0)
+            await tracker.wallet.create("agent-A", 100.0, signup_bonus=False)
+            await tracker.wallet.create("agent-B", 200.0, signup_bonus=False)
 
             @tracker.metered(cost=10.0, require_balance=True)
             async def call_api(agent_id):
@@ -79,7 +79,7 @@ class TestFullWorkflow:
 
     async def test_wallet_exhaustion(self, tmp_db):
         async with UsageTracker(storage=tmp_db) as tracker:
-            await tracker.wallet.create("agent-A", 15.0)
+            await tracker.wallet.create("agent-A", 15.0, signup_bonus=False)
 
             @tracker.metered(cost=10.0, require_balance=True)
             async def expensive_call(agent_id):
@@ -96,7 +96,7 @@ class TestFullWorkflow:
 
     async def test_deposit_and_resume(self, tmp_db):
         async with UsageTracker(storage=tmp_db) as tracker:
-            await tracker.wallet.create("agent-A", 5.0)
+            await tracker.wallet.create("agent-A", 5.0, signup_bonus=False)
 
             @tracker.metered(cost=10.0, require_balance=True)
             async def call(agent_id):
@@ -116,7 +116,7 @@ class TestFullWorkflow:
 
     async def test_event_stream_for_external_billing(self, tmp_db):
         async with UsageTracker(storage=tmp_db) as tracker:
-            await tracker.wallet.create("agent-A", 100.0)
+            await tracker.wallet.create("agent-A", 100.0, signup_bonus=False)
 
             @tracker.metered(cost=1.0, require_balance=True)
             async def call(agent_id):

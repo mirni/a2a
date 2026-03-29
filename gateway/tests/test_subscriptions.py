@@ -11,7 +11,7 @@ async def test_create_subscription_via_gateway(client, pro_api_key, app):
     """Pro agent can create a subscription."""
     ctx = app.state.ctx
     # Need a payee wallet
-    await ctx.tracker.wallet.create("signal-provider", initial_balance=0.0)
+    await ctx.tracker.wallet.create("signal-provider", initial_balance=0.0, signup_bonus=False)
 
     resp = await client.post(
         "/v1/execute",
@@ -39,7 +39,7 @@ async def test_create_subscription_via_gateway(client, pro_api_key, app):
 async def test_cancel_subscription_via_gateway(client, pro_api_key, app):
     """Pro agent can cancel a subscription."""
     ctx = app.state.ctx
-    await ctx.tracker.wallet.create("provider-b", initial_balance=0.0)
+    await ctx.tracker.wallet.create("provider-b", initial_balance=0.0, signup_bonus=False)
 
     # Create subscription first
     sub = await ctx.payment_engine.create_subscription(
@@ -63,7 +63,7 @@ async def test_cancel_subscription_via_gateway(client, pro_api_key, app):
 async def test_get_subscription_via_gateway(client, pro_api_key, app):
     """Pro agent can get subscription details."""
     ctx = app.state.ctx
-    await ctx.tracker.wallet.create("provider-c", initial_balance=0.0)
+    await ctx.tracker.wallet.create("provider-c", initial_balance=0.0, signup_bonus=False)
 
     sub = await ctx.payment_engine.create_subscription(
         payer="pro-agent", payee="provider-c", amount=15.0, interval="weekly"
@@ -87,7 +87,7 @@ async def test_get_subscription_via_gateway(client, pro_api_key, app):
 async def test_list_subscriptions_via_gateway(client, pro_api_key, app):
     """Pro agent can list subscriptions."""
     ctx = app.state.ctx
-    await ctx.tracker.wallet.create("provider-d", initial_balance=0.0)
+    await ctx.tracker.wallet.create("provider-d", initial_balance=0.0, signup_bonus=False)
 
     await ctx.payment_engine.create_subscription(payer="pro-agent", payee="provider-d", amount=5.0, interval="daily")
     await ctx.payment_engine.create_subscription(payer="pro-agent", payee="provider-d", amount=10.0, interval="weekly")
@@ -108,7 +108,7 @@ async def test_list_subscriptions_via_gateway(client, pro_api_key, app):
 async def test_reactivate_subscription_via_gateway(client, pro_api_key, app):
     """Pro agent can reactivate a suspended subscription."""
     ctx = app.state.ctx
-    await ctx.tracker.wallet.create("provider-e", initial_balance=0.0)
+    await ctx.tracker.wallet.create("provider-e", initial_balance=0.0, signup_bonus=False)
 
     sub = await ctx.payment_engine.create_subscription(
         payer="pro-agent", payee="provider-e", amount=5.0, interval="daily"

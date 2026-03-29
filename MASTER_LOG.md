@@ -3701,3 +3701,42 @@ Implement the atomic database migration workflow plan: decouple migrations from 
 ```
 Modules: 10 | Pass: 10 | Fail: 0 | Total: 1475 tests
 ```
+
+## Prompt
+Human is going to bed now -- work autonomously overnight and commit changes periodically.
+
+### Assume the role of CTO
+From the Actionable Next Steps from archive/CMO_MARKETING_REPORT.md, implement (using TDD as usual):
+* New billing features:
+  ** Implement 500 free credits on signup to reduce cold-start friction
+  ** Build auto-reload billing (agents never run out of credits)
+  ** Implement monthly subscription plans alongside credit packages:
+   - Starter Plan: $29/mo (3,500 credits + priority support)
+   - Pro Plan: $199/mo (25,000 credits + SLA + dedicated support)
+   - Enterprise: Custom annual contracts ($5K-50K/mo)
+* Client features:
+  ** Implement Agent leaderboard
+  ** Implement feedback collection -- rating/reviews and "suggestion box"
+  ** Implement spending alerts/budget caps
+  ** Implement Agent search/discovery: search_agents by capabilities or metrics
+  ** Implement support for sub-identity: e.g. a trading bot might want to use strategy-level identity; when it runs 2 engines, it should be able to register sub-identities for each strategy and report metrics separately.
+* Integrations:
+  **  Build MCP server registry integration
+  ** Write a script to generate integration packages with LangChain and CrewAI, with more services to be integrated with in the future. Make sure the design is robust and easy to extend with more services in the future.
+* Certification and documentation:
+  ** Plan SOC 2 certification process -- create a plan for human review with actionable todo list
+  ** Write 2 tutorial blog posts: "Agent Payments in 5 Minutes", "Escrow for AI Service Contracts"
+* Refactoring:
+  ** Make sure the pricing is externalized in its own file, easy to maintain and review. Do not put the prices (numeric values) in code.
+  ** Fix the quality jobs, right now all of these are failing:
+     - mypy
+     - bandit
+     - dependency audit
+     - semgrep
+* Planning:
+Do not implement the following, but create plan for them for human review:
+  ** Analyze current DB schema and propose changes to support efficient time-series queries. The schema should handle diverse metrics (e.g. Sharpe, Sortino, etc) while maintaining data integrity. The Goal is to Minimize resource overhead while maximizing the "Queryability" of historical data.
+  ** Design a mechanism for agents to cryptographically sign their submissions.
+  ** Design Ingestion API: endpoint to receive and validate periodic metric heartbeats from bots
+  ** Design Observability Logic: to calculate performance deltas and moving averages (e.g., "Is the Sharpe ratio improving compared to the 30-day mean?").
+  ** Design Data Lifecycle: a simple retention/compression policy to stay within our 60GB disk limit.

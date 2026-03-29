@@ -115,7 +115,7 @@ class TestGatedRequireBalanceCostZero:
         self, middleware: PaywallMiddleware, key_manager: KeyManager, tracker
     ):
         await key_manager.create_key(agent_id="agent-pro-rb", tier="pro")
-        await tracker.wallet.create("agent-pro-rb", initial_balance=0.0)
+        await tracker.wallet.create("agent-pro-rb", initial_balance=0.0, signup_bonus=False)
 
         @middleware.gated(tier="free", cost=0, require_balance=True)
         async def my_tool(agent_id: str):

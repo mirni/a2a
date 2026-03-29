@@ -12,11 +12,11 @@ async def _create_escrow(client, api_key, app):
     # Fund both agents
     ctx = app.state.ctx
     try:
-        await ctx.tracker.wallet.create("payer-agent", initial_balance=1000.0)
+        await ctx.tracker.wallet.create("payer-agent", initial_balance=1000.0, signup_bonus=False)
     except Exception:
         pass
     try:
-        await ctx.tracker.wallet.create("payee-agent", initial_balance=0.0)
+        await ctx.tracker.wallet.create("payee-agent", initial_balance=0.0, signup_bonus=False)
     except Exception:
         pass
 
