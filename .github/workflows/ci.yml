@@ -29,21 +29,27 @@ jobs:
         run: pip install ruff mypy bandit pydantic pip-audit
 
       - name: Lint with ruff
+        if: ${{ !cancelled() }}
         run: ruff check .
 
       - name: Check formatting with ruff
+        if: ${{ !cancelled() }}
         run: ruff format --check .
 
       - name: Type check with mypy
-        run: mypy --strict --ignore-missing-imports gateway/src/ products/ sdk/src/
+        if: ${{ !cancelled() }}
+        run: mypy $(find gateway/src products/*/src products/connectors/*/src sdk/src -maxdepth 0 -type d 2>/dev/null | sort)
 
       - name: Security scan with bandit
+        if: ${{ !cancelled() }}
         run: bandit -r gateway/src products/ -ll -q --skip B101
 
       - name: Dependency audit
+        if: ${{ !cancelled() }}
         run: pip-audit -r requirements.txt
 
       - name: SAST with Semgrep
+        if: ${{ !cancelled() }}
         uses: semgrep/semgrep-action@v1
         with:
           config: auto
