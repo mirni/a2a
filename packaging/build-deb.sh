@@ -56,7 +56,7 @@ if [[ -d "$REPO_ROOT/sdk-ts" ]]; then
 fi
 
 # Copy root-level Python/config files needed by the app
-for f in pyproject.toml setup.py setup.cfg; do
+for f in pyproject.toml setup.py setup.cfg pricing.json; do
     if [[ -f "$REPO_ROOT/$f" ]]; then
         cp "$REPO_ROOT/$f" "$STAGING/opt/a2a/$f"
     fi
