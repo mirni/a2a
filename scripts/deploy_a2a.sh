@@ -213,8 +213,8 @@ if ! has_ssl_certs; then
     echo ""
 fi
 
-echo "  Edit secrets:  sudo nano $INSTALL_DIR/.env"
-echo "  Restart:       sudo systemctl restart a2a-gateway"
+echo "  Edit secrets:  vi $INSTALL_DIR/.env"
+echo "  Restart:       systemctl restart a2a-gateway"
 echo "  Health check:  curl ${PROTO}://$DOMAIN/v1/health"
 echo ""
 echo "============================================================================="

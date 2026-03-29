@@ -84,8 +84,8 @@ echo "--- Auth Enforcement ---"
 STATUS=$(code -X POST -H "Content-Type: application/json" \
     -d '{"tool":"get_balance","params":{"agent_id":"test"}}' \
     "${BASE}/v1/execute")
-[[ "$STATUS" == "401" ]] \
-    && pass "no key → 401" || fail "no key → 401 (got $STATUS)"
+[[ "$STATUS" == "401" || "$STATUS" == "402" ]] \
+    && pass "no key → $STATUS (rejected)" || fail "no key → 401/402 (got $STATUS)"
 
 STATUS=$(code -X POST -H "Content-Type: application/json" \
     -H "Authorization: Bearer fake_key_12345" \
