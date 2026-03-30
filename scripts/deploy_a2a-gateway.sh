@@ -295,6 +295,9 @@ os.environ.setdefault("MARKETPLACE_DSN", "sqlite:////var/lib/a2a/marketplace.db"
 os.environ.setdefault("TRUST_DSN", "sqlite:////var/lib/a2a/trust.db")
 os.environ.setdefault("EVENT_BUS_DSN", "sqlite:////var/lib/a2a/events.db")
 os.environ.setdefault("IDENTITY_DSN", "sqlite:////var/lib/a2a/identity.db")
+os.environ.setdefault("WEBHOOK_DSN", "sqlite:////var/lib/a2a/webhooks.db")
+os.environ.setdefault("MESSAGING_DSN", "sqlite:////var/lib/a2a/messaging.db")
+os.environ.setdefault("DISPUTE_DSN", "sqlite:////var/lib/a2a/disputes.db")
 
 async def main():
     from gateway.src.lifespan import lifespan
@@ -306,7 +309,7 @@ async def main():
     ctx = app.state.ctx
 
     await ctx.tracker.wallet.create("admin", initial_balance=100000.0)
-    key_info = await ctx.key_manager.create_key("admin", tier="pro")
+    key_info = await ctx.key_manager.create_key("admin", tier="admin", scopes=["read", "write", "admin"])
 
     await ctx_mgr.__aexit__(None, None, None)
     print(key_info["key"])
