@@ -93,12 +93,11 @@ async def test_metrics_latency_recorded_after_requests(client):
 def test_metrics_does_not_use_threading_lock():
     """Metrics._lock must NOT be a threading.Lock (blocks event loop)."""
     lock = Metrics._lock
-    # threading.Lock() returns a _thread.lock instance; check by type name
-    # since threading.Lock is a factory function, not a class in newer Python.
-    lock_type_name = type(lock).__name__
-    assert lock_type_name != "lock" and lock_type_name != "Lock", (
-        f"Metrics._lock is {lock_type_name}, expected asyncio.Lock"
-    )
+    # threading.Lock is a factory function (not a class) in newer Python,
+    # so isinstance() doesn't work. Check the module instead:
+    # asyncio.Lock → module "asyncio.locks", threading.Lock → module "_thread"
+    lock_module = type(lock).__module__
+    assert lock_module != "_thread", f"Metrics._lock is from {lock_module}, expected asyncio.locks (asyncio.Lock)"
 
 
 def test_metrics_uses_asyncio_lock():
