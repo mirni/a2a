@@ -62,12 +62,8 @@ class TestResolveDisputeAdminOnly:
         free_key = await _create_agent(app, "free-disputer-1", tier="free", balance=5000.0)
         await _create_agent(app, "payee-d1", tier="free", balance=0.0)
 
-        escrow = await ctx.payment_engine.create_escrow(
-            payer="free-disputer-1", payee="payee-d1", amount=50.0
-        )
-        dispute = await ctx.dispute_engine.open_dispute(
-            escrow_id=escrow.id, opener="free-disputer-1", reason="test"
-        )
+        escrow = await ctx.payment_engine.create_escrow(payer="free-disputer-1", payee="payee-d1", amount=50.0)
+        dispute = await ctx.dispute_engine.open_dispute(escrow_id=escrow.id, opener="free-disputer-1", reason="test")
 
         resp = await _exec(
             client,
@@ -87,12 +83,8 @@ class TestResolveDisputeAdminOnly:
         pro_key = await _create_agent(app, "pro-disputer-1", tier="pro", balance=5000.0)
         await _create_agent(app, "payee-d2", tier="free", balance=0.0)
 
-        escrow = await ctx.payment_engine.create_escrow(
-            payer="pro-disputer-1", payee="payee-d2", amount=50.0
-        )
-        dispute = await ctx.dispute_engine.open_dispute(
-            escrow_id=escrow.id, opener="pro-disputer-1", reason="test"
-        )
+        escrow = await ctx.payment_engine.create_escrow(payer="pro-disputer-1", payee="payee-d2", amount=50.0)
+        dispute = await ctx.dispute_engine.open_dispute(escrow_id=escrow.id, opener="pro-disputer-1", reason="test")
 
         resp = await _exec(
             client,
@@ -113,12 +105,8 @@ class TestResolveDisputeAdminOnly:
         await _create_agent(app, "buyer-adm1", tier="free", balance=5000.0)
         await _create_agent(app, "seller-adm1", tier="free", balance=0.0)
 
-        escrow = await ctx.payment_engine.create_escrow(
-            payer="buyer-adm1", payee="seller-adm1", amount=50.0
-        )
-        dispute = await ctx.dispute_engine.open_dispute(
-            escrow_id=escrow.id, opener="buyer-adm1", reason="test"
-        )
+        escrow = await ctx.payment_engine.create_escrow(payer="buyer-adm1", payee="seller-adm1", amount=50.0)
+        dispute = await ctx.dispute_engine.open_dispute(escrow_id=escrow.id, opener="buyer-adm1", reason="test")
 
         resp = await _exec(
             client,
@@ -184,9 +172,7 @@ class TestWebhookOwnership:
         )
         webhook_id = resp.json()["result"]["id"]
 
-        resp = await _exec(
-            client, "get_webhook_deliveries", {"webhook_id": webhook_id}, key_b
-        )
+        resp = await _exec(client, "get_webhook_deliveries", {"webhook_id": webhook_id}, key_b)
         assert resp.status_code == 403
 
     async def test_test_webhook_by_other_agent_is_forbidden(self, client, app):
@@ -402,9 +388,7 @@ class TestToolPricingEnum:
         resp = await client.get("/v1/openapi.json")
         assert resp.status_code == 200
         data = resp.json()
-        tier_enum = (
-            data["components"]["schemas"]["ToolPricing"]["properties"]["tier_required"]["enum"]
-        )
+        tier_enum = data["components"]["schemas"]["ToolPricing"]["properties"]["tier_required"]["enum"]
         assert "free" in tier_enum
         assert "starter" in tier_enum
         assert "pro" in tier_enum

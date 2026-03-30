@@ -54,12 +54,8 @@ class TestRespondToDisputeCallerCheck:
         await _create_agent(app, "seller-b2-6", tier="pro", balance=0.0)
         key_c = await _create_agent(app, "outsider-b2-6", tier="pro", balance=1000.0)
 
-        escrow = await ctx.payment_engine.create_escrow(
-            payer="buyer-b2-6", payee="seller-b2-6", amount=50.0
-        )
-        dispute = await ctx.dispute_engine.open_dispute(
-            escrow_id=escrow.id, opener="buyer-b2-6", reason="test"
-        )
+        escrow = await ctx.payment_engine.create_escrow(payer="buyer-b2-6", payee="seller-b2-6", amount=50.0)
+        dispute = await ctx.dispute_engine.open_dispute(escrow_id=escrow.id, opener="buyer-b2-6", reason="test")
 
         # Agent C (outsider) tries to respond
         resp = await _exec(
@@ -80,12 +76,8 @@ class TestRespondToDisputeCallerCheck:
         await _create_agent(app, "buyer-b2-6b", tier="pro", balance=5000.0)
         key_seller = await _create_agent(app, "seller-b2-6b", tier="pro", balance=0.0)
 
-        escrow = await ctx.payment_engine.create_escrow(
-            payer="buyer-b2-6b", payee="seller-b2-6b", amount=50.0
-        )
-        dispute = await ctx.dispute_engine.open_dispute(
-            escrow_id=escrow.id, opener="buyer-b2-6b", reason="test"
-        )
+        escrow = await ctx.payment_engine.create_escrow(payer="buyer-b2-6b", payee="seller-b2-6b", amount=50.0)
+        dispute = await ctx.dispute_engine.open_dispute(escrow_id=escrow.id, opener="buyer-b2-6b", reason="test")
 
         resp = await _exec(
             client,
@@ -116,9 +108,7 @@ class TestOwnershipFieldsExtended:
         await _create_agent(app, "opener-check-b", tier="pro", balance=5000.0)
         await _create_agent(app, "payee-opener-check", tier="free", balance=0.0)
 
-        escrow = await ctx.payment_engine.create_escrow(
-            payer="opener-check-b", payee="payee-opener-check", amount=50.0
-        )
+        escrow = await ctx.payment_engine.create_escrow(payer="opener-check-b", payee="payee-opener-check", amount=50.0)
 
         resp = await _exec(
             client,
@@ -147,16 +137,12 @@ class TestDisputeQueryTools:
         key = await _create_agent(app, "buyer-gd8", tier="pro", balance=5000.0)
         await _create_agent(app, "seller-gd8", tier="free", balance=0.0)
 
-        escrow = await ctx.payment_engine.create_escrow(
-            payer="buyer-gd8", payee="seller-gd8", amount=50.0
-        )
+        escrow = await ctx.payment_engine.create_escrow(payer="buyer-gd8", payee="seller-gd8", amount=50.0)
         dispute = await ctx.dispute_engine.open_dispute(
             escrow_id=escrow.id, opener="buyer-gd8", reason="test get_dispute"
         )
 
-        resp = await _exec(
-            client, "get_dispute", {"dispute_id": dispute["id"]}, key
-        )
+        resp = await _exec(client, "get_dispute", {"dispute_id": dispute["id"]}, key)
         assert resp.status_code == 200
         result = resp.json()["result"]
         assert result["id"] == dispute["id"]
@@ -175,16 +161,10 @@ class TestDisputeQueryTools:
         key = await _create_agent(app, "buyer-ld8", tier="pro", balance=5000.0)
         await _create_agent(app, "seller-ld8", tier="free", balance=0.0)
 
-        escrow = await ctx.payment_engine.create_escrow(
-            payer="buyer-ld8", payee="seller-ld8", amount=50.0
-        )
-        await ctx.dispute_engine.open_dispute(
-            escrow_id=escrow.id, opener="buyer-ld8", reason="test list"
-        )
+        escrow = await ctx.payment_engine.create_escrow(payer="buyer-ld8", payee="seller-ld8", amount=50.0)
+        await ctx.dispute_engine.open_dispute(escrow_id=escrow.id, opener="buyer-ld8", reason="test list")
 
-        resp = await _exec(
-            client, "list_disputes", {"agent_id": "buyer-ld8"}, key
-        )
+        resp = await _exec(client, "list_disputes", {"agent_id": "buyer-ld8"}, key)
         assert resp.status_code == 200
         result = resp.json()["result"]
         assert "disputes" in result

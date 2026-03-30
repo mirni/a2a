@@ -178,9 +178,7 @@ class TestDisputeDeadlines:
         await _create_agent(app, "buyer-dl18", tier="pro", balance=5000.0)
         await _create_agent(app, "seller-dl18", tier="free", balance=0.0)
 
-        escrow = await ctx.payment_engine.create_escrow(
-            payer="buyer-dl18", payee="seller-dl18", amount=50.0
-        )
+        escrow = await ctx.payment_engine.create_escrow(payer="buyer-dl18", payee="seller-dl18", amount=50.0)
         dispute = await ctx.dispute_engine.open_dispute(
             escrow_id=escrow.id, opener="buyer-dl18", reason="test deadline"
         )

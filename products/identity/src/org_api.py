@@ -181,9 +181,7 @@ class OrgAPI:
             all_members = await self.storage.list_org_memberships(org_id)
             owner_count = sum(1 for m in all_members if m.role == "owner")
             if owner_count <= 1:
-                raise LastOwnerError(
-                    f"Cannot remove agent {agent_id}: they are the last owner of {org_id}"
-                )
+                raise LastOwnerError(f"Cannot remove agent {agent_id}: they are the last owner of {org_id}")
 
         deleted = await self.storage.delete_org_membership(org_id, agent_id)
         if not deleted:

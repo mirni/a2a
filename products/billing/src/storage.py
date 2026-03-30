@@ -571,17 +571,14 @@ CREATE INDEX IF NOT EXISTS idx_org_tx_agent ON org_transactions(org_id, agent_id
 
     async def is_wallet_frozen(self, agent_id: str) -> bool:
         """Check if a wallet is frozen."""
-        cursor = await self.db.execute(
-            "SELECT frozen FROM wallet_freeze WHERE agent_id = ?", (agent_id,)
-        )
+        cursor = await self.db.execute("SELECT frozen FROM wallet_freeze WHERE agent_id = ?", (agent_id,))
         row = await cursor.fetchone()
         return bool(row and row["frozen"])
 
     async def set_wallet_frozen(self, agent_id: str, frozen: bool) -> None:
         """Set the freeze state for a wallet."""
         await self.db.execute(
-            "INSERT INTO wallet_freeze (agent_id, frozen) VALUES (?, ?) "
-            "ON CONFLICT(agent_id) DO UPDATE SET frozen = ?",
+            "INSERT INTO wallet_freeze (agent_id, frozen) VALUES (?, ?) ON CONFLICT(agent_id) DO UPDATE SET frozen = ?",
             (agent_id, int(frozen), int(frozen)),
         )
         await self.db.commit()

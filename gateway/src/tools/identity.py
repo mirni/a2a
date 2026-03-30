@@ -239,9 +239,7 @@ async def _remove_agent_from_org(ctx: AppContext, params: dict[str, Any]) -> dic
         )
         owner_count = (await cursor.fetchone())[0]
         if owner_count <= 1:
-            raise ToolValidationError(
-                f"Cannot remove agent {agent_id}: they are the last owner of {org_id}"
-            )
+            raise ToolValidationError(f"Cannot remove agent {agent_id}: they are the last owner of {org_id}")
 
     await db.execute(
         "DELETE FROM org_memberships WHERE org_id = ? AND agent_id = ?",

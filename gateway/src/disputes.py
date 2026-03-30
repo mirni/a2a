@@ -81,7 +81,15 @@ class DisputeEngine:
         await self.db.execute(
             "INSERT INTO disputes (id, escrow_id, opener, respondent, reason, status, created_at, deadline_at) "
             "VALUES (?, ?, ?, ?, ?, 'open', ?, ?)",
-            (dispute_id, escrow_id, opener, escrow.payee if opener == escrow.payer else escrow.payer, reason, now, deadline_at),
+            (
+                dispute_id,
+                escrow_id,
+                opener,
+                escrow.payee if opener == escrow.payer else escrow.payer,
+                reason,
+                now,
+                deadline_at,
+            ),
         )
         await self.db.commit()
         return {
@@ -158,14 +166,11 @@ class DisputeEngine:
         """Public getter for a dispute."""
         return await self._get_dispute(dispute_id)
 
-    async def list_disputes(
-        self, agent_id: str, limit: int = 50, offset: int = 0
-    ) -> list[dict[str, Any]]:
+    async def list_disputes(self, agent_id: str, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
         """List disputes where the agent is opener or respondent."""
         assert self.db is not None
         cursor = await self.db.execute(
-            "SELECT * FROM disputes WHERE opener = ? OR respondent = ? "
-            "ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            "SELECT * FROM disputes WHERE opener = ? OR respondent = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
             (agent_id, agent_id, limit, offset),
         )
         rows = await cursor.fetchall()

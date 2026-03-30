@@ -69,9 +69,7 @@ class TestGetEscrowTool:
         key = await _create_agent(app, "payer-ge12", tier="pro", balance=5000.0)
         await _create_agent(app, "payee-ge12", tier="free", balance=0.0)
 
-        escrow = await ctx.payment_engine.create_escrow(
-            payer="payer-ge12", payee="payee-ge12", amount=50.0
-        )
+        escrow = await ctx.payment_engine.create_escrow(payer="payer-ge12", payee="payee-ge12", amount=50.0)
 
         resp = await _exec(client, "get_escrow", {"escrow_id": escrow.id}, key)
         assert resp.status_code == 200

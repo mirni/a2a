@@ -124,9 +124,7 @@ class WebhookManager:
                     ip_str = sockaddr[0]
                     addr = ipaddress.ip_address(ip_str)
                     if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
-                        raise ValueError(
-                            f"Webhook URL hostname '{hostname}' resolves to private/reserved IP: {ip_str}"
-                        )
+                        raise ValueError(f"Webhook URL hostname '{hostname}' resolves to private/reserved IP: {ip_str}")
             except (socket.gaierror, OSError):
                 pass  # DNS resolution failure is OK at registration time
 

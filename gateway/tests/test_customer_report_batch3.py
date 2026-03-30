@@ -89,9 +89,7 @@ class TestSearchServersOffset:
         key = await _create_agent(app, "trust-offset-agent", tier="free", balance=1000.0)
 
         for i in range(5):
-            await ctx.trust_api.register_server(
-                name=f"server-{i}", url=f"https://server-{i}.example.com"
-            )
+            await ctx.trust_api.register_server(name=f"server-{i}", url=f"https://server-{i}.example.com")
 
         resp = await _exec(
             client,
