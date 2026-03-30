@@ -94,6 +94,42 @@ class WebhookManager:
     # Registration
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _validate_webhook_url(url: str) -> None:
+        """Validate webhook URL: must be HTTPS, no private/loopback IPs."""
+        import ipaddress
+        import socket
+        from urllib.parse import urlparse
+
+        parsed = urlparse(url)
+        if parsed.scheme != "https":
+            raise ValueError(f"Webhook URL must use HTTPS scheme, got '{parsed.scheme}'")
+
+        hostname = parsed.hostname
+        if not hostname:
+            raise ValueError("Webhook URL has no hostname")
+
+        # Check if hostname is an IP address
+        try:
+            addr = ipaddress.ip_address(hostname)
+            if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+                raise ValueError(f"Webhook URL must not target private/loopback/link-local IP: {hostname}")
+        except ValueError as exc:
+            if "private" in str(exc) or "loopback" in str(exc) or "link-local" in str(exc) or "HTTPS" in str(exc):
+                raise
+            # hostname is not an IP — try resolving
+            try:
+                resolved = socket.getaddrinfo(hostname, None, proto=socket.IPPROTO_TCP)
+                for family, _type, _proto, _canonname, sockaddr in resolved:
+                    ip_str = sockaddr[0]
+                    addr = ipaddress.ip_address(ip_str)
+                    if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+                        raise ValueError(
+                            f"Webhook URL hostname '{hostname}' resolves to private/reserved IP: {ip_str}"
+                        )
+            except (socket.gaierror, OSError):
+                pass  # DNS resolution failure is OK at registration time
+
     async def register(
         self,
         agent_id: str,
@@ -104,6 +140,7 @@ class WebhookManager:
     ) -> dict[str, Any]:
         """Register a new webhook and return its representation."""
         self._require_db()
+        self._validate_webhook_url(url)
 
         webhook_id = f"whk-{secrets.token_hex(12)}"
         created_at = time.time()
@@ -332,7 +369,7 @@ class WebhookManager:
     # Delivery history
     # ------------------------------------------------------------------
 
-    async def get_delivery_history(self, webhook_id: str, limit: int = 50) -> list[dict]:
+    async def get_delivery_history(self, webhook_id: str, limit: int = 50, offset: int = 0) -> list[dict]:
         """Return delivery history for a webhook, most recent first."""
         self._require_db()
 
@@ -344,9 +381,9 @@ class WebhookManager:
               FROM webhook_deliveries
              WHERE webhook_id = ?
              ORDER BY created_at DESC
-             LIMIT ?
+             LIMIT ? OFFSET ?
             """,
-            (webhook_id, limit),
+            (webhook_id, limit, offset),
         )
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]

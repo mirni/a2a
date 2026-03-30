@@ -38,6 +38,12 @@ class AlreadyMemberError(Exception):
     pass
 
 
+class LastOwnerError(Exception):
+    """Raised when trying to remove the last owner from an org."""
+
+    pass
+
+
 @dataclass
 class OrgAPI:
     """High-level API for organization operations.
@@ -163,10 +169,21 @@ class OrgAPI:
         Raises:
             OrgNotFoundError: If the organization does not exist.
             MemberNotFoundError: If the agent is not a member.
+            LastOwnerError: If the agent is the last owner.
         """
         org = await self.storage.get_organization(org_id)
         if org is None:
             raise OrgNotFoundError(f"Organization not found: {org_id}")
+
+        # Check if target is an owner and the last one
+        membership = await self.storage.get_org_membership(org_id, agent_id)
+        if membership is not None and membership.role == "owner":
+            all_members = await self.storage.list_org_memberships(org_id)
+            owner_count = sum(1 for m in all_members if m.role == "owner")
+            if owner_count <= 1:
+                raise LastOwnerError(
+                    f"Cannot remove agent {agent_id}: they are the last owner of {org_id}"
+                )
 
         deleted = await self.storage.delete_org_membership(org_id, agent_id)
         if not deleted:

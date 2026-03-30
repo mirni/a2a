@@ -133,6 +133,12 @@ async def _create_org(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]
         "INSERT INTO orgs (id, name, owner_agent_id, created_at) VALUES (?, ?, ?, ?)",
         (org_id, org_name, owner_agent_id, now),
     )
+    # Auto-add the owner as a member with role='owner'
+    if owner_agent_id:
+        await db.execute(
+            "INSERT OR IGNORE INTO org_memberships (org_id, agent_id, role, joined_at) VALUES (?, ?, 'owner', ?)",
+            (org_id, owner_agent_id, now),
+        )
     await db.commit()
 
     return {
@@ -204,10 +210,59 @@ async def _get_metric_averages(ctx: AppContext, params: dict[str, Any]) -> dict[
     return {"averages": avgs}
 
 
-async def _add_agent_to_org(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
-    """Add an agent to an organization."""
+async def _remove_agent_from_org(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    """Remove an agent from an organization (with last-owner guard)."""
+    from gateway.src.tool_errors import ToolNotFoundError, ToolValidationError
+
     org_id = params["org_id"]
     agent_id = params["agent_id"]
+    db = ctx.identity_api.storage.db
+
+    # Verify org exists
+    cursor = await db.execute("SELECT id FROM orgs WHERE id = ?", (org_id,))
+    if await cursor.fetchone() is None:
+        raise ToolNotFoundError(f"Org not found: {org_id}")
+
+    # Check if target is an owner and the last one
+    cursor = await db.execute(
+        "SELECT role FROM org_memberships WHERE org_id = ? AND agent_id = ?",
+        (org_id, agent_id),
+    )
+    membership_row = await cursor.fetchone()
+    if membership_row is None:
+        raise ToolNotFoundError(f"Agent {agent_id} is not a member of {org_id}")
+
+    if membership_row["role"] == "owner":
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM org_memberships WHERE org_id = ? AND role = 'owner'",
+            (org_id,),
+        )
+        owner_count = (await cursor.fetchone())[0]
+        if owner_count <= 1:
+            raise ToolValidationError(
+                f"Cannot remove agent {agent_id}: they are the last owner of {org_id}"
+            )
+
+    await db.execute(
+        "DELETE FROM org_memberships WHERE org_id = ? AND agent_id = ?",
+        (org_id, agent_id),
+    )
+    await db.commit()
+
+    return {
+        "org_id": org_id,
+        "agent_id": agent_id,
+        "removed": True,
+    }
+
+
+async def _add_agent_to_org(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    """Add an agent to an organization."""
+    import time as _time
+
+    org_id = params["org_id"]
+    agent_id = params["agent_id"]
+    role = params.get("role", "member")
     db = ctx.identity_api.storage.db
 
     cursor = await db.execute("SELECT id FROM orgs WHERE id = ?", (org_id,))
@@ -217,6 +272,10 @@ async def _add_agent_to_org(ctx: AppContext, params: dict[str, Any]) -> dict[str
     await db.execute(
         "UPDATE agent_identities SET org_id = ? WHERE agent_id = ?",
         (org_id, agent_id),
+    )
+    await db.execute(
+        "INSERT OR IGNORE INTO org_memberships (org_id, agent_id, role, joined_at) VALUES (?, ?, ?, ?)",
+        (org_id, agent_id, role, _time.time()),
     )
     await db.commit()
 

@@ -11,6 +11,10 @@ class ToolValidationError(ValueError):
     """Raised when a tool receives invalid input (maps to 400)."""
 
 
+class ToolForbiddenError(PermissionError):
+    """Raised when a tool call is forbidden due to ownership/auth (maps to 403)."""
+
+
 class ToolNotFoundError(LookupError):
     """Raised when a tool cannot find a requested resource (maps to 404)."""
 

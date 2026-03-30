@@ -14,7 +14,7 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from gateway.src.auth import extract_api_key
-from gateway.src.authorization import ADMIN_TIER, check_ownership_authorization
+from gateway.src.authorization import ADMIN_ONLY_TOOLS, ADMIN_TIER, check_ownership_authorization
 from gateway.src.catalog import get_tool
 from gateway.src.errors import error_response, handle_product_exception
 from gateway.src.middleware import Metrics
@@ -225,10 +225,19 @@ async def execute(request: Request) -> JSONResponse:
         )
 
     # --- 2b. Ownership authorization: caller must own the resource ---
-    authz_result = check_ownership_authorization(agent_id, agent_tier, params)
+    authz_result = check_ownership_authorization(agent_id, agent_tier, params, tool_name=tool_name)
     if authz_result is not None:
         status, message, code = authz_result
         return await error_response(status, message, code, request=request)
+
+    # --- 2c. Admin-only tools: block non-admin callers ---
+    if tool_name in ADMIN_ONLY_TOOLS and agent_tier != ADMIN_TIER:
+        return await error_response(
+            403,
+            f"Tool '{tool_name}' requires admin privileges",
+            "admin_only",
+            request=request,
+        )
 
     # --- 3. Check tier access (skip for x402) ---
     tool_pricing = tool_def.get("pricing", {})
@@ -306,6 +315,9 @@ async def execute(request: Request) -> JSONResponse:
                 return await handle_product_exception(request, exc)
 
     # --- 6. Dispatch to tool function ---
+    # Inject caller identity so tools can perform ownership checks
+    params["_caller_agent_id"] = agent_id
+
     # Record the request in metrics regardless of outcome
     await Metrics.record_request(tool_name)
 

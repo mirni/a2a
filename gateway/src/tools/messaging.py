@@ -32,6 +32,7 @@ async def _get_messages(ctx: AppContext, params: dict[str, Any]) -> dict[str, An
         agent_id=params["agent_id"],
         thread_id=params.get("thread_id"),
         limit=params.get("limit", 50),
+        offset=params.get("offset", 0),
     )
     return {"messages": messages}
 

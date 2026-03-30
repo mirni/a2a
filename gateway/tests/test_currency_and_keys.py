@@ -304,8 +304,8 @@ class TestRevokeApiKey:
         )
         assert resp.status_code == 403
 
-    async def test_revoke_api_key_rejected_for_free_tier(self, client, api_key):
-        """revoke_api_key should reject free tier (requires starter)."""
+    async def test_revoke_api_key_allowed_for_free_tier(self, client, api_key):
+        """revoke_api_key should be accessible to free tier (moved from starter)."""
         resp = await client.post(
             "/v1/execute",
             json={
@@ -314,8 +314,8 @@ class TestRevokeApiKey:
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
-        # free < starter, should be 403
-        assert resp.status_code == 403
+        # free agents should be able to revoke their own keys
+        assert resp.status_code == 200
 
 
 # ---------------------------------------------------------------------------

@@ -388,6 +388,20 @@ async def _get_revenue_report(ctx: AppContext, params: dict[str, Any]) -> dict[s
 # ---------------------------------------------------------------------------
 
 
+async def _freeze_wallet(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    """Freeze a wallet, blocking deposits and withdrawals."""
+    agent_id = params["agent_id"]
+    await ctx.tracker.storage.set_wallet_frozen(agent_id, True)
+    return {"agent_id": agent_id, "frozen": True}
+
+
+async def _unfreeze_wallet(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    """Unfreeze a wallet, allowing deposits and withdrawals."""
+    agent_id = params["agent_id"]
+    await ctx.tracker.storage.set_wallet_frozen(agent_id, False)
+    return {"agent_id": agent_id, "frozen": False}
+
+
 async def _get_exchange_rate(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     """Query the exchange rate between two currencies."""
     from billing_src.exchange import ExchangeRateService
@@ -402,7 +416,7 @@ async def _get_exchange_rate(ctx: AppContext, params: dict[str, Any]) -> dict[st
     return {
         "from_currency": from_currency.value,
         "to_currency": to_currency.value,
-        "rate": str(rate),
+        "rate": float(rate),
     }
 
 

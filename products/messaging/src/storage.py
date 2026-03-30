@@ -137,6 +137,7 @@ class MessageStorage:
         agent_id: str,
         thread_id: str | None = None,
         limit: int = 50,
+        offset: int = 0,
     ) -> list[dict]:
         """Get messages where agent_id is sender or recipient, newest first.
 
@@ -149,9 +150,9 @@ class MessageStorage:
                 SELECT * FROM messages
                 WHERE (sender = ? OR recipient = ?) AND thread_id = ?
                 ORDER BY created_at DESC
-                LIMIT ?
+                LIMIT ? OFFSET ?
                 """,
-                (agent_id, agent_id, thread_id, limit),
+                (agent_id, agent_id, thread_id, limit, offset),
             )
         else:
             cursor = await self._db.execute(
@@ -159,9 +160,9 @@ class MessageStorage:
                 SELECT * FROM messages
                 WHERE sender = ? OR recipient = ?
                 ORDER BY created_at DESC
-                LIMIT ?
+                LIMIT ? OFFSET ?
                 """,
-                (agent_id, agent_id, limit),
+                (agent_id, agent_id, limit, offset),
             )
         rows = await cursor.fetchall()
         return [self._row_to_message_dict(row) for row in rows]

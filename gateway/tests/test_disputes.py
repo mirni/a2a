@@ -2,9 +2,25 @@
 
 from __future__ import annotations
 
+import hashlib
+import secrets
+
 import pytest
 
 pytestmark = pytest.mark.asyncio
+
+
+async def _create_admin_key(app, agent_id: str = "admin-resolver") -> str:
+    """Create an admin-tier API key."""
+    ctx = app.state.ctx
+    try:
+        await ctx.tracker.wallet.create(agent_id, initial_balance=10000.0, signup_bonus=False)
+    except ValueError:
+        pass  # wallet already exists
+    raw_key = f"a2a_admin_{secrets.token_hex(12)}"
+    key_hash = hashlib.sha3_256(raw_key.encode()).hexdigest()
+    await ctx.paywall_storage.store_key(key_hash=key_hash, agent_id=agent_id, tier="admin")
+    return raw_key
 
 
 async def test_open_dispute(client, pro_api_key, app):
@@ -66,9 +82,10 @@ async def test_respond_to_dispute(client, pro_api_key, app):
     assert result["status"] == "responded"
 
 
-async def test_resolve_dispute_refund(client, pro_api_key, app):
+async def test_resolve_dispute_refund(client, app):
     """Admin can resolve a dispute with refund."""
     ctx = app.state.ctx
+    admin_key = await _create_admin_key(app, "admin-resolve-e")
     await ctx.tracker.wallet.create("buyer-e", initial_balance=1000.0, signup_bonus=False)
     await ctx.tracker.wallet.create("seller-e", initial_balance=0.0, signup_bonus=False)
 
@@ -83,11 +100,11 @@ async def test_resolve_dispute_refund(client, pro_api_key, app):
             "params": {
                 "dispute_id": dispute["id"],
                 "resolution": "refund",
-                "resolved_by": "platform",
+                "resolved_by": "admin-resolve-e",
                 "notes": "Service quality did not meet SLA",
             },
         },
-        headers={"Authorization": f"Bearer {pro_api_key}"},
+        headers={"Authorization": f"Bearer {admin_key}"},
     )
     assert resp.status_code == 200
     result = resp.json()["result"]
@@ -99,9 +116,10 @@ async def test_resolve_dispute_refund(client, pro_api_key, app):
     assert buyer_balance == 1000.0  # original 1000 - 75 (escrow) + 75 (refund)
 
 
-async def test_resolve_dispute_release(client, pro_api_key, app):
+async def test_resolve_dispute_release(client, app):
     """Admin can resolve a dispute by releasing funds to payee."""
     ctx = app.state.ctx
+    admin_key = await _create_admin_key(app, "admin-resolve-f")
     await ctx.tracker.wallet.create("buyer-f", initial_balance=1000.0, signup_bonus=False)
     await ctx.tracker.wallet.create("seller-f", initial_balance=0.0, signup_bonus=False)
 
@@ -116,10 +134,10 @@ async def test_resolve_dispute_release(client, pro_api_key, app):
             "params": {
                 "dispute_id": dispute["id"],
                 "resolution": "release",
-                "resolved_by": "platform",
+                "resolved_by": "admin-resolve-f",
             },
         },
-        headers={"Authorization": f"Bearer {pro_api_key}"},
+        headers={"Authorization": f"Bearer {admin_key}"},
     )
     assert resp.status_code == 200
     result = resp.json()["result"]

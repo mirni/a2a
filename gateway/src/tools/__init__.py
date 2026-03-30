@@ -14,6 +14,7 @@ from gateway.src.tools.billing import (
     _create_wallet,
     _deposit,
     _estimate_cost,
+    _freeze_wallet,
     _get_agent_leaderboard,
     _get_balance,
     _get_budget_status,
@@ -25,6 +26,7 @@ from gateway.src.tools.billing import (
     _get_usage_summary,
     _get_volume_discount,
     _set_budget_cap,
+    _unfreeze_wallet,
     _withdraw,
 )
 from gateway.src.tools.identity import (
@@ -41,6 +43,7 @@ from gateway.src.tools.identity import (
     _ingest_metrics,
     _query_metrics,
     _register_agent,
+    _remove_agent_from_org,
     _search_agents_by_metrics,
     _submit_metrics,
     _verify_agent,
@@ -92,8 +95,12 @@ from gateway.src.tools.payments import (
     _create_performance_escrow,
     _create_split_intent,
     _create_subscription,
+    _get_dispute,
+    _get_escrow,
+    _get_intent,
     _get_payment_history,
     _get_subscription,
+    _list_disputes,
     _list_subscriptions,
     _open_dispute,
     _partial_capture,
@@ -126,8 +133,10 @@ TOOL_REGISTRY: dict[str, ToolFunc] = {
     "get_transactions": _get_transactions,
     # Payments
     "create_intent": _create_intent,
+    "get_intent": _get_intent,
     "capture_intent": _capture_intent,
     "create_escrow": _create_escrow,
+    "get_escrow": _get_escrow,
     "release_escrow": _release_escrow,
     "cancel_escrow": _cancel_escrow,
     "refund_intent": _refund_intent,
@@ -180,6 +189,8 @@ TOOL_REGISTRY: dict[str, ToolFunc] = {
     "open_dispute": _open_dispute,
     "respond_to_dispute": _respond_to_dispute,
     "resolve_dispute": _resolve_dispute,
+    "get_dispute": _get_dispute,
+    "list_disputes": _list_disputes,
     # Key rotation
     "rotate_key": _rotate_key,
     # Historical claims
@@ -229,6 +240,10 @@ TOOL_REGISTRY: dict[str, ToolFunc] = {
     "create_org": _create_org,
     "get_org": _get_org,
     "add_agent_to_org": _add_agent_to_org,
+    "remove_agent_from_org": _remove_agent_from_org,
+    # Wallet freeze/unfreeze
+    "freeze_wallet": _freeze_wallet,
+    "unfreeze_wallet": _unfreeze_wallet,
     # Time-series metrics (PRD 012)
     "ingest_metrics": _ingest_metrics,
     "query_metrics": _query_metrics,

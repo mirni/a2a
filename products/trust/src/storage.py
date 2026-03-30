@@ -153,6 +153,7 @@ class StorageBackend:
         name_contains: str | None = None,
         min_score: float | None = None,
         limit: int = 100,
+        offset: int = 0,
     ) -> list[Server]:
         """Search servers by name or minimum composite score."""
         if min_score is not None:
@@ -166,16 +167,16 @@ class StorageBackend:
             if name_contains:
                 query += " AND s.name LIKE ?"
                 params.append(f"%{name_contains}%")
-            query += " ORDER BY s.registered_at DESC LIMIT ?"
-            params.append(limit)
+            query += " ORDER BY s.registered_at DESC LIMIT ? OFFSET ?"
+            params.extend([limit, offset])
         else:
             query = "SELECT * FROM servers WHERE 1=1"
             params = []
             if name_contains:
                 query += " AND name LIKE ?"
                 params.append(f"%{name_contains}%")
-            query += " ORDER BY registered_at DESC LIMIT ?"
-            params.append(limit)
+            query += " ORDER BY registered_at DESC LIMIT ? OFFSET ?"
+            params.extend([limit, offset])
 
         cursor = await self.db.execute(query, params)
         rows = await cursor.fetchall()

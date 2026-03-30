@@ -55,7 +55,8 @@ class DisputeEngine:
                 notes         TEXT,
                 created_at    REAL NOT NULL,
                 responded_at  REAL,
-                resolved_at   REAL
+                resolved_at   REAL,
+                deadline_at   REAL
             );
             CREATE INDEX IF NOT EXISTS idx_dispute_escrow ON disputes(escrow_id);
             CREATE INDEX IF NOT EXISTS idx_dispute_status ON disputes(status);
@@ -75,11 +76,12 @@ class DisputeEngine:
 
         dispute_id = uuid.uuid4().hex
         now = time.time()
+        deadline_at = now + 7 * 86400  # 7-day response deadline
         assert self.db is not None
         await self.db.execute(
-            "INSERT INTO disputes (id, escrow_id, opener, respondent, reason, status, created_at) "
-            "VALUES (?, ?, ?, ?, ?, 'open', ?)",
-            (dispute_id, escrow_id, opener, escrow.payee if opener == escrow.payer else escrow.payer, reason, now),
+            "INSERT INTO disputes (id, escrow_id, opener, respondent, reason, status, created_at, deadline_at) "
+            "VALUES (?, ?, ?, ?, ?, 'open', ?, ?)",
+            (dispute_id, escrow_id, opener, escrow.payee if opener == escrow.payer else escrow.payer, reason, now, deadline_at),
         )
         await self.db.commit()
         return {
@@ -89,6 +91,7 @@ class DisputeEngine:
             "status": "open",
             "reason": reason,
             "created_at": now,
+            "deadline_at": deadline_at,
         }
 
     async def respond_to_dispute(self, dispute_id: str, respondent: str, response: str) -> dict[str, Any]:
@@ -154,6 +157,44 @@ class DisputeEngine:
     async def get_dispute(self, dispute_id: str) -> dict[str, Any]:
         """Public getter for a dispute."""
         return await self._get_dispute(dispute_id)
+
+    async def list_disputes(
+        self, agent_id: str, limit: int = 50, offset: int = 0
+    ) -> list[dict[str, Any]]:
+        """List disputes where the agent is opener or respondent."""
+        assert self.db is not None
+        cursor = await self.db.execute(
+            "SELECT * FROM disputes WHERE opener = ? OR respondent = ? "
+            "ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (agent_id, agent_id, limit, offset),
+        )
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+    async def process_expired_disputes(self) -> list[dict[str, Any]]:
+        """Auto-resolve disputes past their deadline (default: refund to payer)."""
+        now = time.time()
+        assert self.db is not None
+        cursor = await self.db.execute(
+            "SELECT * FROM disputes WHERE status IN ('open', 'responded') "
+            "AND deadline_at IS NOT NULL AND deadline_at <= ?",
+            (now,),
+        )
+        rows = await cursor.fetchall()
+        resolved = []
+        for row in rows:
+            dispute = dict(row)
+            try:
+                result = await self.resolve_dispute(
+                    dispute_id=dispute["id"],
+                    resolution="refund",
+                    resolved_by="system",
+                    notes="Auto-resolved: deadline expired",
+                )
+                resolved.append(result)
+            except (DisputeStateError, Exception):
+                continue
+        return resolved
 
     async def _get_dispute(self, dispute_id: str) -> dict[str, Any]:
         assert self.db is not None

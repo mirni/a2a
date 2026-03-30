@@ -33,6 +33,7 @@ async def _search_servers(ctx: AppContext, params: dict[str, Any]) -> dict[str, 
         name_contains=params.get("name_contains"),
         min_score=params.get("min_score"),
         limit=params.get("limit", 100),
+        offset=params.get("offset", 0),
     )
     return {
         "servers": [

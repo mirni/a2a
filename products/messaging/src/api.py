@@ -104,6 +104,7 @@ class MessagingAPI:
         agent_id: str,
         thread_id: str | None = None,
         limit: int = 50,
+        offset: int = 0,
         decrypt_key: str | None = None,
         sender_public_key_hex: str | None = None,
     ) -> list[dict]:
@@ -113,6 +114,7 @@ class MessagingAPI:
             agent_id: The agent whose messages to retrieve.
             thread_id: Optional thread filter.
             limit: Maximum number of messages to return.
+            offset: Number of messages to skip for pagination.
             decrypt_key: Recipient's Ed25519 private key hex. If provided,
                 encrypted messages will be decrypted in-place before return.
             sender_public_key_hex: Sender's Ed25519 public key hex, used to
@@ -123,7 +125,7 @@ class MessagingAPI:
             List of message dicts. Encrypted messages are decrypted if
             decrypt_key is provided.
         """
-        messages = await self._storage.get_messages(agent_id, thread_id=thread_id, limit=limit)
+        messages = await self._storage.get_messages(agent_id, thread_id=thread_id, limit=limit, offset=offset)
 
         if decrypt_key:
             for msg in messages:

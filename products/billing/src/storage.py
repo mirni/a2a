@@ -37,6 +37,11 @@ CREATE TABLE IF NOT EXISTS wallets (
     updated_at REAL NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS wallet_freeze (
+    agent_id TEXT PRIMARY KEY,
+    frozen   INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS usage_records (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     agent_id        TEXT NOT NULL,
@@ -58,6 +63,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     amount      INTEGER NOT NULL DEFAULT 0,
     tx_type     TEXT NOT NULL,
     description TEXT,
+    currency    TEXT NOT NULL DEFAULT 'CREDITS',
     created_at  REAL NOT NULL
 );
 
@@ -289,12 +295,15 @@ CREATE INDEX IF NOT EXISTS idx_org_tx_agent ON org_transactions(org_id, agent_id
     # Transaction log
     # -----------------------------------------------------------------------
 
-    async def record_transaction(self, agent_id: str, amount: float, tx_type: str, description: str = "") -> int:
+    async def record_transaction(
+        self, agent_id: str, amount: float, tx_type: str, description: str = "", currency: str = "CREDITS"
+    ) -> int:
         now = time.time()
         amt_atomic = int(Decimal(str(amount)) * SCALE)  # allow negative for withdrawals
         cursor = await self.db.execute(
-            "INSERT INTO transactions (agent_id, amount, tx_type, description, created_at) VALUES (?, ?, ?, ?, ?)",
-            (agent_id, amt_atomic, tx_type, description, now),
+            "INSERT INTO transactions (agent_id, amount, tx_type, description, currency, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (agent_id, amt_atomic, tx_type, description, currency, now),
         )
         await self.db.commit()
         return cursor.lastrowid  # type: ignore[return-value]
@@ -555,6 +564,27 @@ CREATE INDEX IF NOT EXISTS idx_org_tx_agent ON org_transactions(org_id, agent_id
             "reload_amount": self._from_atomic(row["reload_amount"]),
             "enabled": bool(row["enabled"]),
         }
+
+    # -----------------------------------------------------------------------
+    # Wallet freeze/unfreeze
+    # -----------------------------------------------------------------------
+
+    async def is_wallet_frozen(self, agent_id: str) -> bool:
+        """Check if a wallet is frozen."""
+        cursor = await self.db.execute(
+            "SELECT frozen FROM wallet_freeze WHERE agent_id = ?", (agent_id,)
+        )
+        row = await cursor.fetchone()
+        return bool(row and row["frozen"])
+
+    async def set_wallet_frozen(self, agent_id: str, frozen: bool) -> None:
+        """Set the freeze state for a wallet."""
+        await self.db.execute(
+            "INSERT INTO wallet_freeze (agent_id, frozen) VALUES (?, ?) "
+            "ON CONFLICT(agent_id) DO UPDATE SET frozen = ?",
+            (agent_id, int(frozen), int(frozen)),
+        )
+        await self.db.commit()
 
     # -----------------------------------------------------------------------
     # Multi-currency balance operations
