@@ -129,6 +129,7 @@ jobs:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
+          ssh: true
 
       - name: Deploy gateway to production
         env:
@@ -139,10 +140,10 @@ jobs:
           DEB_FILE=$(ls dist/a2a-gateway_*.deb | head -1)
           DEB_BASENAME=$(basename "$DEB_FILE")
 
-          scp -o StrictHostKeyChecking=accept-new "$DEB_FILE" "root@${DEPLOY_HOST}:/tmp/"
+          scp "$DEB_FILE" "root@${DEPLOY_HOST}:/tmp/"
 
           # Deploy with rollback on failure
-          ssh -o StrictHostKeyChecking=accept-new "root@${DEPLOY_HOST}" bash -s -- "$DEB_BASENAME" << 'REMOTE'
+          ssh "root@${DEPLOY_HOST}" bash -s -- "$DEB_BASENAME" << 'REMOTE'
             set -euo pipefail
             DEB_BASENAME="$1"
 
@@ -209,6 +210,7 @@ jobs:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
+          ssh: true
 
       - name: Deploy website to production
         env:
@@ -219,9 +221,9 @@ jobs:
           DEB_FILE=$(ls dist/a2a-website_*.deb | head -1)
           DEB_BASENAME=$(basename "$DEB_FILE")
 
-          scp -o StrictHostKeyChecking=accept-new "$DEB_FILE" "root@${DEPLOY_HOST}:/tmp/"
+          scp "$DEB_FILE" "root@${DEPLOY_HOST}:/tmp/"
 
-          ssh -o StrictHostKeyChecking=accept-new "root@${DEPLOY_HOST}" bash -s -- "$DEB_BASENAME" << 'REMOTE'
+          ssh "root@${DEPLOY_HOST}" bash -s -- "$DEB_BASENAME" << 'REMOTE'
             set -euo pipefail
             DEB_BASENAME="$1"
 

@@ -78,6 +78,7 @@ jobs:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
+          ssh: true
 
       - name: Deploy to staging server
         env:
@@ -86,11 +87,11 @@ jobs:
           DEB_FILE=$(ls dist/a2a-gateway-test_*.deb | head -1)
           DEB_BASENAME=$(basename "$DEB_FILE")
 
-          # Copy deb to server via Tailscale
-          scp -o StrictHostKeyChecking=accept-new "$DEB_FILE" "root@${DEPLOY_HOST}:/tmp/"
+          # Copy deb to server via Tailscale SSH
+          scp "$DEB_FILE" "root@${DEPLOY_HOST}:/tmp/"
 
           # Install and verify service starts
-          ssh -o StrictHostKeyChecking=accept-new "root@${DEPLOY_HOST}" bash -s << REMOTE
+          ssh "root@${DEPLOY_HOST}" bash -s << REMOTE
             set -euo pipefail
             dpkg -i "/tmp/${DEB_BASENAME}" || apt-get install -f -y
             sleep 3
