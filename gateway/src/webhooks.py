@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import json
+import logging
 import secrets
 import time
 from typing import Any
 
 import aiosqlite
 import httpx
+
+logger = logging.getLogger("a2a.webhooks")
 
 _SCHEMA_WEBHOOKS = """
 CREATE TABLE IF NOT EXISTS webhooks (
@@ -53,9 +57,10 @@ _EXPONENTIAL_BASE = 2
 class WebhookManager:
     """Manages webhook registrations, delivery, and retries via SQLite."""
 
-    def __init__(self, dsn: str) -> None:
+    def __init__(self, dsn: str, max_concurrent_sends: int = 10) -> None:
         self._dsn = dsn
         self._db: aiosqlite.Connection | None = None
+        self._send_semaphore = asyncio.Semaphore(max_concurrent_sends)
 
     def _require_db(self) -> aiosqlite.Connection:
         """Return the database connection, raising RuntimeError if not connected."""
@@ -192,7 +197,10 @@ class WebhookManager:
                 payload_json=payload_json,
                 now=now,
             )
-            await self._send(webhook, delivery_id, event)
+            asyncio.create_task(
+                self._guarded_send(webhook, delivery_id, event),
+                name=f"webhook-send-{webhook['id']}-{delivery_id}",
+            )
 
     async def _send(
         self,
@@ -267,6 +275,23 @@ class WebhookManager:
         except Exception:
             await self._db.rollback()
             raise
+
+    async def _guarded_send(
+        self,
+        webhook: dict[str, Any],
+        delivery_id: int,
+        event: dict[str, Any],
+    ) -> None:
+        """Wrap _send with semaphore and error handling for fire-and-forget delivery."""
+        try:
+            async with self._send_semaphore:
+                await self._send(webhook, delivery_id, event)
+        except Exception:
+            logger.exception(
+                "Background webhook send failed for webhook %s delivery %s",
+                webhook.get("id"),
+                delivery_id,
+            )
 
     # ------------------------------------------------------------------
     # Retries

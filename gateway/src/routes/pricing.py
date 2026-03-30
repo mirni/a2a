@@ -36,6 +36,10 @@ async def pricing_list(request: Request) -> JSONResponse:
 
     tools = catalog[offset : offset + limit_val]
 
+    # Use actual IP-based remaining count when the public rate limiter is active
+    limiter = getattr(request.state, "public_rate_limiter", None)
+    client_ip = getattr(request.state, "client_ip", None)
+
     return JSONResponse(
         {
             "tools": tools,
@@ -43,7 +47,7 @@ async def pricing_list(request: Request) -> JSONResponse:
             "limit": limit_val,
             "offset": offset,
         },
-        headers=public_rate_limit_headers(),
+        headers=public_rate_limit_headers(limiter=limiter, client_ip=client_ip),
     )
 
 

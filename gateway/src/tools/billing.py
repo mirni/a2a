@@ -9,8 +9,12 @@ from gateway.src.tool_errors import ToolNotFoundError, ToolValidationError
 
 
 async def _get_balance(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
-    balance = await ctx.tracker.get_balance(params["agent_id"])
-    return {"balance": balance}
+    currency = params.get("currency", "CREDITS")
+    balance = await ctx.tracker.wallet.get_balance(params["agent_id"], currency=currency)
+    result: dict[str, Any] = {"balance": balance}
+    if currency != "CREDITS":
+        result["currency"] = currency
+    return result
 
 
 async def _get_usage_summary(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
@@ -19,10 +23,12 @@ async def _get_usage_summary(ctx: AppContext, params: dict[str, Any]) -> dict[st
 
 
 async def _deposit(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    currency = params.get("currency", "CREDITS")
     new_balance = await ctx.tracker.wallet.deposit(
         params["agent_id"],
         params["amount"],
         description=params.get("description", ""),
+        currency=currency,
     )
     return {"new_balance": new_balance}
 
@@ -46,10 +52,12 @@ async def _create_wallet(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
 
 
 async def _withdraw(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    currency = params.get("currency", "CREDITS")
     new_balance = await ctx.tracker.wallet.withdraw(
         params["agent_id"],
         params["amount"],
         description=params.get("description", ""),
+        currency=currency,
     )
     return {"new_balance": new_balance}
 
@@ -373,3 +381,56 @@ async def _get_revenue_report(ctx: AppContext, params: dict[str, Any]) -> dict[s
         "payment_count": len(incoming),
         "history": incoming[: params.get("limit", 50)],
     }
+
+
+# ---------------------------------------------------------------------------
+# Exchange Rate Tools (P1)
+# ---------------------------------------------------------------------------
+
+
+async def _get_exchange_rate(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    """Query the exchange rate between two currencies."""
+    from billing_src.exchange import ExchangeRateService
+    from billing_src.models import Currency
+
+    from_currency = Currency(params["from_currency"])
+    to_currency = Currency(params["to_currency"])
+
+    exchange_svc = ExchangeRateService(storage=ctx.tracker.storage)
+    rate = await exchange_svc.get_rate(from_currency, to_currency)
+
+    return {
+        "from_currency": from_currency.value,
+        "to_currency": to_currency.value,
+        "rate": str(rate),
+    }
+
+
+async def _convert_currency(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    """Convert between wallet balances using exchange rates."""
+    import sys
+
+    from billing_src.exchange import ExchangeRateService
+    from billing_src.models import Currency as _Currency  # noqa: F841
+
+    # Ensure the billing models module is accessible via relative import path
+    # (wallet.convert_currency uses `from .models import Currency` internally)
+    if "billing_src.models" in sys.modules and "src.models" not in sys.modules:
+        sys.modules["src.models"] = sys.modules["billing_src.models"]
+
+    agent_id = params["agent_id"]
+    amount = float(params["amount"])
+    from_currency = params["from_currency"]
+    to_currency = params["to_currency"]
+
+    exchange_svc = ExchangeRateService(storage=ctx.tracker.storage)
+
+    result = await ctx.tracker.wallet.convert_currency(
+        agent_id=agent_id,
+        amount=amount,
+        from_currency=from_currency,
+        to_currency=to_currency,
+        exchange_service=exchange_svc,
+    )
+
+    return result

@@ -2,13 +2,18 @@
   {
     "name": "get_balance",
     "service": "billing",
-    "description": "Get the current wallet balance for an agent.",
+    "description": "Get the current wallet balance for an agent in a specific currency.",
     "input_schema": {
       "type": "object",
       "properties": {
         "agent_id": {
           "type": "string",
           "description": "The agent identifier"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency code (default: CREDITS). One of: CREDITS, USD, EUR, GBP, BTC, ETH",
+          "default": "CREDITS"
         }
       },
       "required": [
@@ -76,7 +81,7 @@
   {
     "name": "deposit",
     "service": "billing",
-    "description": "Deposit credits into an agent's wallet.",
+    "description": "Deposit funds into an agent's wallet in a specific currency.",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -90,6 +95,11 @@
         "description": {
           "type": "string",
           "description": "Optional description"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency code (default: CREDITS). One of: CREDITS, USD, EUR, GBP, BTC, ETH",
+          "default": "CREDITS"
         }
       },
       "required": [
@@ -193,6 +203,11 @@
         },
         "idempotency_key": {
           "type": "string"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency code (default: CREDITS). One of: CREDITS, USD, EUR, GBP, BTC, ETH",
+          "default": "CREDITS"
         }
       },
       "required": [
@@ -330,6 +345,11 @@
         },
         "timeout_hours": {
           "type": "number"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency code (default: CREDITS). One of: CREDITS, USD, EUR, GBP, BTC, ETH",
+          "default": "CREDITS"
         }
       },
       "required": [
@@ -2071,7 +2091,7 @@
   {
     "name": "withdraw",
     "service": "billing",
-    "description": "Withdraw credits from an agent's wallet.",
+    "description": "Withdraw funds from an agent's wallet in a specific currency.",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -2085,6 +2105,11 @@
         "description": {
           "type": "string",
           "description": "Reason for withdrawal"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency code (default: CREDITS). One of: CREDITS, USD, EUR, GBP, BTC, ETH",
+          "default": "CREDITS"
         }
       },
       "required": [
@@ -4654,6 +4679,200 @@
     },
     "sla": {
       "max_latency_ms": 200
+    },
+    "tier_required": "free"
+  },
+  {
+    "name": "list_api_keys",
+    "service": "paywall",
+    "description": "List all API keys for an agent. Returns truncated key hash prefix, tier, scopes, and created_at (never the full key or hash).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "description": "The agent whose keys to list"
+        }
+      },
+      "required": [
+        "agent_id"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key_hash_prefix": {
+                "type": "string"
+              },
+              "tier": {
+                "type": "string"
+              },
+              "scopes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "created_at": {
+                "type": "number"
+              },
+              "revoked": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
+    "tier_required": "free"
+  },
+  {
+    "name": "revoke_api_key",
+    "service": "paywall",
+    "description": "Soft-delete (revoke) an API key by its hash prefix. The key will no longer be usable for authentication.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "description": "The agent who owns the key"
+        },
+        "key_hash_prefix": {
+          "type": "string",
+          "description": "First 8 characters of the key hash (from list_api_keys)"
+        }
+      },
+      "required": [
+        "agent_id",
+        "key_hash_prefix"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "revoked": {
+          "type": "boolean"
+        },
+        "key_hash_prefix": {
+          "type": "string"
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
+    "tier_required": "starter"
+  },
+  {
+    "name": "get_exchange_rate",
+    "service": "billing",
+    "description": "Query the exchange rate between two supported currencies.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "from_currency": {
+          "type": "string",
+          "description": "Source currency code. One of: CREDITS, USD, EUR, GBP, BTC, ETH"
+        },
+        "to_currency": {
+          "type": "string",
+          "description": "Target currency code. One of: CREDITS, USD, EUR, GBP, BTC, ETH"
+        }
+      },
+      "required": [
+        "from_currency",
+        "to_currency"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "from_currency": {
+          "type": "string"
+        },
+        "to_currency": {
+          "type": "string"
+        },
+        "rate": {
+          "type": "string"
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
+    "tier_required": "free"
+  },
+  {
+    "name": "convert_currency",
+    "service": "billing",
+    "description": "Convert funds between currency balances for an agent. Withdraws from source currency and deposits converted amount to target currency.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "description": "The agent whose balances to convert"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount to convert in the source currency"
+        },
+        "from_currency": {
+          "type": "string",
+          "description": "Source currency code. One of: CREDITS, USD, EUR, GBP, BTC, ETH"
+        },
+        "to_currency": {
+          "type": "string",
+          "description": "Target currency code. One of: CREDITS, USD, EUR, GBP, BTC, ETH"
+        }
+      },
+      "required": [
+        "agent_id",
+        "amount",
+        "from_currency",
+        "to_currency"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "from_amount": {
+          "type": "number"
+        },
+        "to_amount": {
+          "type": "number"
+        },
+        "from_currency": {
+          "type": "string"
+        },
+        "to_currency": {
+          "type": "string"
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
     },
     "tier_required": "free"
   }

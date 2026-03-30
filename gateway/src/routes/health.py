@@ -30,6 +30,10 @@ async def health(request: Request) -> JSONResponse:
         status = "degraded"
         http_status = 503
 
+    # Use actual IP-based remaining count when the public rate limiter is active
+    limiter = getattr(request.state, "public_rate_limiter", None)
+    client_ip = getattr(request.state, "client_ip", None)
+
     return JSONResponse(
         {
             "status": status,
@@ -38,7 +42,7 @@ async def health(request: Request) -> JSONResponse:
             "db": db_status,
         },
         status_code=http_status,
-        headers=public_rate_limit_headers(),
+        headers=public_rate_limit_headers(limiter=limiter, client_ip=client_ip),
     )
 
 

@@ -12,6 +12,7 @@ from gateway.src.lifespan import AppContext
 
 
 async def _create_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    currency = params.get("currency", "CREDITS")
     intent = await ctx.payment_engine.create_intent(
         payer=params["payer"],
         payee=params["payee"],
@@ -20,7 +21,12 @@ async def _create_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
         idempotency_key=params.get("idempotency_key"),
         metadata=params.get("metadata"),
     )
-    return {"id": intent.id, "status": intent.status.value, "amount": float(intent.amount)}
+    return {
+        "id": intent.id,
+        "status": intent.status.value,
+        "amount": float(intent.amount),
+        "currency": currency,
+    }
 
 
 async def _capture_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
@@ -82,6 +88,7 @@ async def _partial_capture(ctx: AppContext, params: dict[str, Any]) -> dict[str,
 
 
 async def _create_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    currency = params.get("currency", "CREDITS")
     escrow = await ctx.payment_engine.create_escrow(
         payer=params["payer"],
         payee=params["payee"],
@@ -90,7 +97,12 @@ async def _create_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
         timeout_hours=params.get("timeout_hours"),
         metadata=params.get("metadata"),
     )
-    return {"id": escrow.id, "status": escrow.status.value, "amount": float(escrow.amount)}
+    return {
+        "id": escrow.id,
+        "status": escrow.status.value,
+        "amount": float(escrow.amount),
+        "currency": currency,
+    }
 
 
 async def _release_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:

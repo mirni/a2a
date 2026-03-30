@@ -8,7 +8,14 @@ from starlette.responses import RedirectResponse, Response
 from starlette.routing import Route, WebSocketRoute
 
 from gateway.src.lifespan import lifespan
-from gateway.src.middleware import CorrelationIDMiddleware, metrics_handler
+from gateway.src.middleware import (
+    BodySizeLimitMiddleware,
+    CorrelationIDMiddleware,
+    MetricsMiddleware,
+    PublicRateLimitMiddleware,
+    RequestTimeoutMiddleware,
+    metrics_handler,
+)
 from gateway.src.openapi import openapi_handler
 from gateway.src.routes.batch import routes as batch_routes
 from gateway.src.routes.execute import routes as execute_routes
@@ -87,7 +94,11 @@ def create_app() -> Starlette:
         lifespan=lifespan,
     )
 
-    # Add middleware
+    # Add middleware (Starlette wraps in reverse order: last add = outermost)
+    app.add_middleware(PublicRateLimitMiddleware)
+    app.add_middleware(RequestTimeoutMiddleware)
+    app.add_middleware(BodySizeLimitMiddleware)
+    app.add_middleware(MetricsMiddleware)
     app.add_middleware(CorrelationIDMiddleware)
 
     return app

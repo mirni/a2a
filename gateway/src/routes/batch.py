@@ -244,18 +244,18 @@ async def batch(request: Request) -> JSONResponse:
 
         # Dispatch to tool function
         _start = time.time()
-        Metrics.record_request(tool_name)
+        await Metrics.record_request(tool_name)
         tool_func = TOOL_REGISTRY[tool_name]
 
         try:
             result = await tool_func(ctx, params)
             results.append({"success": True, "result": result})
         except Exception as exc:
-            Metrics.record_error()
+            await Metrics.record_error()
             results.append({"success": False, "error": {"code": "execution_error", "message": str(exc)}})
         finally:
             elapsed_ms = (time.time() - _start) * 1000
-            Metrics.record_latency(elapsed_ms)
+            await Metrics.record_latency(elapsed_ms)
 
         # Record usage
         tool_pricing = tool_def.get("pricing", {})

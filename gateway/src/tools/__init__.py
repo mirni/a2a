@@ -10,12 +10,14 @@ from typing import Any
 
 from gateway.src.lifespan import AppContext
 from gateway.src.tools.billing import (
+    _convert_currency,
     _create_wallet,
     _deposit,
     _estimate_cost,
     _get_agent_leaderboard,
     _get_balance,
     _get_budget_status,
+    _get_exchange_rate,
     _get_metrics_timeseries,
     _get_revenue_report,
     _get_service_analytics,
@@ -48,12 +50,14 @@ from gateway.src.tools.infrastructure import (
     _get_events,
     _get_global_audit_log,
     _get_webhook_deliveries,
+    _list_api_keys,
     _list_backups,
     _list_webhooks,
     _publish_event,
     _register_event_schema,
     _register_webhook,
     _restore_database,
+    _revoke_api_key,
     _rotate_key,
     _test_webhook,
 )
@@ -195,6 +199,12 @@ TOOL_REGISTRY: dict[str, ToolFunc] = {
     "restore_database": _restore_database,
     "check_db_integrity": _check_db_integrity,
     "list_backups": _list_backups,
+    # P1 features — API Key Management
+    "list_api_keys": _list_api_keys,
+    "revoke_api_key": _revoke_api_key,
+    # P1 features — Exchange Rate
+    "get_exchange_rate": _get_exchange_rate,
+    "convert_currency": _convert_currency,
     # P2 features
     "get_metrics_timeseries": _get_metrics_timeseries,
     "get_agent_leaderboard": _get_agent_leaderboard,

@@ -1,10 +1,12 @@
-"""Observability middleware: correlation IDs, metrics, and structured logging."""
+"""Observability middleware: correlation IDs, metrics, public rate limiting, and structured logging."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import threading
+import time
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -51,75 +53,207 @@ class CorrelationIDMiddleware:
 
 
 # ---------------------------------------------------------------------------
-# 2. Metrics singleton
+# 2. Public Rate Limit Middleware (raw ASGI interface)
+# ---------------------------------------------------------------------------
+
+# Paths subject to public (unauthenticated) IP-based rate limiting.
+_PUBLIC_PATHS: frozenset[str] = frozenset(
+    {
+        "/v1/health",
+        "/v1/pricing",
+        "/v1/openapi.json",
+        "/v1/onboarding",
+        "/v1/metrics",
+    }
+)
+
+
+def _extract_client_ip(scope: dict) -> str:
+    """Extract client IP from the ASGI scope.
+
+    Checks X-Forwarded-For first (for reverse-proxy setups), then falls
+    back to the ASGI client tuple.
+    """
+    headers = dict(scope.get("headers", []))
+    forwarded = headers.get(b"x-forwarded-for", b"").decode("latin-1").strip()
+    if forwarded:
+        # X-Forwarded-For: client, proxy1, proxy2 — take the leftmost
+        return forwarded.split(",")[0].strip()
+
+    client = scope.get("client")
+    if client:
+        return client[0]
+
+    return "unknown"
+
+
+def _is_public_path(path: str) -> bool:
+    """Return True if *path* matches a public endpoint (exact or prefix)."""
+    if path in _PUBLIC_PATHS:
+        return True
+    # /v1/pricing/{tool} and /v1/pricing/summary
+    if path.startswith("/v1/pricing/"):
+        return True
+    return False
+
+
+class PublicRateLimitMiddleware:
+    """ASGI middleware that enforces IP-based rate limiting on public endpoints.
+
+    Requires ``app.state.public_rate_limiter`` to be set (a
+    :class:`~gateway.src.rate_limit_headers.PublicRateLimiter` instance).
+    If the limiter is not present, requests pass through without enforcement.
+    """
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: dict, receive: Callable, send: Callable) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        path = scope.get("path", "")
+        if not _is_public_path(path):
+            await self.app(scope, receive, send)
+            return
+
+        # Retrieve limiter from app state (set during lifespan)
+        app_state = scope.get("app")
+        limiter = None
+        if app_state is not None:
+            limiter = getattr(getattr(app_state, "state", None), "public_rate_limiter", None)
+
+        if limiter is None:
+            await self.app(scope, receive, send)
+            return
+
+        client_ip = _extract_client_ip(scope)
+        allowed, remaining, retry_after = limiter.record(client_ip)
+
+        if not allowed:
+            # Return 429 Too Many Requests
+            import json as _json
+
+            body = _json.dumps(
+                {
+                    "success": False,
+                    "error": {
+                        "code": "rate_limit_exceeded",
+                        "message": "Too many requests. Please retry later.",
+                    },
+                }
+            ).encode("utf-8")
+
+            headers = [
+                (b"content-type", b"application/json"),
+                (b"retry-after", str(retry_after).encode("latin-1")),
+                (b"x-ratelimit-limit", str(limiter.limit).encode("latin-1")),
+                (b"x-ratelimit-remaining", b"0"),
+                (b"x-ratelimit-reset", str(retry_after).encode("latin-1")),
+            ]
+
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 429,
+                    "headers": headers,
+                }
+            )
+            await send(
+                {
+                    "type": "http.response.body",
+                    "body": body,
+                }
+            )
+            return
+
+        # Allowed — store limiter info on scope state for route handlers
+        if "state" not in scope:
+            scope["state"] = {}
+        scope["state"]["public_rate_limiter"] = limiter
+        scope["state"]["client_ip"] = client_ip
+
+        await self.app(scope, receive, send)
+
+
+# ---------------------------------------------------------------------------
+# 3. Metrics singleton
 # ---------------------------------------------------------------------------
 
 
 class Metrics:
-    """Simple in-process metrics collector (thread-safe)."""
+    """Simple in-process metrics collector (async-safe).
+
+    Uses asyncio.Lock for non-blocking synchronization within the
+    single-threaded async event loop.
+    """
 
     requests_total: int = 0
     requests_by_tool: dict[str, int] = {}
     errors_total: int = 0
     latency_samples: list[float] = []
 
-    _lock = threading.Lock()
+    _lock = asyncio.Lock()
     _MAX_LATENCY_SAMPLES = 1000
 
     # -- mutators -----------------------------------------------------------
 
     @classmethod
-    def record_request(cls, tool: str | None = None) -> None:
-        with cls._lock:
+    async def record_request(cls, tool: str | None = None) -> None:
+        async with cls._lock:
             cls.requests_total += 1
             if tool is not None:
                 cls.requests_by_tool[tool] = cls.requests_by_tool.get(tool, 0) + 1
 
     @classmethod
-    def record_error(cls) -> None:
-        with cls._lock:
+    async def record_error(cls) -> None:
+        async with cls._lock:
             cls.errors_total += 1
 
     @classmethod
-    def record_latency(cls, ms: float) -> None:
-        with cls._lock:
+    async def record_latency(cls, ms: float) -> None:
+        async with cls._lock:
             cls.latency_samples.append(ms)
             if len(cls.latency_samples) > cls._MAX_LATENCY_SAMPLES:
                 cls.latency_samples = cls.latency_samples[-cls._MAX_LATENCY_SAMPLES :]
 
     @classmethod
     def reset(cls) -> None:
-        with cls._lock:
-            cls.requests_total = 0
-            cls.requests_by_tool = {}
-            cls.errors_total = 0
-            cls.latency_samples = []
+        """Reset all counters. Synchronous for use in test setup."""
+        cls.requests_total = 0
+        cls.requests_by_tool = {}
+        cls.errors_total = 0
+        cls.latency_samples = []
 
     # -- exposition ----------------------------------------------------------
 
     @classmethod
-    def to_prometheus(cls) -> str:
-        with cls._lock:
+    async def to_prometheus(cls) -> str:
+        async with cls._lock:
             count = len(cls.latency_samples)
             total_ms = sum(cls.latency_samples)
+            requests = cls.requests_total
+            errors = cls.errors_total
+            by_tool = dict(cls.requests_by_tool)
 
         lines = [
             "# HELP a2a_requests_total Total requests processed",
             "# TYPE a2a_requests_total counter",
-            f"a2a_requests_total {cls.requests_total}",
+            f"a2a_requests_total {requests}",
             "# HELP a2a_errors_total Total errors",
             "# TYPE a2a_errors_total counter",
-            f"a2a_errors_total {cls.errors_total}",
+            f"a2a_errors_total {errors}",
             "# HELP a2a_request_duration_ms Request duration in milliseconds",
             "# TYPE a2a_request_duration_ms summary",
             f"a2a_request_duration_ms_count {count}",
             f"a2a_request_duration_ms_sum {total_ms}",
         ]
         # Per-tool request counters
-        if cls.requests_by_tool:
+        if by_tool:
             lines.append("# HELP a2a_requests_by_tool_total Requests per tool")
             lines.append("# TYPE a2a_requests_by_tool_total counter")
-            for tool_name, tool_count in sorted(cls.requests_by_tool.items()):
+            for tool_name, tool_count in sorted(by_tool.items()):
                 lines.append(f'a2a_requests_by_tool_total{{tool="{tool_name}"}} {tool_count}')
         return "\n".join(lines) + "\n"
 
@@ -127,13 +261,193 @@ class Metrics:
 async def metrics_handler(request: Request) -> Response:
     """Starlette route handler that serves Prometheus text exposition."""
     return Response(
-        content=Metrics.to_prometheus(),
+        content=await Metrics.to_prometheus(),
         media_type="text/plain; version=0.0.4",
     )
 
 
 # ---------------------------------------------------------------------------
-# 3. Structured JSON logging
+# 3b. Metrics Middleware (raw ASGI interface)
+# ---------------------------------------------------------------------------
+
+
+class MetricsMiddleware:
+    """ASGI middleware that records request count, errors, and latency for every HTTP request."""
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: dict, receive: Callable, send: Callable) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        start = time.monotonic()
+        status_code: int | None = None
+
+        async def send_wrapper(message: dict) -> None:
+            nonlocal status_code
+            if message["type"] == "http.response.start":
+                status_code = message.get("status", 0)
+            await send(message)
+
+        await Metrics.record_request()
+        try:
+            await self.app(scope, receive, send_wrapper)
+        except Exception:
+            await Metrics.record_error()
+            raise
+        finally:
+            elapsed_ms = (time.monotonic() - start) * 1000
+            await Metrics.record_latency(elapsed_ms)
+
+        if status_code is not None and status_code >= 400:
+            await Metrics.record_error()
+
+
+# ---------------------------------------------------------------------------
+# 4. Body Size Limit Middleware (raw ASGI interface)
+# ---------------------------------------------------------------------------
+
+_logger = logging.getLogger("a2a.middleware")
+
+# Default maximum request body size: 1 MB
+DEFAULT_MAX_BODY_BYTES = 1_048_576  # 1 * 1024 * 1024
+
+
+class BodySizeLimitMiddleware:
+    """ASGI middleware that rejects request bodies exceeding a configurable size limit.
+
+    Inspects the Content-Length header (fast path). If Content-Length declares a
+    body larger than ``max_bytes``, a 413 response is returned immediately.
+    This protects the application even if nginx is bypassed.
+    """
+
+    def __init__(self, app: Any, max_bytes: int = DEFAULT_MAX_BODY_BYTES) -> None:
+        self.app = app
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope: dict, receive: Callable, send: Callable) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        # Fast path: check Content-Length header if present
+        headers = dict(scope.get("headers", []))
+        content_length_raw = headers.get(b"content-length", b"").decode("latin-1")
+        if content_length_raw:
+            try:
+                content_length = int(content_length_raw)
+            except ValueError:
+                content_length = 0
+            if content_length > self.max_bytes:
+                await self._send_413(send)
+                return
+
+        await self.app(scope, receive, send)
+
+    @staticmethod
+    async def _send_413(send: Callable) -> None:
+        """Send a 413 Payload Too Large response."""
+        body = json.dumps(
+            {
+                "success": False,
+                "error": {
+                    "code": "payload_too_large",
+                    "message": "Request body exceeds 1MB limit",
+                },
+            }
+        ).encode()
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 413,
+                "headers": [
+                    (b"content-type", b"application/json"),
+                    (b"content-length", str(len(body)).encode()),
+                ],
+            }
+        )
+        await send(
+            {
+                "type": "http.response.body",
+                "body": body,
+            }
+        )
+
+
+# ---------------------------------------------------------------------------
+# 5. Request Timeout Middleware (raw ASGI interface)
+# ---------------------------------------------------------------------------
+
+# Default per-request timeout: 30 seconds
+DEFAULT_REQUEST_TIMEOUT_SECONDS = 30.0
+
+
+class RequestTimeoutMiddleware:
+    """ASGI middleware that enforces a per-request timeout.
+
+    If the downstream handler takes longer than ``timeout_seconds``,
+    the request is cancelled and a 504 Gateway Timeout response is returned.
+    """
+
+    def __init__(
+        self, app: Any, timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SECONDS
+    ) -> None:
+        self.app = app
+        self.timeout_seconds = timeout_seconds
+
+    async def __call__(self, scope: dict, receive: Callable, send: Callable) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        try:
+            await asyncio.wait_for(
+                self.app(scope, receive, send),
+                timeout=self.timeout_seconds,
+            )
+        except asyncio.TimeoutError:
+            _logger.warning(
+                "Request timed out after %.1fs: %s %s",
+                self.timeout_seconds,
+                scope.get("method", "?"),
+                scope.get("path", "?"),
+            )
+            await self._send_504(send)
+
+    @staticmethod
+    async def _send_504(send: Callable) -> None:
+        """Send a 504 Gateway Timeout response."""
+        body = json.dumps(
+            {
+                "success": False,
+                "error": {
+                    "code": "request_timeout",
+                    "message": "Request timed out",
+                },
+            }
+        ).encode()
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 504,
+                "headers": [
+                    (b"content-type", b"application/json"),
+                    (b"content-length", str(len(body)).encode()),
+                ],
+            }
+        )
+        await send(
+            {
+                "type": "http.response.body",
+                "body": body,
+            }
+        )
+
+
+# ---------------------------------------------------------------------------
+# 6. Structured JSON logging
 # ---------------------------------------------------------------------------
 
 

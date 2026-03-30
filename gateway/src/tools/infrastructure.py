@@ -171,6 +171,50 @@ async def _rotate_key(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]
 
 
 # ---------------------------------------------------------------------------
+# List API Keys (P1)
+# ---------------------------------------------------------------------------
+
+
+async def _list_api_keys(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    """List all API keys for an agent (returns truncated key_hash for security)."""
+    agent_id = params["agent_id"]
+    keys = await ctx.key_manager.get_agent_keys(agent_id)
+
+    sanitized_keys = []
+    for k in keys:
+        sanitized_keys.append({
+            "key_hash_prefix": k["key_hash"][:8],
+            "tier": k["tier"],
+            "scopes": k.get("scopes", ["read", "write"]),
+            "created_at": k["created_at"],
+            "revoked": bool(k["revoked"]),
+        })
+
+    return {"keys": sanitized_keys}
+
+
+# ---------------------------------------------------------------------------
+# Revoke API Key (P1)
+# ---------------------------------------------------------------------------
+
+
+async def _revoke_api_key(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    """Soft-delete (revoke) an API key by key_hash prefix for the given agent."""
+    agent_id = params["agent_id"]
+    key_hash_prefix = params["key_hash_prefix"]
+
+    # Look up all keys for the agent and find one matching the prefix
+    keys = await ctx.key_manager.get_agent_keys(agent_id)
+
+    for k in keys:
+        if k["key_hash"].startswith(key_hash_prefix) and not k["revoked"]:
+            revoked = await ctx.key_manager.storage.revoke_key(k["key_hash"])
+            return {"revoked": revoked, "key_hash_prefix": key_hash_prefix}
+
+    return {"revoked": False, "key_hash_prefix": key_hash_prefix}
+
+
+# ---------------------------------------------------------------------------
 # Self-service API Key Creation (P2-17)
 # ---------------------------------------------------------------------------
 

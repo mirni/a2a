@@ -165,19 +165,9 @@ async def execute(request: Request) -> JSONResponse:
             501, f"Tool '{tool_name}' is cataloged but not implemented", "not_implemented", request=request
         )
 
-    # --- 1b. Validate required parameters ---
-    input_schema = tool_def.get("input_schema", {})
-    required_params = input_schema.get("required", [])
-    missing = [p for p in required_params if p not in params]
-    if missing:
-        return await error_response(
-            400,
-            f"Missing required parameter(s): {', '.join(missing)}",
-            "missing_parameter",
-            request=request,
-        )
-
     # --- 2. Extract + validate API key (with x402 fallback) ---
+    # Auth MUST run before param validation to avoid leaking schema info
+    # (required parameter names) to unauthenticated callers.
     raw_key = extract_api_key(request)
     ctx = request.app.state.ctx
     x402_proof = None
@@ -221,6 +211,18 @@ async def execute(request: Request) -> JSONResponse:
                 scope_checker.check_agent_id(target_agent)
         except KeyScopeError as exc:
             return await error_response(403, exc.reason, "scope_violation", request=request)
+
+    # --- 2b. Validate required parameters (after auth) ---
+    input_schema = tool_def.get("input_schema", {})
+    required_params = input_schema.get("required", [])
+    missing = [p for p in required_params if p not in params]
+    if missing:
+        return await error_response(
+            400,
+            f"Missing required parameter(s): {', '.join(missing)}",
+            "missing_parameter",
+            request=request,
+        )
 
     # --- 2b. Ownership authorization: caller must own the resource ---
     authz_result = check_ownership_authorization(agent_id, agent_tier, params)
@@ -305,15 +307,15 @@ async def execute(request: Request) -> JSONResponse:
 
     # --- 6. Dispatch to tool function ---
     # Record the request in metrics regardless of outcome
-    Metrics.record_request(tool_name)
+    await Metrics.record_request(tool_name)
 
     tool_func = TOOL_REGISTRY[tool_name]
     try:
         result = await tool_func(ctx, params)
     except Exception as exc:
-        Metrics.record_error()
+        await Metrics.record_error()
         elapsed_ms = (time.time() - _start_time) * 1000
-        Metrics.record_latency(elapsed_ms)
+        await Metrics.record_latency(elapsed_ms)
         return await handle_product_exception(request, exc)
 
     # --- 7. Record usage + charge ---
@@ -361,7 +363,7 @@ async def execute(request: Request) -> JSONResponse:
 
     # --- 8. Record latency ---
     elapsed_ms = (time.time() - _start_time) * 1000
-    Metrics.record_latency(elapsed_ms)
+    await Metrics.record_latency(elapsed_ms)
 
     # --- 9. Return result ---
     headers: dict[str, str] = {}

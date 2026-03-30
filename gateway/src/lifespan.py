@@ -51,11 +51,17 @@ from gateway.src.disputes import DisputeEngine
 # Cross-product event handlers
 from gateway.src.event_handlers import register_all_handlers
 
+# Cleanup tasks
+from gateway.src.cleanup_tasks import EventBusCleanup, RateEventsCleanup
+
 # Health monitoring
 from gateway.src.health_monitor import HealthMonitor
 
 # Observability
 from gateway.src.middleware import setup_structured_logging
+
+# Public rate limiter
+from gateway.src.rate_limit_headers import PublicRateLimiter
 
 # Signing
 from gateway.src.signing import SigningManager
@@ -190,6 +196,16 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     health_monitor_task = asyncio.create_task(health_monitor.run())
     logger.info("Health monitor started (interval=300s)")
 
+    # --- Rate Events Cleanup ---
+    rate_events_cleanup = RateEventsCleanup(paywall_storage=paywall_storage, interval=3600)
+    rate_events_cleanup_task = asyncio.create_task(rate_events_cleanup.run())
+    logger.info("Rate events cleanup started (interval=3600s)")
+
+    # --- Event Bus Cleanup ---
+    event_bus_cleanup = EventBusCleanup(event_bus=event_bus, interval=3600, older_than_seconds=86400)
+    event_bus_cleanup_task = asyncio.create_task(event_bus_cleanup.run())
+    logger.info("Event bus cleanup started (interval=3600s, retention=86400s)")
+
     # --- Signing Manager ---
     signing_manager = SigningManager()
 
@@ -229,6 +245,11 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     from gateway.src.tools import TOOL_REGISTRY
 
     validate_catalog(TOOL_REGISTRY)
+
+    # --- Public Rate Limiter ---
+    public_rate_limiter = PublicRateLimiter(limit=1000, window_seconds=3600)
+    app.state.public_rate_limiter = public_rate_limiter
+    logger.info("Public rate limiter initialized (limit=1000/hr)")
 
     # Store on app.state
     ctx = AppContext(
@@ -271,6 +292,18 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
             await scheduler_task
         except asyncio.CancelledError:
             pass
+
+    rate_events_cleanup_task.cancel()
+    try:
+        await rate_events_cleanup_task
+    except asyncio.CancelledError:
+        pass
+
+    event_bus_cleanup_task.cancel()
+    try:
+        await event_bus_cleanup_task
+    except asyncio.CancelledError:
+        pass
 
     await messaging_storage.close()
     await dispute_engine.close()

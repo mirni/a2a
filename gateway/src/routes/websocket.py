@@ -1,5 +1,11 @@
 """WebSocket endpoint at /v1/ws — real-time event streaming alternative to SSE.
 
+Authentication (checked in priority order):
+  1. ``Authorization: Bearer <key>`` header  (preferred — keys stay out of logs)
+  2. ``X-Forwarded-Api-Key: <key>`` header   (proxy-friendly alternative)
+  3. ``api_key`` query parameter             (backward-compat — logs a warning)
+  4. In-band ``{"type": "auth", "api_key": "..."}`` message
+
 Message protocol:
   Client -> Server:
     {"type": "auth", "api_key": "a2a_pro_..."}
@@ -13,6 +19,12 @@ Message protocol:
     {"type": "heartbeat", "timestamp": 1234567890}
     {"type": "error", "message": "..."}
     {"type": "pong"}
+
+Cloudflare compatibility:
+  Ensure "WebSockets" is enabled in the Cloudflare dashboard under
+  Network > WebSockets for the zone.  The handler sends standard upgrade
+  headers; if the upgrade fails (e.g. proxy misconfiguration), a plain
+  HTTP GET to /v1/ws returns a 426 Upgrade Required JSON error.
 """
 
 from __future__ import annotations
@@ -24,13 +36,41 @@ import logging
 import time
 from typing import Any
 
-from starlette.routing import WebSocketRoute
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+from starlette.routing import Route, WebSocketRoute
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
 logger = logging.getLogger("a2a.websocket")
 
 # Default heartbeat interval in seconds
 DEFAULT_HEARTBEAT_INTERVAL = 15
+
+
+def _extract_ws_api_key(websocket: WebSocket) -> tuple[str | None, str]:
+    """Extract API key from WebSocket headers or query params.
+
+    Returns:
+        (api_key, source) where source is one of "header", "query_param", or "none".
+    """
+    # 1. Authorization: Bearer header (preferred)
+    auth = websocket.headers.get("authorization", "")
+    if auth.lower().startswith("bearer "):
+        key = auth[7:].strip()
+        if key:
+            return key, "header"
+
+    # 2. X-Forwarded-Api-Key header (proxy-friendly alternative)
+    forwarded_key = websocket.headers.get("x-forwarded-api-key", "")
+    if forwarded_key:
+        return forwarded_key.strip(), "header"
+
+    # 3. Query parameter (backward-compat — will log a warning)
+    query_key = websocket.query_params.get("api_key")
+    if query_key:
+        return query_key, "query_param"
+
+    return None, "none"
 
 
 async def websocket_handler(websocket: WebSocket) -> None:
@@ -51,14 +91,20 @@ async def websocket_handler(websocket: WebSocket) -> None:
     # --- Authentication Phase ---
     agent_id: str | None = None
 
-    # Check for api_key in query params first
-    api_key = websocket.query_params.get("api_key")
+    # Check headers and query params for API key
+    api_key, auth_source = _extract_ws_api_key(websocket)
+
     if api_key:
+        if auth_source == "query_param":
+            logger.warning(
+                "WebSocket auth via query parameter is deprecated; "
+                "use Authorization header or message-based auth instead"
+            )
         agent_id = await _authenticate(websocket, ctx, api_key)
         if agent_id is None:
             return  # Auth failed, connection closed
 
-    # If no query-param auth, wait for auth message
+    # If no header/query-param auth, wait for auth message
     if agent_id is None:
         try:
             raw = await websocket.receive_text()
@@ -89,6 +135,30 @@ async def websocket_handler(websocket: WebSocket) -> None:
         heartbeat_interval=heartbeat_interval,
     )
     await session.run()
+
+
+async def websocket_upgrade_fallback(request: Request) -> JSONResponse:
+    """Return a helpful error when a plain HTTP request hits the WS endpoint.
+
+    This happens when Cloudflare or another reverse proxy strips the
+    ``Upgrade: websocket`` header.  A 426 status code tells the client
+    that the server requires a protocol upgrade.
+    """
+    return JSONResponse(
+        {
+            "success": False,
+            "error": {
+                "code": "upgrade_required",
+                "message": (
+                    "This endpoint requires a WebSocket connection. "
+                    "If you are behind Cloudflare, ensure WebSockets are "
+                    "enabled in the Network tab of the zone settings."
+                ),
+            },
+        },
+        status_code=426,
+        headers={"Upgrade": "websocket"},
+    )
 
 
 async def _authenticate(websocket: WebSocket, ctx: Any, api_key: str) -> str | None:
@@ -336,4 +406,8 @@ class _WebSocketSession:
         return True
 
 
-routes = [WebSocketRoute("/v1/ws", websocket_handler)]
+routes = [
+    WebSocketRoute("/v1/ws", websocket_handler),
+    # Fallback: plain HTTP GET to /v1/ws returns 426 Upgrade Required
+    Route("/v1/ws", websocket_upgrade_fallback, methods=["GET"]),
+]
