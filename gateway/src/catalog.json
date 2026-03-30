@@ -4875,5 +4875,177 @@
       "max_latency_ms": 500
     },
     "tier_required": "free"
+  },
+  {
+    "name": "ingest_metrics",
+    "service": "identity",
+    "description": "Ingest time-series metric data points for an agent. Supports optional Ed25519 signature verification for authenticated submissions.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "description": "The agent identifier"
+        },
+        "metrics": {
+          "type": "object",
+          "description": "Dict of metric_name -> value (e.g. {\"sharpe_30d\": 2.35})"
+        },
+        "signature": {
+          "type": "string",
+          "description": "Optional Ed25519 signature hex over canonical JSON of metrics+nonce"
+        },
+        "nonce": {
+          "type": "string",
+          "description": "Optional unique nonce for replay protection (required if signature is provided)"
+        },
+        "data_source": {
+          "type": "string",
+          "description": "Data source tier: self_reported, exchange_api, platform_verified",
+          "default": "self_reported"
+        }
+      },
+      "required": [
+        "agent_id",
+        "metrics"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "accepted": {
+          "type": "integer"
+        },
+        "rejected": {
+          "type": "integer"
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
+    "tier_required": "free"
+  },
+  {
+    "name": "query_metrics",
+    "service": "identity",
+    "description": "Query time-series metric data for a specific agent and metric name, with optional time range filtering.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "description": "The agent identifier"
+        },
+        "metric_name": {
+          "type": "string",
+          "description": "Metric to query (e.g. sharpe_30d)"
+        },
+        "since": {
+          "type": "number",
+          "description": "Unix timestamp to query from (optional)"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of data points to return (default: 100)",
+          "default": 100
+        }
+      },
+      "required": [
+        "agent_id",
+        "metric_name"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "array"
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
+    "tier_required": "free"
+  },
+  {
+    "name": "get_metric_deltas",
+    "service": "identity",
+    "description": "Get performance deltas (current vs previous value) for an agent across all metrics or a specific metric.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "description": "The agent identifier"
+        },
+        "metric_name": {
+          "type": "string",
+          "description": "Optional: specific metric to compute delta for"
+        }
+      },
+      "required": [
+        "agent_id"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "deltas": {
+          "type": "object"
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
+    "tier_required": "free"
+  },
+  {
+    "name": "get_metric_averages",
+    "service": "identity",
+    "description": "Get pre-computed rolling averages for an agent over a specified period (7d, 30d, or 90d).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "description": "The agent identifier"
+        },
+        "period": {
+          "type": "string",
+          "description": "Aggregation period: 7d, 30d, or 90d (default: 30d)",
+          "default": "30d"
+        }
+      },
+      "required": [
+        "agent_id"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "averages": {
+          "type": "object"
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
+    "tier_required": "free"
   }
 ]

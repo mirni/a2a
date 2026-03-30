@@ -34,8 +34,12 @@ from gateway.src.tools.identity import (
     _get_agent_identity,
     _get_agent_reputation,
     _get_claim_chains,
+    _get_metric_averages,
+    _get_metric_deltas,
     _get_org,
     _get_verified_claims,
+    _ingest_metrics,
+    _query_metrics,
     _register_agent,
     _search_agents_by_metrics,
     _submit_metrics,
@@ -225,6 +229,11 @@ TOOL_REGISTRY: dict[str, ToolFunc] = {
     "create_org": _create_org,
     "get_org": _get_org,
     "add_agent_to_org": _add_agent_to_org,
+    # Time-series metrics (PRD 012)
+    "ingest_metrics": _ingest_metrics,
+    "query_metrics": _query_metrics,
+    "get_metric_deltas": _get_metric_deltas,
+    "get_metric_averages": _get_metric_averages,
 }
 
 

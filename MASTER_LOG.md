@@ -5741,3 +5741,54 @@ Top tools by usage during Round 4:
 - get_exchange_rate: 6 calls (all failed)
 - get_transactions: 6 calls
 
+
+---
+
+## 2026-03-30: Agent Performance Observability & Time-Series Metrics (PRDs 010-014)
+
+### Prompt
+Implement the Agent Performance Observability & Time-Series Metrics system covering 5 work items: time-series schema, cryptographic signing, ingestion API, observability logic, and data lifecycle management.
+
+### Output
+
+Implemented all 5 PRDs using strict TDD (red-green-refactor) across the identity product and gateway.
+
+#### Work Item 1: Time-Series Schema & Storage (PRD 010)
+- Added `metric_timeseries` table with UNIQUE constraint on `(agent_id, metric_name, window_days, timestamp)` and covering indexes
+- Added `metric_aggregates` table with composite PRIMARY KEY
+- 6 new storage methods: `store_timeseries`, `query_timeseries`, `get_latest_metric`, `upsert_aggregate`, `get_aggregates`, `get_metric_leaderboard`
+- 17 tests
+
+#### Work Item 2: Cryptographic Signing for Submissions (PRD 011)
+- Added `submission_nonces` table for replay protection
+- Extended `IdentityAPI.submit_metrics()` with optional `signature` and `nonce` params
+- Ed25519 verification over canonical JSON; nonce replay prevention
+- `DATA_SOURCE_WEIGHTS` trust tiers: platform_verified=1.0, exchange_api=0.7, agent_signed=0.5, self_reported=0.4
+- 9 tests
+
+#### Work Item 3: Ingestion API (PRD 012)
+- Added `ingest_timeseries`, `query_agent_timeseries`, `get_metric_deltas`, `get_metric_averages` to IdentityAPI
+- 4 gateway tools registered: `ingest_metrics`, `query_metrics`, `get_metric_deltas`, `get_metric_averages`
+- catalog.json updated (114 → 118 entries)
+- 12 tests
+
+#### Work Item 4: Observability Logic (PRD 013)
+- Created `products/identity/src/observability.py`
+- `MetricDelta` dataclass with z-score significance detection
+- `compute_delta()`, `detect_trend()`, `compute_moving_averages()`, `evaluate_alerts()`
+- 14 tests
+
+#### Work Item 5: Data Lifecycle Management (PRD 014)
+- Created `products/identity/src/data_lifecycle.py`
+- Added `metric_aggregates_daily` and `metric_aggregates_monthly` tables
+- `DataLifecycleManager`: hot→warm (>60d), warm→cold (>365d), audit rotation, vacuum, disk check
+- 3 background tasks: `NonceCleanup`, `AggregateRefreshTask`, `DataLifecycleTask` — all integrated into gateway lifespan
+- 7 tests
+
+#### Files Changed
+- **New (4):** `observability.py`, `data_lifecycle.py`, 5 test files
+- **Modified (7):** `storage.py`, `api.py`, `identity.py`, `__init__.py`, `catalog.json`, `cleanup_tasks.py`, `lifespan.py`
+
+#### Test Results
+- Identity module: 216 passed (42 new)
+- Gateway module: 0 regressions (2 pre-existing failures unrelated to changes)

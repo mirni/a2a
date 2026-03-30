@@ -177,6 +177,47 @@ async def _get_org(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+async def _ingest_metrics(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    """Ingest time-series metric data for an agent."""
+    result = await ctx.identity_api.ingest_timeseries(
+        agent_id=params["agent_id"],
+        metrics=params["metrics"],
+        data_source=params.get("data_source", "self_reported"),
+        signature=params.get("signature"),
+        nonce=params.get("nonce"),
+    )
+    return result
+
+
+async def _query_metrics(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    """Query time-series metrics for an agent."""
+    rows = await ctx.identity_api.query_agent_timeseries(
+        agent_id=params["agent_id"],
+        metric_name=params["metric_name"],
+        since=params.get("since"),
+        limit=params.get("limit", 100),
+    )
+    return {"data": rows}
+
+
+async def _get_metric_deltas(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    """Get metric deltas (current vs previous) for an agent."""
+    deltas = await ctx.identity_api.get_metric_deltas(
+        agent_id=params["agent_id"],
+        metric_name=params.get("metric_name"),
+    )
+    return {"deltas": deltas}
+
+
+async def _get_metric_averages(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    """Get pre-computed metric averages for an agent."""
+    avgs = await ctx.identity_api.get_metric_averages(
+        agent_id=params["agent_id"],
+        period=params.get("period", "30d"),
+    )
+    return {"averages": avgs}
+
+
 async def _add_agent_to_org(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     """Add an agent to an organization."""
     org_id = params["org_id"]

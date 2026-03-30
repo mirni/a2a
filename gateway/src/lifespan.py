@@ -52,7 +52,13 @@ from gateway.src.disputes import DisputeEngine
 from gateway.src.event_handlers import register_all_handlers
 
 # Cleanup tasks
-from gateway.src.cleanup_tasks import EventBusCleanup, RateEventsCleanup
+from gateway.src.cleanup_tasks import (
+    AggregateRefreshTask,
+    DataLifecycleTask,
+    EventBusCleanup,
+    NonceCleanup,
+    RateEventsCleanup,
+)
 
 # Health monitoring
 from gateway.src.health_monitor import HealthMonitor
@@ -206,6 +212,21 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     event_bus_cleanup_task = asyncio.create_task(event_bus_cleanup.run())
     logger.info("Event bus cleanup started (interval=3600s, retention=86400s)")
 
+    # --- Nonce Cleanup ---
+    nonce_cleanup = NonceCleanup(identity_storage=identity_storage, interval=3600, ttl_seconds=300)
+    nonce_cleanup_task = asyncio.create_task(nonce_cleanup.run())
+    logger.info("Nonce cleanup started (interval=3600s, ttl=300s)")
+
+    # --- Aggregate Refresh ---
+    aggregate_refresh = AggregateRefreshTask(identity_storage=identity_storage, interval=3600)
+    aggregate_refresh_task = asyncio.create_task(aggregate_refresh.run())
+    logger.info("Aggregate refresh started (interval=3600s)")
+
+    # --- Data Lifecycle ---
+    data_lifecycle = DataLifecycleTask(identity_storage=identity_storage, interval=86400)
+    data_lifecycle_task = asyncio.create_task(data_lifecycle.run())
+    logger.info("Data lifecycle started (interval=86400s)")
+
     # --- Signing Manager ---
     signing_manager = SigningManager()
 
@@ -302,6 +323,24 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     event_bus_cleanup_task.cancel()
     try:
         await event_bus_cleanup_task
+    except asyncio.CancelledError:
+        pass
+
+    nonce_cleanup_task.cancel()
+    try:
+        await nonce_cleanup_task
+    except asyncio.CancelledError:
+        pass
+
+    aggregate_refresh_task.cancel()
+    try:
+        await aggregate_refresh_task
+    except asyncio.CancelledError:
+        pass
+
+    data_lifecycle_task.cancel()
+    try:
+        await data_lifecycle_task
     except asyncio.CancelledError:
         pass
 

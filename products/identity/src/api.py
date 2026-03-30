@@ -45,6 +45,14 @@ class AgentAlreadyExistsError(Exception):
 # Default attestation validity: 7 days
 _DEFAULT_VALIDITY_SECONDS = 7 * 24 * 3600
 
+# Data source trust tier weights (PRD 011)
+DATA_SOURCE_WEIGHTS: dict[str, float] = {
+    "platform_verified": 1.0,
+    "exchange_api": 0.7,
+    "agent_signed": 0.5,
+    "self_reported": 0.4,
+}
+
 
 @dataclass
 class IdentityAPI:
@@ -139,6 +147,8 @@ class IdentityAPI:
         agent_id: str,
         metrics: dict[str, float],
         data_source: str = "self_reported",
+        signature: str | None = None,
+        nonce: str | None = None,
     ) -> MetricSubmissionResult:
         """Agent submits metrics. Platform creates commitments and attestation.
 
@@ -146,10 +156,15 @@ class IdentityAPI:
         signs all commitment hashes together with the attestation metadata.
         Blinding factors are stored and returned so the agent can later reveal values.
 
+        If a valid Ed25519 signature and unused nonce are provided, the submission
+        is upgraded to ``data_source='agent_signed'``.
+
         Args:
             agent_id: The agent submitting metrics.
             metrics: Dict of metric_name -> value (e.g. {"sharpe_30d": 2.35}).
             data_source: "self_reported", "exchange_api", or "platform_verified".
+            signature: Optional Ed25519 signature hex over canonical JSON of metrics+nonce.
+            nonce: Optional unique nonce for replay protection.
 
         Returns:
             MetricSubmissionResult with attestation and blinding_factors.
@@ -157,7 +172,10 @@ class IdentityAPI:
         Raises:
             AgentNotFoundError: If the agent is not registered.
             InvalidMetricError: If a metric name is not supported.
+            ValueError: If nonce has already been used.
         """
+        import json as _json
+
         identity = await self.storage.get_identity(agent_id)
         if identity is None:
             raise AgentNotFoundError(f"Agent not found: {agent_id}")
@@ -167,6 +185,24 @@ class IdentityAPI:
         for name in metrics:
             if name not in all_metrics:
                 raise InvalidMetricError(f"Unsupported metric: {name}. Supported: {sorted(all_metrics)}")
+
+        # Signature verification (PRD 011)
+        if signature and nonce:
+            # Check nonce replay
+            if await self.storage.is_nonce_used(nonce):
+                raise ValueError(f"Nonce already used: {nonce}")
+
+            # Verify Ed25519 signature over canonical JSON
+            canonical = _json.dumps(
+                {"metrics": metrics, "nonce": nonce},
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            if AgentCrypto.verify(identity.public_key, canonical.encode(), signature):
+                data_source = "agent_signed"
+
+            # Store nonce regardless of signature validity
+            await self.storage.store_nonce(nonce, agent_id)
 
         now = time.time()
         commitment_hashes: list[str] = []
@@ -651,6 +687,113 @@ class IdentityAPI:
             "chain_id": chain_id,
             "attestation_index": attestation_index,
         }
+
+    # ------------------------------------------------------------------
+    # Time-series ingestion & query (PRD 012)
+    # ------------------------------------------------------------------
+
+    async def ingest_timeseries(
+        self,
+        agent_id: str,
+        metrics: dict[str, float],
+        data_source: str = "self_reported",
+        signature: str | None = None,
+        nonce: str | None = None,
+        timestamp: float | None = None,
+    ) -> dict:
+        """Ingest metric data points into the time-series store.
+
+        Validates metric names, optionally verifies signature, then stores
+        each valid metric. Invalid metric names are skipped (counted as rejected).
+
+        Returns:
+            Dict with accepted, rejected counts.
+        """
+        import json as _json
+
+        identity = await self.storage.get_identity(agent_id)
+        if identity is None:
+            raise AgentNotFoundError(f"Agent not found: {agent_id}")
+
+        # Signature verification (reuses PRD 011 logic)
+        if signature and nonce:
+            if await self.storage.is_nonce_used(nonce):
+                raise ValueError(f"Nonce already used: {nonce}")
+            canonical = _json.dumps(
+                {"metrics": metrics, "nonce": nonce},
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            if AgentCrypto.verify(identity.public_key, canonical.encode(), signature):
+                data_source = "agent_signed"
+            await self.storage.store_nonce(nonce, agent_id)
+
+        all_metrics = self.get_supported_metrics()
+        ts = timestamp or time.time()
+        accepted = 0
+        rejected = 0
+
+        for metric_name, value in metrics.items():
+            if metric_name not in all_metrics:
+                rejected += 1
+                continue
+            await self.storage.store_timeseries(
+                agent_id=agent_id,
+                metric_name=metric_name,
+                value=value,
+                timestamp=ts,
+                data_source=data_source,
+            )
+            accepted += 1
+
+        return {"accepted": accepted, "rejected": rejected}
+
+    async def query_agent_timeseries(
+        self,
+        agent_id: str,
+        metric_name: str,
+        since: float | None = None,
+        limit: int = 100,
+    ) -> list[dict]:
+        """Query time-series data for an agent+metric."""
+        return await self.storage.query_timeseries(
+            agent_id=agent_id,
+            metric_name=metric_name,
+            since=since,
+            limit=limit,
+        )
+
+    async def get_metric_deltas(self, agent_id: str, metric_name: str | None = None) -> dict:
+        """Compare latest value to previous value for each metric.
+
+        If metric_name is given, returns deltas for that metric only.
+        Otherwise returns deltas for all metrics with >=2 data points.
+        """
+        result: dict[str, dict] = {}
+        metric_names = [metric_name] if metric_name else list(self.get_supported_metrics())
+
+        for name in metric_names:
+            rows = await self.storage.query_timeseries(agent_id, name, limit=2)
+            if len(rows) < 2:
+                continue
+            current = rows[0]["value"]
+            previous = rows[1]["value"]
+            result[name] = {
+                "current": current,
+                "previous": previous,
+                "absolute_delta": current - previous,
+                "relative_delta": ((current - previous) / previous * 100) if previous != 0 else 0.0,
+            }
+        return result
+
+    async def get_metric_averages(self, agent_id: str, period: str = "30d") -> dict:
+        """Return pre-computed aggregates for an agent, keyed by metric name."""
+        result: dict[str, dict] = {}
+        for name in self.get_supported_metrics():
+            agg = await self.storage.get_aggregates(agent_id, name, period)
+            if agg is not None:
+                result[name] = agg
+        return result
 
     # ------------------------------------------------------------------
     # TODO-18: Reputation integration with payment/dispute data

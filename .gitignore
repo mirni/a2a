@@ -35,6 +35,7 @@ venv/
 *.swo
 .#*
 *~
+\#*\#
 
 # OS
 .DS_Store
@@ -57,3 +58,4 @@ next_tmrw.md
 
 # Build artifacts
 *.deb
+.pip_packages

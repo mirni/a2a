@@ -146,6 +146,62 @@ CREATE TABLE IF NOT EXISTS sub_identities (
 );
 
 CREATE INDEX IF NOT EXISTS idx_sub_identity_parent ON sub_identities(parent_agent_id);
+
+CREATE TABLE IF NOT EXISTS metric_timeseries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_id TEXT NOT NULL,
+    metric_name TEXT NOT NULL,
+    value REAL NOT NULL,
+    window_days INTEGER NOT NULL DEFAULT 30,
+    timestamp REAL NOT NULL,
+    data_source TEXT NOT NULL DEFAULT 'self_reported',
+    commitment_hash TEXT,
+    UNIQUE(agent_id, metric_name, window_days, timestamp)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ts_agent_metric_time ON metric_timeseries(agent_id, metric_name, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_ts_metric_time ON metric_timeseries(metric_name, timestamp DESC, value DESC);
+
+CREATE TABLE IF NOT EXISTS submission_nonces (
+    nonce TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    used_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS metric_aggregates (
+    agent_id TEXT NOT NULL,
+    metric_name TEXT NOT NULL,
+    period TEXT NOT NULL,
+    avg_value REAL,
+    min_value REAL,
+    max_value REAL,
+    stddev REAL,
+    sample_count INTEGER,
+    computed_at REAL NOT NULL,
+    PRIMARY KEY(agent_id, metric_name, period)
+);
+
+CREATE TABLE IF NOT EXISTS metric_aggregates_daily (
+    agent_id TEXT NOT NULL,
+    metric_name TEXT NOT NULL,
+    day TEXT NOT NULL,
+    avg_value REAL,
+    min_value REAL,
+    max_value REAL,
+    sample_count INTEGER,
+    PRIMARY KEY(agent_id, metric_name, day)
+);
+
+CREATE TABLE IF NOT EXISTS metric_aggregates_monthly (
+    agent_id TEXT NOT NULL,
+    metric_name TEXT NOT NULL,
+    month TEXT NOT NULL,
+    avg_value REAL,
+    min_value REAL,
+    max_value REAL,
+    sample_count INTEGER,
+    PRIMARY KEY(agent_id, metric_name, month)
+);
 """
 
 
@@ -807,3 +863,191 @@ class IdentityStorage:
         )
         await self.db.commit()
         return cursor.rowcount > 0
+
+    # -------------------------------------------------------------------
+    # Submission nonces
+    # -------------------------------------------------------------------
+
+    async def store_nonce(self, nonce: str, agent_id: str) -> None:
+        """Record a nonce as used."""
+        await self.db.execute(
+            "INSERT INTO submission_nonces (nonce, agent_id, used_at) VALUES (?, ?, ?)",
+            (nonce, agent_id, time.time()),
+        )
+        await self.db.commit()
+
+    async def is_nonce_used(self, nonce: str) -> bool:
+        """Check if a nonce has already been used."""
+        cursor = await self.db.execute(
+            "SELECT 1 FROM submission_nonces WHERE nonce = ?", (nonce,)
+        )
+        return await cursor.fetchone() is not None
+
+    async def cleanup_expired_nonces(self, ttl_seconds: float = 300) -> int:
+        """Delete nonces older than ttl_seconds. Returns count deleted."""
+        cutoff = time.time() - ttl_seconds
+        cursor = await self.db.execute(
+            "DELETE FROM submission_nonces WHERE used_at < ?", (cutoff,)
+        )
+        await self.db.commit()
+        return cursor.rowcount
+
+    # -------------------------------------------------------------------
+    # Metric time-series
+    # -------------------------------------------------------------------
+
+    async def store_timeseries(
+        self,
+        agent_id: str,
+        metric_name: str,
+        value: float,
+        timestamp: float,
+        data_source: str = "self_reported",
+        window_days: int = 30,
+        commitment_hash: str | None = None,
+    ) -> None:
+        """Insert or replace a time-series metric data point."""
+        await self.db.execute(
+            "INSERT OR REPLACE INTO metric_timeseries "
+            "(agent_id, metric_name, value, window_days, timestamp, data_source, commitment_hash) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (agent_id, metric_name, value, window_days, timestamp, data_source, commitment_hash),
+        )
+        await self.db.commit()
+
+    async def query_timeseries(
+        self,
+        agent_id: str,
+        metric_name: str,
+        since: float | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Query time-series data for an agent+metric, newest first."""
+        query = "SELECT * FROM metric_timeseries WHERE agent_id = ? AND metric_name = ?"
+        params: list[Any] = [agent_id, metric_name]
+        if since is not None:
+            query += " AND timestamp >= ?"
+            params.append(since)
+        query += " ORDER BY timestamp DESC LIMIT ?"
+        params.append(limit)
+        cursor = await self.db.execute(query, params)
+        rows = await cursor.fetchall()
+        return [
+            {
+                "id": r["id"],
+                "agent_id": r["agent_id"],
+                "metric_name": r["metric_name"],
+                "value": r["value"],
+                "window_days": r["window_days"],
+                "timestamp": r["timestamp"],
+                "data_source": r["data_source"],
+                "commitment_hash": r["commitment_hash"],
+            }
+            for r in rows
+        ]
+
+    async def get_latest_metric(
+        self,
+        agent_id: str,
+        metric_name: str,
+    ) -> dict[str, Any] | None:
+        """Return the single most recent data point for an agent+metric."""
+        cursor = await self.db.execute(
+            "SELECT * FROM metric_timeseries "
+            "WHERE agent_id = ? AND metric_name = ? "
+            "ORDER BY timestamp DESC LIMIT 1",
+            (agent_id, metric_name),
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        return {
+            "id": row["id"],
+            "agent_id": row["agent_id"],
+            "metric_name": row["metric_name"],
+            "value": row["value"],
+            "window_days": row["window_days"],
+            "timestamp": row["timestamp"],
+            "data_source": row["data_source"],
+            "commitment_hash": row["commitment_hash"],
+        }
+
+    async def upsert_aggregate(
+        self,
+        agent_id: str,
+        metric_name: str,
+        period: str,
+        avg_value: float,
+        min_value: float,
+        max_value: float,
+        stddev: float,
+        sample_count: int,
+    ) -> None:
+        """Insert or replace a pre-computed rolling aggregate."""
+        await self.db.execute(
+            "INSERT OR REPLACE INTO metric_aggregates "
+            "(agent_id, metric_name, period, avg_value, min_value, max_value, stddev, sample_count, computed_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (agent_id, metric_name, period, avg_value, min_value, max_value, stddev, sample_count, time.time()),
+        )
+        await self.db.commit()
+
+    async def get_aggregates(
+        self,
+        agent_id: str,
+        metric_name: str,
+        period: str,
+    ) -> dict[str, Any] | None:
+        """Retrieve a pre-computed aggregate for an agent+metric+period."""
+        cursor = await self.db.execute(
+            "SELECT * FROM metric_aggregates WHERE agent_id = ? AND metric_name = ? AND period = ?",
+            (agent_id, metric_name, period),
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        return {
+            "agent_id": row["agent_id"],
+            "metric_name": row["metric_name"],
+            "period": row["period"],
+            "avg_value": row["avg_value"],
+            "min_value": row["min_value"],
+            "max_value": row["max_value"],
+            "stddev": row["stddev"],
+            "sample_count": row["sample_count"],
+            "computed_at": row["computed_at"],
+        }
+
+    async def get_metric_leaderboard(
+        self,
+        metric_name: str,
+        limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        """Return top agents by latest value for a given metric.
+
+        Uses a subquery to pick each agent's most recent timestamp,
+        then sorts by value descending.
+        """
+        cursor = await self.db.execute(
+            "SELECT t.agent_id, t.value, t.timestamp, t.data_source "
+            "FROM metric_timeseries t "
+            "INNER JOIN ("
+            "  SELECT agent_id, MAX(timestamp) AS max_ts "
+            "  FROM metric_timeseries "
+            "  WHERE metric_name = ? "
+            "  GROUP BY agent_id"
+            ") latest ON t.agent_id = latest.agent_id AND t.timestamp = latest.max_ts "
+            "WHERE t.metric_name = ? "
+            "ORDER BY t.value DESC LIMIT ?",
+            (metric_name, metric_name, limit),
+        )
+        rows = await cursor.fetchall()
+        return [
+            {
+                "agent_id": r["agent_id"],
+                "value": r["value"],
+                "timestamp": r["timestamp"],
+                "data_source": r["data_source"],
+            }
+            for r in rows
+        ]
