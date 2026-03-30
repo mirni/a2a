@@ -145,7 +145,6 @@ class TestWebhookOwnership:
 
     async def test_delete_webhook_by_other_agent_is_forbidden(self, client, app):
         """Agent B cannot delete Agent A's webhook."""
-        ctx = app.state.ctx
         key_a = await _create_agent(app, "wh-owner-a", tier="pro", balance=5000.0)
         key_b = await _create_agent(app, "wh-intruder-b", tier="pro", balance=5000.0)
 
@@ -169,7 +168,6 @@ class TestWebhookOwnership:
 
     async def test_get_webhook_deliveries_by_other_agent_is_forbidden(self, client, app):
         """Agent B cannot read Agent A's webhook deliveries."""
-        ctx = app.state.ctx
         key_a = await _create_agent(app, "wh-owner-c", tier="pro", balance=5000.0)
         key_b = await _create_agent(app, "wh-intruder-d", tier="pro", balance=5000.0)
 
@@ -193,7 +191,6 @@ class TestWebhookOwnership:
 
     async def test_test_webhook_by_other_agent_is_forbidden(self, client, app):
         """Agent B cannot test Agent A's webhook."""
-        ctx = app.state.ctx
         key_a = await _create_agent(app, "wh-owner-e", tier="pro", balance=5000.0)
         key_b = await _create_agent(app, "wh-intruder-f", tier="pro", balance=5000.0)
 

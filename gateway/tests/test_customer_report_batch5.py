@@ -103,7 +103,6 @@ class TestExchangeRateReturnType:
 
     async def test_exchange_rate_is_numeric(self, client, app):
         """rate field should be a number, not a string."""
-        ctx = app.state.ctx
         key = await _create_agent(app, "rate-agent", tier="free", balance=1000.0)
 
         resp = await _exec(
@@ -127,7 +126,6 @@ class TestWalletFreeze:
 
     async def test_freeze_wallet_blocks_withdraw(self, client, app):
         """After freeze, withdraw attempt fails."""
-        ctx = app.state.ctx
         admin_key = await _create_admin_agent(app, "admin-freeze")
         key = await _create_agent(app, "freeze-agent", tier="free", balance=1000.0)
 
@@ -147,7 +145,6 @@ class TestWalletFreeze:
 
     async def test_unfreeze_wallet_allows_withdraw(self, client, app):
         """After unfreeze, withdraw succeeds."""
-        ctx = app.state.ctx
         admin_key = await _create_admin_agent(app, "admin-unfreeze")
         key = await _create_agent(app, "unfreeze-agent", tier="free", balance=1000.0)
 

@@ -7,9 +7,6 @@ Item 21: Webhook — Require HMAC secret
 
 from __future__ import annotations
 
-import hashlib
-import secrets
-
 import pytest
 
 pytestmark = pytest.mark.asyncio
@@ -112,10 +109,6 @@ class TestOpenAPIOutputSchemas:
         resp = await client.get("/v1/openapi.json")
         assert resp.status_code == 200
         spec = resp.json()
-
-        # The execute endpoint examples should reflect the tool catalog
-        execute_path = spec["paths"]["/execute"]["post"]
-        examples = execute_path["requestBody"]["content"]["application/json"].get("examples", {})
 
         # Check that the spec itself contains per-tool response schemas
         # referenced from the execute endpoint or components

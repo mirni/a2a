@@ -97,7 +97,6 @@ class TestEscrowIdempotency:
 
     async def test_create_escrow_idempotency_same_key(self, client, app):
         """Two create_escrow calls with same idempotency_key return same escrow."""
-        ctx = app.state.ctx
         key = await _create_agent(app, "idemp-payer-e", tier="pro", balance=10000.0)
         await _create_agent(app, "idemp-payee-e", tier="free", balance=0.0)
 
@@ -120,7 +119,6 @@ class TestEscrowIdempotency:
 
     async def test_create_escrow_different_key(self, client, app):
         """Two create_escrow calls with different keys return different escrows."""
-        ctx = app.state.ctx
         key = await _create_agent(app, "idemp-payer-e2", tier="pro", balance=10000.0)
         await _create_agent(app, "idemp-payee-e2", tier="free", balance=0.0)
 
@@ -154,7 +152,6 @@ class TestSubscriptionIdempotency:
 
     async def test_create_subscription_idempotency_same_key(self, client, app):
         """Two create_subscription calls with same idempotency_key return same sub."""
-        ctx = app.state.ctx
         key = await _create_agent(app, "idemp-payer-s", tier="starter", balance=10000.0)
         await _create_agent(app, "idemp-payee-s", tier="free", balance=0.0)
 

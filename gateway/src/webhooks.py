@@ -120,7 +120,7 @@ class WebhookManager:
             # hostname is not an IP — try resolving
             try:
                 resolved = socket.getaddrinfo(hostname, None, proto=socket.IPPROTO_TCP)
-                for family, _type, _proto, _canonname, sockaddr in resolved:
+                for _family, _type, _proto, _canonname, sockaddr in resolved:
                     ip_str = sockaddr[0]
                     addr = ipaddress.ip_address(ip_str)
                     if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:

@@ -193,6 +193,13 @@ class DisputeEngine:
                 )
                 resolved.append(result)
             except (DisputeStateError, Exception):
+                import logging
+
+                logging.getLogger("a2a.disputes").warning(
+                    "Failed to auto-resolve dispute %s: %s",
+                    dispute["id"],
+                    dispute.get("status"),
+                )
                 continue
         return resolved
 

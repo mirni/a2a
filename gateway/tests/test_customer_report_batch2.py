@@ -50,7 +50,7 @@ class TestRespondToDisputeCallerCheck:
     async def test_non_respondent_cannot_respond(self, client, app):
         """Agent C (not the respondent) cannot respond to a dispute."""
         ctx = app.state.ctx
-        key_a = await _create_agent(app, "buyer-b2-6", tier="pro", balance=5000.0)
+        await _create_agent(app, "buyer-b2-6", tier="pro", balance=5000.0)
         await _create_agent(app, "seller-b2-6", tier="pro", balance=0.0)
         key_c = await _create_agent(app, "outsider-b2-6", tier="pro", balance=1000.0)
 
