@@ -72,35 +72,31 @@ jobs:
           name: staging-deb-packages
           path: dist/
 
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
       - name: Deploy to staging server
         env:
-          STAGING_SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
-          STAGING_HOST: ${{ secrets.STAGING_HOST }}
+          DEPLOY_HOST: ${{ secrets.TAILSCALE_IP }}
         run: |
-          # Set up SSH
-          mkdir -p ~/.ssh
-          echo "$STAGING_SSH_KEY" > ~/.ssh/staging_key
-          chmod 600 ~/.ssh/staging_key
-          ssh-keyscan -H "$STAGING_HOST" >> ~/.ssh/known_hosts 2>/dev/null
-
-          SSH_OPTS="-o StrictHostKeyChecking=accept-new -i ~/.ssh/staging_key"
-
-          # Upload the test gateway deb
           DEB_FILE=$(ls dist/a2a-gateway-test_*.deb | head -1)
-          scp $SSH_OPTS "$DEB_FILE" "root@${STAGING_HOST}:/tmp/"
+          DEB_BASENAME=$(basename "$DEB_FILE")
+
+          # Copy deb to server via Tailscale
+          scp -o StrictHostKeyChecking=accept-new "$DEB_FILE" "root@${DEPLOY_HOST}:/tmp/"
 
           # Install and verify service starts
-          DEB_BASENAME=$(basename "$DEB_FILE")
-          ssh $SSH_OPTS "root@${STAGING_HOST}" bash -s << REMOTE
+          ssh -o StrictHostKeyChecking=accept-new "root@${DEPLOY_HOST}" bash -s << REMOTE
             set -euo pipefail
             dpkg -i "/tmp/${DEB_BASENAME}" || apt-get install -f -y
             sleep 3
             systemctl is-active a2a-gateway-test
             rm -f "/tmp/${DEB_BASENAME}"
           REMOTE
-
-          # Clean up SSH key
-          rm -f ~/.ssh/staging_key
 
   # ---------------------------------------------------------------------------
   # Smoke tests against the staging server

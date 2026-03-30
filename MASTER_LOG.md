@@ -4480,7 +4480,7 @@ Tested 5 AI customer personas against the live production API (https://api.green
 
 5. **WebSocket** — Both authenticated and unauthenticated WebSocket upgrade attempts hang with HTTP 000. This suggests the WebSocket endpoint is not responding to HTTP upgrade requests properly, or the reverse proxy (Cloudflare) is stripping WebSocket headers.
 
-6. **Pricing model analysis:** 
+6. **Pricing model analysis:**
    - Payment tools use percentage-based fees (2% on create_intent, 1.5% on escrow) with min/max caps. Reasonable for commerce.
    - Most tools are free (per_call: 0.0). Revenue comes from payment percentage fees.
    - **Concern for HFT:** best_match costs $0.10/call. At 1000 trades/day, that is $100/day just for matching.
@@ -4503,7 +4503,7 @@ Tested 5 AI customer personas against the live production API (https://api.green
 
 1. **Identity service (12 tools)** — Comprehensive. Ed25519 keypair generation, signature verification, Merkle claim chains, metric attestation, organization management. Well-designed for a legal use case.
 
-2. **Cryptographic features documented:** 
+2. **Cryptographic features documented:**
    - `register_agent`: Ed25519 keypair generation (mentioned in description)
    - `verify_agent`: Ed25519 signature verification
    - `build_claim_chain` / `get_claim_chains`: Merkle tree attestation
@@ -4576,7 +4576,7 @@ Tested 5 AI customer personas against the live production API (https://api.green
 3. **Webhook tools (5 tools):**
    - `register_webhook` with HMAC-SHA3 secret and `filter_agent_ids` (NEW since last assessment)
    - `list_webhooks`, `delete_webhook`, `get_webhook_deliveries`, `test_webhook`
-   - All pro tier except `test_webhook` (free). 
+   - All pro tier except `test_webhook` (free).
    - **Agent ID filtering** is exactly what ReadGate needs for per-customer event filtering.
 
 4. **Organization billing** — `create_org`, `get_org`, `add_agent_to_org` in identity service. Combined with billing tools, this supports team billing. **Gap: no `remove_agent_from_org`, no org-level spending reports exposed as tools** (though implemented per Session 4 log).

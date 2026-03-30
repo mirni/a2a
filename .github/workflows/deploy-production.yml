@@ -75,28 +75,27 @@ jobs:
           name: production-deb
           path: dist/
 
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
       - name: Deploy to production
         env:
-          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
-          PROD_HOST: ${{ secrets.PROD_HOST }}
+          DEPLOY_HOST: ${{ secrets.TAILSCALE_IP }}
         run: |
           set -euo pipefail
 
-          # Set up SSH
-          mkdir -p ~/.ssh
-          echo "$PROD_SSH_KEY" > ~/.ssh/prod_key
-          chmod 600 ~/.ssh/prod_key
-          ssh-keyscan -H "$PROD_HOST" >> ~/.ssh/known_hosts 2>/dev/null
-
-          SSH_OPTS="-o StrictHostKeyChecking=accept-new -i ~/.ssh/prod_key"
           DEB_FILE=$(ls dist/a2a-gateway_*.deb | head -1)
           DEB_BASENAME=$(basename "$DEB_FILE")
 
-          # Upload new deb
-          scp $SSH_OPTS "$DEB_FILE" "root@${PROD_HOST}:/tmp/"
+          # Upload new deb via Tailscale
+          scp -o StrictHostKeyChecking=accept-new "$DEB_FILE" "root@${DEPLOY_HOST}:/tmp/"
 
           # Deploy with rollback on failure
-          ssh $SSH_OPTS "root@${PROD_HOST}" bash -s -- "$DEB_BASENAME" << 'REMOTE'
+          ssh -o StrictHostKeyChecking=accept-new "root@${DEPLOY_HOST}" bash -s -- "$DEB_BASENAME" << 'REMOTE'
             set -euo pipefail
             DEB_BASENAME="$1"
 
@@ -141,9 +140,6 @@ jobs:
 
             rm -f "/tmp/$DEB_BASENAME"
           REMOTE
-
-          # Clean up SSH key
-          rm -f ~/.ssh/prod_key
 
   # ---------------------------------------------------------------------------
   # Post-deploy smoke tests
