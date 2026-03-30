@@ -129,7 +129,16 @@ jobs:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
-          ssh: true
+
+      - name: Configure SSH for Tailscale
+        run: |
+          mkdir -p ~/.ssh
+          cat >> ~/.ssh/config << 'SSHEOF'
+          Host *
+            StrictHostKeyChecking accept-new
+            ProxyCommand tailscale nc %h %p
+          SSHEOF
+          chmod 600 ~/.ssh/config
 
       - name: Deploy gateway to production
         env:
@@ -210,7 +219,16 @@ jobs:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
-          ssh: true
+
+      - name: Configure SSH for Tailscale
+        run: |
+          mkdir -p ~/.ssh
+          cat >> ~/.ssh/config << 'SSHEOF'
+          Host *
+            StrictHostKeyChecking accept-new
+            ProxyCommand tailscale nc %h %p
+          SSHEOF
+          chmod 600 ~/.ssh/config
 
       - name: Deploy website to production
         env:
