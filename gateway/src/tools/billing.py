@@ -411,7 +411,6 @@ async def _convert_currency(ctx: AppContext, params: dict[str, Any]) -> dict[str
     import sys
 
     from billing_src.exchange import ExchangeRateService
-    from billing_src.models import Currency as _Currency  # noqa: F841
 
     # Ensure the billing models module is accessible via relative import path
     # (wallet.convert_currency uses `from .models import Currency` internally)

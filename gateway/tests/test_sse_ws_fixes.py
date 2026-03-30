@@ -142,9 +142,11 @@ class TestWebSocketCloudflareCompat:
         # Should get an error response, not a 500
         assert resp.status_code in (400, 426)
         body = resp.json()
-        assert "websocket" in body.get("detail", "").lower() or \
-               "upgrade" in body.get("detail", "").lower() or \
-               "websocket" in json.dumps(body).lower()
+        assert (
+            "websocket" in body.get("detail", "").lower()
+            or "upgrade" in body.get("detail", "").lower()
+            or "websocket" in json.dumps(body).lower()
+        )
 
 
 # =========================================================================
@@ -212,8 +214,7 @@ class TestWebSocketHeaderAuth:
                 msg = ws.receive_json()
                 assert msg["type"] == "auth_ok"
 
-        ws_warnings = [r for r in caplog.records
-                       if r.levelno >= logging.WARNING and "query" in r.message.lower()]
+        ws_warnings = [r for r in caplog.records if r.levelno >= logging.WARNING and "query" in r.message.lower()]
         assert len(ws_warnings) == 0
 
     def test_ws_message_auth_still_works(self, sync_app_client):

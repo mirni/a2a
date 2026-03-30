@@ -268,9 +268,7 @@ class PaymentEngine:
 
         # Block if already fully refunded
         if settlement.status == SettlementStatus.REFUNDED:
-            raise InvalidStateError(
-                f"Settlement {settlement_id} is already fully refunded"
-            )
+            raise InvalidStateError(f"Settlement {settlement_id} is already fully refunded")
 
         # Calculate remaining refundable amount
         total_refunded = await self.storage.get_total_refunded(settlement_id)
@@ -281,9 +279,7 @@ class PaymentEngine:
             if amount <= 0:
                 raise PaymentError("Refund amount must be positive")
             if amount > remaining:
-                raise PaymentError(
-                    f"Refund amount {amount} exceeds remaining refundable balance {remaining}"
-                )
+                raise PaymentError(f"Refund amount {amount} exceeds remaining refundable balance {remaining}")
             refund_amount = amount
         else:
             # Full refund of remaining
@@ -312,13 +308,9 @@ class PaymentEngine:
         # Update settlement status
         new_total_refunded = total_refunded + refund_amount
         if new_total_refunded >= settlement.amount:
-            await self.storage.update_settlement_status(
-                settlement_id, SettlementStatus.REFUNDED.value
-            )
+            await self.storage.update_settlement_status(settlement_id, SettlementStatus.REFUNDED.value)
         else:
-            await self.storage.update_settlement_status(
-                settlement_id, SettlementStatus.PARTIALLY_REFUNDED.value
-            )
+            await self.storage.update_settlement_status(settlement_id, SettlementStatus.PARTIALLY_REFUNDED.value)
 
         return refund
 

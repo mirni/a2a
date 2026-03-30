@@ -17,15 +17,13 @@ from decimal import Decimal
 
 import pytest
 import pytest_asyncio
-
 from src.org_billing import (
-    OrgBilling,
-    OrgWalletNotFoundError,
-    OrgSpendLimitExceededError,
     NotOrgMemberError,
+    OrgBilling,
+    OrgSpendLimitExceededError,
+    OrgWalletNotFoundError,
 )
 from src.storage import StorageBackend
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -66,9 +64,7 @@ class TestOrgWalletCreate:
     @pytest.mark.asyncio
     async def test_create_org_wallet_with_initial_balance(self, org_billing):
         """create_org_wallet with initial_balance should set the balance."""
-        wallet = await org_billing.create_org_wallet(
-            org_id="org-2", initial_balance=Decimal("1000.00")
-        )
+        wallet = await org_billing.create_org_wallet(org_id="org-2", initial_balance=Decimal("1000.00"))
         assert wallet["balance"] == Decimal("1000.00")
 
     @pytest.mark.asyncio
@@ -91,9 +87,7 @@ class TestOrgDeposit:
     async def test_deposit_increases_balance(self, org_billing):
         """deposit_org should increase the org wallet balance."""
         await org_billing.create_org_wallet(org_id="org-1")
-        new_balance = await org_billing.deposit_org(
-            org_id="org-1", amount=Decimal("500.00")
-        )
+        new_balance = await org_billing.deposit_org(org_id="org-1", amount=Decimal("500.00"))
         assert new_balance == Decimal("500.00")
 
     @pytest.mark.asyncio
@@ -114,9 +108,7 @@ class TestOrgDeposit:
     async def test_deposit_to_nonexistent_wallet(self, org_billing):
         """Depositing to a non-existent org wallet raises OrgWalletNotFoundError."""
         with pytest.raises(OrgWalletNotFoundError):
-            await org_billing.deposit_org(
-                org_id="no-wallet", amount=Decimal("100")
-            )
+            await org_billing.deposit_org(org_id="no-wallet", amount=Decimal("100"))
 
 
 # ---------------------------------------------------------------------------
@@ -157,11 +149,11 @@ class TestMemberCharge:
         await org_billing.create_org_wallet(org_id="org-1")
         await org_billing.deposit_org(org_id="org-1", amount=Decimal("1000"))
         # Register membership: owner
-        await org_billing.register_member(
-            org_id="org-1", agent_id="owner-1", role="owner"
-        )
+        await org_billing.register_member(org_id="org-1", agent_id="owner-1", role="owner")
         new_balance = await org_billing.charge_to_org(
-            org_id="org-1", agent_id="owner-1", amount=Decimal("800"),
+            org_id="org-1",
+            agent_id="owner-1",
+            amount=Decimal("800"),
             description="big purchase",
         )
         assert new_balance == Decimal("200")
@@ -171,11 +163,11 @@ class TestMemberCharge:
         """Admin can charge any amount against the org wallet."""
         await org_billing.create_org_wallet(org_id="org-1")
         await org_billing.deposit_org(org_id="org-1", amount=Decimal("1000"))
-        await org_billing.register_member(
-            org_id="org-1", agent_id="admin-1", role="admin"
-        )
+        await org_billing.register_member(org_id="org-1", agent_id="admin-1", role="admin")
         new_balance = await org_billing.charge_to_org(
-            org_id="org-1", agent_id="admin-1", amount=Decimal("999"),
+            org_id="org-1",
+            agent_id="admin-1",
+            amount=Decimal("999"),
             description="admin spend",
         )
         assert new_balance == Decimal("1")
@@ -186,11 +178,15 @@ class TestMemberCharge:
         await org_billing.create_org_wallet(org_id="org-1")
         await org_billing.deposit_org(org_id="org-1", amount=Decimal("1000"))
         await org_billing.register_member(
-            org_id="org-1", agent_id="member-1", role="member",
+            org_id="org-1",
+            agent_id="member-1",
+            role="member",
             spend_limit=Decimal("200"),
         )
         new_balance = await org_billing.charge_to_org(
-            org_id="org-1", agent_id="member-1", amount=Decimal("150"),
+            org_id="org-1",
+            agent_id="member-1",
+            amount=Decimal("150"),
             description="api call",
         )
         assert new_balance == Decimal("850")
@@ -201,18 +197,24 @@ class TestMemberCharge:
         await org_billing.create_org_wallet(org_id="org-1")
         await org_billing.deposit_org(org_id="org-1", amount=Decimal("1000"))
         await org_billing.register_member(
-            org_id="org-1", agent_id="member-1", role="member",
+            org_id="org-1",
+            agent_id="member-1",
+            role="member",
             spend_limit=Decimal("100"),
         )
         # First charge within limit
         await org_billing.charge_to_org(
-            org_id="org-1", agent_id="member-1", amount=Decimal("80"),
+            org_id="org-1",
+            agent_id="member-1",
+            amount=Decimal("80"),
             description="first charge",
         )
         # Second charge would exceed limit (80 + 50 > 100)
         with pytest.raises(OrgSpendLimitExceededError):
             await org_billing.charge_to_org(
-                org_id="org-1", agent_id="member-1", amount=Decimal("50"),
+                org_id="org-1",
+                agent_id="member-1",
+                amount=Decimal("50"),
                 description="over limit",
             )
 
@@ -223,7 +225,9 @@ class TestMemberCharge:
         await org_billing.deposit_org(org_id="org-1", amount=Decimal("1000"))
         with pytest.raises(NotOrgMemberError):
             await org_billing.charge_to_org(
-                org_id="org-1", agent_id="outsider", amount=Decimal("10"),
+                org_id="org-1",
+                agent_id="outsider",
+                amount=Decimal("10"),
                 description="sneaky",
             )
 
@@ -232,12 +236,12 @@ class TestMemberCharge:
         """Charging more than the wallet balance should raise InsufficientCredits-like error."""
         await org_billing.create_org_wallet(org_id="org-1")
         await org_billing.deposit_org(org_id="org-1", amount=Decimal("50"))
-        await org_billing.register_member(
-            org_id="org-1", agent_id="owner-1", role="owner"
-        )
+        await org_billing.register_member(org_id="org-1", agent_id="owner-1", role="owner")
         with pytest.raises(Exception):  # InsufficientCreditsError or similar
             await org_billing.charge_to_org(
-                org_id="org-1", agent_id="owner-1", amount=Decimal("100"),
+                org_id="org-1",
+                agent_id="owner-1",
+                amount=Decimal("100"),
                 description="too much",
             )
 
@@ -255,19 +259,23 @@ class TestOrgSpending:
         """get_org_spending without agent_id returns all member spending."""
         await org_billing.create_org_wallet(org_id="org-1")
         await org_billing.deposit_org(org_id="org-1", amount=Decimal("1000"))
+        await org_billing.register_member(org_id="org-1", agent_id="owner-1", role="owner")
         await org_billing.register_member(
-            org_id="org-1", agent_id="owner-1", role="owner"
-        )
-        await org_billing.register_member(
-            org_id="org-1", agent_id="member-1", role="member",
+            org_id="org-1",
+            agent_id="member-1",
+            role="member",
             spend_limit=Decimal("500"),
         )
         await org_billing.charge_to_org(
-            org_id="org-1", agent_id="owner-1", amount=Decimal("100"),
+            org_id="org-1",
+            agent_id="owner-1",
+            amount=Decimal("100"),
             description="owner charge",
         )
         await org_billing.charge_to_org(
-            org_id="org-1", agent_id="member-1", amount=Decimal("50"),
+            org_id="org-1",
+            agent_id="member-1",
+            amount=Decimal("50"),
             description="member charge",
         )
         report = await org_billing.get_org_spending(org_id="org-1")
@@ -281,16 +289,14 @@ class TestOrgSpending:
         """get_org_spending with agent_id returns just that member's spending."""
         await org_billing.create_org_wallet(org_id="org-1")
         await org_billing.deposit_org(org_id="org-1", amount=Decimal("1000"))
-        await org_billing.register_member(
-            org_id="org-1", agent_id="owner-1", role="owner"
-        )
+        await org_billing.register_member(org_id="org-1", agent_id="owner-1", role="owner")
         await org_billing.charge_to_org(
-            org_id="org-1", agent_id="owner-1", amount=Decimal("75"),
+            org_id="org-1",
+            agent_id="owner-1",
+            amount=Decimal("75"),
             description="owner charge",
         )
-        report = await org_billing.get_org_spending(
-            org_id="org-1", agent_id="owner-1"
-        )
+        report = await org_billing.get_org_spending(org_id="org-1", agent_id="owner-1")
         assert len(report) == 1
         assert report[0]["agent_id"] == "owner-1"
         assert report[0]["total_spent"] == Decimal("75")

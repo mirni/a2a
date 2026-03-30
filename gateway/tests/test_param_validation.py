@@ -46,12 +46,12 @@ async def test_valid_params_pass_validation(client, api_key):
     assert body["success"] is True
 
 
-async def test_tool_with_no_required_params(client, pro_api_key):
+async def test_tool_with_no_required_params(client, admin_api_key):
     """Tools without required params should work with empty params."""
     resp = await client.post(
         "/v1/execute",
         json={"tool": "list_backups", "params": {}},
-        headers={"Authorization": f"Bearer {pro_api_key}"},
+        headers={"Authorization": f"Bearer {admin_api_key}"},
     )
     assert resp.status_code == 200
 

@@ -22,12 +22,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Validate branch and confirmation
+        env:
+          GIT_REF: ${{ github.ref }}
+          CONFIRM: ${{ github.event.inputs.confirm }}
         run: |
-          if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
+          if [[ "$GIT_REF" != "refs/heads/main" ]]; then
             echo "Production deployments can only be triggered from main"
             exit 1
           fi
-          if [[ "${{ github.event.inputs.confirm }}" != "deploy" ]]; then
+          if [[ "$CONFIRM" != "deploy" ]]; then
             echo "Confirmation required: type 'deploy' to proceed"
             exit 1
           fi

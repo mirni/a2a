@@ -14,59 +14,55 @@ import inspect
 import os
 import sys
 from decimal import Decimal
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
+from pydantic import ValidationError
 
 # Ensure project root is on sys.path
 _project_root = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from pydantic import ValidationError
-
 from sdk.src.a2a_client import A2AClient
 from sdk.src.a2a_client.models import (
-    # Existing models
+    AddAgentToOrgResponse,
     BalanceResponse,
+    CancelEscrowResponse,
+    CancelSubscriptionResponse,
+    CreateApiKeyResponse,
+    CreateOrgResponse,
+    DeleteWebhookResponse,
     DepositResponse,
     EscrowResponse,
     ExecuteResponse,
-    PaymentIntentResponse,
-    TrustScoreResponse,
-    # New models for Item 12
-    CancelEscrowResponse,
-    RefundSettlementResponse,
-    SubscriptionResponse,
-    CancelSubscriptionResponse,
-    GetSubscriptionResponse,
-    ListSubscriptionsResponse,
-    RegisterServiceResponse,
-    SearchServicesResponse,
-    GetServiceResponse,
-    RateServiceResponse,
-    SearchServersResponse,
-    RegisterAgentResponse,
-    VerifyAgentResponse,
     GetAgentIdentityResponse,
-    SubmitMetricsResponse,
-    GetVerifiedClaimsResponse,
-    SendMessageResponse,
-    GetMessagesResponse,
-    NegotiatePriceResponse,
-    RegisterWebhookResponse,
-    ListWebhooksResponse,
-    DeleteWebhookResponse,
-    CreateApiKeyResponse,
-    RotateKeyResponse,
-    PublishEventResponse,
     GetEventsResponse,
-    CreateOrgResponse,
+    GetMessagesResponse,
     GetOrgResponse,
-    AddAgentToOrgResponse,
+    GetServiceResponse,
+    GetSubscriptionResponse,
+    GetVerifiedClaimsResponse,
+    ListSubscriptionsResponse,
+    ListWebhooksResponse,
+    NegotiatePriceResponse,
+    PaymentIntentResponse,
+    PublishEventResponse,
+    RateServiceResponse,
+    RefundSettlementResponse,
+    RegisterAgentResponse,
+    RegisterServiceResponse,
+    RegisterWebhookResponse,
+    RotateKeyResponse,
+    SearchServersResponse,
+    SearchServicesResponse,
+    SendMessageResponse,
+    SubmitMetricsResponse,
+    SubscriptionResponse,
+    TrustScoreResponse,
+    VerifyAgentResponse,
     VoidPaymentResponse,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helper: create a client with a mocked execute method
@@ -108,9 +104,7 @@ class TestRegisterAgent:
             {"agent_id": "a1", "public_key": "abc123", "created_at": 1234567890.0}
         )
         result = await mock_client.register_agent("a1")
-        mock_client.execute.assert_called_once_with(
-            "register_agent", {"agent_id": "a1"}
-        )
+        mock_client.execute.assert_called_once_with("register_agent", {"agent_id": "a1"})
         assert isinstance(result, RegisterAgentResponse)
         assert result.agent_id == "a1"
 
@@ -120,9 +114,7 @@ class TestRegisterAgent:
             {"agent_id": "a1", "public_key": "mypk", "created_at": 1234567890.0}
         )
         result = await mock_client.register_agent("a1", public_key="mypk")
-        mock_client.execute.assert_called_once_with(
-            "register_agent", {"agent_id": "a1", "public_key": "mypk"}
-        )
+        mock_client.execute.assert_called_once_with("register_agent", {"agent_id": "a1", "public_key": "mypk"})
         assert result.public_key == "mypk"
 
     def test_signature(self, mock_client):
@@ -140,9 +132,7 @@ class TestSendMessage:
         mock_client.execute.return_value = _make_exec_response(
             {"id": "m1", "sender": "a", "recipient": "b", "thread_id": "t1"}
         )
-        result = await mock_client.send_message(
-            sender="a", recipient="b", message_type="text", body="hello"
-        )
+        result = await mock_client.send_message(sender="a", recipient="b", message_type="text", body="hello")
         call_args = mock_client.execute.call_args
         assert call_args[0][0] == "send_message"
         params = call_args[0][1]
@@ -175,20 +165,14 @@ class TestGetMessages:
 
     @pytest.mark.asyncio
     async def test_calls_execute(self, mock_client):
-        mock_client.execute.return_value = _make_exec_response(
-            {"messages": []}
-        )
+        mock_client.execute.return_value = _make_exec_response({"messages": []})
         result = await mock_client.get_messages("a1")
-        mock_client.execute.assert_called_once_with(
-            "get_messages", {"agent_id": "a1", "limit": 50}
-        )
+        mock_client.execute.assert_called_once_with("get_messages", {"agent_id": "a1", "limit": 50})
         assert isinstance(result, GetMessagesResponse)
 
     @pytest.mark.asyncio
     async def test_with_thread_id(self, mock_client):
-        mock_client.execute.return_value = _make_exec_response(
-            {"messages": []}
-        )
+        mock_client.execute.return_value = _make_exec_response({"messages": []})
         await mock_client.get_messages("a1", thread_id="t1", limit=10)
         params = mock_client.execute.call_args[0][1]
         assert params["thread_id"] == "t1"
@@ -204,9 +188,7 @@ class TestVoidPayment:
             {"id": "i1", "status": "refunded", "amount": Decimal("10.00")}
         )
         result = await mock_client.void_payment("i1")
-        mock_client.execute.assert_called_once_with(
-            "refund_intent", {"intent_id": "i1"}
-        )
+        mock_client.execute.assert_called_once_with("refund_intent", {"intent_id": "i1"})
         assert isinstance(result, VoidPaymentResponse)
 
 
@@ -223,9 +205,7 @@ class TestNegotiatePrice:
                 "proposed_amount": Decimal("50.00"),
             }
         )
-        result = await mock_client.negotiate_price(
-            initiator="a", responder="b", amount=50.0, service_id="s1"
-        )
+        result = await mock_client.negotiate_price(initiator="a", responder="b", amount=50.0, service_id="s1")
         params = mock_client.execute.call_args[0][1]
         assert params["initiator"] == "a"
         assert params["amount"] == 50.0
@@ -245,9 +225,7 @@ class TestCancelEscrow:
             {"id": "e1", "status": "cancelled", "amount": Decimal("10.00")}
         )
         result = await mock_client.cancel_escrow("e1")
-        mock_client.execute.assert_called_once_with(
-            "cancel_escrow", {"escrow_id": "e1"}
-        )
+        mock_client.execute.assert_called_once_with("cancel_escrow", {"escrow_id": "e1"})
         assert isinstance(result, CancelEscrowResponse)
 
 
@@ -271,9 +249,7 @@ class TestCreateSubscription:
         mock_client.execute.return_value = _make_exec_response(
             {"id": "sub1", "status": "active", "amount": Decimal("10.00"), "interval": "daily", "next_charge_at": 123.0}
         )
-        result = await mock_client.create_subscription(
-            payer="a", payee="b", amount=10.0, interval="daily"
-        )
+        result = await mock_client.create_subscription(payer="a", payee="b", amount=10.0, interval="daily")
         params = mock_client.execute.call_args[0][1]
         assert params["payer"] == "a"
         assert params["interval"] == "daily"
@@ -283,9 +259,7 @@ class TestCreateSubscription:
 class TestCancelSubscription:
     @pytest.mark.asyncio
     async def test_calls_execute(self, mock_client):
-        mock_client.execute.return_value = _make_exec_response(
-            {"id": "sub1", "status": "cancelled"}
-        )
+        mock_client.execute.return_value = _make_exec_response({"id": "sub1", "status": "cancelled"})
         result = await mock_client.cancel_subscription("sub1", cancelled_by="a")
         params = mock_client.execute.call_args[0][1]
         assert params["subscription_id"] == "sub1"
@@ -310,18 +284,14 @@ class TestGetSubscription:
             }
         )
         result = await mock_client.get_subscription("sub1")
-        mock_client.execute.assert_called_once_with(
-            "get_subscription", {"subscription_id": "sub1"}
-        )
+        mock_client.execute.assert_called_once_with("get_subscription", {"subscription_id": "sub1"})
         assert isinstance(result, GetSubscriptionResponse)
 
 
 class TestListSubscriptions:
     @pytest.mark.asyncio
     async def test_calls_execute(self, mock_client):
-        mock_client.execute.return_value = _make_exec_response(
-            {"subscriptions": []}
-        )
+        mock_client.execute.return_value = _make_exec_response({"subscriptions": []})
         result = await mock_client.list_subscriptions(agent_id="a1", status="active")
         params = mock_client.execute.call_args[0][1]
         assert params["agent_id"] == "a1"
@@ -332,12 +302,8 @@ class TestListSubscriptions:
 class TestRegisterService:
     @pytest.mark.asyncio
     async def test_calls_execute(self, mock_client):
-        mock_client.execute.return_value = _make_exec_response(
-            {"id": "svc1", "name": "MySvc", "status": "active"}
-        )
-        result = await mock_client.register_service(
-            provider_id="p1", name="MySvc", description="desc", category="ai"
-        )
+        mock_client.execute.return_value = _make_exec_response({"id": "svc1", "name": "MySvc", "status": "active"})
+        result = await mock_client.register_service(provider_id="p1", name="MySvc", description="desc", category="ai")
         params = mock_client.execute.call_args[0][1]
         assert params["provider_id"] == "p1"
         assert params["name"] == "MySvc"
@@ -351,18 +317,14 @@ class TestGetService:
             {"id": "svc1", "name": "MySvc", "description": "d", "category": "ai", "status": "active"}
         )
         result = await mock_client.get_service("svc1")
-        mock_client.execute.assert_called_once_with(
-            "get_service", {"service_id": "svc1"}
-        )
+        mock_client.execute.assert_called_once_with("get_service", {"service_id": "svc1"})
         assert isinstance(result, GetServiceResponse)
 
 
 class TestRateService:
     @pytest.mark.asyncio
     async def test_calls_execute(self, mock_client):
-        mock_client.execute.return_value = _make_exec_response(
-            {"service_id": "svc1", "agent_id": "a1", "rating": 5}
-        )
+        mock_client.execute.return_value = _make_exec_response({"service_id": "svc1", "agent_id": "a1", "rating": 5})
         result = await mock_client.rate_service(service_id="svc1", agent_id="a1", rating=5)
         params = mock_client.execute.call_args[0][1]
         assert params["service_id"] == "svc1"
@@ -373,9 +335,7 @@ class TestRateService:
 class TestSearchServers:
     @pytest.mark.asyncio
     async def test_calls_execute(self, mock_client):
-        mock_client.execute.return_value = _make_exec_response(
-            {"servers": []}
-        )
+        mock_client.execute.return_value = _make_exec_response({"servers": []})
         result = await mock_client.search_servers(name_contains="test", min_score=0.5)
         params = mock_client.execute.call_args[0][1]
         assert params["name_contains"] == "test"
@@ -390,21 +350,15 @@ class TestGetAgentIdentity:
             {"agent_id": "a1", "public_key": "pk1", "created_at": 100.0, "found": True}
         )
         result = await mock_client.get_agent_identity("a1")
-        mock_client.execute.assert_called_once_with(
-            "get_agent_identity", {"agent_id": "a1"}
-        )
+        mock_client.execute.assert_called_once_with("get_agent_identity", {"agent_id": "a1"})
         assert isinstance(result, GetAgentIdentityResponse)
 
 
 class TestVerifyAgent:
     @pytest.mark.asyncio
     async def test_calls_execute(self, mock_client):
-        mock_client.execute.return_value = _make_exec_response(
-            {"valid": True}
-        )
-        result = await mock_client.verify_agent(
-            agent_id="a1", message="hello", signature="sig123"
-        )
+        mock_client.execute.return_value = _make_exec_response({"valid": True})
+        result = await mock_client.verify_agent(agent_id="a1", message="hello", signature="sig123")
         params = mock_client.execute.call_args[0][1]
         assert params["agent_id"] == "a1"
         assert params["message"] == "hello"
@@ -425,9 +379,7 @@ class TestSubmitMetrics:
                 "signature": "sig",
             }
         )
-        result = await mock_client.submit_metrics(
-            agent_id="a1", metrics={"sharpe_30d": 2.0}
-        )
+        result = await mock_client.submit_metrics(agent_id="a1", metrics={"sharpe_30d": 2.0})
         params = mock_client.execute.call_args[0][1]
         assert params["agent_id"] == "a1"
         assert params["metrics"] == {"sharpe_30d": 2.0}
@@ -437,13 +389,9 @@ class TestSubmitMetrics:
 class TestGetVerifiedClaims:
     @pytest.mark.asyncio
     async def test_calls_execute(self, mock_client):
-        mock_client.execute.return_value = _make_exec_response(
-            {"claims": []}
-        )
+        mock_client.execute.return_value = _make_exec_response({"claims": []})
         result = await mock_client.get_verified_claims("a1")
-        mock_client.execute.assert_called_once_with(
-            "get_verified_claims", {"agent_id": "a1"}
-        )
+        mock_client.execute.assert_called_once_with("get_verified_claims", {"agent_id": "a1"})
         assert isinstance(result, GetVerifiedClaimsResponse)
 
 
@@ -472,26 +420,18 @@ class TestRegisterWebhook:
 class TestListWebhooks:
     @pytest.mark.asyncio
     async def test_calls_execute(self, mock_client):
-        mock_client.execute.return_value = _make_exec_response(
-            {"webhooks": []}
-        )
+        mock_client.execute.return_value = _make_exec_response({"webhooks": []})
         result = await mock_client.list_webhooks("a1")
-        mock_client.execute.assert_called_once_with(
-            "list_webhooks", {"agent_id": "a1"}
-        )
+        mock_client.execute.assert_called_once_with("list_webhooks", {"agent_id": "a1"})
         assert isinstance(result, ListWebhooksResponse)
 
 
 class TestDeleteWebhook:
     @pytest.mark.asyncio
     async def test_calls_execute(self, mock_client):
-        mock_client.execute.return_value = _make_exec_response(
-            {"deleted": True}
-        )
+        mock_client.execute.return_value = _make_exec_response({"deleted": True})
         result = await mock_client.delete_webhook("w1")
-        mock_client.execute.assert_called_once_with(
-            "delete_webhook", {"webhook_id": "w1"}
-        )
+        mock_client.execute.assert_called_once_with("delete_webhook", {"webhook_id": "w1"})
         assert isinstance(result, DeleteWebhookResponse)
 
 
@@ -515,21 +455,15 @@ class TestRotateKey:
             {"new_key": "nk1", "tier": "free", "agent_id": "a1", "revoked": True}
         )
         result = await mock_client.rotate_key("old_key")
-        mock_client.execute.assert_called_once_with(
-            "rotate_key", {"current_key": "old_key"}
-        )
+        mock_client.execute.assert_called_once_with("rotate_key", {"current_key": "old_key"})
         assert isinstance(result, RotateKeyResponse)
 
 
 class TestPublishEvent:
     @pytest.mark.asyncio
     async def test_calls_execute(self, mock_client):
-        mock_client.execute.return_value = _make_exec_response(
-            {"event_id": 42}
-        )
-        result = await mock_client.publish_event(
-            event_type="trust.score_drop", source="billing", payload={"x": 1}
-        )
+        mock_client.execute.return_value = _make_exec_response({"event_id": 42})
+        result = await mock_client.publish_event(event_type="trust.score_drop", source="billing", payload={"x": 1})
         params = mock_client.execute.call_args[0][1]
         assert params["event_type"] == "trust.score_drop"
         assert params["source"] == "billing"
@@ -539,9 +473,7 @@ class TestPublishEvent:
 class TestGetEvents:
     @pytest.mark.asyncio
     async def test_calls_execute(self, mock_client):
-        mock_client.execute.return_value = _make_exec_response(
-            {"events": []}
-        )
+        mock_client.execute.return_value = _make_exec_response({"events": []})
         result = await mock_client.get_events(event_type="trust.score_drop", since_id=10)
         params = mock_client.execute.call_args[0][1]
         assert params["event_type"] == "trust.score_drop"
@@ -552,13 +484,9 @@ class TestGetEvents:
 class TestCreateOrg:
     @pytest.mark.asyncio
     async def test_calls_execute(self, mock_client):
-        mock_client.execute.return_value = _make_exec_response(
-            {"org_id": "o1", "name": "Org1", "created_at": 100.0}
-        )
+        mock_client.execute.return_value = _make_exec_response({"org_id": "o1", "name": "Org1", "created_at": 100.0})
         result = await mock_client.create_org("Org1")
-        mock_client.execute.assert_called_once_with(
-            "create_org", {"org_name": "Org1"}
-        )
+        mock_client.execute.assert_called_once_with("create_org", {"org_name": "Org1"})
         assert isinstance(result, CreateOrgResponse)
 
 
@@ -569,18 +497,14 @@ class TestGetOrg:
             {"org_id": "o1", "name": "Org1", "created_at": 100.0, "members": []}
         )
         result = await mock_client.get_org("o1")
-        mock_client.execute.assert_called_once_with(
-            "get_org", {"org_id": "o1"}
-        )
+        mock_client.execute.assert_called_once_with("get_org", {"org_id": "o1"})
         assert isinstance(result, GetOrgResponse)
 
 
 class TestAddAgentToOrg:
     @pytest.mark.asyncio
     async def test_calls_execute(self, mock_client):
-        mock_client.execute.return_value = _make_exec_response(
-            {"agent_id": "a1", "org_id": "o1"}
-        )
+        mock_client.execute.return_value = _make_exec_response({"agent_id": "a1", "org_id": "o1"})
         result = await mock_client.add_agent_to_org(org_id="o1", agent_id="a1")
         params = mock_client.execute.call_args[0][1]
         assert params["org_id"] == "o1"
@@ -598,9 +522,7 @@ class TestModelValidation:
 
     def test_register_agent_response_extra_forbid(self):
         with pytest.raises(ValidationError):
-            RegisterAgentResponse(
-                agent_id="a1", public_key="pk", created_at=100.0, bogus="x"
-            )
+            RegisterAgentResponse(agent_id="a1", public_key="pk", created_at=100.0, bogus="x")
 
     def test_register_agent_response_valid(self):
         m = RegisterAgentResponse(agent_id="a1", public_key="pk", created_at=100.0)
@@ -608,7 +530,11 @@ class TestModelValidation:
 
     def test_register_agent_response_schema_extra(self):
         schema = RegisterAgentResponse.model_json_schema()
-        assert "examples" in schema or "example" in schema.get("json_schema_extra", {}) or RegisterAgentResponse.model_config.get("json_schema_extra") is not None
+        assert (
+            "examples" in schema
+            or "example" in schema.get("json_schema_extra", {})
+            or RegisterAgentResponse.model_config.get("json_schema_extra") is not None
+        )
 
     def test_escrow_response_decimal_amount(self):
         m = EscrowResponse(id="e1", status="held", amount=Decimal("10.50"))
@@ -616,22 +542,21 @@ class TestModelValidation:
 
     def test_subscription_response_decimal_amount(self):
         m = SubscriptionResponse(
-            id="s1", status="active", amount=Decimal("10.00"),
-            interval="daily", next_charge_at=100.0,
+            id="s1",
+            status="active",
+            amount=Decimal("10.00"),
+            interval="daily",
+            next_charge_at=100.0,
         )
         assert isinstance(m.amount, Decimal)
 
     def test_refund_settlement_response_decimal(self):
-        m = RefundSettlementResponse(
-            id="r1", settlement_id="s1", amount=Decimal("5.00"), status="refunded"
-        )
+        m = RefundSettlementResponse(id="r1", settlement_id="s1", amount=Decimal("5.00"), status="refunded")
         assert isinstance(m.amount, Decimal)
 
     def test_send_message_response_extra_forbid(self):
         with pytest.raises(ValidationError):
-            SendMessageResponse(
-                id="m1", sender="a", recipient="b", thread_id="t1", extra_field="bad"
-            )
+            SendMessageResponse(id="m1", sender="a", recipient="b", thread_id="t1", extra_field="bad")
 
     def test_negotiate_price_response_decimal_amount(self):
         m = NegotiatePriceResponse(
@@ -652,9 +577,15 @@ class TestModelValidation:
 
     def test_get_subscription_response_decimal(self):
         m = GetSubscriptionResponse(
-            id="s1", payer="a", payee="b", amount=Decimal("10.00"),
-            interval="daily", status="active", next_charge_at=100.0,
-            charge_count=0, created_at=100.0,
+            id="s1",
+            payer="a",
+            payee="b",
+            amount=Decimal("10.00"),
+            interval="daily",
+            status="active",
+            next_charge_at=100.0,
+            charge_count=0,
+            created_at=100.0,
         )
         assert isinstance(m.amount, Decimal)
 
@@ -664,9 +595,7 @@ class TestModelValidation:
 
     def test_create_api_key_response_extra_forbid(self):
         with pytest.raises(ValidationError):
-            CreateApiKeyResponse(
-                key="k1", agent_id="a1", tier="free", created_at=100.0, extra="bad"
-            )
+            CreateApiKeyResponse(key="k1", agent_id="a1", tier="free", created_at=100.0, extra="bad")
 
 
 # ===========================================================================
@@ -740,9 +669,7 @@ class TestExistingMethodsReturnTypedModels:
 
     @pytest.mark.asyncio
     async def test_search_services_returns_model(self, mock_client):
-        mock_client.execute.return_value = _make_exec_response(
-            {"services": [{"id": "s1", "name": "svc"}]}
-        )
+        mock_client.execute.return_value = _make_exec_response({"services": [{"id": "s1", "name": "svc"}]})
         result = await mock_client.search_services(query="test")
         assert isinstance(result, SearchServicesResponse)
 

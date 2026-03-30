@@ -84,7 +84,7 @@ _MIGRATIONS = (
         "add key scoping columns to api_keys",
         "ALTER TABLE api_keys ADD COLUMN allowed_tools TEXT;\n"
         "ALTER TABLE api_keys ADD COLUMN allowed_agent_ids TEXT;\n"
-        "ALTER TABLE api_keys ADD COLUMN scopes TEXT NOT NULL DEFAULT '[\"read\",\"write\"]';\n"
+        'ALTER TABLE api_keys ADD COLUMN scopes TEXT NOT NULL DEFAULT \'["read","write"]\';\n'
         "ALTER TABLE api_keys ADD COLUMN expires_at REAL;",
     ),
     Migration(
@@ -155,7 +155,18 @@ class PaywallStorage:
             "INSERT INTO api_keys "
             "(key_hash, agent_id, tier, connector, org_id, created_at, allowed_tools, allowed_agent_ids, scopes, expires_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (key_hash, agent_id, tier, connector, org_id, now, allowed_tools_json, allowed_agent_ids_json, scopes_json, expires_at),
+            (
+                key_hash,
+                agent_id,
+                tier,
+                connector,
+                org_id,
+                now,
+                allowed_tools_json,
+                allowed_agent_ids_json,
+                scopes_json,
+                expires_at,
+            ),
         )
         await self.db.commit()
         return {
@@ -173,7 +184,7 @@ class PaywallStorage:
         }
 
     @staticmethod
-    def _deserialize_key_row(row: dict[str, Any]) -> dict[str, Any]:
+    def _deserialize_key_row(row: aiosqlite.Row | dict[str, Any]) -> dict[str, Any]:
         """Deserialize JSON columns from an api_keys row."""
         d = dict(row)
         for col in ("allowed_tools", "allowed_agent_ids", "scopes"):

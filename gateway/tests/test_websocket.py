@@ -10,11 +10,9 @@ from __future__ import annotations
 import time
 
 import pytest
-
 from starlette.testclient import TestClient
 
 from gateway.src.app import create_app
-
 
 # ---------------------------------------------------------------------------
 # Helpers — thin async wrappers for ``portal.call()`` (positional args only)
@@ -148,9 +146,7 @@ def test_ws_subscribe_and_receive_event(sync_app_client):
         ws.send_json({"type": "subscribe", "event_types": ["billing.deposit"]})
         time.sleep(0.1)
 
-        event_id = client.portal.call(
-            _publish_event, ctx, "billing.deposit", "test", {"amount": "100.00"}
-        )
+        event_id = client.portal.call(_publish_event, ctx, "billing.deposit", "test", {"amount": "100.00"})
 
         msg = ws.receive_json()
         assert msg["type"] == "event"
@@ -177,9 +173,7 @@ def test_ws_wildcard_subscribe(sync_app_client):
         ws.send_json({"type": "subscribe", "event_types": ["billing.*"]})
         time.sleep(0.1)
 
-        client.portal.call(
-            _publish_event, ctx, "billing.deposit", "test", {"amount": "50.00"}
-        )
+        client.portal.call(_publish_event, ctx, "billing.deposit", "test", {"amount": "50.00"})
 
         msg = ws.receive_json()
         assert msg["type"] == "event"
@@ -201,22 +195,30 @@ def test_ws_agent_id_filtering(sync_app_client):
         auth_msg = ws.receive_json()
         assert auth_msg["type"] == "auth_ok"
 
-        ws.send_json({
-            "type": "subscribe",
-            "event_types": ["billing.deposit"],
-            "agent_id": "ws-agent-2",
-        })
+        ws.send_json(
+            {
+                "type": "subscribe",
+                "event_types": ["billing.deposit"],
+                "agent_id": "ws-agent-2",
+            }
+        )
         time.sleep(0.1)
 
         # Event for a different agent -- should NOT be delivered
         client.portal.call(
-            _publish_event, ctx, "billing.deposit", "test",
+            _publish_event,
+            ctx,
+            "billing.deposit",
+            "test",
             {"amount": "200.00", "agent_id": "other-agent"},
         )
 
         # Event for our agent -- should be delivered
         client.portal.call(
-            _publish_event, ctx, "billing.deposit", "test",
+            _publish_event,
+            ctx,
+            "billing.deposit",
+            "test",
             {"amount": "300.00", "agent_id": "ws-agent-2"},
         )
 
@@ -236,9 +238,7 @@ def test_ws_heartbeat(sync_app_client):
     client = sync_app_client
     api_key = client.portal.call(_create_api_key, client.app.state)
 
-    with client.websocket_connect(
-        f"/v1/ws?api_key={api_key}&heartbeat_interval=1"
-    ) as ws:
+    with client.websocket_connect(f"/v1/ws?api_key={api_key}&heartbeat_interval=1") as ws:
         auth_msg = ws.receive_json()
         assert auth_msg["type"] == "auth_ok"
 
@@ -263,23 +263,21 @@ def test_ws_last_event_id_reconnection(sync_app_client):
     ctx = client.app.state.ctx
 
     # Publish events before connecting
-    id1 = client.portal.call(
-        _publish_event, ctx, "billing.deposit", "test", {"seq": 1}
-    )
-    id2 = client.portal.call(
-        _publish_event, ctx, "billing.deposit", "test", {"seq": 2}
-    )
+    id1 = client.portal.call(_publish_event, ctx, "billing.deposit", "test", {"seq": 1})
+    id2 = client.portal.call(_publish_event, ctx, "billing.deposit", "test", {"seq": 2})
 
     with client.websocket_connect(f"/v1/ws?api_key={api_key}") as ws:
         auth_msg = ws.receive_json()
         assert auth_msg["type"] == "auth_ok"
 
         # Subscribe with last_event_id = id1 (should replay id2 onward)
-        ws.send_json({
-            "type": "subscribe",
-            "event_types": ["billing.deposit"],
-            "last_event_id": id1,
-        })
+        ws.send_json(
+            {
+                "type": "subscribe",
+                "event_types": ["billing.deposit"],
+                "last_event_id": id1,
+            }
+        )
 
         msg = ws.receive_json()
         assert msg["type"] == "event"
@@ -306,9 +304,7 @@ def test_ws_unsubscribe(sync_app_client):
         time.sleep(0.1)
 
         # Publish first event -- should arrive
-        client.portal.call(
-            _publish_event, ctx, "billing.deposit", "test", {"seq": 1}
-        )
+        client.portal.call(_publish_event, ctx, "billing.deposit", "test", {"seq": 1})
         msg = ws.receive_json()
         assert msg["type"] == "event"
         assert msg["data"]["seq"] == 1
@@ -318,9 +314,7 @@ def test_ws_unsubscribe(sync_app_client):
         time.sleep(0.1)
 
         # Publish another event -- should NOT arrive
-        client.portal.call(
-            _publish_event, ctx, "billing.deposit", "test", {"seq": 2}
-        )
+        client.portal.call(_publish_event, ctx, "billing.deposit", "test", {"seq": 2})
 
         # Send a ping to flush -- next message should be pong, not event
         time.sleep(0.2)

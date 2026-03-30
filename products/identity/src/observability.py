@@ -177,12 +177,14 @@ def evaluate_alerts(
             continue
         threshold = rule.get("z_score_threshold", 2.0)
         if abs(delta.z_score) >= threshold:
-            triggered.append({
-                "metric_name": delta.metric_name,
-                "z_score": delta.z_score,
-                "threshold": threshold,
-                "action": rule["action"],
-                "current_value": delta.current_value,
-                "baseline_value": delta.baseline_value,
-            })
+            triggered.append(
+                {
+                    "metric_name": delta.metric_name,
+                    "z_score": delta.z_score,
+                    "threshold": threshold,
+                    "action": rule["action"],
+                    "current_value": delta.current_value,
+                    "baseline_value": delta.baseline_value,
+                }
+            )
     return triggered

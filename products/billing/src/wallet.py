@@ -85,9 +85,7 @@ class Wallet:
             raise WalletNotFoundError(agent_id)
         return await self.storage.get_currency_balance(agent_id, currency)
 
-    async def deposit(
-        self, agent_id: str, amount: float, description: str = "", currency: str = "CREDITS"
-    ) -> float:
+    async def deposit(self, agent_id: str, amount: float, description: str = "", currency: str = "CREDITS") -> float:
         """Add funds to an agent's wallet in a specific currency. Returns new balance."""
         if amount <= 0:
             raise ValueError("Deposit amount must be positive")
@@ -102,9 +100,7 @@ class Wallet:
         )
         return new_balance
 
-    async def withdraw(
-        self, agent_id: str, amount: float, description: str = "", currency: str = "CREDITS"
-    ) -> float:
+    async def withdraw(self, agent_id: str, amount: float, description: str = "", currency: str = "CREDITS") -> float:
         """Remove funds from an agent's wallet in a specific currency. Returns new balance.
 
         Raises InsufficientCreditsError if balance is too low.

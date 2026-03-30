@@ -34,9 +34,7 @@ class TestHotToWarmCompression:
         assert compressed > 0
 
         # Raw rows should be gone
-        rows = await storage.query_timeseries(
-            "lifecycle-bot", "sharpe_30d", since=base - 86400, limit=100
-        )
+        rows = await storage.query_timeseries("lifecycle-bot", "sharpe_30d", since=base - 86400, limit=100)
         old_rows = [r for r in rows if r["timestamp"] < time.time() - 60 * 86400]
         assert len(old_rows) == 0
 

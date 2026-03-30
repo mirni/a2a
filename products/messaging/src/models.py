@@ -43,9 +43,7 @@ class EncryptionMetadata(BaseModel):
         default="x25519-aes256gcm",
         description="Encryption algorithm identifier.",
     )
-    ephemeral_public_key: str = Field(
-        description="Hex-encoded ephemeral X25519 public key used for ECDH."
-    )
+    ephemeral_public_key: str = Field(description="Hex-encoded ephemeral X25519 public key used for ECDH.")
 
 
 class Message(BaseModel):

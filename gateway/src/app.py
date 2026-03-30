@@ -5,7 +5,7 @@ from __future__ import annotations
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response
-from starlette.routing import Route, WebSocketRoute
+from starlette.routing import BaseRoute, Route
 
 from gateway.src.lifespan import lifespan
 from gateway.src.middleware import (
@@ -60,7 +60,7 @@ _redirect_routes = [
 
 def create_app() -> Starlette:
     """Build and return the Starlette application."""
-    all_routes: list[Route | WebSocketRoute] = []
+    all_routes: list[BaseRoute] = []
 
     # Versioned routes
     all_routes.extend(health_routes)

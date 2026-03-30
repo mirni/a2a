@@ -75,12 +75,11 @@ async def sse_event_generator(
 
         for event in events:
             # Filter by agent_id (source field) if requested
-            if agent_id is not None:
-                if isinstance(event, dict) and event.get("source") != agent_id:
-                    # Still advance the cursor past this event
-                    if isinstance(event, dict) and "id" in event:
-                        current_since_id = max(current_since_id, event["id"])
-                    continue
+            if agent_id is not None and isinstance(event, dict) and event.get("source") != agent_id:
+                # Still advance the cursor past this event
+                if isinstance(event, dict) and "id" in event:
+                    current_since_id = max(current_since_id, event["id"])
+                continue
 
             data = json.dumps(event)
             # Include id: field for Last-Event-ID reconnection support

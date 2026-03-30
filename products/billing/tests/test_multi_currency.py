@@ -10,7 +10,6 @@ from __future__ import annotations
 from decimal import Decimal
 
 import pytest
-
 from src.exchange import (
     ExchangeRateService,
     UnsupportedCurrencyError,
@@ -18,7 +17,6 @@ from src.exchange import (
 from src.models import Currency, CurrencyAmount, ExchangeRate
 from src.storage import StorageBackend
 from src.wallet import InsufficientCreditsError, Wallet
-
 
 # ---------------------------------------------------------------------------
 # Currency model tests
@@ -36,7 +34,7 @@ class TestCurrencyEnum:
 
     def test_credits_is_default(self):
         """CREDITS should be usable as a default."""
-        assert Currency.CREDITS == Currency("CREDITS")
+        assert Currency("CREDITS") == Currency.CREDITS
 
     def test_currency_amount_creation(self):
         """CurrencyAmount holds a Decimal amount and a Currency."""

@@ -24,7 +24,6 @@ from payments.engine import (
 )
 from payments.models import Refund, RefundStatus, SettlementStatus
 
-
 # ---------------------------------------------------------------------------
 # Refund model unit tests
 # ---------------------------------------------------------------------------
@@ -34,9 +33,7 @@ class TestRefundModel:
     def test_refund_has_schema_extra(self):
         """Refund model must include json_schema_extra example per CLAUDE.md."""
         schema = Refund.model_json_schema()
-        assert "examples" in schema or "examples" in Refund.model_config.get(
-            "json_schema_extra", {}
-        )
+        assert "examples" in schema or "examples" in Refund.model_config.get("json_schema_extra", {})
 
     def test_refund_creation_defaults(self):
         refund = Refund(
@@ -94,9 +91,7 @@ class TestFullRefund:
         """Full refund should reverse the entire settlement amount."""
         wallet, _, _ = funded_wallets
         # Create and capture intent (agent-a pays agent-b)
-        intent = await engine.create_intent(
-            payer="agent-a", payee="agent-b", amount=100.0
-        )
+        intent = await engine.create_intent(payer="agent-a", payee="agent-b", amount=100.0)
         settlement = await engine.capture(intent.id)
 
         # Verify pre-refund balances
@@ -117,9 +112,7 @@ class TestFullRefund:
 
     async def test_full_refund_updates_settlement_status(self, engine, funded_wallets):
         """Settlement status should be 'refunded' after full refund."""
-        intent = await engine.create_intent(
-            payer="agent-a", payee="agent-b", amount=50.0
-        )
+        intent = await engine.create_intent(payer="agent-a", payee="agent-b", amount=50.0)
         settlement = await engine.capture(intent.id)
         await engine.refund_settlement(settlement.id)
 
@@ -128,9 +121,7 @@ class TestFullRefund:
         assert settlement_data["status"] == "refunded"
 
     async def test_full_refund_returns_refund_object(self, engine, funded_wallets):
-        intent = await engine.create_intent(
-            payer="agent-a", payee="agent-b", amount=25.0
-        )
+        intent = await engine.create_intent(payer="agent-a", payee="agent-b", amount=25.0)
         settlement = await engine.capture(intent.id)
         refund = await engine.refund_settlement(settlement.id)
 
@@ -148,40 +139,28 @@ class TestPartialRefund:
     async def test_partial_refund_deducts_correct_amount(self, engine, funded_wallets):
         """Partial refund should only reverse the specified amount."""
         wallet, _, _ = funded_wallets
-        intent = await engine.create_intent(
-            payer="agent-a", payee="agent-b", amount=100.0
-        )
+        intent = await engine.create_intent(payer="agent-a", payee="agent-b", amount=100.0)
         settlement = await engine.capture(intent.id)
 
-        refund = await engine.refund_settlement(
-            settlement.id, amount=Decimal("40.00")
-        )
+        refund = await engine.refund_settlement(settlement.id, amount=Decimal("40.00"))
 
         assert refund.amount == Decimal("40.00")
         assert await wallet.get_balance("agent-a") == 940.0
         assert await wallet.get_balance("agent-b") == 560.0
 
-    async def test_partial_refund_updates_settlement_status(
-        self, engine, funded_wallets
-    ):
+    async def test_partial_refund_updates_settlement_status(self, engine, funded_wallets):
         """Settlement status should be 'partially_refunded' after partial refund."""
-        intent = await engine.create_intent(
-            payer="agent-a", payee="agent-b", amount=100.0
-        )
+        intent = await engine.create_intent(payer="agent-a", payee="agent-b", amount=100.0)
         settlement = await engine.capture(intent.id)
         await engine.refund_settlement(settlement.id, amount=Decimal("30.00"))
 
         settlement_data = await engine.storage.get_settlement(settlement.id)
         assert settlement_data["status"] == "partially_refunded"
 
-    async def test_multiple_partial_refunds_up_to_original(
-        self, engine, funded_wallets
-    ):
+    async def test_multiple_partial_refunds_up_to_original(self, engine, funded_wallets):
         """Multiple partial refunds should work as long as total <= original amount."""
         wallet, _, _ = funded_wallets
-        intent = await engine.create_intent(
-            payer="agent-a", payee="agent-b", amount=100.0
-        )
+        intent = await engine.create_intent(payer="agent-a", payee="agent-b", amount=100.0)
         settlement = await engine.capture(intent.id)
 
         # First partial refund: 30
@@ -202,9 +181,7 @@ class TestPartialRefund:
     async def test_refund_then_full_remaining(self, engine, funded_wallets):
         """Partial then full-remaining refund should work."""
         wallet, _, _ = funded_wallets
-        intent = await engine.create_intent(
-            payer="agent-a", payee="agent-b", amount=100.0
-        )
+        intent = await engine.create_intent(payer="agent-a", payee="agent-b", amount=100.0)
         settlement = await engine.capture(intent.id)
 
         # Partial refund first
@@ -224,13 +201,9 @@ class TestPartialRefund:
 
 
 class TestRefundErrors:
-    async def test_refund_exceeding_remaining_raises_error(
-        self, engine, funded_wallets
-    ):
+    async def test_refund_exceeding_remaining_raises_error(self, engine, funded_wallets):
         """Refund amount > remaining should raise PaymentError."""
-        intent = await engine.create_intent(
-            payer="agent-a", payee="agent-b", amount=100.0
-        )
+        intent = await engine.create_intent(payer="agent-a", payee="agent-b", amount=100.0)
         settlement = await engine.capture(intent.id)
 
         with pytest.raises(PaymentError, match="exceeds"):
@@ -238,9 +211,7 @@ class TestRefundErrors:
 
     async def test_refund_exceeding_after_partial(self, engine, funded_wallets):
         """After partial refund, requesting more than remaining should fail."""
-        intent = await engine.create_intent(
-            payer="agent-a", payee="agent-b", amount=100.0
-        )
+        intent = await engine.create_intent(payer="agent-a", payee="agent-b", amount=100.0)
         settlement = await engine.capture(intent.id)
         await engine.refund_settlement(settlement.id, amount=Decimal("80.00"))
 
@@ -254,9 +225,7 @@ class TestRefundErrors:
 
     async def test_refund_already_fully_refunded(self, engine, funded_wallets):
         """Double full refund should raise InvalidStateError."""
-        intent = await engine.create_intent(
-            payer="agent-a", payee="agent-b", amount=50.0
-        )
+        intent = await engine.create_intent(payer="agent-a", payee="agent-b", amount=50.0)
         settlement = await engine.capture(intent.id)
         await engine.refund_settlement(settlement.id)
 
@@ -265,9 +234,7 @@ class TestRefundErrors:
 
     async def test_refund_zero_amount_raises_error(self, engine, funded_wallets):
         """Refund with amount=0 should raise PaymentError."""
-        intent = await engine.create_intent(
-            payer="agent-a", payee="agent-b", amount=50.0
-        )
+        intent = await engine.create_intent(payer="agent-a", payee="agent-b", amount=50.0)
         settlement = await engine.capture(intent.id)
 
         with pytest.raises(PaymentError, match="positive"):
@@ -275,9 +242,7 @@ class TestRefundErrors:
 
     async def test_refund_negative_amount_raises_error(self, engine, funded_wallets):
         """Refund with negative amount should raise PaymentError."""
-        intent = await engine.create_intent(
-            payer="agent-a", payee="agent-b", amount=50.0
-        )
+        intent = await engine.create_intent(payer="agent-a", payee="agent-b", amount=50.0)
         settlement = await engine.capture(intent.id)
 
         with pytest.raises(PaymentError, match="positive"):
@@ -293,14 +258,10 @@ class TestDecimalPrecision:
     async def test_decimal_precision_maintained(self, engine, funded_wallets):
         """Refund should maintain Decimal precision, not use float."""
         wallet, _, _ = funded_wallets
-        intent = await engine.create_intent(
-            payer="agent-a", payee="agent-b", amount=33.33
-        )
+        intent = await engine.create_intent(payer="agent-a", payee="agent-b", amount=33.33)
         settlement = await engine.capture(intent.id)
 
-        refund = await engine.refund_settlement(
-            settlement.id, amount=Decimal("11.11")
-        )
+        refund = await engine.refund_settlement(settlement.id, amount=Decimal("11.11"))
         assert refund.amount == Decimal("11.11")
 
 
@@ -312,9 +273,7 @@ class TestDecimalPrecision:
 class TestRefundStorage:
     async def test_get_refunds_for_settlement(self, engine, funded_wallets):
         """Should return all refunds for a given settlement."""
-        intent = await engine.create_intent(
-            payer="agent-a", payee="agent-b", amount=100.0
-        )
+        intent = await engine.create_intent(payer="agent-a", payee="agent-b", amount=100.0)
         settlement = await engine.capture(intent.id)
         await engine.refund_settlement(settlement.id, amount=Decimal("30.00"))
         await engine.refund_settlement(settlement.id, amount=Decimal("20.00"))
@@ -328,9 +287,7 @@ class TestRefundStorage:
 
     async def test_get_total_refunded(self, engine, funded_wallets):
         """Should return sum of all refunded amounts for a settlement."""
-        intent = await engine.create_intent(
-            payer="agent-a", payee="agent-b", amount=100.0
-        )
+        intent = await engine.create_intent(payer="agent-a", payee="agent-b", amount=100.0)
         settlement = await engine.capture(intent.id)
         await engine.refund_settlement(settlement.id, amount=Decimal("30.00"))
         await engine.refund_settlement(settlement.id, amount=Decimal("25.00"))
@@ -340,9 +297,7 @@ class TestRefundStorage:
 
     async def test_get_total_refunded_no_refunds(self, engine, funded_wallets):
         """Should return 0 for a settlement with no refunds."""
-        intent = await engine.create_intent(
-            payer="agent-a", payee="agent-b", amount=100.0
-        )
+        intent = await engine.create_intent(payer="agent-a", payee="agent-b", amount=100.0)
         settlement = await engine.capture(intent.id)
 
         total = await engine.storage.get_total_refunded(settlement.id)
@@ -350,9 +305,7 @@ class TestRefundStorage:
 
     async def test_refund_reason_stored(self, engine, funded_wallets):
         """Refund reason should be persisted and retrievable."""
-        intent = await engine.create_intent(
-            payer="agent-a", payee="agent-b", amount=100.0
-        )
+        intent = await engine.create_intent(payer="agent-a", payee="agent-b", amount=100.0)
         settlement = await engine.capture(intent.id)
         await engine.refund_settlement(
             settlement.id,

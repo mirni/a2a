@@ -182,13 +182,15 @@ async def _list_api_keys(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
 
     sanitized_keys = []
     for k in keys:
-        sanitized_keys.append({
-            "key_hash_prefix": k["key_hash"][:8],
-            "tier": k["tier"],
-            "scopes": k.get("scopes", ["read", "write"]),
-            "created_at": k["created_at"],
-            "revoked": bool(k["revoked"]),
-        })
+        sanitized_keys.append(
+            {
+                "key_hash_prefix": k["key_hash"][:8],
+                "tier": k["tier"],
+                "scopes": k.get("scopes", ["read", "write"]),
+                "created_at": k["created_at"],
+                "revoked": bool(k["revoked"]),
+            }
+        )
 
     return {"keys": sanitized_keys}
 

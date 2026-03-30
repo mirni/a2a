@@ -549,9 +549,7 @@ class PaymentStorage:
         if isinstance(amount, (int, float)) and not isinstance(amount, Decimal):
             amount = credits_to_atomic(Decimal(str(amount)))
         await self.db.execute(
-            "INSERT INTO refunds "
-            "(id, settlement_id, amount, reason, status, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO refunds (id, settlement_id, amount, reason, status, created_at) VALUES (?, ?, ?, ?, ?, ?)",
             (
                 data["id"],
                 data["settlement_id"],

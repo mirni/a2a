@@ -105,9 +105,7 @@ async def test_oversized_body_returns_413(client, api_key):
             "Content-Type": "application/json",
         },
     )
-    assert resp.status_code == 413, (
-        f"Expected 413 for oversized body but got {resp.status_code}"
-    )
+    assert resp.status_code == 413, f"Expected 413 for oversized body but got {resp.status_code}"
 
 
 async def test_normal_body_passes_size_check(client, api_key):
@@ -134,6 +132,5 @@ async def test_request_timeout_middleware_configured(app):
     # Starlette stores registered middleware classes in app.user_middleware
     middleware_classes = [m.cls for m in app.user_middleware]
     assert RequestTimeoutMiddleware in middleware_classes, (
-        f"RequestTimeoutMiddleware not found in middleware stack. "
-        f"Registered: {middleware_classes}"
+        f"RequestTimeoutMiddleware not found in middleware stack. Registered: {middleware_classes}"
     )
