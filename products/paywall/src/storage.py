@@ -16,8 +16,10 @@ from typing import Any
 import aiosqlite
 
 try:
+    from shared_src.migrate import Migration
     from shared_src.money import atomic_to_float, credits_to_atomic
 except ImportError:
+    from src.migrate import Migration
     from src.money import atomic_to_float, credits_to_atomic
 
 # ---------------------------------------------------------------------------
@@ -75,6 +77,23 @@ CREATE TABLE IF NOT EXISTS rate_events (
 CREATE INDEX IF NOT EXISTS idx_rate_events_agent ON rate_events(agent_id, window_key, timestamp);
 CREATE INDEX IF NOT EXISTS idx_rate_events_tool ON rate_events(agent_id, tool_name, timestamp);
 """
+
+_MIGRATIONS = (
+    Migration(
+        1,
+        "add key scoping columns to api_keys",
+        "ALTER TABLE api_keys ADD COLUMN allowed_tools TEXT;\n"
+        "ALTER TABLE api_keys ADD COLUMN allowed_agent_ids TEXT;\n"
+        "ALTER TABLE api_keys ADD COLUMN scopes TEXT NOT NULL DEFAULT '[\"read\",\"write\"]';\n"
+        "ALTER TABLE api_keys ADD COLUMN expires_at REAL;",
+    ),
+    Migration(
+        2,
+        "convert audit_log cost from REAL to INTEGER (atomic units, SCALE=1e8)",
+        "UPDATE audit_log SET cost = CAST(ROUND(cost * 100000000) AS INTEGER) "
+        "WHERE typeof(cost) = 'real' OR (cost > 0 AND cost < 100000000);",
+    ),
+)
 
 
 @dataclass

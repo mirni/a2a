@@ -112,6 +112,11 @@ _PRODUCTS = [
         "env_var": "BILLING_DB",
         "default_path": "/var/lib/a2a/billing.db",
     },
+    {
+        "name": "paywall",
+        "env_var": "PAYWALL_DB",
+        "default_path": "/var/lib/a2a/paywall.db",
+    },
 ]
 
 
