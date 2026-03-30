@@ -1,7 +1,7 @@
 # =============================================================================
 # A2A Commerce Platform — CI Pipeline
 # =============================================================================
-# Runs on every push and pull request to main.
+# Runs on every push and pull request (all branches).
 # Tests all modules independently to catch import/isolation issues.
 # Quality checks run as independent jobs so one failure doesn't block others.
 # =============================================================================
@@ -10,9 +10,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
   pull_request:
-    branches: [main]
 
 jobs:
   lint:
@@ -143,3 +141,34 @@ jobs:
 
       - name: Build and verify Docker image
         run: scripts/ci/docker_build_verify.sh
+
+  package:
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install packaging tools
+        run: pip install wheel setuptools
+
+      - name: Build all packages
+        run: scripts/create_package.sh ALL
+
+      - name: Upload deb artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-packages
+          path: dist/*.deb
+          retention-days: 14
+
+      - name: Upload SDK wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-wheel
+          path: dist/*.whl
+          retention-days: 14

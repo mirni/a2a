@@ -5792,3 +5792,70 @@ Implemented all 5 PRDs using strict TDD (red-green-refactor) across the identity
 #### Test Results
 - Identity module: 216 passed (42 new)
 - Gateway module: 0 regressions (2 pre-existing failures unrelated to changes)
+
+---
+
+## Session — 2026-03-30: CI/CD Pipeline Overhaul & Packaging Refactoring
+
+### Prompt
+Implement the CI/CD Pipeline Overhaul and Packaging Overhaul from DEPLOYMENT_REFACTORING.md:
+1. Move from push-to-main to feature-branch model with staging integration tests and manual production deployment with rollback.
+2. Split the monolithic a2a-server deb into multiple content-agnostic packages with a symlink-based package/ tree and a single driver script.
+
+### Output
+
+#### Part 1: CI/CD Pipeline Overhaul
+
+**ci.yml changes:**
+- Trigger on all branches (not just main) so feature branches get CI
+- Added `package` job that builds all debs + SDK wheel via `scripts/create_package.sh ALL` and uploads artifacts
+
+**New: staging.yml**
+- Triggered on pull requests targeting main
+- Concurrency group per head branch with cancel-in-progress
+- Jobs: ci-check → package → staging-deploy → staging-smoke → staging-report
+- Deploys a2a-gateway-test deb to staging server via SSH
+- Runs health checks and lightweight stress tests against test.greenhelix.net
+- Posts pass/fail summary back to PR as a comment
+
+**New: deploy-production.yml**
+- Manual trigger (workflow_dispatch) on main only with confirmation input
+- Jobs: validate → package → deploy (with `environment: production` approval gate) → smoke
+- Auto-rollback on failure: backs up current deb via dpkg-repack, restores on dpkg -i or service start failure
+- Post-deploy smoke tests against api.greenhelix.net
+
+#### Part 2: Packaging Overhaul
+
+**New: package/ directory tree**
+- `package/a2a-gateway/` — production gateway with DEBIAN/{control,postinst,prerm}, symlinks to gateway/, products/, sdk/, server/, scripts/, config files, and /usr/local/bin/ script symlinks
+- `package/a2a-gateway-test/` — staging gateway with DEBIAN/{control,postinst,prerm}, symlinks to gateway/, products/, sdk/, scripts/, config files; self-contained postinst creates systemd service on port 8001 with /var/lib/a2a-test/ data dir
+- `package/a2a-website/` — static website with DEBIAN/{control,postinst,prerm}, symlinks to website/ and scripts/
+- `package/a2a-sdk/` — marker directory (built as wheel, not deb)
+
+**New: scripts/create_package.sh**
+- Universal driver: `./scripts/create_package.sh <a2a-gateway|a2a-gateway-test|a2a-website|a2a-sdk|ALL>`
+- Uses `cp -rL` to dereference symlinks into staging dir
+- Strips .git, __pycache__, *.pyc, .env, .egg-info, node_modules, tests/, .pytest_cache
+- Builds debs via dpkg-deb --root-owner-group --build
+- SDK built via pip wheel --no-deps
+
+**Deleted: packaging/**
+- Old monolithic build-deb.sh, control, postinst, prerm replaced by package/ tree + create_package.sh
+
+#### Documentation
+
+**New: docs/BRANCH_PROTECTION.md**
+- Step-by-step GitHub branch protection setup
+- Required status checks: lint, test (3.12), test (3.13), staging-smoke
+- Required secrets and environment configuration
+
+**New: docs/TEST_SERVER_SETUP.md**
+- Test server architecture diagram and comparison table
+- Package installation, nginx upstream config, .env setup
+- SSH deploy key setup for GitHub Actions
+- Logs, troubleshooting, and upgrade procedures
+
+#### Files Changed
+- **New (10):** `scripts/create_package.sh`, `.github/workflows/staging.yml`, `.github/workflows/deploy-production.yml`, `docs/BRANCH_PROTECTION.md`, `docs/TEST_SERVER_SETUP.md`, `package/a2a-gateway/DEBIAN/{control,postinst,prerm}`, `package/a2a-gateway-test/DEBIAN/{control,postinst,prerm}`, `package/a2a-website/DEBIAN/{control,postinst,prerm}`, plus symlinks
+- **Modified (1):** `.github/workflows/ci.yml` (trigger all branches, add package job)
+- **Deleted (4):** `packaging/{build-deb.sh,control,postinst,prerm}`

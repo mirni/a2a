@@ -1,0 +1,9 @@
+Package: a2a-website
+Version: 0.3.0
+Architecture: all
+Depends: nginx
+Maintainer: A2A Team <team@greenhelix.net>
+Section: web
+Priority: optional
+Description: A2A Commerce Platform — static website
+ Static website for greenhelix.net deployed via nginx.

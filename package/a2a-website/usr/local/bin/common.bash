@@ -1,0 +1,1 @@
+../../opt/a2a/scripts/common.bash

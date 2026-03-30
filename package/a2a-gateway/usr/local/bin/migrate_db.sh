@@ -1,0 +1,1 @@
+../../opt/a2a/scripts/migrate_db.sh

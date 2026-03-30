@@ -1,0 +1,11 @@
+Package: a2a-gateway
+Version: 0.3.0
+Architecture: all
+Depends: python3 (>= 3.12), nginx, sqlite3, curl, ufw
+Maintainer: A2A Team <team@greenhelix.net>
+Section: web
+Priority: optional
+Description: A2A Commerce Gateway — production deployment
+ Production gateway for agent-to-agent commerce transactions.
+ Includes billing, payments, paywall, marketplace, identity,
+ messaging, trust, and reputation modules.

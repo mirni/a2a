@@ -1,0 +1,179 @@
+# =============================================================================
+# A2A Commerce Platform — Production Deployment
+# =============================================================================
+# Manual deployment to production with approval gate and auto-rollback.
+# Triggered via workflow_dispatch on main only.
+# =============================================================================
+
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type 'deploy' to confirm production deployment"
+        required: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Guard: only allow on main, require explicit confirmation
+  # ---------------------------------------------------------------------------
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate branch and confirmation
+        run: |
+          if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
+            echo "Production deployments can only be triggered from main"
+            exit 1
+          fi
+          if [[ "${{ github.event.inputs.confirm }}" != "deploy" ]]; then
+            echo "Confirmation required: type 'deploy' to proceed"
+            exit 1
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Build production gateway package
+  # ---------------------------------------------------------------------------
+  package:
+    runs-on: ubuntu-latest
+    needs: [validate]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install packaging tools
+        run: pip install wheel setuptools
+
+      - name: Build production gateway
+        run: scripts/create_package.sh a2a-gateway
+
+      - name: Upload deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-deb
+          path: dist/*.deb
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # Deploy to production (requires manual approval via GitHub environment)
+  # ---------------------------------------------------------------------------
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [package]
+    environment: production
+    steps:
+      - name: Download deb artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: production-deb
+          path: dist/
+
+      - name: Deploy to production
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+        run: |
+          set -euo pipefail
+
+          # Set up SSH
+          mkdir -p ~/.ssh
+          echo "$PROD_SSH_KEY" > ~/.ssh/prod_key
+          chmod 600 ~/.ssh/prod_key
+          ssh-keyscan -H "$PROD_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+          SSH_OPTS="-o StrictHostKeyChecking=accept-new -i ~/.ssh/prod_key"
+          DEB_FILE=$(ls dist/a2a-gateway_*.deb | head -1)
+          DEB_BASENAME=$(basename "$DEB_FILE")
+
+          # Upload new deb
+          scp $SSH_OPTS "$DEB_FILE" "root@${PROD_HOST}:/tmp/"
+
+          # Deploy with rollback on failure
+          ssh $SSH_OPTS "root@${PROD_HOST}" bash -s -- "$DEB_BASENAME" << 'REMOTE'
+            set -euo pipefail
+            DEB_BASENAME="$1"
+
+            BACKUP_DIR="/var/backups/a2a/deploy-$(date +%Y%m%d-%H%M%S)"
+            mkdir -p "$BACKUP_DIR"
+
+            # Back up current package state
+            dpkg-query -W -f='${Package}_${Version}_${Architecture}.deb\n' a2a-gateway 2>/dev/null \
+              > "$BACKUP_DIR/previous_version.txt" || true
+
+            # Save the currently installed deb for rollback
+            if dpkg -s a2a-gateway >/dev/null 2>&1; then
+              dpkg-repack a2a-gateway 2>/dev/null && mv a2a-gateway_*.deb "$BACKUP_DIR/" || true
+            fi
+
+            echo "[+] Installing new package..."
+            if dpkg -i "/tmp/$DEB_BASENAME"; then
+              echo "[+] Package installed successfully"
+              sleep 3
+
+              # Verify service is running
+              if systemctl is-active a2a-gateway; then
+                echo "[+] Service is active"
+              else
+                echo "[x] Service failed to start — rolling back"
+                ROLLBACK_DEB=$(ls "$BACKUP_DIR"/a2a-gateway_*.deb 2>/dev/null | head -1)
+                if [[ -n "$ROLLBACK_DEB" ]]; then
+                  dpkg -i "$ROLLBACK_DEB"
+                  systemctl restart a2a-gateway || true
+                fi
+                exit 1
+              fi
+            else
+              echo "[x] dpkg -i failed — rolling back"
+              ROLLBACK_DEB=$(ls "$BACKUP_DIR"/a2a-gateway_*.deb 2>/dev/null | head -1)
+              if [[ -n "$ROLLBACK_DEB" ]]; then
+                dpkg -i "$ROLLBACK_DEB"
+                systemctl restart a2a-gateway || true
+              fi
+              exit 1
+            fi
+
+            rm -f "/tmp/$DEB_BASENAME"
+          REMOTE
+
+          # Clean up SSH key
+          rm -f ~/.ssh/prod_key
+
+  # ---------------------------------------------------------------------------
+  # Post-deploy smoke tests
+  # ---------------------------------------------------------------------------
+  smoke:
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: scripts/ci/install_deps.sh --with-test
+
+      - name: Health check
+        run: |
+          for i in $(seq 1 10); do
+            if curl -sf "https://api.greenhelix.net/v1/health" -o /dev/null; then
+              echo "Health check passed (attempt $i)"
+              exit 0
+            fi
+            echo "Health check attempt $i failed, retrying in 5s..."
+            sleep 5
+          done
+          echo "Health check failed after 10 attempts"
+          exit 1
+
+      - name: Post-deploy smoke tests
+        run: |
+          python scripts/stress_test.py \
+            --base-url "https://api.greenhelix.net" \
+            --customers 5 \
+            --duration 15

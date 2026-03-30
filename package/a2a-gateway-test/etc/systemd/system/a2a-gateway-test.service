@@ -1,0 +1,30 @@
+[Unit]
+Description=A2A Commerce Gateway (Test)
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=a2a
+Group=a2a
+WorkingDirectory=/opt/a2a-test
+EnvironmentFile=/opt/a2a-test/.env
+ExecStart=/opt/a2a-test/venv/bin/python -m uvicorn gateway.main:app \
+    --host 127.0.0.1 \
+    --port 8001 \
+    --workers 1 \
+    --log-level info \
+    --access-log
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/a2a-test /var/log/a2a-test
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
