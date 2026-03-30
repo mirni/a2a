@@ -87,7 +87,23 @@ ephemeral node, then SSH to the server's Tailscale IP.
 3. Assign the tag **`tag:ci`** to the client (the CI runner will join as this tag)
 4. Save the **Client ID** and **Client Secret**
 
-### 5b. Configure Tailscale ACLs
+### 5b. Enable Tailscale SSH on the server
+
+On the server, enable Tailscale SSH so it accepts Tailscale-authenticated
+connections without traditional SSH keys:
+
+```bash
+# Enable Tailscale SSH on the server
+sudo tailscale up --ssh
+
+# Verify Tailscale SSH is active
+tailscale status
+```
+
+This tells the server to accept SSH connections authenticated via Tailscale
+ACLs, bypassing the need for SSH keys or password auth.
+
+### 5c. Configure Tailscale ACLs
 
 In the [ACL editor](https://login.tailscale.com/admin/acls), allow `tag:ci`
 to SSH to the server. Example:
@@ -102,7 +118,7 @@ to SSH to the server. Example:
     {
       "action": "accept",
       "src": ["tag:ci"],
-      "dst": ["YOUR-SERVER-HOSTNAME:22"]
+      "dst": ["YOUR-SERVER-HOSTNAME:*"]
     }
   ],
   "ssh": [
@@ -117,7 +133,11 @@ to SSH to the server. Example:
 }
 ```
 
-### 5c. Add GitHub repository secrets
+**Important:** The `ssh` ACL section is what allows `tag:ci` nodes to SSH
+as root. Without this, even with `tailscale up --ssh` on the server,
+CI runners will get "Permission denied".
+
+### 5d. Add GitHub repository secrets
 
 Go to **Settings → Secrets and variables → Actions** and add:
 
