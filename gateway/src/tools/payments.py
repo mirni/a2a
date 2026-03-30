@@ -307,3 +307,33 @@ async def _resolve_dispute(ctx: AppContext, params: dict[str, Any]) -> dict[str,
         resolved_by=params["resolved_by"],
         notes=params.get("notes", ""),
     )
+
+
+# ---------------------------------------------------------------------------
+# Settlement Refunds
+# ---------------------------------------------------------------------------
+
+
+async def _refund_settlement(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    """Refund a settled payment (full or partial).
+
+    If amount is omitted, refunds the full remaining balance.
+    """
+    from decimal import Decimal
+
+    amount = None
+    if "amount" in params and params["amount"] is not None:
+        amount = Decimal(str(params["amount"]))
+
+    refund = await ctx.payment_engine.refund_settlement(
+        settlement_id=params["settlement_id"],
+        amount=amount,
+        reason=params.get("reason", ""),
+    )
+    return {
+        "id": refund.id,
+        "settlement_id": refund.settlement_id,
+        "amount": float(refund.amount),
+        "reason": refund.reason,
+        "status": refund.status.value,
+    }

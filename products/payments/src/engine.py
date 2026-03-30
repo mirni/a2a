@@ -16,7 +16,9 @@ from payments.models import (
     EscrowStatus,
     IntentStatus,
     PaymentIntent,
+    Refund,
     Settlement,
+    SettlementStatus,
     Subscription,
     SubscriptionInterval,
     SubscriptionStatus,
@@ -45,6 +47,10 @@ class EscrowNotFoundError(PaymentError):
 
 class SubscriptionNotFoundError(PaymentError):
     """Raised when a subscription is not found."""
+
+
+class SettlementNotFoundError(PaymentError):
+    """Raised when a settlement is not found."""
 
 
 class InvalidStateError(PaymentError):
@@ -228,6 +234,93 @@ class PaymentEngine:
         if data is None:
             raise IntentNotFoundError(f"Intent {intent_id} not found")
         return PaymentIntent(**data)
+
+    # -------------------------------------------------------------------
+    # Settlement Refunds
+    # -------------------------------------------------------------------
+
+    async def refund_settlement(
+        self,
+        settlement_id: str,
+        amount: Decimal | None = None,
+        reason: str = "",
+    ) -> Refund:
+        """Refund a settled payment (full or partial).
+
+        Args:
+            settlement_id: ID of the settlement to refund.
+            amount: Amount to refund. If None, refunds the remaining (un-refunded) balance.
+            reason: Optional reason for the refund.
+
+        Returns:
+            A Refund object with the details of this refund.
+
+        Raises:
+            SettlementNotFoundError: If settlement_id does not exist.
+            InvalidStateError: If the settlement is already fully refunded.
+            PaymentError: If amount is zero, negative, or exceeds the remaining refundable balance.
+        """
+        settlement_data = await self.storage.get_settlement(settlement_id)
+        if settlement_data is None:
+            raise SettlementNotFoundError(f"Settlement {settlement_id} not found")
+
+        settlement = Settlement(**settlement_data)
+
+        # Block if already fully refunded
+        if settlement.status == SettlementStatus.REFUNDED:
+            raise InvalidStateError(
+                f"Settlement {settlement_id} is already fully refunded"
+            )
+
+        # Calculate remaining refundable amount
+        total_refunded = await self.storage.get_total_refunded(settlement_id)
+        remaining = settlement.amount - total_refunded
+
+        if amount is not None:
+            # Validate explicit amount
+            if amount <= 0:
+                raise PaymentError("Refund amount must be positive")
+            if amount > remaining:
+                raise PaymentError(
+                    f"Refund amount {amount} exceeds remaining refundable balance {remaining}"
+                )
+            refund_amount = amount
+        else:
+            # Full refund of remaining
+            refund_amount = remaining
+
+        # Atomic fund transfer: withdraw from payee, deposit to payer
+        await self.wallet.withdraw(
+            settlement.payee,
+            float(refund_amount),
+            description=f"refund:{settlement_id}",
+        )
+        await self.wallet.deposit(
+            settlement.payer,
+            float(refund_amount),
+            description=f"refund:{settlement_id}",
+        )
+
+        # Create refund record
+        refund = Refund(
+            settlement_id=settlement_id,
+            amount=refund_amount,
+            reason=reason,
+        )
+        await self.storage.insert_refund(refund.model_dump())
+
+        # Update settlement status
+        new_total_refunded = total_refunded + refund_amount
+        if new_total_refunded >= settlement.amount:
+            await self.storage.update_settlement_status(
+                settlement_id, SettlementStatus.REFUNDED.value
+            )
+        else:
+            await self.storage.update_settlement_status(
+                settlement_id, SettlementStatus.PARTIALLY_REFUNDED.value
+            )
+
+        return refund
 
     # -------------------------------------------------------------------
     # Escrow

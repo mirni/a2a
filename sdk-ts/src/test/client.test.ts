@@ -193,8 +193,8 @@ describe("Convenience methods", () => {
   it("getBalance extracts balance from result", async () => {
     route("POST", "/v1/execute", () => [200, { success: true, result: { balance: 99.5 }, charged: 0 }]);
     const client = new A2AClient({ baseUrl, apiKey: "key" });
-    const balance = await client.getBalance("agent-1");
-    assert.equal(balance, 99.5);
+    const result = await client.getBalance("agent-1");
+    assert.equal(result.balance, 99.5);
   });
 
   it("deposit extracts new_balance from result", async () => {

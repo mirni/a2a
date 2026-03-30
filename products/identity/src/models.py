@@ -9,6 +9,8 @@ All timestamps are Unix floats (time.time()).
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -276,6 +278,54 @@ class SubIdentity(BaseModel):
     public_key: str
     created_at: float
     metadata: dict = Field(default_factory=dict)
+
+
+class Organization(BaseModel):
+    """An organization that groups agents under shared billing and management."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "org-acme-001",
+                    "name": "Acme Corp",
+                    "owner_agent_id": "agent-7f3a2b",
+                    "created_at": 1711612800.0,
+                    "metadata": {"industry": "fintech"},
+                }
+            ]
+        },
+    )
+
+    id: str
+    name: str
+    owner_agent_id: str
+    created_at: float
+    metadata: dict = Field(default_factory=dict)
+
+
+class OrgMembership(BaseModel):
+    """Membership record linking an agent to an organization with a role."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "org_id": "org-acme-001",
+                    "agent_id": "agent-7f3a2b",
+                    "role": "owner",
+                    "joined_at": 1711612800.0,
+                }
+            ]
+        },
+    )
+
+    org_id: str
+    agent_id: str
+    role: Literal["owner", "admin", "member"]
+    joined_at: float
 
 
 # Supported metric names for trading bot attestation

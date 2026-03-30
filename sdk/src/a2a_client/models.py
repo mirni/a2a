@@ -1,9 +1,26 @@
-"""Response models for the A2A SDK."""
+"""Response models for the A2A SDK.
+
+Infrastructure models (ExecuteResponse, ToolPricing, HealthResponse) remain as
+dataclasses for backward compatibility.
+
+Tool-specific response models use Pydantic v2 with:
+- extra = "forbid" on all request/response models
+- json_schema_extra examples for documentation
+- Decimal for all currency-related fields
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Any
+
+from pydantic import BaseModel, ConfigDict
+
+
+# ===========================================================================
+# Infrastructure dataclass models (unchanged wire-format)
+# ===========================================================================
 
 
 @dataclass
@@ -67,98 +84,709 @@ class HealthResponse:
         )
 
 
-# ---------------------------------------------------------------------------
-# Typed response models for specific tool results
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# Pydantic base for typed tool responses
+# ===========================================================================
 
 
-@dataclass
-class BalanceResponse:
+class _ToolResponse(BaseModel):
+    """Base class for all typed tool response models."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]):  # noqa: ANN206
+        return cls.model_validate(data)
+
+
+# ===========================================================================
+# Billing tool responses
+# ===========================================================================
+
+
+class BalanceResponse(_ToolResponse):
     """Response from get_balance tool."""
 
-    balance: float
+    balance: Decimal
 
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> BalanceResponse:
-        return cls(balance=data["balance"])
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{"balance": "100.00"}]
+        },
+    )
 
 
-@dataclass
-class DepositResponse:
+class DepositResponse(_ToolResponse):
     """Response from deposit tool."""
 
-    new_balance: float
+    new_balance: Decimal
 
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> DepositResponse:
-        return cls(new_balance=data["new_balance"])
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{"new_balance": "200.00"}]
+        },
+    )
 
 
-@dataclass
-class PaymentIntentResponse:
-    """Response from create_intent tool."""
+# ===========================================================================
+# Payment tool responses
+# ===========================================================================
+
+
+class PaymentIntentResponse(_ToolResponse):
+    """Response from create_intent / capture_intent tools."""
 
     id: str
     status: str
-    amount: float
+    amount: Decimal
 
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> PaymentIntentResponse:
-        return cls(id=data["id"], status=data["status"], amount=data["amount"])
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{"id": "intent_abc123", "status": "pending", "amount": "10.00"}]
+        },
+    )
 
 
-@dataclass
-class EscrowResponse:
+class EscrowResponse(_ToolResponse):
     """Response from create_escrow / release_escrow tools."""
 
     id: str
     status: str
-    amount: float
+    amount: Decimal
 
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> EscrowResponse:
-        return cls(id=data["id"], status=data["status"], amount=data["amount"])
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{"id": "escrow_abc123", "status": "held", "amount": "50.00"}]
+        },
+    )
 
 
-@dataclass
-class TrustScoreResponse:
+class CancelEscrowResponse(_ToolResponse):
+    """Response from cancel_escrow tool."""
+
+    id: str
+    status: str
+    amount: Decimal
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{"id": "escrow_abc123", "status": "cancelled", "amount": "50.00"}]
+        },
+    )
+
+
+class VoidPaymentResponse(_ToolResponse):
+    """Response from refund_intent (void_payment) tool."""
+
+    id: str
+    status: str
+    amount: Decimal
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{"id": "intent_abc123", "status": "refunded", "amount": "10.00"}]
+        },
+    )
+
+
+class RefundSettlementResponse(_ToolResponse):
+    """Response from refund_settlement tool."""
+
+    id: str
+    settlement_id: str
+    amount: Decimal
+    status: str
+    reason: str | None = None
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "refund_abc123",
+                    "settlement_id": "settle_abc123",
+                    "amount": "5.00",
+                    "status": "refunded",
+                    "reason": "service not delivered",
+                }
+            ]
+        },
+    )
+
+
+# ===========================================================================
+# Subscription tool responses
+# ===========================================================================
+
+
+class SubscriptionResponse(_ToolResponse):
+    """Response from create_subscription tool."""
+
+    id: str
+    status: str
+    amount: Decimal
+    interval: str
+    next_charge_at: float
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "sub_abc123",
+                    "status": "active",
+                    "amount": "10.00",
+                    "interval": "daily",
+                    "next_charge_at": 1700000000.0,
+                }
+            ]
+        },
+    )
+
+
+class CancelSubscriptionResponse(_ToolResponse):
+    """Response from cancel_subscription tool."""
+
+    id: str
+    status: str
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{"id": "sub_abc123", "status": "cancelled"}]
+        },
+    )
+
+
+class GetSubscriptionResponse(_ToolResponse):
+    """Response from get_subscription tool."""
+
+    id: str
+    payer: str
+    payee: str
+    amount: Decimal
+    interval: str
+    status: str
+    next_charge_at: float
+    charge_count: int
+    created_at: float
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "sub_abc123",
+                    "payer": "agent-a",
+                    "payee": "agent-b",
+                    "amount": "10.00",
+                    "interval": "daily",
+                    "status": "active",
+                    "next_charge_at": 1700000000.0,
+                    "charge_count": 5,
+                    "created_at": 1699900000.0,
+                }
+            ]
+        },
+    )
+
+
+class ListSubscriptionsResponse(_ToolResponse):
+    """Response from list_subscriptions tool."""
+
+    subscriptions: list[dict[str, Any]]
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{"subscriptions": []}]
+        },
+    )
+
+
+# ===========================================================================
+# Marketplace tool responses
+# ===========================================================================
+
+
+class RegisterServiceResponse(_ToolResponse):
+    """Response from register_service tool."""
+
+    id: str
+    name: str
+    status: str
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{"id": "svc_abc123", "name": "MyService", "status": "active"}]
+        },
+    )
+
+
+class SearchServicesResponse(_ToolResponse):
+    """Response from search_services tool."""
+
+    services: list[dict[str, Any]]
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{"services": [{"id": "svc_abc123", "name": "MyService"}]}]
+        },
+    )
+
+
+class GetServiceResponse(_ToolResponse):
+    """Response from get_service tool."""
+
+    id: str
+    name: str
+    description: str
+    category: str
+    status: str
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "svc_abc123",
+                    "name": "MyService",
+                    "description": "A service",
+                    "category": "ai",
+                    "status": "active",
+                }
+            ]
+        },
+    )
+
+
+class RateServiceResponse(_ToolResponse):
+    """Response from rate_service tool."""
+
+    service_id: str
+    agent_id: str
+    rating: int
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{"service_id": "svc_abc123", "agent_id": "agent-a", "rating": 5}]
+        },
+    )
+
+
+class ServiceMatch(_ToolResponse):
+    """A single service match result."""
+
+    service: dict[str, Any]
+    rank_score: float
+    match_reasons: list[str] = []
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {"service": {"id": "svc1"}, "rank_score": 0.95, "match_reasons": ["keyword_match"]}
+            ]
+        },
+    )
+
+
+# ===========================================================================
+# Trust tool responses
+# ===========================================================================
+
+
+class TrustScoreResponse(_ToolResponse):
     """Response from get_trust_score tool."""
 
     server_id: str
     composite_score: float
     reliability_score: float
     security_score: float
-    documentation_score: float
-    responsiveness_score: float
+    documentation_score: float = 0.0
+    responsiveness_score: float = 0.0
     confidence: float
     window: str
 
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> TrustScoreResponse:
-        return cls(
-            server_id=data["server_id"],
-            composite_score=data["composite_score"],
-            reliability_score=data["reliability_score"],
-            security_score=data["security_score"],
-            documentation_score=data.get("documentation_score", 0.0),
-            responsiveness_score=data.get("responsiveness_score", 0.0),
-            confidence=data["confidence"],
-            window=data["window"],
-        )
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "server_id": "srv_abc123",
+                    "composite_score": 0.92,
+                    "reliability_score": 0.95,
+                    "security_score": 0.88,
+                    "documentation_score": 0.80,
+                    "responsiveness_score": 0.90,
+                    "confidence": 0.95,
+                    "window": "24h",
+                }
+            ]
+        },
+    )
 
 
-@dataclass
-class ServiceMatch:
-    """A single service match result."""
+class SearchServersResponse(_ToolResponse):
+    """Response from search_servers tool."""
 
-    service: dict[str, Any]
-    rank_score: float
-    match_reasons: list[str]
+    servers: list[dict[str, Any]]
 
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> ServiceMatch:
-        return cls(
-            service=data["service"],
-            rank_score=data["rank_score"],
-            match_reasons=data.get("match_reasons", []),
-        )
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{"servers": [{"id": "srv1", "name": "Server1"}]}]
+        },
+    )
+
+
+# ===========================================================================
+# Identity tool responses
+# ===========================================================================
+
+
+class RegisterAgentResponse(_ToolResponse):
+    """Response from register_agent tool."""
+
+    agent_id: str
+    public_key: str
+    created_at: float
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {"agent_id": "agent-a", "public_key": "ed25519_hex...", "created_at": 1700000000.0}
+            ]
+        },
+    )
+
+
+class GetAgentIdentityResponse(_ToolResponse):
+    """Response from get_agent_identity tool."""
+
+    agent_id: str
+    public_key: str | None = None
+    created_at: float | None = None
+    org_id: str | None = None
+    found: bool = True
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "agent_id": "agent-a",
+                    "public_key": "ed25519_hex...",
+                    "created_at": 1700000000.0,
+                    "org_id": None,
+                    "found": True,
+                }
+            ]
+        },
+    )
+
+
+class VerifyAgentResponse(_ToolResponse):
+    """Response from verify_agent tool."""
+
+    valid: bool
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{"valid": True}]
+        },
+    )
+
+
+class SubmitMetricsResponse(_ToolResponse):
+    """Response from submit_metrics tool."""
+
+    agent_id: str
+    commitment_hashes: list[str]
+    verified_at: float
+    valid_until: float
+    data_source: str
+    signature: str
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "agent_id": "agent-a",
+                    "commitment_hashes": ["abc123"],
+                    "verified_at": 1700000000.0,
+                    "valid_until": 1700100000.0,
+                    "data_source": "self_reported",
+                    "signature": "sig_hex...",
+                }
+            ]
+        },
+    )
+
+
+class GetVerifiedClaimsResponse(_ToolResponse):
+    """Response from get_verified_claims tool."""
+
+    claims: list[dict[str, Any]]
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{"claims": []}]
+        },
+    )
+
+
+# ===========================================================================
+# Messaging tool responses
+# ===========================================================================
+
+
+class SendMessageResponse(_ToolResponse):
+    """Response from send_message tool."""
+
+    id: str
+    sender: str
+    recipient: str
+    thread_id: str
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {"id": "msg_abc123", "sender": "agent-a", "recipient": "agent-b", "thread_id": "thread_abc123"}
+            ]
+        },
+    )
+
+
+class GetMessagesResponse(_ToolResponse):
+    """Response from get_messages tool."""
+
+    messages: list[dict[str, Any]]
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{"messages": []}]
+        },
+    )
+
+
+class NegotiatePriceResponse(_ToolResponse):
+    """Response from negotiate_price tool."""
+
+    negotiation_id: str
+    thread_id: str
+    status: str
+    proposed_amount: Decimal
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "negotiation_id": "neg_abc123",
+                    "thread_id": "thread_abc123",
+                    "status": "pending",
+                    "proposed_amount": "50.00",
+                }
+            ]
+        },
+    )
+
+
+# ===========================================================================
+# Webhook tool responses
+# ===========================================================================
+
+
+class RegisterWebhookResponse(_ToolResponse):
+    """Response from register_webhook tool."""
+
+    id: str
+    agent_id: str
+    url: str
+    event_types: list[str]
+    filter_agent_ids: list[str] | None = None
+    created_at: float
+    active: bool
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "wh_abc123",
+                    "agent_id": "agent-a",
+                    "url": "https://hook.example.com",
+                    "event_types": ["billing.deposit"],
+                    "filter_agent_ids": None,
+                    "created_at": 1700000000.0,
+                    "active": True,
+                }
+            ]
+        },
+    )
+
+
+class ListWebhooksResponse(_ToolResponse):
+    """Response from list_webhooks tool."""
+
+    webhooks: list[dict[str, Any]]
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{"webhooks": []}]
+        },
+    )
+
+
+class DeleteWebhookResponse(_ToolResponse):
+    """Response from delete_webhook tool."""
+
+    deleted: bool
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{"deleted": True}]
+        },
+    )
+
+
+# ===========================================================================
+# API key tool responses
+# ===========================================================================
+
+
+class CreateApiKeyResponse(_ToolResponse):
+    """Response from create_api_key tool."""
+
+    key: str
+    agent_id: str
+    tier: str
+    created_at: float
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {"key": "a2a_free_abc123", "agent_id": "agent-a", "tier": "free", "created_at": 1700000000.0}
+            ]
+        },
+    )
+
+
+class RotateKeyResponse(_ToolResponse):
+    """Response from rotate_key tool."""
+
+    new_key: str
+    tier: str
+    agent_id: str
+    revoked: bool
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {"new_key": "a2a_free_new123", "tier": "free", "agent_id": "agent-a", "revoked": True}
+            ]
+        },
+    )
+
+
+# ===========================================================================
+# Event tool responses
+# ===========================================================================
+
+
+class PublishEventResponse(_ToolResponse):
+    """Response from publish_event tool."""
+
+    event_id: int
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{"event_id": 42}]
+        },
+    )
+
+
+class GetEventsResponse(_ToolResponse):
+    """Response from get_events tool."""
+
+    events: list[dict[str, Any]]
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{"events": []}]
+        },
+    )
+
+
+# ===========================================================================
+# Org tool responses
+# ===========================================================================
+
+
+class CreateOrgResponse(_ToolResponse):
+    """Response from create_org tool."""
+
+    org_id: str
+    name: str
+    created_at: float
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{"org_id": "org_abc123", "name": "MyOrg", "created_at": 1700000000.0}]
+        },
+    )
+
+
+class GetOrgResponse(_ToolResponse):
+    """Response from get_org tool."""
+
+    org_id: str
+    name: str
+    created_at: float
+    members: list[Any]
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {"org_id": "org_abc123", "name": "MyOrg", "created_at": 1700000000.0, "members": []}
+            ]
+        },
+    )
+
+
+class AddAgentToOrgResponse(_ToolResponse):
+    """Response from add_agent_to_org tool."""
+
+    agent_id: str
+    org_id: str
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{"agent_id": "agent-a", "org_id": "org_abc123"}]
+        },
+    )

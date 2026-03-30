@@ -19,16 +19,18 @@ from .models import Message
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS messages (
-    id           TEXT PRIMARY KEY,
-    sender       TEXT NOT NULL,
-    recipient    TEXT NOT NULL,
-    message_type TEXT NOT NULL,
-    subject      TEXT NOT NULL DEFAULT '',
-    body         TEXT NOT NULL DEFAULT '',
-    metadata     TEXT NOT NULL DEFAULT '{}',
-    thread_id    TEXT,
-    created_at   REAL NOT NULL,
-    read_at      REAL
+    id                  TEXT PRIMARY KEY,
+    sender              TEXT NOT NULL,
+    recipient           TEXT NOT NULL,
+    message_type        TEXT NOT NULL,
+    subject             TEXT NOT NULL DEFAULT '',
+    body                TEXT NOT NULL DEFAULT '',
+    metadata            TEXT NOT NULL DEFAULT '{}',
+    thread_id           TEXT,
+    created_at          REAL NOT NULL,
+    read_at             REAL,
+    encrypted           INTEGER NOT NULL DEFAULT 0,
+    encryption_metadata TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_sender    ON messages(sender);
@@ -104,10 +106,13 @@ class MessageStorage:
     async def store_message(self, message: Message) -> str:
         """Store a message and return its id."""
         self._require_db()
+        encryption_metadata_json = None
+        if message.encryption_metadata is not None:
+            encryption_metadata_json = message.encryption_metadata.model_dump_json()
         await self._db.execute(
             """
-            INSERT INTO messages (id, sender, recipient, message_type, subject, body, metadata, thread_id, created_at, read_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO messages (id, sender, recipient, message_type, subject, body, metadata, thread_id, created_at, read_at, encrypted, encryption_metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 message.id,
@@ -120,6 +125,8 @@ class MessageStorage:
                 message.thread_id,
                 message.created_at,
                 message.read_at,
+                1 if message.encrypted else 0,
+                encryption_metadata_json,
             ),
         )
         await self._db.commit()
@@ -273,6 +280,12 @@ class MessageStorage:
         d = dict(row)
         if isinstance(d.get("metadata"), str):
             d["metadata"] = json.loads(d["metadata"])
+        # Convert encrypted integer back to bool
+        if "encrypted" in d:
+            d["encrypted"] = bool(d["encrypted"])
+        # Parse encryption_metadata JSON
+        if isinstance(d.get("encryption_metadata"), str):
+            d["encryption_metadata"] = json.loads(d["encryption_metadata"])
         return d
 
     @staticmethod

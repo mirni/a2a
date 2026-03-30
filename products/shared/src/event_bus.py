@@ -12,6 +12,7 @@ Provides pub/sub messaging across A2A commerce products with:
 from __future__ import annotations
 
 import asyncio
+import fnmatch
 import hashlib
 import json
 import logging
@@ -312,10 +313,16 @@ class EventBus:
     # ------------------------------------------------------------------
 
     async def _dispatch(self, event: dict) -> None:
-        """Dispatch an event to all matching in-memory subscribers."""
+        """Dispatch an event to all matching in-memory subscribers.
+
+        Supports exact matches and fnmatch-style wildcard patterns
+        (e.g. ``billing.*`` matches ``billing.deposit``).
+        """
         tasks = []
         for sub_info in self._subscribers.values():
-            if sub_info["event_type"] != event["event_type"]:
+            sub_type = sub_info["event_type"]
+            evt_type = event["event_type"]
+            if sub_type != evt_type and not fnmatch.fnmatch(evt_type, sub_type):
                 continue
             filter_fn = sub_info["filter_fn"]
             if filter_fn is not None and not filter_fn(event):

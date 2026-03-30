@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import time
 import uuid
 
-from .models import Message, MessageType, NegotiationState
+from .crypto import MessageCrypto
+from .models import EncryptionMetadata, Message, MessageType, NegotiationState
 from .storage import MessageStorage
 
 
@@ -28,8 +30,64 @@ class MessagingAPI:
         body: str = "",
         metadata: dict | None = None,
         thread_id: str | None = None,
+        encrypt: bool = False,
+        sender_private_key_hex: str | None = None,
+        recipient_public_key_hex: str | None = None,
     ) -> Message:
-        """Create and store a message. Returns the Message object."""
+        """Create and store a message. Returns the Message object.
+
+        Args:
+            sender: Sender agent ID.
+            recipient: Recipient agent ID.
+            message_type: Type of message.
+            subject: Message subject line.
+            body: Message body (plaintext). If encrypt=True, this will be
+                encrypted before storage.
+            metadata: Optional metadata dict.
+            thread_id: Optional thread ID for conversation threading.
+            encrypt: If True, encrypt the body using X25519 + AES-256-GCM.
+            sender_private_key_hex: Sender's Ed25519 private key hex.
+                Required when encrypt=True.
+            recipient_public_key_hex: Recipient's X25519 public key hex
+                (derived from their Ed25519 private key seed). Required
+                when encrypt=True.
+
+        Returns:
+            The stored Message object. If encrypted, body contains base64
+            ciphertext and encryption_metadata is populated.
+
+        Raises:
+            ValueError: If encrypt=True but keys are not provided.
+        """
+        encrypted = False
+        encryption_metadata = None
+
+        if encrypt:
+            if not sender_private_key_hex or not recipient_public_key_hex:
+                raise ValueError(
+                    "sender_private_key_hex and recipient_public_key_hex are "
+                    "required when encrypt=True"
+                )
+
+            # Derive the recipient's X25519 public key from their Ed25519 private seed.
+            # The caller passes recipient_public_key_hex which may be either:
+            # - An Ed25519 public key (in which case we can't derive X25519 from it)
+            # - An X25519 public key already derived
+            # Our convention: pass the X25519 public key derived from the recipient's
+            # Ed25519 seed. The API layer or caller handles the derivation.
+            ciphertext_b64, nonce_b64, ephemeral_pub_hex = MessageCrypto.encrypt_message(
+                sender_private_key_hex=sender_private_key_hex,
+                recipient_public_key_hex=recipient_public_key_hex,
+                plaintext=body,
+            )
+            body = ciphertext_b64
+            encrypted = True
+            encryption_metadata = EncryptionMetadata(
+                nonce=nonce_b64,
+                algorithm="x25519-aes256gcm",
+                ephemeral_public_key=ephemeral_pub_hex,
+            )
+
         msg = Message(
             sender=sender,
             recipient=recipient,
@@ -38,6 +96,8 @@ class MessagingAPI:
             body=body,
             metadata=metadata or {},
             thread_id=thread_id,
+            encrypted=encrypted,
+            encryption_metadata=encryption_metadata,
         )
         await self._storage.store_message(msg)
         return msg
@@ -47,9 +107,46 @@ class MessagingAPI:
         agent_id: str,
         thread_id: str | None = None,
         limit: int = 50,
+        decrypt_key: str | None = None,
+        sender_public_key_hex: str | None = None,
     ) -> list[dict]:
-        """Get messages for an agent, optionally filtered by thread."""
-        return await self._storage.get_messages(agent_id, thread_id=thread_id, limit=limit)
+        """Get messages for an agent, optionally filtered by thread.
+
+        Args:
+            agent_id: The agent whose messages to retrieve.
+            thread_id: Optional thread filter.
+            limit: Maximum number of messages to return.
+            decrypt_key: Recipient's Ed25519 private key hex. If provided,
+                encrypted messages will be decrypted in-place before return.
+            sender_public_key_hex: Sender's Ed25519 public key hex, used to
+                derive their X25519 public key for decryption context. Not
+                needed when ephemeral key is stored in encryption_metadata.
+
+        Returns:
+            List of message dicts. Encrypted messages are decrypted if
+            decrypt_key is provided.
+        """
+        messages = await self._storage.get_messages(agent_id, thread_id=thread_id, limit=limit)
+
+        if decrypt_key:
+            for msg in messages:
+                if msg.get("encrypted") and msg.get("encryption_metadata"):
+                    enc_meta = msg["encryption_metadata"]
+                    if isinstance(enc_meta, str):
+                        enc_meta = json.loads(enc_meta)
+                    try:
+                        plaintext = MessageCrypto.decrypt_message(
+                            recipient_private_key_hex=decrypt_key,
+                            sender_public_key_hex=enc_meta["ephemeral_public_key"],
+                            ciphertext=msg["body"],
+                            nonce=enc_meta["nonce"],
+                        )
+                        msg["body"] = plaintext
+                    except Exception:
+                        # Decryption failed — leave ciphertext in place
+                        pass
+
+        return messages
 
     async def get_thread(self, thread_id: str) -> list[dict]:
         """Get all messages in a thread, ordered oldest first."""

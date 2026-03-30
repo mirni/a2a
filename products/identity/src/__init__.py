@@ -5,14 +5,28 @@ and reputation scoring for agents.
 """
 
 from .api import IdentityAPI
-from .models import AgentIdentity, MetricSubmissionResult, VerifiedClaim
+from .models import AgentIdentity, MetricSubmissionResult, OrgMembership, Organization, VerifiedClaim
+from .org_api import (
+    AlreadyMemberError,
+    MemberNotFoundError,
+    NotAuthorizedError,
+    OrgAPI,
+    OrgNotFoundError,
+)
 from .storage import IdentityStorage
 
 __all__ = [
     "AgentIdentity",
+    "AlreadyMemberError",
     "IdentityAPI",
     "IdentityStorage",
+    "MemberNotFoundError",
     "MetricSubmissionResult",
+    "NotAuthorizedError",
+    "OrgAPI",
+    "OrgMembership",
+    "OrgNotFoundError",
+    "Organization",
     "VerifiedClaim",
 ]
 

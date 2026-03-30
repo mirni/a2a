@@ -22,6 +22,7 @@ import httpx
 import gateway.src.bootstrap  # noqa: F401
 from gateway.src.app import create_app
 from gateway.src.lifespan import lifespan
+from gateway.src.routes.sse import SSEConfig
 
 
 @pytest.fixture
@@ -46,6 +47,15 @@ async def app(tmp_data_dir, monkeypatch):
     monkeypatch.setenv("MESSAGING_DSN", f"sqlite:///{tmp_data_dir}/messaging.db")
 
     application = create_app()
+
+    # Use fast SSE config in tests so streaming endpoints terminate quickly.
+    # Without this, the default 3600s max_connection_seconds would cause
+    # httpx ASGI transport to hang waiting for the generator to finish.
+    application.state.sse_config = SSEConfig(
+        poll_interval_seconds=0.05,
+        heartbeat_interval_seconds=60.0,
+        max_connection_seconds=0.3,
+    )
 
     # Manually run the lifespan
     ctx_manager = lifespan(application)
@@ -84,4 +94,19 @@ async def pro_api_key(app, client):
     ctx = app.state.ctx
     await ctx.tracker.wallet.create("pro-agent", initial_balance=5000.0, signup_bonus=False)
     key_info = await ctx.key_manager.create_key("pro-agent", tier="pro")
+    return key_info["key"]
+
+
+@pytest.fixture
+async def admin_api_key(app, client):
+    """Create an admin-scoped pro-tier API key with a funded wallet.
+
+    Admin scope is needed for admin-service tools like backup_database,
+    restore_database, check_db_integrity, and list_backups.
+    """
+    ctx = app.state.ctx
+    await ctx.tracker.wallet.create("admin-agent", initial_balance=5000.0, signup_bonus=False)
+    key_info = await ctx.key_manager.create_key(
+        "admin-agent", tier="pro", scopes=["read", "write", "admin"]
+    )
     return key_info["key"]

@@ -8,12 +8,8 @@ pytestmark = pytest.mark.asyncio
 
 
 async def _setup_agents(app):
-    """Helper: create wallets for payer and payee."""
+    """Helper: create wallets for payee (payer is test-agent from fixture)."""
     ctx = app.state.ctx
-    try:
-        await ctx.tracker.wallet.create("ri-payer", initial_balance=1000.0, signup_bonus=False)
-    except Exception:
-        pass
     try:
         await ctx.tracker.wallet.create("ri-payee", initial_balance=500.0, signup_bonus=False)
     except Exception:
@@ -21,13 +17,16 @@ async def _setup_agents(app):
 
 
 async def _create_intent(client, api_key):
-    """Helper: create a payment intent and return its ID."""
+    """Helper: create a payment intent and return its ID.
+
+    Uses test-agent as payer (matches api_key fixture).
+    """
     resp = await client.post(
         "/v1/execute",
         json={
             "tool": "create_intent",
             "params": {
-                "payer": "ri-payer",
+                "payer": "test-agent",
                 "payee": "ri-payee",
                 "amount": 100.0,
                 "description": "test intent for refund",
@@ -73,7 +72,7 @@ async def test_refund_settled_intent_creates_reverse_transfer(client, api_key, a
 
     # Record balances before refund
     payee_before = await ctx.tracker.get_balance("ri-payee")
-    payer_before = await ctx.tracker.get_balance("ri-payer")
+    payer_before = await ctx.tracker.get_balance("test-agent")
 
     # Refund the settled intent
     resp = await client.post(
@@ -89,7 +88,7 @@ async def test_refund_settled_intent_creates_reverse_transfer(client, api_key, a
 
     # Payee should have been debited and payer credited
     payee_after = await ctx.tracker.get_balance("ri-payee")
-    payer_after = await ctx.tracker.get_balance("ri-payer")
+    payer_after = await ctx.tracker.get_balance("test-agent")
     assert payer_after == payer_before + 100.0
     assert payee_after == payee_before - 100.0
 

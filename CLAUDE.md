@@ -38,3 +38,7 @@ Infrastructure code is exempt from this rule.
 
 # Append all prompts and outputs into MASTER_LOG.md
 * Both human prompt and claude terminal output should be appended.
+
+
+# Use per-project memory, in workdir/.claude/memory.
+Do not share memory between different projects.

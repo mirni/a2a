@@ -28,7 +28,10 @@ async def handle_product_exception(request: Request, exc: Exception) -> JSONResp
     mapping: dict[str, tuple[int, str]] = {
         # Paywall / Auth
         "InvalidKeyError": (401, "invalid_key"),
+        "ExpiredKeyError": (401, "expired_key"),
         "PaywallAuthError": (401, "authentication_error"),
+        # Scoping
+        "KeyScopeError": (403, "scope_violation"),
         # Tier
         "TierInsufficientError": (403, "insufficient_tier"),
         # Rate limits

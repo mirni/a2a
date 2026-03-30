@@ -92,6 +92,7 @@ from gateway.src.tools.payments import (
     _process_due_subscriptions,
     _reactivate_subscription,
     _refund_intent,
+    _refund_settlement,
     _release_escrow,
     _resolve_dispute,
     _respond_to_dispute,
@@ -122,6 +123,7 @@ TOOL_REGISTRY: dict[str, ToolFunc] = {
     "release_escrow": _release_escrow,
     "cancel_escrow": _cancel_escrow,
     "refund_intent": _refund_intent,
+    "refund_settlement": _refund_settlement,
     "get_payment_history": _get_payment_history,
     "partial_capture": _partial_capture,
     # Subscriptions

@@ -7,6 +7,7 @@ Monetary values (cost) are stored as INTEGER in atomic units (1 credit = 10^8 at
 
 from __future__ import annotations
 
+import json
 import time
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -25,13 +26,17 @@ except ImportError:
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS api_keys (
-    key_hash   TEXT PRIMARY KEY,
-    agent_id   TEXT NOT NULL,
-    tier       TEXT NOT NULL,
-    connector  TEXT NOT NULL DEFAULT '',
-    org_id     TEXT NOT NULL DEFAULT 'default',
-    created_at REAL NOT NULL,
-    revoked    INTEGER NOT NULL DEFAULT 0
+    key_hash          TEXT PRIMARY KEY,
+    agent_id          TEXT NOT NULL,
+    tier              TEXT NOT NULL,
+    connector         TEXT NOT NULL DEFAULT '',
+    org_id            TEXT NOT NULL DEFAULT 'default',
+    created_at        REAL NOT NULL,
+    revoked           INTEGER NOT NULL DEFAULT 0,
+    allowed_tools     TEXT,
+    allowed_agent_ids TEXT,
+    scopes            TEXT NOT NULL DEFAULT '["read","write"]',
+    expires_at        REAL
 );
 
 CREATE INDEX IF NOT EXISTS idx_apikeys_agent ON api_keys(agent_id);
@@ -116,12 +121,22 @@ class PaywallStorage:
         tier: str,
         connector: str = "",
         org_id: str = "default",
+        allowed_tools: list[str] | None = None,
+        allowed_agent_ids: list[str] | None = None,
+        scopes: list[str] | None = None,
+        expires_at: float | None = None,
     ) -> dict[str, Any]:
-        """Store a hashed API key."""
+        """Store a hashed API key with optional scoping fields."""
         now = time.time()
+        scopes_list = scopes if scopes is not None else ["read", "write"]
+        allowed_tools_json = json.dumps(allowed_tools) if allowed_tools is not None else None
+        allowed_agent_ids_json = json.dumps(allowed_agent_ids) if allowed_agent_ids is not None else None
+        scopes_json = json.dumps(scopes_list)
         await self.db.execute(
-            "INSERT INTO api_keys (key_hash, agent_id, tier, connector, org_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (key_hash, agent_id, tier, connector, org_id, now),
+            "INSERT INTO api_keys "
+            "(key_hash, agent_id, tier, connector, org_id, created_at, allowed_tools, allowed_agent_ids, scopes, expires_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (key_hash, agent_id, tier, connector, org_id, now, allowed_tools_json, allowed_agent_ids_json, scopes_json, expires_at),
         )
         await self.db.commit()
         return {
@@ -132,16 +147,34 @@ class PaywallStorage:
             "org_id": org_id,
             "created_at": now,
             "revoked": 0,
+            "allowed_tools": allowed_tools,
+            "allowed_agent_ids": allowed_agent_ids,
+            "scopes": scopes_list,
+            "expires_at": expires_at,
         }
+
+    @staticmethod
+    def _deserialize_key_row(row: dict[str, Any]) -> dict[str, Any]:
+        """Deserialize JSON columns from an api_keys row."""
+        d = dict(row)
+        for col in ("allowed_tools", "allowed_agent_ids", "scopes"):
+            val = d.get(col)
+            if isinstance(val, str):
+                d[col] = json.loads(val)
+            elif val is None and col == "scopes":
+                d[col] = ["read", "write"]
+        return d
 
     async def lookup_key(self, key_hash: str) -> dict[str, Any] | None:
         """Look up an API key by its hash. Returns None if not found."""
         cursor = await self.db.execute(
-            "SELECT key_hash, agent_id, tier, connector, org_id, created_at, revoked FROM api_keys WHERE key_hash = ?",
+            "SELECT key_hash, agent_id, tier, connector, org_id, created_at, revoked, "
+            "allowed_tools, allowed_agent_ids, scopes, expires_at "
+            "FROM api_keys WHERE key_hash = ?",
             (key_hash,),
         )
         row = await cursor.fetchone()
-        return dict(row) if row else None
+        return self._deserialize_key_row(row) if row else None
 
     async def revoke_key(self, key_hash: str) -> bool:
         """Revoke an API key. Returns True if found and revoked."""
@@ -155,12 +188,13 @@ class PaywallStorage:
     async def get_keys_for_agent(self, agent_id: str) -> list[dict[str, Any]]:
         """Get all API keys for an agent."""
         cursor = await self.db.execute(
-            "SELECT key_hash, agent_id, tier, connector, org_id, created_at, revoked "
+            "SELECT key_hash, agent_id, tier, connector, org_id, created_at, revoked, "
+            "allowed_tools, allowed_agent_ids, scopes, expires_at "
             "FROM api_keys WHERE agent_id = ? ORDER BY created_at DESC",
             (agent_id,),
         )
         rows = await cursor.fetchall()
-        return [dict(r) for r in rows]
+        return [self._deserialize_key_row(r) for r in rows]
 
     # -----------------------------------------------------------------------
     # Rate window operations (hourly sliding window)

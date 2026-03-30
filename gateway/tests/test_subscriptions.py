@@ -128,8 +128,8 @@ async def test_reactivate_subscription_via_gateway(client, pro_api_key, app):
     assert resp.json()["result"]["status"] == "active"
 
 
-async def test_create_subscription_requires_pro(client, api_key):
-    """Free tier cannot create subscriptions."""
+async def test_create_subscription_requires_starter(client, api_key):
+    """Free tier cannot create subscriptions (starter tier required)."""
     resp = await client.post(
         "/v1/execute",
         json={
@@ -144,3 +144,108 @@ async def test_create_subscription_requires_pro(client, api_key):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 403
+
+
+async def test_create_subscription_starter_tier_allowed(client, app):
+    """Starter tier can create subscriptions."""
+    ctx = app.state.ctx
+    await ctx.tracker.wallet.create("starter-agent", initial_balance=5000.0, signup_bonus=False)
+    await ctx.tracker.wallet.create("provider-starter", initial_balance=0.0, signup_bonus=False)
+    key_info = await ctx.key_manager.create_key("starter-agent", tier="starter")
+    starter_key = key_info["key"]
+
+    resp = await client.post(
+        "/v1/execute",
+        json={
+            "tool": "create_subscription",
+            "params": {
+                "payer": "starter-agent",
+                "payee": "provider-starter",
+                "amount": 10.0,
+                "interval": "daily",
+                "description": "Starter subscription",
+            },
+        },
+        headers={"Authorization": f"Bearer {starter_key}"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is True
+    assert data["result"]["status"] == "active"
+
+
+async def test_create_subscription_invalid_interval(client, pro_api_key, app):
+    """Creating a subscription with an invalid interval returns 400."""
+    ctx = app.state.ctx
+    await ctx.tracker.wallet.create("provider-invalid", initial_balance=0.0, signup_bonus=False)
+
+    resp = await client.post(
+        "/v1/execute",
+        json={
+            "tool": "create_subscription",
+            "params": {
+                "payer": "pro-agent",
+                "payee": "provider-invalid",
+                "amount": 10.0,
+                "interval": "biweekly",
+                "description": "Bad interval subscription",
+            },
+        },
+        headers={"Authorization": f"Bearer {pro_api_key}"},
+    )
+    assert resp.status_code == 400
+    data = resp.json()
+    assert data["success"] is False
+    assert "error" in data
+
+
+async def test_cancel_nonexistent_subscription(client, pro_api_key):
+    """Cancelling a non-existent subscription returns 404."""
+    resp = await client.post(
+        "/v1/execute",
+        json={
+            "tool": "cancel_subscription",
+            "params": {"subscription_id": "nonexistent-sub-id"},
+        },
+        headers={"Authorization": f"Bearer {pro_api_key}"},
+    )
+    assert resp.status_code == 404
+    data = resp.json()
+    assert data["success"] is False
+
+
+async def test_get_nonexistent_subscription(client, pro_api_key):
+    """Getting a non-existent subscription returns 404."""
+    resp = await client.post(
+        "/v1/execute",
+        json={
+            "tool": "get_subscription",
+            "params": {"subscription_id": "does-not-exist"},
+        },
+        headers={"Authorization": f"Bearer {pro_api_key}"},
+    )
+    assert resp.status_code == 404
+    data = resp.json()
+    assert data["success"] is False
+
+
+async def test_reactivate_non_suspended_subscription(client, pro_api_key, app):
+    """Reactivating an already-active subscription returns 409 (invalid state)."""
+    ctx = app.state.ctx
+    await ctx.tracker.wallet.create("provider-reactivate", initial_balance=0.0, signup_bonus=False)
+
+    sub = await ctx.payment_engine.create_subscription(
+        payer="pro-agent", payee="provider-reactivate", amount=5.0, interval="daily"
+    )
+
+    resp = await client.post(
+        "/v1/execute",
+        json={
+            "tool": "reactivate_subscription",
+            "params": {"subscription_id": sub.id},
+        },
+        headers={"Authorization": f"Bearer {pro_api_key}"},
+    )
+    assert resp.status_code == 409
+    data = resp.json()
+    assert data["success"] is False

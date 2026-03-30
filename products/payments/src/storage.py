@@ -99,12 +99,24 @@ CREATE TABLE IF NOT EXISTS settlements (
     source_type TEXT NOT NULL,
     source_id   TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
+    status      TEXT NOT NULL DEFAULT 'settled',
     created_at  REAL NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_settlement_payer ON settlements(payer);
 CREATE INDEX IF NOT EXISTS idx_settlement_payee ON settlements(payee);
 CREATE INDEX IF NOT EXISTS idx_settlement_source ON settlements(source_type, source_id);
+
+CREATE TABLE IF NOT EXISTS refunds (
+    id              TEXT PRIMARY KEY,
+    settlement_id   TEXT NOT NULL REFERENCES settlements(id),
+    amount          INTEGER NOT NULL DEFAULT 0,
+    reason          TEXT NOT NULL DEFAULT '',
+    status          TEXT NOT NULL DEFAULT 'completed',
+    created_at      REAL NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_refund_settlement ON refunds(settlement_id);
 """
 
 
@@ -476,8 +488,8 @@ class PaymentStorage:
             amount = credits_to_atomic(Decimal(str(amount)))
         await self.db.execute(
             "INSERT INTO settlements "
-            "(id, payer, payee, amount, source_type, source_id, description, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "(id, payer, payee, amount, source_type, source_id, description, status, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 data["id"],
                 data["payer"],
@@ -486,6 +498,7 @@ class PaymentStorage:
                 data["source_type"],
                 data["source_id"],
                 data.get("description", ""),
+                data.get("status", "settled"),
                 data["created_at"],
             ),
         )
@@ -518,6 +531,56 @@ class PaymentStorage:
         cursor = await self.db.execute(query, params)
         rows = await cursor.fetchall()
         return [self._convert_amount(dict(r)) for r in rows]
+
+    async def update_settlement_status(self, settlement_id: str, status: str) -> None:
+        """Update the status of a settlement (e.g. to 'refunded' or 'partially_refunded')."""
+        await self.db.execute(
+            "UPDATE settlements SET status = ? WHERE id = ?",
+            (status, settlement_id),
+        )
+        await self.db.commit()
+
+    # -----------------------------------------------------------------------
+    # Refunds
+    # -----------------------------------------------------------------------
+
+    async def insert_refund(self, data: dict[str, Any]) -> None:
+        amount = data["amount"]
+        if isinstance(amount, (int, float)) and not isinstance(amount, Decimal):
+            amount = credits_to_atomic(Decimal(str(amount)))
+        await self.db.execute(
+            "INSERT INTO refunds "
+            "(id, settlement_id, amount, reason, status, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                data["id"],
+                data["settlement_id"],
+                amount,
+                data.get("reason", ""),
+                data.get("status", "completed"),
+                data["created_at"],
+            ),
+        )
+        await self.db.commit()
+
+    async def get_refunds_for_settlement(self, settlement_id: str) -> list[dict[str, Any]]:
+        """Return all refunds for a given settlement."""
+        cursor = await self.db.execute(
+            "SELECT * FROM refunds WHERE settlement_id = ? ORDER BY created_at ASC",
+            (settlement_id,),
+        )
+        rows = await cursor.fetchall()
+        return [self._convert_amount(dict(r)) for r in rows]
+
+    async def get_total_refunded(self, settlement_id: str) -> Decimal:
+        """Return the sum of all refunded amounts for a settlement as Decimal."""
+        cursor = await self.db.execute(
+            "SELECT COALESCE(SUM(amount), 0) as total FROM refunds WHERE settlement_id = ?",
+            (settlement_id,),
+        )
+        row = await cursor.fetchone()
+        total_atomic = row["total"] if row else 0
+        return Decimal(str(atomic_to_float(total_atomic)))
 
     # -----------------------------------------------------------------------
     # Payment History (unified view)

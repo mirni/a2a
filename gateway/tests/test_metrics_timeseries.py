@@ -121,11 +121,12 @@ class TestMetricsTimeseries:
 
     async def test_empty_agent_returns_empty_buckets(self, client, api_key):
         """An agent with no usage records should get empty buckets."""
+        # Use test-agent (matches api_key) with future since to get empty results
         resp = await client.post(
             "/v1/execute",
             json={
                 "tool": "get_metrics_timeseries",
-                "params": {"agent_id": "nonexistent-agent", "interval": "hour"},
+                "params": {"agent_id": "test-agent", "interval": "hour", "since": time.time() + 86400 * 365},
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )

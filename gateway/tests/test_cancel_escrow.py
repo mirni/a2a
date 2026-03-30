@@ -7,14 +7,10 @@ import pytest
 pytestmark = pytest.mark.asyncio
 
 
-async def _create_escrow(client, api_key, app):
+async def _create_escrow(client, api_key, app, payer="pro-agent"):
     """Helper: create an escrow and return its ID."""
-    # Fund both agents
+    # Fund payee agent
     ctx = app.state.ctx
-    try:
-        await ctx.tracker.wallet.create("payer-agent", initial_balance=1000.0, signup_bonus=False)
-    except Exception:
-        pass
     try:
         await ctx.tracker.wallet.create("payee-agent", initial_balance=0.0, signup_bonus=False)
     except Exception:
@@ -25,7 +21,7 @@ async def _create_escrow(client, api_key, app):
         json={
             "tool": "create_escrow",
             "params": {
-                "payer": "payer-agent",
+                "payer": payer,
                 "payee": "payee-agent",
                 "amount": 50.0,
                 "description": "test escrow",
@@ -39,11 +35,11 @@ async def _create_escrow(client, api_key, app):
 
 async def test_cancel_escrow_refunds_payer(client, pro_api_key, app):
     """cancel_escrow should refund the payer and return status 'refunded'."""
-    escrow_id = await _create_escrow(client, pro_api_key, app)
+    escrow_id = await _create_escrow(client, pro_api_key, app, payer="pro-agent")
 
     # Check payer balance before cancel
     ctx = app.state.ctx
-    balance_before = await ctx.tracker.get_balance("payer-agent")
+    balance_before = await ctx.tracker.get_balance("pro-agent")
 
     resp = await client.post(
         "/v1/execute",
@@ -57,7 +53,7 @@ async def test_cancel_escrow_refunds_payer(client, pro_api_key, app):
     assert body["result"]["status"] == "refunded"
 
     # Payer should have been refunded
-    balance_after = await ctx.tracker.get_balance("payer-agent")
+    balance_after = await ctx.tracker.get_balance("pro-agent")
     assert balance_after > balance_before
 
 

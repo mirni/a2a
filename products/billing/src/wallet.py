@@ -68,30 +68,44 @@ class Wallet:
         await self.storage.emit_event("wallet.created", agent_id, {"balance": total_initial})
         return wallet
 
-    async def get_balance(self, agent_id: str) -> float:
-        """Return current balance for an agent. Raises WalletNotFoundError if missing."""
+    async def get_balance(self, agent_id: str, currency: str = "CREDITS") -> float:
+        """Return current balance for an agent in a specific currency.
+
+        Raises WalletNotFoundError if the agent has no wallet at all (for CREDITS).
+        For non-CREDITS currencies, returns 0.0 if no balance exists.
+        """
+        if currency == "CREDITS":
+            wallet = await self.storage.get_wallet(agent_id)
+            if wallet is None:
+                raise WalletNotFoundError(agent_id)
+            return wallet["balance"]
+        # For non-CREDITS currencies, first verify the agent has a wallet
         wallet = await self.storage.get_wallet(agent_id)
         if wallet is None:
             raise WalletNotFoundError(agent_id)
-        return wallet["balance"]
+        return await self.storage.get_currency_balance(agent_id, currency)
 
-    async def deposit(self, agent_id: str, amount: float, description: str = "") -> float:
-        """Add credits to an agent's wallet. Returns new balance."""
+    async def deposit(
+        self, agent_id: str, amount: float, description: str = "", currency: str = "CREDITS"
+    ) -> float:
+        """Add funds to an agent's wallet in a specific currency. Returns new balance."""
         if amount <= 0:
             raise ValueError("Deposit amount must be positive")
-        success, new_balance = await self.storage.atomic_credit(agent_id, amount)
+        success, new_balance = await self.storage.atomic_currency_credit(agent_id, amount, currency)
         if not success:
             raise WalletNotFoundError(agent_id)
         await self.storage.record_transaction(agent_id, amount, "deposit", description)
         await self.storage.emit_event(
             "wallet.deposit",
             agent_id,
-            {"amount": amount, "new_balance": new_balance},
+            {"amount": amount, "new_balance": new_balance, "currency": currency},
         )
         return new_balance
 
-    async def withdraw(self, agent_id: str, amount: float, description: str = "") -> float:
-        """Remove credits from an agent's wallet. Returns new balance.
+    async def withdraw(
+        self, agent_id: str, amount: float, description: str = "", currency: str = "CREDITS"
+    ) -> float:
+        """Remove funds from an agent's wallet in a specific currency. Returns new balance.
 
         Raises InsufficientCreditsError if balance is too low.
         Uses atomic UPDATE WHERE balance >= ? to prevent race conditions.
@@ -101,19 +115,18 @@ class Wallet:
         wallet = await self.storage.get_wallet(agent_id)
         if wallet is None:
             raise WalletNotFoundError(agent_id)
-        success, new_balance = await self.storage.atomic_debit_strict(agent_id, amount)
+        success, new_balance = await self.storage.atomic_currency_debit_strict(agent_id, amount, currency)
         if not success:
-            # Re-fetch current balance for the error message
-            current = await self.storage.get_wallet(agent_id)
-            available = current["balance"] if current else 0.0
+            available = await self.storage.get_currency_balance(agent_id, currency)
             raise InsufficientCreditsError(agent_id, amount, available)
         await self.storage.record_transaction(agent_id, -amount, "withdrawal", description)
         await self.storage.emit_event(
             "wallet.withdrawal",
             agent_id,
-            {"amount": amount, "new_balance": new_balance},
+            {"amount": amount, "new_balance": new_balance, "currency": currency},
         )
-        new_balance = await self._maybe_auto_reload(agent_id, new_balance)
+        if currency == "CREDITS":
+            new_balance = await self._maybe_auto_reload(agent_id, new_balance)
         return new_balance
 
     async def charge(self, agent_id: str, amount: float, description: str = "") -> float:
@@ -142,6 +155,56 @@ class Wallet:
         if wallet is None:
             raise WalletNotFoundError(agent_id)
         return await self.storage.get_transactions(agent_id, limit, offset)
+
+    # -----------------------------------------------------------------------
+    # Multi-currency conversion
+    # -----------------------------------------------------------------------
+
+    async def convert_currency(
+        self,
+        agent_id: str,
+        amount: float,
+        from_currency: str,
+        to_currency: str,
+        exchange_service: Any,
+    ) -> dict[str, Any]:
+        """Convert funds between currency balances for an agent.
+
+        Withdraws ``amount`` from ``from_currency`` balance and deposits the
+        converted amount into ``to_currency`` balance using the exchange service.
+
+        Args:
+            agent_id: The agent whose balances to modify.
+            amount: Amount to convert in the source currency.
+            from_currency: Source currency code (e.g. "USD").
+            to_currency: Target currency code (e.g. "CREDITS").
+            exchange_service: An ExchangeRateService instance.
+
+        Returns:
+            Dict with from_amount, to_amount, from_currency, to_currency.
+        """
+        from decimal import Decimal as _Decimal
+
+        from .models import Currency
+
+        # Withdraw from source currency (raises InsufficientCreditsError if not enough)
+        await self.withdraw(agent_id, amount, f"convert:{from_currency}->{to_currency}", currency=from_currency)
+
+        # Convert using exchange service
+        from_cur = Currency(from_currency)
+        to_cur = Currency(to_currency)
+        converted = await exchange_service.convert(_Decimal(str(amount)), from_cur, to_cur)
+        to_amount = float(converted.amount)
+
+        # Deposit to target currency
+        await self.deposit(agent_id, to_amount, f"convert:{from_currency}->{to_currency}", currency=to_currency)
+
+        return {
+            "from_amount": amount,
+            "to_amount": to_amount,
+            "from_currency": from_currency,
+            "to_currency": to_currency,
+        }
 
     # -----------------------------------------------------------------------
     # Auto-reload

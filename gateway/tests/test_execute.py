@@ -118,7 +118,7 @@ async def test_execute_insufficient_tier(client, api_key):
         "/v1/execute",
         json={
             "tool": "create_escrow",
-            "params": {"payer": "a", "payee": "b", "amount": 10},
+            "params": {"payer": "test-agent", "payee": "b", "amount": 10},
         },
         headers={"Authorization": f"Bearer {api_key}"},
     )

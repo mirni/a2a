@@ -39,6 +39,16 @@ class SubscriptionStatus(StrEnum):
     SUSPENDED = "suspended"
 
 
+class SettlementStatus(StrEnum):
+    SETTLED = "settled"
+    REFUNDED = "refunded"
+    PARTIALLY_REFUNDED = "partially_refunded"
+
+
+class RefundStatus(StrEnum):
+    COMPLETED = "completed"
+
+
 class SubscriptionInterval(StrEnum):
     HOURLY = "hourly"
     DAILY = "daily"
@@ -141,6 +151,7 @@ class Settlement(BaseModel):
                     "source_type": "intent",
                     "source_id": "abc123def456",
                     "description": "Code review service settlement",
+                    "status": "settled",
                 }
             ]
         },
@@ -153,6 +164,7 @@ class Settlement(BaseModel):
     source_type: str  # "intent" or "escrow" or "subscription"
     source_id: str
     description: str = ""
+    status: SettlementStatus = SettlementStatus.SETTLED
     created_at: float = Field(default_factory=time.time)
 
     @field_serializer("amount")
@@ -212,3 +224,33 @@ class Subscription(BaseModel):
             SubscriptionInterval.MONTHLY: 2592000,  # 30 days
         }
         return now + intervals[self.interval]
+
+
+class Refund(BaseModel):
+    """A refund against a settlement (full or partial)."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "settlement_id": "settle-abc123",
+                    "amount": "25.00",
+                    "reason": "Service not delivered",
+                    "status": "completed",
+                }
+            ]
+        },
+    )
+
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex)
+    settlement_id: str
+    amount: Decimal
+    reason: str = ""
+    status: RefundStatus = RefundStatus.COMPLETED
+    created_at: float = Field(default_factory=time.time)
+
+    @field_serializer("amount")
+    @classmethod
+    def _serialize_amount(cls, v: Decimal) -> float:
+        return float(v)

@@ -16,15 +16,15 @@ pytestmark = pytest.mark.asyncio
 async def test_build_claim_chain_via_gateway(client, pro_api_key, app):
     """Build a Merkle tree of attestations via gateway."""
     ctx = app.state.ctx
-    await ctx.identity_api.register_agent("chain-bot")
-    await ctx.identity_api.submit_metrics("chain-bot", {"sharpe_30d": 2.5})
-    await ctx.identity_api.submit_metrics("chain-bot", {"sharpe_30d": 3.0})
+    await ctx.identity_api.register_agent("pro-agent")
+    await ctx.identity_api.submit_metrics("pro-agent", {"sharpe_30d": 2.5})
+    await ctx.identity_api.submit_metrics("pro-agent", {"sharpe_30d": 3.0})
 
     resp = await client.post(
         "/v1/execute",
         json={
             "tool": "build_claim_chain",
-            "params": {"agent_id": "chain-bot"},
+            "params": {"agent_id": "pro-agent"},
         },
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
@@ -37,15 +37,15 @@ async def test_build_claim_chain_via_gateway(client, pro_api_key, app):
 async def test_get_claim_chains_via_gateway(client, pro_api_key, app):
     """Get stored claim chains for an agent."""
     ctx = app.state.ctx
-    await ctx.identity_api.register_agent("chain-bot-2")
-    await ctx.identity_api.submit_metrics("chain-bot-2", {"sharpe_30d": 1.5})
-    await ctx.identity_api.build_claim_chain("chain-bot-2")
+    await ctx.identity_api.register_agent("pro-agent")
+    await ctx.identity_api.submit_metrics("pro-agent", {"sharpe_30d": 1.5})
+    await ctx.identity_api.build_claim_chain("pro-agent")
 
     resp = await client.post(
         "/v1/execute",
         json={
             "tool": "get_claim_chains",
-            "params": {"agent_id": "chain-bot-2"},
+            "params": {"agent_id": "pro-agent"},
         },
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )

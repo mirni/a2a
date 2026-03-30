@@ -5,7 +5,7 @@ from __future__ import annotations
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response
-from starlette.routing import Route
+from starlette.routing import Route, WebSocketRoute
 
 from gateway.src.lifespan import lifespan
 from gateway.src.middleware import CorrelationIDMiddleware, metrics_handler
@@ -16,6 +16,7 @@ from gateway.src.routes.health import routes as health_routes
 from gateway.src.routes.onboarding import routes as onboarding_routes
 from gateway.src.routes.pricing import routes as pricing_routes
 from gateway.src.routes.sse import routes as sse_routes
+from gateway.src.routes.websocket import routes as ws_routes
 from gateway.src.signing import signing_key_handler
 from gateway.src.stripe_checkout import routes as checkout_routes
 from gateway.src.swagger import swagger_ui_handler
@@ -52,7 +53,7 @@ _redirect_routes = [
 
 def create_app() -> Starlette:
     """Build and return the Starlette application."""
-    all_routes: list[Route] = []
+    all_routes: list[Route | WebSocketRoute] = []
 
     # Versioned routes
     all_routes.extend(health_routes)
@@ -68,6 +69,9 @@ def create_app() -> Starlette:
 
     # SSE streaming
     all_routes.extend(sse_routes)
+
+    # WebSocket streaming
+    all_routes.extend(ws_routes)
 
     # Agentic Onboarding
     all_routes.extend(onboarding_routes)

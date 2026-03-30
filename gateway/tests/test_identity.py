@@ -20,7 +20,7 @@ class TestRegisterAgent:
             "/v1/execute",
             json={
                 "tool": "register_agent",
-                "params": {"agent_id": "bot-gw-1"},
+                "params": {"agent_id": "test-agent"},
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
@@ -28,7 +28,7 @@ class TestRegisterAgent:
         data = resp.json()
         assert data["success"] is True
         result = data["result"]
-        assert result["agent_id"] == "bot-gw-1"
+        assert result["agent_id"] == "test-agent"
         assert len(result["public_key"]) == 64  # 32 bytes hex
         assert result["created_at"] > 0
 
@@ -46,7 +46,7 @@ class TestVerifyAgent:
             "/v1/execute",
             json={
                 "tool": "register_agent",
-                "params": {"agent_id": "signer-gw", "public_key": pub},
+                "params": {"agent_id": "test-agent", "public_key": pub},
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
@@ -62,7 +62,7 @@ class TestVerifyAgent:
             json={
                 "tool": "verify_agent",
                 "params": {
-                    "agent_id": "signer-gw",
+                    "agent_id": "test-agent",
                     "message": message,
                     "signature": sig,
                 },
@@ -191,14 +191,14 @@ class TestGetVerifiedClaims:
             headers={"Authorization": f"Bearer {pro_api_key}"},
         )
 
-        # Get claims (free tier is fine)
+        # Get claims — must use pro_api_key since agent_id is "pro-agent"
         resp = await client.post(
             "/v1/execute",
             json={
                 "tool": "get_verified_claims",
                 "params": {"agent_id": "pro-agent"},
             },
-            headers={"Authorization": f"Bearer {api_key}"},
+            headers={"Authorization": f"Bearer {pro_api_key}"},
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -220,7 +220,7 @@ class TestGetReputation:
             "/v1/execute",
             json={
                 "tool": "get_agent_reputation",
-                "params": {"agent_id": "unknown-bot"},
+                "params": {"agent_id": "test-agent"},
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
@@ -230,7 +230,7 @@ class TestGetReputation:
         assert data["result"]["found"] is False
 
     @pytest.mark.asyncio
-    async def test_get_reputation_after_compute(self, app, client, pro_api_key, api_key):
+    async def test_get_reputation_after_compute(self, app, client, pro_api_key):
         """After submit_metrics + compute, get_agent_reputation should return data."""
         # Register and submit metrics
         await client.post(
@@ -254,14 +254,14 @@ class TestGetReputation:
         identity_api = app.state.ctx.identity_api
         await identity_api.compute_reputation("pro-agent")
 
-        # Now fetch via gateway
+        # Now fetch via gateway — must use pro_api_key since agent_id is "pro-agent"
         resp = await client.post(
             "/v1/execute",
             json={
                 "tool": "get_agent_reputation",
                 "params": {"agent_id": "pro-agent"},
             },
-            headers={"Authorization": f"Bearer {api_key}"},
+            headers={"Authorization": f"Bearer {pro_api_key}"},
         )
         assert resp.status_code == 200
         data = resp.json()

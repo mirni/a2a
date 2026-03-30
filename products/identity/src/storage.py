@@ -17,6 +17,8 @@ from .models import (
     AgentReputation,
     AuditorAttestation,
     MetricCommitment,
+    OrgMembership,
+    Organization,
     VerifiedClaim,
 )
 
@@ -115,10 +117,23 @@ CREATE TABLE IF NOT EXISTS commitment_secrets (
 CREATE INDEX IF NOT EXISTS idx_secret_agent_metric ON commitment_secrets(agent_id, metric_name);
 
 CREATE TABLE IF NOT EXISTS orgs (
-    id         TEXT PRIMARY KEY,
-    name       TEXT NOT NULL,
-    created_at REAL NOT NULL
+    id             TEXT PRIMARY KEY,
+    name           TEXT NOT NULL,
+    owner_agent_id TEXT NOT NULL,
+    created_at     REAL NOT NULL,
+    metadata       TEXT NOT NULL DEFAULT '{}'
 );
+
+CREATE TABLE IF NOT EXISTS org_memberships (
+    org_id    TEXT NOT NULL,
+    agent_id  TEXT NOT NULL,
+    role      TEXT NOT NULL CHECK(role IN ('owner', 'admin', 'member')),
+    joined_at REAL NOT NULL,
+    PRIMARY KEY (org_id, agent_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_org_membership_org ON org_memberships(org_id);
+CREATE INDEX IF NOT EXISTS idx_org_membership_agent ON org_memberships(agent_id);
 
 CREATE TABLE IF NOT EXISTS sub_identities (
     sub_identity_id  TEXT PRIMARY KEY,
@@ -710,3 +725,85 @@ class IdentityStorage:
         """Delete a sub-identity."""
         await self.db.execute("DELETE FROM sub_identities WHERE sub_identity_id = ?", (sub_identity_id,))
         await self.db.commit()
+
+    # -------------------------------------------------------------------
+    # Organizations
+    # -------------------------------------------------------------------
+
+    async def store_organization(self, org: Organization) -> Organization:
+        """Insert a new organization record."""
+        await self.db.execute(
+            "INSERT INTO orgs (id, name, owner_agent_id, created_at, metadata) VALUES (?, ?, ?, ?, ?)",
+            (org.id, org.name, org.owner_agent_id, org.created_at, json.dumps(org.metadata)),
+        )
+        await self.db.commit()
+        return org
+
+    async def get_organization(self, org_id: str) -> Organization | None:
+        """Retrieve an organization by ID."""
+        cursor = await self.db.execute("SELECT * FROM orgs WHERE id = ?", (org_id,))
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        return Organization(
+            id=row["id"],
+            name=row["name"],
+            owner_agent_id=row["owner_agent_id"],
+            created_at=row["created_at"],
+            metadata=json.loads(row["metadata"]),
+        )
+
+    # -------------------------------------------------------------------
+    # Org memberships
+    # -------------------------------------------------------------------
+
+    async def store_org_membership(self, membership: OrgMembership) -> OrgMembership:
+        """Insert a new org membership record."""
+        await self.db.execute(
+            "INSERT INTO org_memberships (org_id, agent_id, role, joined_at) VALUES (?, ?, ?, ?)",
+            (membership.org_id, membership.agent_id, membership.role, membership.joined_at),
+        )
+        await self.db.commit()
+        return membership
+
+    async def get_org_membership(self, org_id: str, agent_id: str) -> OrgMembership | None:
+        """Retrieve a single membership record."""
+        cursor = await self.db.execute(
+            "SELECT * FROM org_memberships WHERE org_id = ? AND agent_id = ?",
+            (org_id, agent_id),
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        return OrgMembership(
+            org_id=row["org_id"],
+            agent_id=row["agent_id"],
+            role=row["role"],
+            joined_at=row["joined_at"],
+        )
+
+    async def list_org_memberships(self, org_id: str) -> list[OrgMembership]:
+        """List all memberships for an organization."""
+        cursor = await self.db.execute(
+            "SELECT * FROM org_memberships WHERE org_id = ? ORDER BY joined_at",
+            (org_id,),
+        )
+        rows = await cursor.fetchall()
+        return [
+            OrgMembership(
+                org_id=r["org_id"],
+                agent_id=r["agent_id"],
+                role=r["role"],
+                joined_at=r["joined_at"],
+            )
+            for r in rows
+        ]
+
+    async def delete_org_membership(self, org_id: str, agent_id: str) -> bool:
+        """Delete a membership record. Returns True if a row was deleted."""
+        cursor = await self.db.execute(
+            "DELETE FROM org_memberships WHERE org_id = ? AND agent_id = ?",
+            (org_id, agent_id),
+        )
+        await self.db.commit()
+        return cursor.rowcount > 0

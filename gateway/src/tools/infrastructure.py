@@ -106,6 +106,7 @@ async def _register_webhook(ctx: AppContext, params: dict[str, Any]) -> dict[str
         url=params["url"],
         event_types=params["event_types"],
         secret=params.get("secret", ""),
+        filter_agent_ids=params.get("filter_agent_ids"),
     )
     return result
 

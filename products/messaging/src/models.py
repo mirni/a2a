@@ -18,6 +18,36 @@ class MessageType(StrEnum):
     REJECT = "reject"
 
 
+class EncryptionMetadata(BaseModel):
+    """Metadata required to decrypt an encrypted message body.
+
+    Stored alongside the ciphertext so the recipient can reconstruct
+    the shared secret and decrypt.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "nonce": "dGVzdG5vbmNlMTIz",
+                    "algorithm": "x25519-aes256gcm",
+                    "ephemeral_public_key": "ab" * 32,
+                }
+            ]
+        },
+    )
+
+    nonce: str = Field(description="Base64-encoded AES-256-GCM nonce (12 bytes).")
+    algorithm: str = Field(
+        default="x25519-aes256gcm",
+        description="Encryption algorithm identifier.",
+    )
+    ephemeral_public_key: str = Field(
+        description="Hex-encoded ephemeral X25519 public key used for ECDH."
+    )
+
+
 class Message(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -31,6 +61,8 @@ class Message(BaseModel):
                     "body": "Proposing $150 for the REST API integration task.",
                     "metadata": {"urgency": "high"},
                     "thread_id": "thread-7a3f",
+                    "encrypted": False,
+                    "encryption_metadata": None,
                 }
             ]
         },
@@ -46,6 +78,11 @@ class Message(BaseModel):
     thread_id: str | None = None
     created_at: float = Field(default_factory=time.time)
     read_at: float | None = None
+    encrypted: bool = Field(default=False, description="Whether the body is encrypted.")
+    encryption_metadata: EncryptionMetadata | None = Field(
+        default=None,
+        description="Encryption metadata (nonce, algorithm, ephemeral key). Present only when encrypted=True.",
+    )
 
 
 class NegotiationState(StrEnum):

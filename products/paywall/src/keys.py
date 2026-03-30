@@ -8,11 +8,22 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+import time
 from dataclasses import dataclass
 from typing import Any
 
+from .scoping import VALID_SCOPES, KeyScopeError
 from .storage import PaywallStorage
 from .tiers import TierName, get_tier_config
+
+# Re-export for convenience
+__all__ = [
+    "InvalidKeyError",
+    "ExpiredKeyError",
+    "KeyScopeError",
+    "KeyManager",
+    "_hash_key",
+]
 
 
 class InvalidKeyError(Exception):
@@ -20,6 +31,13 @@ class InvalidKeyError(Exception):
 
     def __init__(self, reason: str = "Invalid API key") -> None:
         self.reason = reason
+        super().__init__(reason)
+
+
+class ExpiredKeyError(InvalidKeyError):
+    """Raised when an API key has expired (expires_at < now)."""
+
+    def __init__(self, reason: str = "API key has expired") -> None:
         super().__init__(reason)
 
 
@@ -45,18 +63,30 @@ class KeyManager:
         agent_id: str,
         tier: str | TierName = TierName.FREE,
         connector: str = "",
+        scopes: list[str] | None = None,
+        allowed_tools: list[str] | None = None,
+        allowed_agent_ids: list[str] | None = None,
+        expires_at: float | None = None,
     ) -> dict[str, Any]:
         """Create a new API key for an agent.
 
         Returns a dict with the plaintext key (only time it's available),
-        the key hash, agent_id, and tier.
+        the key hash, agent_id, tier, and scoping fields.
 
-        Validates that the tier is known before creating.
+        Validates that the tier is known and scopes are valid before creating.
         """
         if isinstance(tier, TierName):
             tier = tier.value
         # Validate tier name
         get_tier_config(tier)
+
+        # Validate scopes
+        scopes_list = scopes if scopes is not None else ["read", "write"]
+        if not scopes_list:
+            raise ValueError("Scopes must contain at least one scope")
+        for s in scopes_list:
+            if s not in VALID_SCOPES:
+                raise ValueError(f"Invalid scope '{s}'. Valid scopes: {list(VALID_SCOPES)}")
 
         raw_key = _generate_key(tier)
         key_hash = _hash_key(raw_key)
@@ -66,6 +96,10 @@ class KeyManager:
             agent_id=agent_id,
             tier=tier,
             connector=connector,
+            allowed_tools=allowed_tools,
+            allowed_agent_ids=allowed_agent_ids,
+            scopes=scopes_list,
+            expires_at=expires_at,
         )
 
         return {
@@ -75,12 +109,17 @@ class KeyManager:
             "tier": tier,
             "connector": connector,
             "created_at": record["created_at"],
+            "scopes": record["scopes"],
+            "allowed_tools": record["allowed_tools"],
+            "allowed_agent_ids": record["allowed_agent_ids"],
+            "expires_at": record["expires_at"],
         }
 
     async def validate_key(self, raw_key: str) -> dict[str, Any]:
         """Validate an API key and return its metadata.
 
         Raises InvalidKeyError if the key is not found or has been revoked.
+        Raises ExpiredKeyError if the key has expired.
         """
         if not raw_key or not raw_key.startswith("a2a_"):
             raise InvalidKeyError("Invalid key format")
@@ -93,6 +132,10 @@ class KeyManager:
 
         if record["revoked"]:
             raise InvalidKeyError("API key has been revoked")
+
+        # Check expiration
+        if record.get("expires_at") is not None and record["expires_at"] < time.time():
+            raise ExpiredKeyError("API key has expired")
 
         return record
 

@@ -94,6 +94,45 @@ CREATE TABLE IF NOT EXISTS auto_reload_config (
     reload_amount  INTEGER NOT NULL,
     enabled        INTEGER NOT NULL DEFAULT 1
 );
+
+CREATE TABLE IF NOT EXISTS currency_balances (
+    agent_id   TEXT NOT NULL,
+    currency   TEXT NOT NULL DEFAULT 'CREDITS',
+    balance    INTEGER NOT NULL DEFAULT 0,
+    updated_at REAL NOT NULL,
+    PRIMARY KEY (agent_id, currency)
+);
+
+CREATE TABLE IF NOT EXISTS org_wallets (
+    org_id     TEXT PRIMARY KEY,
+    balance    INTEGER NOT NULL DEFAULT 0,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS org_members (
+    org_id      TEXT NOT NULL,
+    agent_id    TEXT NOT NULL,
+    role        TEXT NOT NULL CHECK(role IN ('owner', 'admin', 'member')),
+    spend_limit INTEGER,
+    joined_at   REAL NOT NULL,
+    PRIMARY KEY (org_id, agent_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_org_members_org ON org_members(org_id);
+
+CREATE TABLE IF NOT EXISTS org_transactions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    org_id      TEXT NOT NULL,
+    agent_id    TEXT NOT NULL,
+    amount      INTEGER NOT NULL DEFAULT 0,
+    tx_type     TEXT NOT NULL,
+    description TEXT,
+    created_at  REAL NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_org_tx_org ON org_transactions(org_id);
+CREATE INDEX IF NOT EXISTS idx_org_tx_agent ON org_transactions(org_id, agent_id);
 """
 
     _MIGRATIONS: tuple[Migration, ...] = (
@@ -130,6 +169,17 @@ CREATE TABLE IF NOT EXISTS auto_reload_config (
             "    threshold      INTEGER NOT NULL,\n"
             "    reload_amount  INTEGER NOT NULL,\n"
             "    enabled        INTEGER NOT NULL DEFAULT 1\n"
+            ");",
+        ),
+        Migration(
+            4,
+            "add currency_balances table for multi-currency support",
+            "CREATE TABLE IF NOT EXISTS currency_balances (\n"
+            "    agent_id   TEXT NOT NULL,\n"
+            "    currency   TEXT NOT NULL DEFAULT 'CREDITS',\n"
+            "    balance    INTEGER NOT NULL DEFAULT 0,\n"
+            "    updated_at REAL NOT NULL,\n"
+            "    PRIMARY KEY (agent_id, currency)\n"
             ");",
         ),
     )
@@ -505,3 +555,225 @@ CREATE TABLE IF NOT EXISTS auto_reload_config (
             "reload_amount": self._from_atomic(row["reload_amount"]),
             "enabled": bool(row["enabled"]),
         }
+
+    # -----------------------------------------------------------------------
+    # Multi-currency balance operations
+    # -----------------------------------------------------------------------
+
+    async def get_currency_balance(self, agent_id: str, currency: str = "CREDITS") -> float:
+        """Return the balance for a specific currency.
+
+        For CREDITS, delegates to the main wallets table for backward compatibility.
+        For other currencies, reads from currency_balances.
+        """
+        if currency == "CREDITS":
+            wallet = await self.get_wallet(agent_id)
+            if wallet is None:
+                return 0.0
+            return wallet["balance"]
+
+        cursor = await self.db.execute(
+            "SELECT balance FROM currency_balances WHERE agent_id = ? AND currency = ?",
+            (agent_id, currency),
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return 0.0
+        return self._from_atomic(row[0])
+
+    async def atomic_currency_credit(
+        self, agent_id: str, amount: float, currency: str = "CREDITS"
+    ) -> tuple[bool, float]:
+        """Atomically credit amount in a specific currency.
+
+        For CREDITS, delegates to atomic_credit (wallets table).
+        For other currencies, upserts into currency_balances.
+        Returns (success, new_balance).
+        """
+        if currency == "CREDITS":
+            return await self.atomic_credit(agent_id, amount)
+
+        now = time.time()
+        amt_atomic = self._to_atomic(amount)
+        await self.db.execute(
+            "INSERT INTO currency_balances (agent_id, currency, balance, updated_at) "
+            "VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(agent_id, currency) DO UPDATE SET "
+            "balance = balance + ?, updated_at = ?",
+            (agent_id, currency, amt_atomic, now, amt_atomic, now),
+        )
+        await self.db.commit()
+        cursor = await self.db.execute(
+            "SELECT balance FROM currency_balances WHERE agent_id = ? AND currency = ?",
+            (agent_id, currency),
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return (False, 0.0)
+        return (True, self._from_atomic(row[0]))
+
+    async def atomic_currency_debit_strict(
+        self, agent_id: str, amount: float, currency: str = "CREDITS"
+    ) -> tuple[bool, float]:
+        """Atomically debit amount in a specific currency.
+
+        For CREDITS, delegates to atomic_debit_strict (wallets table).
+        For other currencies, uses currency_balances with balance >= check.
+        Returns (success, balance).
+        """
+        if currency == "CREDITS":
+            return await self.atomic_debit_strict(agent_id, amount)
+
+        now = time.time()
+        amt_atomic = self._to_atomic(amount)
+        cursor = await self.db.execute(
+            "UPDATE currency_balances SET balance = balance - ?, updated_at = ? "
+            "WHERE agent_id = ? AND currency = ? AND balance >= ?",
+            (amt_atomic, now, agent_id, currency, amt_atomic),
+        )
+        await self.db.commit()
+        affected = cursor.rowcount
+
+        cur2 = await self.db.execute(
+            "SELECT balance FROM currency_balances WHERE agent_id = ? AND currency = ?",
+            (agent_id, currency),
+        )
+        row = await cur2.fetchone()
+        if row is None:
+            return (False, 0.0)
+        return (affected > 0, self._from_atomic(row[0]))
+
+    # -----------------------------------------------------------------------
+    # Organization wallets
+    # -----------------------------------------------------------------------
+
+    async def create_org_wallet(self, org_id: str, initial_balance: int = 0) -> dict[str, Any]:
+        """Create an org wallet. balance is in atomic units."""
+        now = time.time()
+        await self.db.execute(
+            "INSERT INTO org_wallets (org_id, balance, created_at, updated_at) VALUES (?, ?, ?, ?)",
+            (org_id, initial_balance, now, now),
+        )
+        await self.db.commit()
+        return {
+            "org_id": org_id,
+            "balance": self._from_atomic(initial_balance),
+            "created_at": now,
+            "updated_at": now,
+        }
+
+    async def get_org_wallet(self, org_id: str) -> dict[str, Any] | None:
+        """Retrieve an org wallet by org_id."""
+        cursor = await self.db.execute(
+            "SELECT org_id, balance, created_at, updated_at FROM org_wallets WHERE org_id = ?",
+            (org_id,),
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        d = dict(row)
+        d["balance"] = self._from_atomic(d["balance"])
+        return d
+
+    async def atomic_org_credit(self, org_id: str, amount_atomic: int) -> tuple[bool, float]:
+        """Atomically credit amount to org wallet. Returns (success, new_balance)."""
+        now = time.time()
+        cursor = await self.db.execute(
+            "UPDATE org_wallets SET balance = balance + ?, updated_at = ? WHERE org_id = ?",
+            (amount_atomic, now, org_id),
+        )
+        await self.db.commit()
+        affected = cursor.rowcount
+        cur2 = await self.db.execute("SELECT balance FROM org_wallets WHERE org_id = ?", (org_id,))
+        row = await cur2.fetchone()
+        if row is None:
+            return (False, 0.0)
+        return (affected > 0, self._from_atomic(row[0]))
+
+    async def atomic_org_debit_strict(self, org_id: str, amount_atomic: int) -> tuple[bool, float]:
+        """Atomically debit from org wallet. Returns (success, new_balance)."""
+        now = time.time()
+        cursor = await self.db.execute(
+            "UPDATE org_wallets SET balance = balance - ?, updated_at = ? "
+            "WHERE org_id = ? AND balance >= ?",
+            (amount_atomic, now, org_id, amount_atomic),
+        )
+        await self.db.commit()
+        affected = cursor.rowcount
+        cur2 = await self.db.execute("SELECT balance FROM org_wallets WHERE org_id = ?", (org_id,))
+        row = await cur2.fetchone()
+        if row is None:
+            return (False, 0.0)
+        return (affected > 0, self._from_atomic(row[0]))
+
+    # -----------------------------------------------------------------------
+    # Organization members (billing-side registry)
+    # -----------------------------------------------------------------------
+
+    async def register_org_member(
+        self, org_id: str, agent_id: str, role: str, spend_limit_atomic: int | None = None
+    ) -> None:
+        """Register a member in the billing org_members table."""
+        now = time.time()
+        await self.db.execute(
+            "INSERT INTO org_members (org_id, agent_id, role, spend_limit, joined_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (org_id, agent_id, role, spend_limit_atomic, now),
+        )
+        await self.db.commit()
+
+    async def get_org_member(self, org_id: str, agent_id: str) -> dict[str, Any] | None:
+        """Get a billing org member record."""
+        cursor = await self.db.execute(
+            "SELECT * FROM org_members WHERE org_id = ? AND agent_id = ?",
+            (org_id, agent_id),
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        d = dict(row)
+        if d["spend_limit"] is not None:
+            d["spend_limit"] = self._from_atomic(d["spend_limit"])
+        return d
+
+    # -----------------------------------------------------------------------
+    # Organization transactions
+    # -----------------------------------------------------------------------
+
+    async def record_org_transaction(
+        self, org_id: str, agent_id: str, amount_atomic: int, tx_type: str, description: str = ""
+    ) -> int:
+        """Record a transaction against the org wallet."""
+        now = time.time()
+        cursor = await self.db.execute(
+            "INSERT INTO org_transactions (org_id, agent_id, amount, tx_type, description, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (org_id, agent_id, amount_atomic, tx_type, description, now),
+        )
+        await self.db.commit()
+        return cursor.lastrowid  # type: ignore[return-value]
+
+    async def get_org_member_spending(self, org_id: str, agent_id: str | None = None) -> list[dict[str, Any]]:
+        """Get spending per member. If agent_id is given, filter to that agent only."""
+        if agent_id is not None:
+            cursor = await self.db.execute(
+                "SELECT agent_id, COALESCE(SUM(ABS(amount)), 0) AS total_spent "
+                "FROM org_transactions WHERE org_id = ? AND agent_id = ? AND tx_type = 'charge' "
+                "GROUP BY agent_id",
+                (org_id, agent_id),
+            )
+        else:
+            cursor = await self.db.execute(
+                "SELECT agent_id, COALESCE(SUM(ABS(amount)), 0) AS total_spent "
+                "FROM org_transactions WHERE org_id = ? AND tx_type = 'charge' "
+                "GROUP BY agent_id",
+                (org_id,),
+            )
+        rows = await cursor.fetchall()
+        return [
+            {
+                "agent_id": r["agent_id"],
+                "total_spent": self._from_atomic(r["total_spent"]),
+            }
+            for r in rows
+        ]

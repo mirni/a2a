@@ -14,6 +14,7 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from gateway.src.auth import extract_api_key
+from gateway.src.authorization import ADMIN_TIER, check_ownership_authorization
 from gateway.src.catalog import get_tool
 from gateway.src.errors import error_response, handle_product_exception
 from gateway.src.middleware import Metrics
@@ -203,12 +204,36 @@ async def execute(request: Request) -> JSONResponse:
         agent_id = key_info["agent_id"]
         agent_tier = key_info["tier"]
 
+        # --- 2a. Enforce key scoping (allowed_tools, allowed_agent_ids, scopes) ---
+        from paywall_src.scoping import KeyScopeError, ScopeChecker
+
+        scope_checker = ScopeChecker(
+            scopes=key_info.get("scopes", ["read", "write"]),
+            allowed_tools=key_info.get("allowed_tools"),
+            allowed_agent_ids=key_info.get("allowed_agent_ids"),
+        )
+        try:
+            scope_checker.check_tool(tool_name)
+            scope_checker.check_scope(tool_name)
+            # Check agent_id param if present
+            target_agent = params.get("agent_id")
+            if target_agent is not None:
+                scope_checker.check_agent_id(target_agent)
+        except KeyScopeError as exc:
+            return await error_response(403, exc.reason, "scope_violation", request=request)
+
+    # --- 2b. Ownership authorization: caller must own the resource ---
+    authz_result = check_ownership_authorization(agent_id, agent_tier, params)
+    if authz_result is not None:
+        status, message, code = authz_result
+        return await error_response(status, message, code, request=request)
+
     # --- 3. Check tier access (skip for x402) ---
     tool_pricing = tool_def.get("pricing", {})
     cost = calculate_tool_cost(tool_pricing, params)
     rate_count = 0
 
-    if not x402_agent_id:
+    if not x402_agent_id and agent_tier != ADMIN_TIER:
         from paywall_src.tiers import tier_has_access
 
         required_tier = tool_def.get("tier_required", "free")
@@ -278,17 +303,6 @@ async def execute(request: Request) -> JSONResponse:
                 # WalletNotFoundError → 402
                 return await handle_product_exception(request, exc)
 
-    # --- 5b. Tool-specific authorization checks ---
-    if tool_name == "create_api_key":
-        requested_agent = params.get("agent_id", "")
-        if requested_agent != agent_id and agent_tier != "admin":
-            return await error_response(
-                403,
-                f"Cannot create API key for agent '{requested_agent}' (you are '{agent_id}')",
-                "forbidden",
-                request=request,
-            )
-
     # --- 6. Dispatch to tool function ---
     # Record the request in metrics regardless of outcome
     Metrics.record_request(tool_name)
@@ -354,8 +368,8 @@ async def execute(request: Request) -> JSONResponse:
     if correlation_id:
         headers["X-Request-ID"] = correlation_id
 
-    # Add rate limit headers (skip for x402)
-    if not x402_agent_id:
+    # Add rate limit headers (skip for x402 and admin)
+    if not x402_agent_id and agent_tier != ADMIN_TIER:
         from paywall_src.tiers import get_tier_config as _get_tier_config
 
         _tc = _get_tier_config(agent_tier)

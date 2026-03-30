@@ -477,6 +477,58 @@
     "tier_required": "free"
   },
   {
+    "name": "refund_settlement",
+    "service": "payments",
+    "description": "Refund a settled payment (full or partial). If amount is omitted, refunds the full remaining balance.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "settlement_id": {
+          "type": "string",
+          "description": "The settlement identifier to refund"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount to refund. If omitted, refunds the full remaining balance."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Optional reason for the refund"
+        }
+      },
+      "required": [
+        "settlement_id"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "settlement_id": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
+    "tier_required": "starter"
+  },
+  {
     "name": "search_services",
     "service": "marketplace",
     "description": "Search the marketplace for available services.",
@@ -1246,6 +1298,13 @@
         "secret": {
           "type": "string",
           "description": "Shared secret for HMAC-SHA3 signature verification"
+        },
+        "filter_agent_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional list of agent_ids to filter events. When set, only events whose agent_id/payer/payee/sender/recipient matches an entry in this list will be delivered. When null or empty, all matching events are delivered."
         }
       },
       "required": [
@@ -1271,6 +1330,13 @@
           "items": {
             "type": "string"
           }
+        },
+        "filter_agent_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The configured agent_id filter, or null if not set"
         },
         "created_at": {
           "type": "number"
@@ -1786,7 +1852,7 @@
     "sla": {
       "max_latency_ms": 500
     },
-    "tier_required": "pro"
+    "tier_required": "starter"
   },
   {
     "name": "cancel_subscription",
@@ -1824,7 +1890,7 @@
     "sla": {
       "max_latency_ms": 300
     },
-    "tier_required": "pro"
+    "tier_required": "starter"
   },
   {
     "name": "get_subscription",
@@ -1879,7 +1945,7 @@
     "sla": {
       "max_latency_ms": 200
     },
-    "tier_required": "pro"
+    "tier_required": "starter"
   },
   {
     "name": "list_subscriptions",
@@ -1923,7 +1989,7 @@
     "sla": {
       "max_latency_ms": 300
     },
-    "tier_required": "pro"
+    "tier_required": "starter"
   },
   {
     "name": "reactivate_subscription",
@@ -1957,7 +2023,7 @@
     "sla": {
       "max_latency_ms": 300
     },
-    "tier_required": "pro"
+    "tier_required": "starter"
   },
   {
     "name": "create_wallet",

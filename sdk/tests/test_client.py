@@ -106,14 +106,14 @@ async def test_pricing_tool_not_found(sdk_client):
 
 @pytest.mark.asyncio
 async def test_get_balance(sdk_client, setup_agent):
-    balance = await sdk_client.get_balance("sdk-agent")
-    assert balance == 1000.0
+    result = await sdk_client.get_balance("sdk-agent")
+    assert result.balance == 1000.0
 
 
 @pytest.mark.asyncio
 async def test_deposit(sdk_client, setup_agent):
-    new_balance = await sdk_client.deposit("sdk-agent", 100.0)
-    assert new_balance == 1100.0
+    result = await sdk_client.deposit("sdk-agent", 100.0)
+    assert result.new_balance == 1100.0
 
 
 @pytest.mark.asyncio
@@ -132,8 +132,8 @@ async def test_authentication_error(sdk_client):
 
 @pytest.mark.asyncio
 async def test_search_services(sdk_client, setup_agent):
-    services = await sdk_client.search_services(query="test")
-    assert isinstance(services, list)
+    result = await sdk_client.search_services(query="test")
+    assert isinstance(result.services, list)
 
 
 @pytest.mark.asyncio
@@ -151,9 +151,9 @@ async def test_create_payment_intent(sdk_client, setup_agent, gateway_app):
     intent = await sdk_client.create_payment_intent(
         payer="sdk-agent", payee="payee-sdk", amount=10.0, description="sdk test"
     )
-    assert intent["status"] == "pending"
-    assert intent["amount"] == 10.0
+    assert intent.status == "pending"
+    assert intent.amount == 10.0
 
     # Capture it
-    settlement = await sdk_client.capture_payment(intent["id"])
-    assert settlement["status"] == "settled"
+    settlement = await sdk_client.capture_payment(intent.id)
+    assert settlement.status == "settled"

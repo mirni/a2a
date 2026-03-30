@@ -14,15 +14,19 @@ import httpx
 
 _SCHEMA_WEBHOOKS = """
 CREATE TABLE IF NOT EXISTS webhooks (
-    id          TEXT PRIMARY KEY,
-    agent_id    TEXT    NOT NULL,
-    url         TEXT    NOT NULL,
-    event_types TEXT    NOT NULL,  -- JSON array
-    secret      TEXT    NOT NULL,
-    created_at  REAL    NOT NULL,
-    active      INTEGER NOT NULL DEFAULT 1
+    id               TEXT PRIMARY KEY,
+    agent_id         TEXT    NOT NULL,
+    url              TEXT    NOT NULL,
+    event_types      TEXT    NOT NULL,  -- JSON array
+    secret           TEXT    NOT NULL,
+    created_at       REAL    NOT NULL,
+    active           INTEGER NOT NULL DEFAULT 1,
+    filter_agent_ids TEXT             -- JSON array or NULL (deliver all)
 );
 """
+
+# Fields in an event payload that may contain an agent identifier.
+_AGENT_ID_FIELDS = ("agent_id", "payer", "payee", "sender", "recipient")
 
 _SCHEMA_DELIVERIES = """
 CREATE TABLE IF NOT EXISTS webhook_deliveries (
@@ -91,6 +95,7 @@ class WebhookManager:
         url: str,
         event_types: list[str],
         secret: str,
+        filter_agent_ids: list[str] | None = None,
     ) -> dict[str, Any]:
         """Register a new webhook and return its representation."""
         self._require_db()
@@ -98,13 +103,15 @@ class WebhookManager:
         webhook_id = f"whk-{secrets.token_hex(12)}"
         created_at = time.time()
         event_types_json = json.dumps(event_types)
+        filter_json = json.dumps(filter_agent_ids) if filter_agent_ids else None
 
         await self._db.execute(
             """
-            INSERT INTO webhooks (id, agent_id, url, event_types, secret, created_at, active)
-            VALUES (?, ?, ?, ?, ?, ?, 1)
+            INSERT INTO webhooks
+                (id, agent_id, url, event_types, secret, created_at, active, filter_agent_ids)
+            VALUES (?, ?, ?, ?, ?, ?, 1, ?)
             """,
-            (webhook_id, agent_id, url, event_types_json, secret, created_at),
+            (webhook_id, agent_id, url, event_types_json, secret, created_at, filter_json),
         )
         await self._db.commit()
 
@@ -116,6 +123,7 @@ class WebhookManager:
             "secret": secret,
             "created_at": created_at,
             "active": 1,
+            "filter_agent_ids": filter_agent_ids,
         }
 
     async def list_webhooks(self, agent_id: str) -> list[dict[str, Any]]:
@@ -145,7 +153,14 @@ class WebhookManager:
     # ------------------------------------------------------------------
 
     async def deliver(self, event: dict[str, Any]) -> None:
-        """Queue delivery records for every active webhook matching *event_type*."""
+        """Queue delivery records for every active webhook matching *event_type*.
+
+        When a webhook has ``filter_agent_ids`` set, the event is only delivered
+        if one of the common agent-identifying fields (``agent_id``, ``payer``,
+        ``payee``, ``sender``, ``recipient``) contains a value present in the
+        filter list.  Events with **no** recognised agent field are always
+        delivered (no false negatives).
+        """
         self._require_db()
 
         event_type = event.get("type", "")
@@ -157,12 +172,20 @@ class WebhookManager:
         )
         webhooks = await cursor.fetchall()
 
+        # Extract agent ids from event payload once.
+        event_agent_ids = self._extract_agent_ids(event)
+
         for row in webhooks:
             registered_types: list[str] = json.loads(row["event_types"])
             if event_type not in registered_types:
                 continue
 
             webhook = self._row_to_webhook(row)
+
+            # Apply agent_id filter when configured.
+            if not self._matches_agent_filter(webhook, event_agent_ids):
+                continue
+
             delivery_id = await self._insert_delivery(
                 webhook_id=webhook["id"],
                 event_type=event_type,
@@ -387,8 +410,38 @@ class WebhookManager:
         return cursor.lastrowid
 
     @staticmethod
+    def _extract_agent_ids(event: dict[str, Any]) -> set[str]:
+        """Return the set of agent identifiers found in the event payload."""
+        ids: set[str] = set()
+        for field in _AGENT_ID_FIELDS:
+            value = event.get(field)
+            if isinstance(value, str) and value:
+                ids.add(value)
+        return ids
+
+    @staticmethod
+    def _matches_agent_filter(
+        webhook: dict[str, Any],
+        event_agent_ids: set[str],
+    ) -> bool:
+        """Return True if the event should be delivered to *webhook*.
+
+        * No filter configured (``None`` / empty) -> always deliver.
+        * Filter configured but event has no agent fields -> deliver (no false negatives).
+        * Filter configured and event has agent fields -> deliver only if intersection.
+        """
+        filter_ids: list[str] | None = webhook.get("filter_agent_ids")
+        if not filter_ids:
+            return True
+        if not event_agent_ids:
+            return True
+        return bool(event_agent_ids & set(filter_ids))
+
+    @staticmethod
     def _row_to_webhook(row: aiosqlite.Row) -> dict[str, Any]:
         """Convert a database row into a webhook dict."""
+        raw_filter = row["filter_agent_ids"]
+        filter_agent_ids = json.loads(raw_filter) if raw_filter else None
         return {
             "id": row["id"],
             "agent_id": row["agent_id"],
@@ -397,4 +450,5 @@ class WebhookManager:
             "secret": row["secret"],
             "created_at": row["created_at"],
             "active": row["active"],
+            "filter_agent_ids": filter_agent_ids,
         }

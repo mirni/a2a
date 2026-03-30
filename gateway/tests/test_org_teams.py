@@ -56,8 +56,8 @@ async def test_add_agent_to_org(client, api_key, app):
     """Add an agent to an org and verify membership."""
     ctx = app.state.ctx
 
-    # Register an agent identity
-    await ctx.identity_api.register_agent("org-agent-1")
+    # Register an agent identity (use test-agent to match api_key ownership)
+    await ctx.identity_api.register_agent("test-agent")
 
     # Create org
     resp1 = await client.post(
@@ -70,18 +70,18 @@ async def test_add_agent_to_org(client, api_key, app):
     )
     org_id = resp1.json()["result"]["org_id"]
 
-    # Add agent to org
+    # Add agent to org (agent_id must match caller)
     resp2 = await client.post(
         "/v1/execute",
         json={
             "tool": "add_agent_to_org",
-            "params": {"org_id": org_id, "agent_id": "org-agent-1"},
+            "params": {"org_id": org_id, "agent_id": "test-agent"},
         },
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp2.status_code == 200
     result = resp2.json()["result"]
-    assert result["agent_id"] == "org-agent-1"
+    assert result["agent_id"] == "test-agent"
     assert result["org_id"] == org_id
 
     # Verify agent is listed as member
@@ -94,7 +94,7 @@ async def test_add_agent_to_org(client, api_key, app):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     result3 = resp3.json()["result"]
-    assert any(m["agent_id"] == "org-agent-1" for m in result3["members"])
+    assert any(m["agent_id"] == "test-agent" for m in result3["members"])
 
 
 async def test_get_org_not_found(client, api_key):
@@ -119,13 +119,13 @@ async def test_get_org_not_found(client, api_key):
 async def test_add_agent_to_nonexistent_org(client, api_key, app):
     """Adding agent to non-existent org should fail."""
     ctx = app.state.ctx
-    await ctx.identity_api.register_agent("orphan-agent")
+    await ctx.identity_api.register_agent("test-agent")
 
     resp = await client.post(
         "/v1/execute",
         json={
             "tool": "add_agent_to_org",
-            "params": {"org_id": "fake-org", "agent_id": "orphan-agent"},
+            "params": {"org_id": "fake-org", "agent_id": "test-agent"},
         },
         headers={"Authorization": f"Bearer {api_key}"},
     )
