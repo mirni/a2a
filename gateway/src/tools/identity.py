@@ -124,20 +124,14 @@ async def _create_org(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]
     import uuid as _uuid
 
     org_name = params["org_name"]
+    owner_agent_id = params.get("agent_id", "")
     org_id = f"org-{_uuid.uuid4().hex[:12]}"
     now = _time.time()
 
     db = ctx.identity_api.storage.db
     await db.execute(
-        """CREATE TABLE IF NOT EXISTS orgs (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            created_at REAL NOT NULL
-        )"""
-    )
-    await db.execute(
-        "INSERT INTO orgs (id, name, created_at) VALUES (?, ?, ?)",
-        (org_id, org_name, now),
+        "INSERT INTO orgs (id, name, owner_agent_id, created_at) VALUES (?, ?, ?, ?)",
+        (org_id, org_name, owner_agent_id, now),
     )
     await db.commit()
 
@@ -152,14 +146,6 @@ async def _get_org(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     """Get organization details and members."""
     org_id = params["org_id"]
     db = ctx.identity_api.storage.db
-
-    await db.execute(
-        """CREATE TABLE IF NOT EXISTS orgs (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            created_at REAL NOT NULL
-        )"""
-    )
 
     cursor = await db.execute("SELECT * FROM orgs WHERE id = ?", (org_id,))
     row = await cursor.fetchone()
@@ -223,14 +209,6 @@ async def _add_agent_to_org(ctx: AppContext, params: dict[str, Any]) -> dict[str
     org_id = params["org_id"]
     agent_id = params["agent_id"]
     db = ctx.identity_api.storage.db
-
-    await db.execute(
-        """CREATE TABLE IF NOT EXISTS orgs (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            created_at REAL NOT NULL
-        )"""
-    )
 
     cursor = await db.execute("SELECT id FROM orgs WHERE id = ?", (org_id,))
     if await cursor.fetchone() is None:
