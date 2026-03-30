@@ -295,6 +295,74 @@ def generate_openapi_spec() -> dict:
                     },
                     "required": ["error", "detail"],
                 },
+                # Per-tool output schemas for key tools
+                "GetBalanceOutput": {
+                    "type": "object",
+                    "properties": {
+                        "balance": {
+                            "type": "number",
+                            "description": "Current wallet balance.",
+                        },
+                        "currency": {
+                            "type": "string",
+                            "description": "Currency code (only present if non-default).",
+                        },
+                    },
+                    "required": ["balance"],
+                },
+                "CreateIntentOutput": {
+                    "type": "object",
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                            "description": "Payment intent ID.",
+                        },
+                        "status": {
+                            "type": "string",
+                            "description": "Intent status (e.g. pending, captured).",
+                        },
+                        "payer": {
+                            "type": "string",
+                            "description": "Payer agent ID.",
+                        },
+                        "payee": {
+                            "type": "string",
+                            "description": "Payee agent ID.",
+                        },
+                        "amount": {
+                            "type": "number",
+                            "description": "Payment amount in atomic units.",
+                        },
+                    },
+                    "required": ["id", "status", "payer", "payee", "amount"],
+                },
+                "GetPaymentHistoryOutput": {
+                    "type": "object",
+                    "properties": {
+                        "history": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "description": "Record type (intent, settlement, escrow).",
+                                    },
+                                    "amount": {
+                                        "type": "number",
+                                        "description": "Payment amount.",
+                                    },
+                                    "created_at": {
+                                        "type": "number",
+                                        "description": "Unix timestamp.",
+                                    },
+                                },
+                            },
+                            "description": "List of payment history records.",
+                        },
+                    },
+                    "required": ["history"],
+                },
                 "ToolPricing": {
                     "type": "object",
                     "properties": {
@@ -333,13 +401,27 @@ def generate_openapi_spec() -> dict:
                         "tier_required": {
                             "type": "string",
                             "description": "Minimum tier required to use this tool.",
-                            "enum": ["free", "pro"],
+                            "enum": ["free", "starter", "pro", "enterprise"],
                         },
                     },
                     "required": ["name", "service", "pricing", "tier_required"],
                 },
-            }
+            },
+            "securitySchemes": {
+                "BearerAuth": {
+                    "type": "http",
+                    "scheme": "bearer",
+                    "description": "API key passed as Bearer token in the Authorization header.",
+                },
+                "X402Payment": {
+                    "type": "apiKey",
+                    "in": "header",
+                    "name": "X-PAYMENT",
+                    "description": "x402 payment proof for stateless authentication.",
+                },
+            },
         },
+        "security": [{"BearerAuth": []}, {"X402Payment": []}],
     }
 
     return spec

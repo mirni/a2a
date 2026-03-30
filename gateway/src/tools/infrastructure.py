@@ -101,11 +101,16 @@ async def _get_event_schema(ctx: AppContext, params: dict[str, Any]) -> dict[str
 
 
 async def _register_webhook(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    from gateway.src.tool_errors import ToolValidationError
+
+    secret = params.get("secret", "")
+    if not secret:
+        raise ToolValidationError("Webhook 'secret' is required and must be non-empty for HMAC signature verification")
     result = await ctx.webhook_manager.register(
         agent_id=params["agent_id"],
         url=params["url"],
         event_types=params["event_types"],
-        secret=params.get("secret", ""),
+        secret=secret,
         filter_agent_ids=params.get("filter_agent_ids"),
     )
     return result
@@ -116,15 +121,38 @@ async def _list_webhooks(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
     return {"webhooks": webhooks}
 
 
+async def _check_webhook_ownership(ctx: AppContext, params: dict[str, Any], webhook_id: str) -> None:
+    """Verify the caller owns the webhook. Raises ToolForbiddenError on mismatch."""
+    from gateway.src.tool_errors import ToolForbiddenError
+
+    caller = params.get("_caller_agent_id")
+    if not caller:
+        return  # no caller info (e.g. tests without execute route)
+
+    webhook = await ctx.webhook_manager.get_webhook(webhook_id)
+    if webhook is None:
+        from gateway.src.tool_errors import ToolNotFoundError
+
+        raise ToolNotFoundError(f"Webhook not found: {webhook_id}")
+
+    if webhook["agent_id"] != caller:
+        raise ToolForbiddenError(f"Forbidden: webhook {webhook_id} does not belong to agent {caller}")
+
+
 async def _delete_webhook(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
-    deleted = await ctx.webhook_manager.delete_webhook(params["webhook_id"])
+    webhook_id = params["webhook_id"]
+    await _check_webhook_ownership(ctx, params, webhook_id)
+    deleted = await ctx.webhook_manager.delete_webhook(webhook_id)
     return {"deleted": deleted}
 
 
 async def _get_webhook_deliveries(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    webhook_id = params["webhook_id"]
+    await _check_webhook_ownership(ctx, params, webhook_id)
     deliveries = await ctx.webhook_manager.get_delivery_history(
-        webhook_id=params["webhook_id"],
+        webhook_id=webhook_id,
         limit=params.get("limit", 50),
+        offset=params.get("offset", 0),
     )
     return {"deliveries": deliveries}
 
@@ -139,6 +167,7 @@ async def _test_webhook(ctx: AppContext, params: dict[str, Any]) -> dict[str, An
     from gateway.src.tool_errors import ToolNotFoundError
 
     webhook_id = params["webhook_id"]
+    await _check_webhook_ownership(ctx, params, webhook_id)
     wm = ctx.webhook_manager
 
     try:

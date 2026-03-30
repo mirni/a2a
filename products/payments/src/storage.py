@@ -51,19 +51,22 @@ CREATE INDEX IF NOT EXISTS idx_intent_payee ON payment_intents(payee);
 CREATE INDEX IF NOT EXISTS idx_intent_status ON payment_intents(status);
 
 CREATE TABLE IF NOT EXISTS escrows (
-    id            TEXT PRIMARY KEY,
-    payer         TEXT NOT NULL,
-    payee         TEXT NOT NULL,
-    amount        INTEGER NOT NULL DEFAULT 0,
-    description   TEXT NOT NULL DEFAULT '',
-    status        TEXT NOT NULL DEFAULT 'held',
-    settlement_id TEXT,
-    timeout_at    REAL,
-    created_at    REAL NOT NULL,
-    updated_at    REAL NOT NULL,
-    metadata      TEXT NOT NULL DEFAULT '{}'
+    id              TEXT PRIMARY KEY,
+    payer           TEXT NOT NULL,
+    payee           TEXT NOT NULL,
+    amount          INTEGER NOT NULL DEFAULT 0,
+    description     TEXT NOT NULL DEFAULT '',
+    idempotency_key TEXT,
+    status          TEXT NOT NULL DEFAULT 'held',
+    settlement_id   TEXT,
+    timeout_at      REAL,
+    created_at      REAL NOT NULL,
+    updated_at      REAL NOT NULL,
+    metadata        TEXT NOT NULL DEFAULT '{}'
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_escrow_idempotency
+    ON escrows(idempotency_key) WHERE idempotency_key IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_escrow_payer ON escrows(payer);
 CREATE INDEX IF NOT EXISTS idx_escrow_payee ON escrows(payee);
 CREATE INDEX IF NOT EXISTS idx_escrow_status ON escrows(status);
@@ -76,6 +79,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     amount          INTEGER NOT NULL DEFAULT 0,
     interval        TEXT NOT NULL,
     description     TEXT NOT NULL DEFAULT '',
+    idempotency_key TEXT,
     status          TEXT NOT NULL DEFAULT 'active',
     cancelled_by    TEXT,
     next_charge_at  REAL NOT NULL,
@@ -86,6 +90,8 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     metadata        TEXT NOT NULL DEFAULT '{}'
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sub_idempotency
+    ON subscriptions(idempotency_key) WHERE idempotency_key IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_sub_payer ON subscriptions(payer);
 CREATE INDEX IF NOT EXISTS idx_sub_payee ON subscriptions(payee);
 CREATE INDEX IF NOT EXISTS idx_sub_status ON subscriptions(status);
@@ -270,15 +276,16 @@ class PaymentStorage:
             amount = credits_to_atomic(Decimal(str(amount)))
         await self.db.execute(
             "INSERT INTO escrows "
-            "(id, payer, payee, amount, description, status, settlement_id, "
+            "(id, payer, payee, amount, description, idempotency_key, status, settlement_id, "
             "timeout_at, created_at, updated_at, metadata) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 data["id"],
                 data["payer"],
                 data["payee"],
                 amount,
                 data.get("description", ""),
+                data.get("idempotency_key"),
                 data.get("status", "held"),
                 data.get("settlement_id"),
                 data.get("timeout_at"),
@@ -288,6 +295,15 @@ class PaymentStorage:
             ),
         )
         await self.db.commit()
+
+    async def get_escrow_by_idempotency_key(self, key: str) -> dict[str, Any] | None:
+        cursor = await self.db.execute("SELECT * FROM escrows WHERE idempotency_key = ?", (key,))
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        d = dict(row)
+        d["metadata"] = json.loads(d["metadata"])
+        return self._convert_amount(d)
 
     async def get_escrow(self, escrow_id: str) -> dict[str, Any] | None:
         cursor = await self.db.execute("SELECT * FROM escrows WHERE id = ?", (escrow_id,))
@@ -364,9 +380,9 @@ class PaymentStorage:
             amount = credits_to_atomic(Decimal(str(amount)))
         await self.db.execute(
             "INSERT INTO subscriptions "
-            "(id, payer, payee, amount, interval, description, status, cancelled_by, "
+            "(id, payer, payee, amount, interval, description, idempotency_key, status, cancelled_by, "
             "next_charge_at, last_charged_at, charge_count, created_at, updated_at, metadata) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 data["id"],
                 data["payer"],
@@ -374,6 +390,7 @@ class PaymentStorage:
                 amount,
                 data["interval"],
                 data.get("description", ""),
+                data.get("idempotency_key"),
                 data.get("status", "active"),
                 data.get("cancelled_by"),
                 data["next_charge_at"],
@@ -385,6 +402,15 @@ class PaymentStorage:
             ),
         )
         await self.db.commit()
+
+    async def get_subscription_by_idempotency_key(self, key: str) -> dict[str, Any] | None:
+        cursor = await self.db.execute("SELECT * FROM subscriptions WHERE idempotency_key = ?", (key,))
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        d = dict(row)
+        d["metadata"] = json.loads(d["metadata"])
+        return self._convert_amount(d)
 
     async def get_subscription(self, sub_id: str) -> dict[str, Any] | None:
         cursor = await self.db.execute("SELECT * FROM subscriptions WHERE id = ?", (sub_id,))

@@ -124,6 +124,7 @@ class Escrow(BaseModel):
     payee: str
     amount: Decimal
     description: str = ""
+    idempotency_key: str | None = None
     status: EscrowStatus = EscrowStatus.HELD
     settlement_id: str | None = None
     timeout_at: float | None = None
@@ -200,6 +201,7 @@ class Subscription(BaseModel):
     amount: Decimal
     interval: SubscriptionInterval
     description: str = ""
+    idempotency_key: str | None = None
     status: SubscriptionStatus = SubscriptionStatus.ACTIVE
     cancelled_by: str | None = None
     next_charge_at: float = Field(default_factory=time.time)

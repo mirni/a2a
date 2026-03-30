@@ -133,6 +133,7 @@ class TrustAPI:
         name_contains: str | None = None,
         min_score: float | None = None,
         limit: int = 100,
+        offset: int = 0,
     ) -> list[Server]:
         """Search registered servers.
 
@@ -140,11 +141,12 @@ class TrustAPI:
             name_contains: Filter by partial name match.
             min_score: Minimum composite score threshold.
             limit: Maximum results.
+            offset: Number of results to skip for pagination.
 
         Returns:
             List of matching Server objects.
         """
-        return await self.storage.search_servers(name_contains, min_score, limit)
+        return await self.storage.search_servers(name_contains, min_score, limit, offset)
 
     async def delete_server(self, server_id: str) -> None:
         """Delete a server and all its associated data.

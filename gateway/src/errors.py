@@ -47,6 +47,7 @@ async def handle_product_exception(request: Request, exc: Exception) -> JSONResp
         "IntentNotFoundError": (404, "intent_not_found"),
         "EscrowNotFoundError": (404, "escrow_not_found"),
         "WalletNotFoundError": (404, "wallet_not_found"),
+        "WalletFrozenError": (403, "wallet_frozen"),
         "SubscriptionNotFoundError": (404, "subscription_not_found"),
         "AgentNotFoundError": (404, "agent_not_found"),
         # Conflict / invalid state
@@ -60,11 +61,16 @@ async def handle_product_exception(request: Request, exc: Exception) -> JSONResp
         # "ValueError" removed — use ToolValidationError for tool input errors
         # Tool-level errors
         "ToolValidationError": (400, "validation_error"),
+        "ToolForbiddenError": (403, "forbidden"),
         "ToolNotFoundError": (404, "not_found"),
         "NegativeCostError": (500, "pricing_error"),
         # Disputes
         "DisputeNotFoundError": (404, "dispute_not_found"),
         "DisputeStateError": (409, "dispute_state_error"),
+        # Org/Team
+        "OrgNotFoundError": (404, "org_not_found"),
+        "MemberNotFoundError": (404, "member_not_found"),
+        "LastOwnerError": (400, "last_owner"),
         "SubscriptionStateError": (409, "invalid_state"),
         # Payment engine base error
         "PaymentError": (400, "payment_error"),

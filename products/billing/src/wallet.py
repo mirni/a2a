@@ -30,6 +30,14 @@ class WalletNotFoundError(Exception):
         super().__init__(f"Wallet not found for agent {agent_id}")
 
 
+class WalletFrozenError(Exception):
+    """Raised when operating on a frozen wallet."""
+
+    def __init__(self, agent_id: str) -> None:
+        self.agent_id = agent_id
+        super().__init__(f"Wallet is frozen for agent {agent_id}")
+
+
 @dataclass
 class Wallet:
     """High-level wallet operations wrapping the storage backend."""
@@ -89,10 +97,12 @@ class Wallet:
         """Add funds to an agent's wallet in a specific currency. Returns new balance."""
         if amount <= 0:
             raise ValueError("Deposit amount must be positive")
+        if await self.storage.is_wallet_frozen(agent_id):
+            raise WalletFrozenError(agent_id)
         success, new_balance = await self.storage.atomic_currency_credit(agent_id, amount, currency)
         if not success:
             raise WalletNotFoundError(agent_id)
-        await self.storage.record_transaction(agent_id, amount, "deposit", description)
+        await self.storage.record_transaction(agent_id, amount, "deposit", description, currency=currency)
         await self.storage.emit_event(
             "wallet.deposit",
             agent_id,
@@ -108,6 +118,8 @@ class Wallet:
         """
         if amount <= 0:
             raise ValueError("Withdrawal amount must be positive")
+        if await self.storage.is_wallet_frozen(agent_id):
+            raise WalletFrozenError(agent_id)
         wallet = await self.storage.get_wallet(agent_id)
         if wallet is None:
             raise WalletNotFoundError(agent_id)
@@ -115,7 +127,7 @@ class Wallet:
         if not success:
             available = await self.storage.get_currency_balance(agent_id, currency)
             raise InsufficientCreditsError(agent_id, amount, available)
-        await self.storage.record_transaction(agent_id, -amount, "withdrawal", description)
+        await self.storage.record_transaction(agent_id, -amount, "withdrawal", description, currency=currency)
         await self.storage.emit_event(
             "wallet.withdrawal",
             agent_id,

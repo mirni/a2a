@@ -11,6 +11,32 @@ from gateway.src.lifespan import AppContext
 # ---------------------------------------------------------------------------
 
 
+async def _get_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    intent = await ctx.payment_engine.get_intent(params["intent_id"])
+    return {
+        "id": intent.id,
+        "status": intent.status.value,
+        "payer": intent.payer,
+        "payee": intent.payee,
+        "amount": float(intent.amount),
+        "description": intent.description,
+        "created_at": intent.created_at,
+    }
+
+
+async def _get_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    escrow = await ctx.payment_engine.get_escrow(params["escrow_id"])
+    return {
+        "id": escrow.id,
+        "status": escrow.status.value,
+        "payer": escrow.payer,
+        "payee": escrow.payee,
+        "amount": float(escrow.amount),
+        "description": escrow.description,
+        "created_at": escrow.created_at,
+    }
+
+
 async def _create_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     currency = params.get("currency", "CREDITS")
     intent = await ctx.payment_engine.create_intent(
@@ -96,6 +122,7 @@ async def _create_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
         description=params.get("description", ""),
         timeout_hours=params.get("timeout_hours"),
         metadata=params.get("metadata"),
+        idempotency_key=params.get("idempotency_key"),
     )
     return {
         "id": escrow.id,
@@ -190,6 +217,7 @@ async def _create_subscription(ctx: AppContext, params: dict[str, Any]) -> dict[
         interval=params["interval"],
         description=params.get("description", ""),
         metadata=params.get("metadata"),
+        idempotency_key=params.get("idempotency_key"),
     )
     return {
         "id": sub.id,
@@ -305,11 +333,34 @@ async def _open_dispute(ctx: AppContext, params: dict[str, Any]) -> dict[str, An
 
 
 async def _respond_to_dispute(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    # Verify caller is the actual respondent
+    caller = params.get("_caller_agent_id")
+    if caller:
+        dispute = await ctx.dispute_engine.get_dispute(params["dispute_id"])
+        if dispute["respondent"] != caller:
+            from gateway.src.tool_errors import ToolForbiddenError
+
+            raise ToolForbiddenError(
+                f"Only the dispute respondent can respond (expected '{dispute['respondent']}', got '{caller}')"
+            )
     return await ctx.dispute_engine.respond_to_dispute(
         dispute_id=params["dispute_id"],
         respondent=params["respondent"],
         response=params["response"],
     )
+
+
+async def _get_dispute(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    return await ctx.dispute_engine.get_dispute(params["dispute_id"])
+
+
+async def _list_disputes(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    disputes = await ctx.dispute_engine.list_disputes(
+        agent_id=params["agent_id"],
+        limit=params.get("limit", 50),
+        offset=params.get("offset", 0),
+    )
+    return {"disputes": disputes}
 
 
 async def _resolve_dispute(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:

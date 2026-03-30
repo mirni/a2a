@@ -242,6 +242,66 @@
     "tier_required": "free"
   },
   {
+    "name": "get_intent",
+    "service": "payments",
+    "description": "Get details of a payment intent by its ID.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "intent_id": {
+          "type": "string",
+          "description": "The payment intent ID"
+        }
+      },
+      "required": ["intent_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"type": "string"},
+        "payer": {"type": "string"},
+        "payee": {"type": "string"},
+        "amount": {"type": "number"},
+        "description": {"type": "string"},
+        "created_at": {"type": "number"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 200},
+    "tier_required": "free"
+  },
+  {
+    "name": "get_escrow",
+    "service": "payments",
+    "description": "Get details of an escrow by its ID.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "escrow_id": {
+          "type": "string",
+          "description": "The escrow ID"
+        }
+      },
+      "required": ["escrow_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"type": "string"},
+        "payer": {"type": "string"},
+        "payee": {"type": "string"},
+        "amount": {"type": "number"},
+        "description": {"type": "string"},
+        "created_at": {"type": "number"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 200},
+    "tier_required": "free"
+  },
+  {
     "name": "capture_intent",
     "service": "payments",
     "description": "Capture (settle) a pending payment intent.",
@@ -350,6 +410,10 @@
           "type": "string",
           "description": "Currency code (default: CREDITS). One of: CREDITS, USD, EUR, GBP, BTC, ETH",
           "default": "CREDITS"
+        },
+        "idempotency_key": {
+          "type": "string",
+          "description": "Unique key for idempotent creation. Same key returns same escrow."
         }
       },
       "required": [
@@ -1007,6 +1071,11 @@
         "limit": {
           "type": "integer",
           "default": 100
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "description": "Offset for pagination"
         }
       }
     },
@@ -1456,6 +1525,11 @@
           "type": "integer",
           "default": 50,
           "description": "Maximum number of deliveries to return"
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "description": "Offset for pagination"
         }
       },
       "required": [
@@ -1837,6 +1911,10 @@
         },
         "description": {
           "type": "string"
+        },
+        "idempotency_key": {
+          "type": "string",
+          "description": "Unique key for idempotent creation. Same key returns same subscription."
         }
       },
       "required": [
@@ -2441,6 +2519,74 @@
     "tier_required": "pro"
   },
   {
+    "name": "get_dispute",
+    "service": "disputes",
+    "description": "Get details of a dispute by its ID.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "dispute_id": {
+          "type": "string",
+          "description": "The dispute ID to look up"
+        }
+      },
+      "required": ["dispute_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "escrow_id": {"type": "string"},
+        "opener": {"type": "string"},
+        "respondent": {"type": "string"},
+        "status": {"type": "string"},
+        "reason": {"type": "string"},
+        "resolution": {"type": "string"},
+        "created_at": {"type": "number"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 200},
+    "tier_required": "free"
+  },
+  {
+    "name": "list_disputes",
+    "service": "disputes",
+    "description": "List disputes where the agent is opener or respondent.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "description": "The agent to list disputes for"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 50,
+          "description": "Maximum number of disputes to return"
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "description": "Offset for pagination"
+        }
+      },
+      "required": ["agent_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "disputes": {
+          "type": "array",
+          "items": {"type": "object"}
+        }
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 300},
+    "tier_required": "free"
+  },
+  {
     "name": "rotate_key",
     "service": "paywall",
     "description": "Rotate an API key: revoke the current key and create a new one with the same tier.",
@@ -2643,6 +2789,11 @@
         "limit": {
           "type": "integer",
           "default": 50
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "description": "Offset for pagination"
         }
       },
       "required": [
@@ -4564,6 +4715,56 @@
     "tier_required": "free"
   },
   {
+    "name": "freeze_wallet",
+    "service": "billing",
+    "description": "Freeze a wallet, blocking all deposits and withdrawals. Admin only.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "description": "The agent whose wallet to freeze"
+        }
+      },
+      "required": ["agent_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string"},
+        "frozen": {"type": "boolean"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 200},
+    "tier_required": "free"
+  },
+  {
+    "name": "unfreeze_wallet",
+    "service": "billing",
+    "description": "Unfreeze a wallet, allowing deposits and withdrawals again. Admin only.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "description": "The agent whose wallet to unfreeze"
+        }
+      },
+      "required": ["agent_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {"type": "string"},
+        "frozen": {"type": "boolean"}
+      }
+    },
+    "pricing": {"per_call": 0.0},
+    "sla": {"max_latency_ms": 200},
+    "tier_required": "free"
+  },
+  {
     "name": "create_org",
     "service": "identity",
     "description": "Create a new organization.",
@@ -4683,6 +4884,49 @@
     "tier_required": "free"
   },
   {
+    "name": "remove_agent_from_org",
+    "service": "identity",
+    "description": "Remove an agent from an organization. Cannot remove the last owner.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "org_id": {
+          "type": "string",
+          "description": "The organization ID"
+        },
+        "agent_id": {
+          "type": "string",
+          "description": "The agent to remove"
+        }
+      },
+      "required": [
+        "org_id",
+        "agent_id"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "org_id": {
+          "type": "string"
+        },
+        "agent_id": {
+          "type": "string"
+        },
+        "removed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
+    "tier_required": "free"
+  },
+  {
     "name": "list_api_keys",
     "service": "paywall",
     "description": "List all API keys for an agent. Returns truncated key hash prefix, tier, scopes, and created_at (never the full key or hash).",
@@ -4775,7 +5019,7 @@
     "sla": {
       "max_latency_ms": 200
     },
-    "tier_required": "starter"
+    "tier_required": "free"
   },
   {
     "name": "get_exchange_rate",

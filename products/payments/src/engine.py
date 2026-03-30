@@ -326,12 +326,19 @@ class PaymentEngine:
         description: str = "",
         timeout_hours: float | None = None,
         metadata: dict[str, Any] | None = None,
+        idempotency_key: str | None = None,
     ) -> Escrow:
         """Create an escrow: withdraw funds from payer and hold them."""
         if amount <= 0:
             raise PaymentError("Amount must be positive")
         if payer == payee:
             raise PaymentError("Payer and payee must be different agents")
+
+        # Idempotency check
+        if idempotency_key is not None:
+            existing = await self.storage.get_escrow_by_idempotency_key(idempotency_key)
+            if existing is not None:
+                return Escrow(**existing)
 
         timeout_at = None
         if timeout_hours is not None:
@@ -353,6 +360,7 @@ class PaymentEngine:
             description=description,
             timeout_at=timeout_at,
             metadata=metadata or {},
+            idempotency_key=idempotency_key,
         )
         await self.storage.insert_escrow(escrow.model_dump())
         return escrow
@@ -463,12 +471,19 @@ class PaymentEngine:
         interval: str,
         description: str = "",
         metadata: dict[str, Any] | None = None,
+        idempotency_key: str | None = None,
     ) -> Subscription:
         """Create a recurring payment subscription."""
         if amount <= 0:
             raise PaymentError("Amount must be positive")
         if payer == payee:
             raise PaymentError("Payer and payee must be different agents")
+
+        # Idempotency check
+        if idempotency_key is not None:
+            existing = await self.storage.get_subscription_by_idempotency_key(idempotency_key)
+            if existing is not None:
+                return Subscription(**existing)
 
         # Validate interval
         try:
@@ -484,6 +499,7 @@ class PaymentEngine:
             interval=sub_interval,
             description=description,
             metadata=metadata or {},
+            idempotency_key=idempotency_key,
         )
         # Set next_charge_at to the first billing cycle from now
         sub.next_charge_at = sub.compute_next_charge()
