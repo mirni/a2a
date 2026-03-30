@@ -42,8 +42,8 @@ from .models import (
     RegisterServiceResponse,
     RegisterWebhookResponse,
     RotateKeyResponse,
-    SearchServicesResponse,
     SearchServersResponse,
+    SearchServicesResponse,
     SendMessageResponse,
     ServiceMatch,
     SubmitMetricsResponse,
@@ -703,9 +703,7 @@ class A2AClient:
 
     async def add_agent_to_org(self, org_id: str, agent_id: str) -> AddAgentToOrgResponse:
         """Add an agent to an organization."""
-        result = await self.execute(
-            "add_agent_to_org", {"org_id": org_id, "agent_id": agent_id}
-        )
+        result = await self.execute("add_agent_to_org", {"org_id": org_id, "agent_id": agent_id})
         return AddAgentToOrgResponse.from_dict(result.result)
 
     # ----- Batch execution -----

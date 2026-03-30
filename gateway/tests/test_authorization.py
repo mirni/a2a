@@ -19,6 +19,7 @@ pytestmark = pytest.mark.asyncio
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 async def _create_agent(app, agent_id: str, tier: str = "free", balance: float = 1000.0) -> str:
     """Create a wallet + API key for an agent. Returns the raw API key."""
     ctx = app.state.ctx
@@ -52,6 +53,7 @@ async def _create_admin_agent(app, agent_id: str = "admin-agent") -> str:
 # ---------------------------------------------------------------------------
 # 1. agent_id param — own resources
 # ---------------------------------------------------------------------------
+
 
 class TestAgentIdOwnership:
     """Tools that take an agent_id param must match the caller's agent_id."""
@@ -115,6 +117,7 @@ class TestAgentIdOwnership:
 # ---------------------------------------------------------------------------
 # 2. payer param — payment tools
 # ---------------------------------------------------------------------------
+
 
 class TestPayerOwnership:
     """Tools that take a payer param must match the caller's agent_id."""
@@ -184,6 +187,7 @@ class TestPayerOwnership:
 # 3. sender param — messaging tools
 # ---------------------------------------------------------------------------
 
+
 class TestSenderOwnership:
     """Tools that take a sender param must match the caller's agent_id."""
 
@@ -231,6 +235,7 @@ class TestSenderOwnership:
 # ---------------------------------------------------------------------------
 # 4. Admin bypass
 # ---------------------------------------------------------------------------
+
 
 class TestAdminBypass:
     """Admin-tier keys should bypass all ownership checks."""
@@ -292,6 +297,7 @@ class TestAdminBypass:
 # 5. Tools without ownership params
 # ---------------------------------------------------------------------------
 
+
 class TestNoOwnershipParam:
     """Tools without agent_id/payer/sender should work for any authenticated caller."""
 
@@ -328,12 +334,14 @@ class TestNoOwnershipParam:
 # 6. Unit tests for the authorization function itself
 # ---------------------------------------------------------------------------
 
+
 class TestAuthorizationGuard:
     """Direct unit tests for the check_ownership_authorization function."""
 
     def test_matching_agent_id_returns_none(self):
         """No error when agent_id matches caller."""
         from gateway.src.authorization import check_ownership_authorization
+
         result = check_ownership_authorization(
             caller_agent_id="alice",
             caller_tier="free",
@@ -344,6 +352,7 @@ class TestAuthorizationGuard:
     def test_mismatched_agent_id_returns_error(self):
         """Returns error tuple when agent_id does not match."""
         from gateway.src.authorization import check_ownership_authorization
+
         result = check_ownership_authorization(
             caller_agent_id="alice",
             caller_tier="free",
@@ -355,6 +364,7 @@ class TestAuthorizationGuard:
     def test_mismatched_payer_returns_error(self):
         """Returns error tuple when payer does not match."""
         from gateway.src.authorization import check_ownership_authorization
+
         result = check_ownership_authorization(
             caller_agent_id="alice",
             caller_tier="free",
@@ -366,6 +376,7 @@ class TestAuthorizationGuard:
     def test_mismatched_sender_returns_error(self):
         """Returns error tuple when sender does not match."""
         from gateway.src.authorization import check_ownership_authorization
+
         result = check_ownership_authorization(
             caller_agent_id="alice",
             caller_tier="free",
@@ -377,6 +388,7 @@ class TestAuthorizationGuard:
     def test_admin_bypasses_agent_id_check(self):
         """Admin tier bypasses ownership checks."""
         from gateway.src.authorization import check_ownership_authorization
+
         result = check_ownership_authorization(
             caller_agent_id="admin-agent",
             caller_tier="admin",
@@ -387,6 +399,7 @@ class TestAuthorizationGuard:
     def test_admin_bypasses_payer_check(self):
         """Admin tier bypasses payer ownership checks."""
         from gateway.src.authorization import check_ownership_authorization
+
         result = check_ownership_authorization(
             caller_agent_id="admin-agent",
             caller_tier="admin",
@@ -397,6 +410,7 @@ class TestAuthorizationGuard:
     def test_admin_bypasses_sender_check(self):
         """Admin tier bypasses sender ownership checks."""
         from gateway.src.authorization import check_ownership_authorization
+
         result = check_ownership_authorization(
             caller_agent_id="admin-agent",
             caller_tier="admin",
@@ -407,6 +421,7 @@ class TestAuthorizationGuard:
     def test_no_ownership_param_returns_none(self):
         """No error when params have no ownership-relevant fields."""
         from gateway.src.authorization import check_ownership_authorization
+
         result = check_ownership_authorization(
             caller_agent_id="alice",
             caller_tier="free",
@@ -417,6 +432,7 @@ class TestAuthorizationGuard:
     def test_empty_params_returns_none(self):
         """No error for empty params dict."""
         from gateway.src.authorization import check_ownership_authorization
+
         result = check_ownership_authorization(
             caller_agent_id="alice",
             caller_tier="free",
@@ -427,6 +443,7 @@ class TestAuthorizationGuard:
     def test_multiple_ownership_fields_all_checked(self):
         """If both agent_id and payer are present, both must match."""
         from gateway.src.authorization import check_ownership_authorization
+
         # agent_id matches but payer doesn't
         result = check_ownership_authorization(
             caller_agent_id="alice",
@@ -439,6 +456,7 @@ class TestAuthorizationGuard:
     def test_error_message_includes_field_and_values(self):
         """Error message should specify which field failed."""
         from gateway.src.authorization import check_ownership_authorization
+
         result = check_ownership_authorization(
             caller_agent_id="alice",
             caller_tier="free",

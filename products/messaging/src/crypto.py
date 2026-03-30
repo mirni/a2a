@@ -73,14 +73,10 @@ class MessageCrypto:
         # Generate ephemeral X25519 keypair for forward secrecy
         ephemeral_private = X25519PrivateKey.generate()
         ephemeral_public = ephemeral_private.public_key()
-        ephemeral_public_hex = ephemeral_public.public_bytes(
-            Encoding.Raw, PublicFormat.Raw
-        ).hex()
+        ephemeral_public_hex = ephemeral_public.public_bytes(Encoding.Raw, PublicFormat.Raw).hex()
 
         # Parse recipient's precomputed X25519 public key
-        recipient_x25519_pub = X25519PublicKey.from_public_bytes(
-            bytes.fromhex(recipient_public_key_hex)
-        )
+        recipient_x25519_pub = X25519PublicKey.from_public_bytes(bytes.fromhex(recipient_public_key_hex))
 
         # ECDH: ephemeral private * recipient public -> shared secret
         shared_secret = ephemeral_private.exchange(recipient_x25519_pub)
@@ -128,14 +124,10 @@ class MessageCrypto:
                 or tampered ciphertext).
         """
         # Derive recipient's X25519 private key from Ed25519 seed
-        recipient_x25519_priv = MessageCrypto._ed25519_hex_to_x25519_private(
-            recipient_private_key_hex
-        )
+        recipient_x25519_priv = MessageCrypto._ed25519_hex_to_x25519_private(recipient_private_key_hex)
 
         # The sender_public_key_hex is the ephemeral X25519 public key
-        ephemeral_pub = X25519PublicKey.from_public_bytes(
-            bytes.fromhex(sender_public_key_hex)
-        )
+        ephemeral_pub = X25519PublicKey.from_public_bytes(bytes.fromhex(sender_public_key_hex))
 
         # ECDH: recipient private * ephemeral public -> shared secret
         shared_secret = recipient_x25519_priv.exchange(ephemeral_pub)

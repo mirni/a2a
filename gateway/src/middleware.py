@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import threading
 import time
 import uuid
 from collections.abc import Callable
@@ -391,9 +390,7 @@ class RequestTimeoutMiddleware:
     the request is cancelled and a 504 Gateway Timeout response is returned.
     """
 
-    def __init__(
-        self, app: Any, timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SECONDS
-    ) -> None:
+    def __init__(self, app: Any, timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SECONDS) -> None:
         self.app = app
         self.timeout_seconds = timeout_seconds
 
@@ -407,7 +404,7 @@ class RequestTimeoutMiddleware:
                 self.app(scope, receive, send),
                 timeout=self.timeout_seconds,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             _logger.warning(
                 "Request timed out after %.1fs: %s %s",
                 self.timeout_seconds,

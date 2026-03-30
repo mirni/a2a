@@ -42,7 +42,6 @@ from products.messaging.src.crypto import MessageCrypto
 from products.messaging.src.models import EncryptionMetadata, Message, MessageType
 from products.messaging.src.storage import MessageStorage
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -226,9 +225,7 @@ class TestEncryptionMetadataModel:
     def test_encryption_metadata_schema_extra(self):
         """Model must have json_schema_extra examples (CLAUDE.md requirement)."""
         schema = EncryptionMetadata.model_json_schema()
-        assert "examples" in schema or "example" in schema or any(
-            "examples" in str(v) for v in schema.values()
-        )
+        assert "examples" in schema or "example" in schema or any("examples" in str(v) for v in schema.values())
 
 
 # ===========================================================================
@@ -371,9 +368,7 @@ class TestGetMessagesDecryption:
         assert len(msgs) == 1
         assert msgs[0]["body"] == plaintext
 
-    async def test_get_messages_without_decrypt_key_returns_ciphertext(
-        self, api, storage, alice_keys, bob_keys
-    ):
+    async def test_get_messages_without_decrypt_key_returns_ciphertext(self, api, storage, alice_keys, bob_keys):
         alice_priv, _, _ = alice_keys
         _, _, bob_x25519_pub = bob_keys
         plaintext = "Should stay encrypted."

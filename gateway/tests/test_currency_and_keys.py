@@ -172,9 +172,10 @@ class TestMultiCurrencyPaymentTools:
         data = resp.json()
         # Should not be a schema validation error about unknown 'currency' field
         error = data.get("error", {})
-        assert "currency" not in str(error.get("message", "")).lower() or "unknown" not in str(
-            error.get("message", "")
-        ).lower()
+        assert (
+            "currency" not in str(error.get("message", "")).lower()
+            or "unknown" not in str(error.get("message", "")).lower()
+        )
 
 
 # ---------------------------------------------------------------------------

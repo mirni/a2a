@@ -17,7 +17,6 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-
 # ===========================================================================
 # Infrastructure dataclass models (unchanged wire-format)
 # ===========================================================================
@@ -111,9 +110,7 @@ class BalanceResponse(_ToolResponse):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [{"balance": "100.00"}]
-        },
+        json_schema_extra={"examples": [{"balance": "100.00"}]},
     )
 
 
@@ -124,9 +121,7 @@ class DepositResponse(_ToolResponse):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [{"new_balance": "200.00"}]
-        },
+        json_schema_extra={"examples": [{"new_balance": "200.00"}]},
     )
 
 
@@ -144,9 +139,7 @@ class PaymentIntentResponse(_ToolResponse):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [{"id": "intent_abc123", "status": "pending", "amount": "10.00"}]
-        },
+        json_schema_extra={"examples": [{"id": "intent_abc123", "status": "pending", "amount": "10.00"}]},
     )
 
 
@@ -159,9 +152,7 @@ class EscrowResponse(_ToolResponse):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [{"id": "escrow_abc123", "status": "held", "amount": "50.00"}]
-        },
+        json_schema_extra={"examples": [{"id": "escrow_abc123", "status": "held", "amount": "50.00"}]},
     )
 
 
@@ -174,9 +165,7 @@ class CancelEscrowResponse(_ToolResponse):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [{"id": "escrow_abc123", "status": "cancelled", "amount": "50.00"}]
-        },
+        json_schema_extra={"examples": [{"id": "escrow_abc123", "status": "cancelled", "amount": "50.00"}]},
     )
 
 
@@ -189,9 +178,7 @@ class VoidPaymentResponse(_ToolResponse):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [{"id": "intent_abc123", "status": "refunded", "amount": "10.00"}]
-        },
+        json_schema_extra={"examples": [{"id": "intent_abc123", "status": "refunded", "amount": "10.00"}]},
     )
 
 
@@ -258,9 +245,7 @@ class CancelSubscriptionResponse(_ToolResponse):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [{"id": "sub_abc123", "status": "cancelled"}]
-        },
+        json_schema_extra={"examples": [{"id": "sub_abc123", "status": "cancelled"}]},
     )
 
 
@@ -304,9 +289,7 @@ class ListSubscriptionsResponse(_ToolResponse):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [{"subscriptions": []}]
-        },
+        json_schema_extra={"examples": [{"subscriptions": []}]},
     )
 
 
@@ -324,9 +307,7 @@ class RegisterServiceResponse(_ToolResponse):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [{"id": "svc_abc123", "name": "MyService", "status": "active"}]
-        },
+        json_schema_extra={"examples": [{"id": "svc_abc123", "name": "MyService", "status": "active"}]},
     )
 
 
@@ -337,9 +318,7 @@ class SearchServicesResponse(_ToolResponse):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [{"services": [{"id": "svc_abc123", "name": "MyService"}]}]
-        },
+        json_schema_extra={"examples": [{"services": [{"id": "svc_abc123", "name": "MyService"}]}]},
     )
 
 
@@ -377,9 +356,7 @@ class RateServiceResponse(_ToolResponse):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [{"service_id": "svc_abc123", "agent_id": "agent-a", "rating": 5}]
-        },
+        json_schema_extra={"examples": [{"service_id": "svc_abc123", "agent_id": "agent-a", "rating": 5}]},
     )
 
 
@@ -393,9 +370,7 @@ class ServiceMatch(_ToolResponse):
     model_config = ConfigDict(
         extra="forbid",
         json_schema_extra={
-            "examples": [
-                {"service": {"id": "svc1"}, "rank_score": 0.95, "match_reasons": ["keyword_match"]}
-            ]
+            "examples": [{"service": {"id": "svc1"}, "rank_score": 0.95, "match_reasons": ["keyword_match"]}]
         },
     )
 
@@ -443,9 +418,7 @@ class SearchServersResponse(_ToolResponse):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [{"servers": [{"id": "srv1", "name": "Server1"}]}]
-        },
+        json_schema_extra={"examples": [{"servers": [{"id": "srv1", "name": "Server1"}]}]},
     )
 
 
@@ -464,9 +437,7 @@ class RegisterAgentResponse(_ToolResponse):
     model_config = ConfigDict(
         extra="forbid",
         json_schema_extra={
-            "examples": [
-                {"agent_id": "agent-a", "public_key": "ed25519_hex...", "created_at": 1700000000.0}
-            ]
+            "examples": [{"agent_id": "agent-a", "public_key": "ed25519_hex...", "created_at": 1700000000.0}]
         },
     )
 
@@ -503,9 +474,7 @@ class VerifyAgentResponse(_ToolResponse):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [{"valid": True}]
-        },
+        json_schema_extra={"examples": [{"valid": True}]},
     )
 
 
@@ -543,9 +512,7 @@ class GetVerifiedClaimsResponse(_ToolResponse):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [{"claims": []}]
-        },
+        json_schema_extra={"examples": [{"claims": []}]},
     )
 
 
@@ -579,9 +546,7 @@ class GetMessagesResponse(_ToolResponse):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [{"messages": []}]
-        },
+        json_schema_extra={"examples": [{"messages": []}]},
     )
 
 
@@ -649,9 +614,7 @@ class ListWebhooksResponse(_ToolResponse):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [{"webhooks": []}]
-        },
+        json_schema_extra={"examples": [{"webhooks": []}]},
     )
 
 
@@ -662,9 +625,7 @@ class DeleteWebhookResponse(_ToolResponse):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [{"deleted": True}]
-        },
+        json_schema_extra={"examples": [{"deleted": True}]},
     )
 
 
@@ -684,9 +645,7 @@ class CreateApiKeyResponse(_ToolResponse):
     model_config = ConfigDict(
         extra="forbid",
         json_schema_extra={
-            "examples": [
-                {"key": "a2a_free_abc123", "agent_id": "agent-a", "tier": "free", "created_at": 1700000000.0}
-            ]
+            "examples": [{"key": "a2a_free_abc123", "agent_id": "agent-a", "tier": "free", "created_at": 1700000000.0}]
         },
     )
 
@@ -702,9 +661,7 @@ class RotateKeyResponse(_ToolResponse):
     model_config = ConfigDict(
         extra="forbid",
         json_schema_extra={
-            "examples": [
-                {"new_key": "a2a_free_new123", "tier": "free", "agent_id": "agent-a", "revoked": True}
-            ]
+            "examples": [{"new_key": "a2a_free_new123", "tier": "free", "agent_id": "agent-a", "revoked": True}]
         },
     )
 
@@ -721,9 +678,7 @@ class PublishEventResponse(_ToolResponse):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [{"event_id": 42}]
-        },
+        json_schema_extra={"examples": [{"event_id": 42}]},
     )
 
 
@@ -734,9 +689,7 @@ class GetEventsResponse(_ToolResponse):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [{"events": []}]
-        },
+        json_schema_extra={"examples": [{"events": []}]},
     )
 
 
@@ -754,9 +707,7 @@ class CreateOrgResponse(_ToolResponse):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [{"org_id": "org_abc123", "name": "MyOrg", "created_at": 1700000000.0}]
-        },
+        json_schema_extra={"examples": [{"org_id": "org_abc123", "name": "MyOrg", "created_at": 1700000000.0}]},
     )
 
 
@@ -771,9 +722,7 @@ class GetOrgResponse(_ToolResponse):
     model_config = ConfigDict(
         extra="forbid",
         json_schema_extra={
-            "examples": [
-                {"org_id": "org_abc123", "name": "MyOrg", "created_at": 1700000000.0, "members": []}
-            ]
+            "examples": [{"org_id": "org_abc123", "name": "MyOrg", "created_at": 1700000000.0, "members": []}]
         },
     )
 
@@ -786,7 +735,5 @@ class AddAgentToOrgResponse(_ToolResponse):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [{"agent_id": "agent-a", "org_id": "org_abc123"}]
-        },
+        json_schema_extra={"examples": [{"agent_id": "agent-a", "org_id": "org_abc123"}]},
     )

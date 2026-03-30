@@ -27,9 +27,7 @@ class UnsupportedCurrencyError(Exception):
     def __init__(self, from_currency: Currency, to_currency: Currency) -> None:
         self.from_currency = from_currency
         self.to_currency = to_currency
-        super().__init__(
-            f"No exchange rate found for {from_currency.value} -> {to_currency.value}"
-        )
+        super().__init__(f"No exchange rate found for {from_currency.value} -> {to_currency.value}")
 
 
 # Default rates: all expressed as X -> CREDITS

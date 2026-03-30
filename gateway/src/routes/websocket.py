@@ -116,7 +116,7 @@ async def websocket_handler(websocket: WebSocket) -> None:
                 return
 
             if msg.get("type") != "auth":
-                await _send_error(websocket, "Authentication required. Send {\"type\": \"auth\", \"api_key\": \"...\"} first.")
+                await _send_error(websocket, 'Authentication required. Send {"type": "auth", "api_key": "..."} first.')
                 await websocket.close(code=1008)
                 return
 
@@ -282,9 +282,8 @@ class _WebSocketSession:
                     limit=100,
                 )
                 for event in events:
-                    if self._matches_pattern(event["event_type"], pattern):
-                        if self._passes_agent_filter(event):
-                            await self._send_event(event)
+                    if self._matches_pattern(event["event_type"], pattern) and self._passes_agent_filter(event):
+                        await self._send_event(event)
             else:
                 events = await self.ctx.event_bus.get_events(
                     event_type=pattern,
@@ -305,9 +304,7 @@ class _WebSocketSession:
                 sub_id = await self.ctx.event_bus.subscribe(
                     event_type="*",
                     handler=self._on_event,
-                    filter_fn=lambda event, p=pattern: self._matches_pattern(
-                        event.get("event_type", ""), p
-                    ),
+                    filter_fn=lambda event, p=pattern: self._matches_pattern(event.get("event_type", ""), p),
                 )
                 self._subscription_ids.append(sub_id)
             else:
@@ -332,9 +329,8 @@ class _WebSocketSession:
 
     async def _on_event(self, event: dict) -> None:
         """EventBus handler — push event to the WebSocket send queue."""
-        if self._filter_agent_id:
-            if not self._passes_agent_filter(event):
-                return
+        if self._filter_agent_id and not self._passes_agent_filter(event):
+            return
         await self._event_queue.put(event)
 
     async def _event_sender_loop(self) -> None:
@@ -350,12 +346,14 @@ class _WebSocketSession:
 
     async def _send_event(self, event: dict) -> None:
         """Format and send a single event to the WebSocket client."""
-        await self.websocket.send_json({
-            "type": "event",
-            "event_type": event["event_type"],
-            "data": event.get("payload", {}),
-            "id": event["id"],
-        })
+        await self.websocket.send_json(
+            {
+                "type": "event",
+                "event_type": event["event_type"],
+                "data": event.get("payload", {}),
+                "id": event["id"],
+            }
+        )
 
     async def _handle_unsubscribe(self) -> None:
         """Remove all active subscriptions."""
@@ -378,10 +376,12 @@ class _WebSocketSession:
         try:
             while True:
                 await asyncio.sleep(self.heartbeat_interval)
-                await self.websocket.send_json({
-                    "type": "heartbeat",
-                    "timestamp": int(time.time()),
-                })
+                await self.websocket.send_json(
+                    {
+                        "type": "heartbeat",
+                        "timestamp": int(time.time()),
+                    }
+                )
         except asyncio.CancelledError:
             pass
         except WebSocketDisconnect:

@@ -8,8 +8,9 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass
+from typing import Literal
 
-from .models import OrgMembership, Organization
+from .models import Organization, OrgMembership
 from .storage import IdentityStorage
 
 
@@ -107,7 +108,7 @@ class OrgAPI:
         self,
         org_id: str,
         agent_id: str,
-        role: str,
+        role: Literal["owner", "admin", "member"],
         requester_agent_id: str,
     ) -> OrgMembership:
         """Add an agent to an organization.
@@ -136,9 +137,7 @@ class OrgAPI:
         # Verify requester is owner or admin
         requester_membership = await self.storage.get_org_membership(org_id, requester_agent_id)
         if requester_membership is None or requester_membership.role not in ("owner", "admin"):
-            raise NotAuthorizedError(
-                f"Agent {requester_agent_id} is not authorized to add members to {org_id}"
-            )
+            raise NotAuthorizedError(f"Agent {requester_agent_id} is not authorized to add members to {org_id}")
 
         # Check if already a member
         existing = await self.storage.get_org_membership(org_id, agent_id)

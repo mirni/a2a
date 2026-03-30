@@ -106,7 +106,5 @@ async def admin_api_key(app, client):
     """
     ctx = app.state.ctx
     await ctx.tracker.wallet.create("admin-agent", initial_balance=5000.0, signup_bonus=False)
-    key_info = await ctx.key_manager.create_key(
-        "admin-agent", tier="pro", scopes=["read", "write", "admin"]
-    )
+    key_info = await ctx.key_manager.create_key("admin-agent", tier="pro", scopes=["read", "write", "admin"])
     return key_info["key"]

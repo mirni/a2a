@@ -6,7 +6,6 @@ alert evaluation, edge cases with insufficient data.
 
 from __future__ import annotations
 
-import math
 import time
 
 import pytest

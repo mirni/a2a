@@ -17,8 +17,8 @@ from .models import (
     AgentReputation,
     AuditorAttestation,
     MetricCommitment,
-    OrgMembership,
     Organization,
+    OrgMembership,
     VerifiedClaim,
 )
 
@@ -878,17 +878,13 @@ class IdentityStorage:
 
     async def is_nonce_used(self, nonce: str) -> bool:
         """Check if a nonce has already been used."""
-        cursor = await self.db.execute(
-            "SELECT 1 FROM submission_nonces WHERE nonce = ?", (nonce,)
-        )
+        cursor = await self.db.execute("SELECT 1 FROM submission_nonces WHERE nonce = ?", (nonce,))
         return await cursor.fetchone() is not None
 
     async def cleanup_expired_nonces(self, ttl_seconds: float = 300) -> int:
         """Delete nonces older than ttl_seconds. Returns count deleted."""
         cutoff = time.time() - ttl_seconds
-        cursor = await self.db.execute(
-            "DELETE FROM submission_nonces WHERE used_at < ?", (cutoff,)
-        )
+        cursor = await self.db.execute("DELETE FROM submission_nonces WHERE used_at < ?", (cutoff,))
         await self.db.commit()
         return cursor.rowcount
 
@@ -953,9 +949,7 @@ class IdentityStorage:
     ) -> dict[str, Any] | None:
         """Return the single most recent data point for an agent+metric."""
         cursor = await self.db.execute(
-            "SELECT * FROM metric_timeseries "
-            "WHERE agent_id = ? AND metric_name = ? "
-            "ORDER BY timestamp DESC LIMIT 1",
+            "SELECT * FROM metric_timeseries WHERE agent_id = ? AND metric_name = ? ORDER BY timestamp DESC LIMIT 1",
             (agent_id, metric_name),
         )
         row = await cursor.fetchone()

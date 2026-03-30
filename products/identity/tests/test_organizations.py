@@ -14,18 +14,16 @@ Covers:
 
 from __future__ import annotations
 
-from decimal import Decimal
-
 import pytest
 import pytest_asyncio
 
 from products.identity.src.models import Organization, OrgMembership
 from products.identity.src.org_api import (
-    OrgAPI,
-    OrgNotFoundError,
+    AlreadyMemberError,
     MemberNotFoundError,
     NotAuthorizedError,
-    AlreadyMemberError,
+    OrgAPI,
+    OrgNotFoundError,
 )
 from products.identity.src.storage import IdentityStorage
 
@@ -57,8 +55,11 @@ class TestOrganizationModel:
     def test_organization_schema_extra_exists(self):
         """Organization model must have json_schema_extra with example."""
         schema = Organization.model_json_schema()
-        assert "examples" in schema or "example" in schema or \
-            Organization.model_config.get("json_schema_extra") is not None
+        assert (
+            "examples" in schema
+            or "example" in schema
+            or Organization.model_config.get("json_schema_extra") is not None
+        )
 
     def test_organization_fields(self):
         """Organization must have required fields."""
@@ -174,7 +175,9 @@ class TestAddMember:
         """Owner can add a new member to the org."""
         org = await org_api.create_org(name="Team", owner_agent_id="owner")
         membership = await org_api.add_agent_to_org(
-            org_id=org.id, agent_id="member-1", role="member",
+            org_id=org.id,
+            agent_id="member-1",
+            role="member",
             requester_agent_id="owner",
         )
         assert membership.agent_id == "member-1"
@@ -188,12 +191,16 @@ class TestAddMember:
         org = await org_api.create_org(name="Team", owner_agent_id="owner")
         # First, add an admin
         await org_api.add_agent_to_org(
-            org_id=org.id, agent_id="admin-1", role="admin",
+            org_id=org.id,
+            agent_id="admin-1",
+            role="admin",
             requester_agent_id="owner",
         )
         # Admin adds a member
         membership = await org_api.add_agent_to_org(
-            org_id=org.id, agent_id="member-2", role="member",
+            org_id=org.id,
+            agent_id="member-2",
+            role="member",
             requester_agent_id="admin-1",
         )
         assert membership.role == "member"
@@ -203,12 +210,16 @@ class TestAddMember:
         """A regular member cannot add new members (NotAuthorizedError)."""
         org = await org_api.create_org(name="Team", owner_agent_id="owner")
         await org_api.add_agent_to_org(
-            org_id=org.id, agent_id="member-1", role="member",
+            org_id=org.id,
+            agent_id="member-1",
+            role="member",
             requester_agent_id="owner",
         )
         with pytest.raises(NotAuthorizedError):
             await org_api.add_agent_to_org(
-                org_id=org.id, agent_id="member-2", role="member",
+                org_id=org.id,
+                agent_id="member-2",
+                role="member",
                 requester_agent_id="member-1",
             )
 
@@ -217,12 +228,16 @@ class TestAddMember:
         """Adding an agent who is already a member should raise AlreadyMemberError."""
         org = await org_api.create_org(name="Team", owner_agent_id="owner")
         await org_api.add_agent_to_org(
-            org_id=org.id, agent_id="member-1", role="member",
+            org_id=org.id,
+            agent_id="member-1",
+            role="member",
             requester_agent_id="owner",
         )
         with pytest.raises(AlreadyMemberError):
             await org_api.add_agent_to_org(
-                org_id=org.id, agent_id="member-1", role="member",
+                org_id=org.id,
+                agent_id="member-1",
+                role="member",
                 requester_agent_id="owner",
             )
 
@@ -231,7 +246,9 @@ class TestAddMember:
         """Adding a member to a non-existent org raises OrgNotFoundError."""
         with pytest.raises(OrgNotFoundError):
             await org_api.add_agent_to_org(
-                org_id="no-such-org", agent_id="member-1", role="member",
+                org_id="no-such-org",
+                agent_id="member-1",
+                role="member",
                 requester_agent_id="owner",
             )
 
@@ -241,7 +258,9 @@ class TestAddMember:
         org = await org_api.create_org(name="Team", owner_agent_id="owner")
         with pytest.raises(NotAuthorizedError):
             await org_api.add_agent_to_org(
-                org_id=org.id, agent_id="member-1", role="member",
+                org_id=org.id,
+                agent_id="member-1",
+                role="member",
                 requester_agent_id="outsider",
             )
 
@@ -254,7 +273,9 @@ class TestRemoveMember:
         """Owner can remove a member from the org."""
         org = await org_api.create_org(name="Team", owner_agent_id="owner")
         await org_api.add_agent_to_org(
-            org_id=org.id, agent_id="member-1", role="member",
+            org_id=org.id,
+            agent_id="member-1",
+            role="member",
             requester_agent_id="owner",
         )
         await org_api.remove_agent_from_org(org_id=org.id, agent_id="member-1")
@@ -283,11 +304,15 @@ class TestGetOrgMembers:
         """get_org_members should return all members with correct roles."""
         org = await org_api.create_org(name="BigTeam", owner_agent_id="owner")
         await org_api.add_agent_to_org(
-            org_id=org.id, agent_id="admin-1", role="admin",
+            org_id=org.id,
+            agent_id="admin-1",
+            role="admin",
             requester_agent_id="owner",
         )
         await org_api.add_agent_to_org(
-            org_id=org.id, agent_id="member-1", role="member",
+            org_id=org.id,
+            agent_id="member-1",
+            role="member",
             requester_agent_id="owner",
         )
         members = await org_api.get_org_members(org.id)

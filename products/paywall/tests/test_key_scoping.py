@@ -16,9 +16,8 @@ from __future__ import annotations
 import time
 
 import pytest
-from src.keys import ExpiredKeyError, InvalidKeyError, KeyManager, KeyScopeError
+from src.keys import ExpiredKeyError, KeyManager, KeyScopeError
 from src.scoping import ScopeChecker, ToolScope
-
 
 # ---------------------------------------------------------------------------
 # ToolScope classification

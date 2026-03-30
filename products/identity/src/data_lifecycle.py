@@ -16,7 +16,6 @@ from dataclasses import dataclass
 
 from .storage import IdentityStorage
 
-
 # Default: 60 GB disk limit
 _DEFAULT_MAX_DB_BYTES = 60 * 1024 * 1024 * 1024
 
@@ -60,8 +59,7 @@ class DataLifecycleManager:
                 "INSERT OR REPLACE INTO metric_aggregates_daily "
                 "(agent_id, metric_name, day, avg_value, min_value, max_value, sample_count) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (g["agent_id"], g["metric_name"], g["day"],
-                 g["avg_val"], g["min_val"], g["max_val"], g["cnt"]),
+                (g["agent_id"], g["metric_name"], g["day"], g["avg_val"], g["min_val"], g["max_val"], g["cnt"]),
             )
 
         # Delete compressed raw rows
@@ -79,9 +77,7 @@ class DataLifecycleManager:
 
         Returns the number of daily rows deleted.
         """
-        cutoff_date = time.strftime(
-            "%Y-%m-%d", time.gmtime(time.time() - retention_days * 86400)
-        )
+        cutoff_date = time.strftime("%Y-%m-%d", time.gmtime(time.time() - retention_days * 86400))
         db = self.storage.db
 
         # Find distinct (agent_id, metric_name, month) groups older than cutoff
@@ -107,8 +103,7 @@ class DataLifecycleManager:
                 "INSERT OR REPLACE INTO metric_aggregates_monthly "
                 "(agent_id, metric_name, month, avg_value, min_value, max_value, sample_count) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (g["agent_id"], g["metric_name"], g["month"],
-                 g["avg_val"], g["min_val"], g["max_val"], g["cnt"]),
+                (g["agent_id"], g["metric_name"], g["month"], g["avg_val"], g["min_val"], g["max_val"], g["cnt"]),
             )
 
         # Delete compressed daily rows

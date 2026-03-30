@@ -35,8 +35,7 @@ class OrgSpendLimitExceededError(Exception):
         self.limit = limit
         self.spent = spent
         super().__init__(
-            f"Agent {agent_id}: spend limit exceeded. "
-            f"Requested {requested}, limit {limit}, already spent {spent}"
+            f"Agent {agent_id}: spend limit exceeded. Requested {requested}, limit {limit}, already spent {spent}"
         )
 
 
@@ -56,9 +55,7 @@ class OrgInsufficientCreditsError(Exception):
         self.org_id = org_id
         self.requested = requested
         self.available = available
-        super().__init__(
-            f"Org {org_id}: insufficient credits. Requested {requested}, available {available}"
-        )
+        super().__init__(f"Org {org_id}: insufficient credits. Requested {requested}, available {available}")
 
 
 def _decimal_to_atomic(value: Decimal) -> int:
@@ -85,9 +82,7 @@ class OrgBilling:
     # Org wallet lifecycle
     # -------------------------------------------------------------------
 
-    async def create_org_wallet(
-        self, org_id: str, initial_balance: Decimal = Decimal("0")
-    ) -> dict[str, Any]:
+    async def create_org_wallet(self, org_id: str, initial_balance: Decimal = Decimal("0")) -> dict[str, Any]:
         """Create an org wallet.
 
         Args:
@@ -233,9 +228,7 @@ class OrgBilling:
     # Spending reports
     # -------------------------------------------------------------------
 
-    async def get_org_spending(
-        self, org_id: str, agent_id: str | None = None
-    ) -> list[dict[str, Any]]:
+    async def get_org_spending(self, org_id: str, agent_id: str | None = None) -> list[dict[str, Any]]:
         """Get spending report for an organization.
 
         Args:

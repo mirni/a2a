@@ -5,7 +5,7 @@ and reputation scoring for agents.
 """
 
 from .api import IdentityAPI
-from .models import AgentIdentity, MetricSubmissionResult, OrgMembership, Organization, VerifiedClaim
+from .models import AgentIdentity, MetricSubmissionResult, Organization, OrgMembership, VerifiedClaim
 from .org_api import (
     AlreadyMemberError,
     MemberNotFoundError,

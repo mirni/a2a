@@ -694,8 +694,7 @@ CREATE INDEX IF NOT EXISTS idx_org_tx_agent ON org_transactions(org_id, agent_id
         """Atomically debit from org wallet. Returns (success, new_balance)."""
         now = time.time()
         cursor = await self.db.execute(
-            "UPDATE org_wallets SET balance = balance - ?, updated_at = ? "
-            "WHERE org_id = ? AND balance >= ?",
+            "UPDATE org_wallets SET balance = balance - ?, updated_at = ? WHERE org_id = ? AND balance >= ?",
             (amount_atomic, now, org_id, amount_atomic),
         )
         await self.db.commit()
@@ -716,8 +715,7 @@ CREATE INDEX IF NOT EXISTS idx_org_tx_agent ON org_transactions(org_id, agent_id
         """Register a member in the billing org_members table."""
         now = time.time()
         await self.db.execute(
-            "INSERT INTO org_members (org_id, agent_id, role, spend_limit, joined_at) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO org_members (org_id, agent_id, role, spend_limit, joined_at) VALUES (?, ?, ?, ?, ?)",
             (org_id, agent_id, role, spend_limit_atomic, now),
         )
         await self.db.commit()

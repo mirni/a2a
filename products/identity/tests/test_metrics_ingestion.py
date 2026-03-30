@@ -12,7 +12,6 @@ import time
 import pytest
 
 from products.identity.src.crypto import AgentCrypto
-from products.identity.src.models import SUPPORTED_METRICS
 
 
 class TestIngestMetrics:
@@ -140,9 +139,7 @@ class TestQueryMetrics:
     @pytest.mark.asyncio
     async def test_query_empty(self, api):
         """query for non-existent agent returns empty."""
-        rows = await api.query_agent_timeseries(
-            agent_id="no-data", metric_name="sharpe_30d"
-        )
+        rows = await api.query_agent_timeseries(agent_id="no-data", metric_name="sharpe_30d")
         assert rows == []
 
 

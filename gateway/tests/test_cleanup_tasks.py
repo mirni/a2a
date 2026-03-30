@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # RateEventsCleanup task tests
@@ -177,8 +176,6 @@ async def test_webhook_deliver_does_not_await_send():
     send_started = asyncio.Event()
     send_done = asyncio.Event()
 
-    original_send = manager._send
-
     async def slow_send(webhook, delivery_id, event):
         send_started.set()
         await asyncio.sleep(0.5)  # Simulate slow endpoint
@@ -214,16 +211,18 @@ async def test_webhook_deliver_semaphore_limits_concurrency():
     # Create 15 webhook rows to exceed the semaphore limit of 10
     rows = []
     for i in range(15):
-        rows.append({
-            "id": f"whk-{i:04d}",
-            "agent_id": "agent-1",
-            "url": f"https://example.com/hook{i}",
-            "event_types": '["test.event"]',
-            "secret": "secret",
-            "created_at": 1000.0,
-            "active": 1,
-            "filter_agent_ids": None,
-        })
+        rows.append(
+            {
+                "id": f"whk-{i:04d}",
+                "agent_id": "agent-1",
+                "url": f"https://example.com/hook{i}",
+                "event_types": '["test.event"]',
+                "secret": "secret",
+                "created_at": 1000.0,
+                "active": 1,
+                "filter_agent_ids": None,
+            }
+        )
 
     mock_cursor = AsyncMock()
     mock_cursor.fetchall = AsyncMock(return_value=rows)

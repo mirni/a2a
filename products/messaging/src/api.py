@@ -64,10 +64,7 @@ class MessagingAPI:
 
         if encrypt:
             if not sender_private_key_hex or not recipient_public_key_hex:
-                raise ValueError(
-                    "sender_private_key_hex and recipient_public_key_hex are "
-                    "required when encrypt=True"
-                )
+                raise ValueError("sender_private_key_hex and recipient_public_key_hex are required when encrypt=True")
 
             # Derive the recipient's X25519 public key from their Ed25519 private seed.
             # The caller passes recipient_public_key_hex which may be either:

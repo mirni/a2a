@@ -94,9 +94,7 @@ class NonceCleanup:
         """Polling loop -- calls cleanup_expired_nonces() every *interval* seconds."""
         while True:
             try:
-                deleted = await self.identity_storage.cleanup_expired_nonces(
-                    ttl_seconds=self.ttl_seconds
-                )
+                deleted = await self.identity_storage.cleanup_expired_nonces(ttl_seconds=self.ttl_seconds)
                 logger.info("NonceCleanup: removed %d expired nonces", deleted)
             except Exception:
                 logger.exception("NonceCleanup: unexpected error during cleanup")
@@ -170,9 +168,7 @@ class AggregateRefreshTask:
                 )
                 pairs = await cursor.fetchall()
                 for pair in pairs:
-                    await compute_moving_averages(
-                        self.identity_storage, pair["agent_id"], pair["metric_name"]
-                    )
+                    await compute_moving_averages(self.identity_storage, pair["agent_id"], pair["metric_name"])
                 if pairs:
                     logger.info("AggregateRefresh: refreshed %d agent-metric pairs", len(pairs))
             except Exception:

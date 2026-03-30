@@ -12,12 +12,10 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-import threading
 
 import pytest
 
 from gateway.src.middleware import Metrics
-
 
 # ---------------------------------------------------------------------------
 # P0: Integration tests — metrics pipeline wired end-to-end
@@ -41,9 +39,7 @@ async def test_metrics_endpoint_counts_after_requests(client, api_key):
     for line in text.splitlines():
         if line.startswith("a2a_requests_total "):
             value = int(line.split()[-1])
-            assert value >= n, (
-                f"Expected a2a_requests_total >= {n} after {n} health requests, got {value}"
-            )
+            assert value >= n, f"Expected a2a_requests_total >= {n} after {n} health requests, got {value}"
             break
     else:
         pytest.fail("a2a_requests_total line not found in /v1/metrics output")
@@ -64,9 +60,7 @@ async def test_metrics_errors_increment_on_bad_request(client):
     for line in text.splitlines():
         if line.startswith("a2a_errors_total "):
             value = int(line.split()[-1])
-            assert value >= 1, (
-                f"Expected a2a_errors_total >= 1 after a 400 error, got {value}"
-            )
+            assert value >= 1, f"Expected a2a_errors_total >= 1 after a 400 error, got {value}"
             break
     else:
         pytest.fail("a2a_errors_total line not found in /v1/metrics output")
@@ -85,9 +79,7 @@ async def test_metrics_latency_recorded_after_requests(client):
     for line in text.splitlines():
         if line.startswith("a2a_request_duration_ms_count "):
             value = int(line.split()[-1])
-            assert value >= 1, (
-                f"Expected a2a_request_duration_ms_count >= 1 after request, got {value}"
-            )
+            assert value >= 1, f"Expected a2a_request_duration_ms_count >= 1 after request, got {value}"
             break
     else:
         pytest.fail("a2a_request_duration_ms_count not found in /v1/metrics output")
@@ -101,17 +93,18 @@ async def test_metrics_latency_recorded_after_requests(client):
 def test_metrics_does_not_use_threading_lock():
     """Metrics._lock must NOT be a threading.Lock (blocks event loop)."""
     lock = Metrics._lock
-    assert not isinstance(lock, (threading.Lock, type(threading.Lock()))), (
-        f"Metrics._lock is {type(lock).__name__}, expected asyncio.Lock"
+    # threading.Lock() returns a _thread.lock instance; check by type name
+    # since threading.Lock is a factory function, not a class in newer Python.
+    lock_type_name = type(lock).__name__
+    assert lock_type_name != "lock" and lock_type_name != "Lock", (
+        f"Metrics._lock is {lock_type_name}, expected asyncio.Lock"
     )
 
 
 def test_metrics_uses_asyncio_lock():
     """Metrics._lock must be an asyncio.Lock instance."""
     lock = Metrics._lock
-    assert isinstance(lock, asyncio.Lock), (
-        f"Metrics._lock is {type(lock).__name__}, expected asyncio.Lock"
-    )
+    assert isinstance(lock, asyncio.Lock), f"Metrics._lock is {type(lock).__name__}, expected asyncio.Lock"
 
 
 def test_metrics_record_request_is_async():
@@ -123,9 +116,7 @@ def test_metrics_record_request_is_async():
 
 def test_metrics_record_error_is_async():
     """Metrics.record_error must be an async (coroutine) function."""
-    assert inspect.iscoroutinefunction(Metrics.record_error), (
-        "Metrics.record_error should be async to use asyncio.Lock"
-    )
+    assert inspect.iscoroutinefunction(Metrics.record_error), "Metrics.record_error should be async to use asyncio.Lock"
 
 
 def test_metrics_record_latency_is_async():
