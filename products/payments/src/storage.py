@@ -162,10 +162,12 @@ class PaymentStorage:
             ("subscriptions", "idempotency_key", "TEXT"),
         ]
         for table, column, col_type in migrations:
-            cursor = await self._db.execute(f"PRAGMA table_info({table})")
+            cursor = await self._db.execute(  # nosemgrep: formatted-sql-query, sqlalchemy-execute-raw-query
+                f"PRAGMA table_info({table})"
+            )
             columns = [row[1] for row in await cursor.fetchall()]
             if columns and column not in columns:
-                await self._db.execute(
+                await self._db.execute(  # nosemgrep: formatted-sql-query, sqlalchemy-execute-raw-query
                     f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"
                 )
         await self._db.commit()
