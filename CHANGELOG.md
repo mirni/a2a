@@ -1,5 +1,39 @@
 # Changelog
 
+# Release v0.6.0
+
+**Date:** 2026-03-31
+**Commit:** 1acdc903
+**Previous:** v0.5.3
+
+## Changes
+
+### Refactoring
+
+- refactor: optimize CI/CD pipeline — lightweight PRs, thorough releases (#20) (`1acdc90`)
+- refactor: migrate gateway from Starlette to FastAPI (#19) (`cd06118`)
+- refactor: organize .md files into structured directories (`de4f286`)
+
+### Documentation
+
+- docs: API design review — Richardson Maturity Model assessment (`a0e8dd7`)
+
+### Other
+
+- Add _EXAMPLE.md for humand and _INSTRUTIONS_FO_CLAUDE.md for claude on how to treat the tasks/ files (`0d459a0`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 0.6.0 |
+| a2a-gateway | 0.6.0 |
+| a2a-gateway-sandbox | 0.6.0 |
+| a2a-gateway-test | 0.6.0 |
+| a2a-website | 0.6.0 |
+---
+
+
 # Release v0.4.9
 
 **Date:** 2026-03-31
