@@ -561,13 +561,36 @@ git -C "$REPO_ROOT" push origin "v${VERSION}"
 log "Created and pushed tag v${VERSION}"
 
 # ---------------------------------------------------------------------------
-# Step 11: Summary
+# Step 11: Update main with release
+# ---------------------------------------------------------------------------
+
+header "Step 11: Update main branch"
+
+git -C "$REPO_ROOT" checkout main
+git -C "$REPO_ROOT" pull origin main
+git -C "$REPO_ROOT" merge --no-ff "$RELEASE_BRANCH" -m "$(cat <<EOF
+Merge release v${VERSION} into main
+
+Release branch: ${RELEASE_BRANCH}
+Component: ${COMPONENT}
+EOF
+)"
+git -C "$REPO_ROOT" push origin main
+log "Merged ${RELEASE_BRANCH} into main"
+
+# Clean up release branch
+git -C "$REPO_ROOT" branch -d "$RELEASE_BRANCH"
+git -C "$REPO_ROOT" push origin --delete "$RELEASE_BRANCH"
+log "Deleted release branch ${RELEASE_BRANCH}"
+
+# ---------------------------------------------------------------------------
+# Step 12: Summary
 # ---------------------------------------------------------------------------
 
 header "Release v${VERSION} Complete"
 echo ""
 log "Version:    v${VERSION}"
-log "Branch:     ${RELEASE_BRANCH}"
+log "Branch:     main (merged from ${RELEASE_BRANCH})"
 log "Commit:     ${RELEASE_SHA:0:8}"
 log "Component:  ${COMPONENT}"
 log "Tag:        v${VERSION}"
@@ -575,6 +598,4 @@ log "Deploy run: gh run view ${RUN_ID}"
 echo ""
 info "Next steps:"
 info "  - Verify production: curl -sf https://api.greenhelix.net/v1/health"
-info "  - Merge release branch to main: gh pr create --base main --head ${RELEASE_BRANCH}"
-info "  - Delete release branch after merge"
 echo ""
