@@ -6253,3 +6253,31 @@ gateway/tests/test_openapi_error_schema.py::test_actual_error_response_matches_s
 
 ### Files Created
 - `gateway/tests/test_openapi_error_schema.py` -- 3 tests for ErrorResponse schema correctness
+
+---
+
+## Session — 2026-03-31 (continued)
+
+### Task: API Design Review (Richardson Maturity Model)
+
+**Prompt:** Assume role of Sr. SW Architect. Review current API design, propose refactoring to Richardson Maturity Model Level 2 and 3.
+
+**Output:** `tasks/backlog/claude-api-review.md` — comprehensive review with:
+- Current state: Level 1 with partial Level 2 (single-endpoint RPC pattern via POST /v1/execute)
+- 32-item actionable TODO list across 4 priority tiers
+- Phased migration strategy: Level 2 foundation → resource endpoints → HATEOAS → deprecation
+- Key recommendations: RFC 9457 errors, cursor pagination, Idempotency-Key header, ISO 8601 timestamps, string-serialized Decimals, ETag/conditional GET support
+- Risk assessment and standards references
+
+No code changes made (research-only task).
+
+### Task: Organize .md Files
+
+Reorganized all markdown files into structured directories:
+- `docs/infra/` — infrastructure docs
+- `reports/customer/`, `reports/archive/` — analysis output (gitignored)
+- `tasks/{backlog,active,done}/` — human↔Claude task queue
+- `logs/` — session transcripts
+- `plans/` — living strategic documents
+
+Updated CLAUDE.md with directory layout, task workflow, and PR conventions.
