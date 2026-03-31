@@ -6311,3 +6311,12 @@ Updated `tasks/backlog/claude-api-review.md` to reflect:
 - Collapsed 4 migration phases into 3 direct implementation phases
 - Removed obsolete Starlette references, sunset/deprecation items
 - Goal: reach HATEOAS directly
+
+**Task 3: Fix Staging Deployment** (same PR #20)
+
+Root cause: deb postinst scripts still installed `starlette>=0.37` instead of `fastapi>=0.115` after the Starlette→FastAPI migration. Fixed:
+- Updated all 3 postinst scripts (prod, test, sandbox) to install `fastapi>=0.115`
+- Bumped `cryptography` to `>=46.0` across all dep lists
+- Added Step 11 to `release.sh`: merge release branch back to main + cleanup
+
+CI result: all 4 jobs green (quality, test, package, staging).
