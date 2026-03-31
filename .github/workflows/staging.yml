@@ -72,7 +72,7 @@ jobs:
             --host "${{ secrets.TAILSCALE_IP }}" \
             --deb "$(ls dist/a2a-gateway-test_*.deb | head -1)" \
             --component a2a-gateway-test \
-            --ssh-cmd "tailscale ssh" \
+            --ssh-cmd "tailscale ssh -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null" \
             --health-url "https://test.greenhelix.net/v1/health"
 
   # ---------------------------------------------------------------------------
