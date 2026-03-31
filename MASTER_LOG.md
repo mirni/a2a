@@ -6111,3 +6111,145 @@ Completed all 29 items in PLAN_v2.md across P0-P4 priority tiers. Used parallel 
 ### Test Counts
 - Gateway: 871 tests passing
 - Billing: 202 tests passing
+
+## Session 19 — 2026-03-31: CTO Review of v2 Customer Reports + PLAN_v2.md
+
+### Prompt
+
+> Assume role of CTO. Process the customer reports in customer_reports/*, weigh against current implementation, and create actionable todo items in PLAN_v2.md. Add items from MASTER_LOG.md findings. Add CI coverage calculation task.
+
+### Actions Taken
+
+1. **Processed 27 customer report files** (25 individual agent reports + v2 master report, totaling ~700KB / 13,910 lines of analysis from 25 domain-specific agents making ~1,652 live requests against the API).
+
+2. **Cross-referenced against MASTER_LOG.md** (18 previous sessions, 5,896 lines) to identify:
+   - Items already resolved (ownership validation, Prometheus metrics, SSE auth, integer money storage, migration framework, monitoring stack, etc.)
+   - Items still broken (payments/messaging OperationalErrors, exchange rate UnsupportedCurrencyError)
+   - New items from v2 report not previously identified
+
+3. **Created PLAN_v2.md** with 29 actionable items organized into 6 priority tiers:
+   - **P0 (7 items):** Security critical — pg_execute SQL restriction, ownership validation audit, freeze_wallet tier fix, webhook SSRF prevention, backup key leak, key tier escalation, dispute impersonation
+   - **P1 (5 items):** Database/data integrity — payments migration, messaging migration, exchange rate fix, idempotency keys, atomic convert_currency
+   - **P2 (8 items):** Feature gaps — get_budget_cap, multi-currency in gateway tools, list_intents/list_escrows, pagination, audit log access control, key TTL, self-service registration, register_server
+   - **P3 (7 items):** Developer experience — OpenAPI error schema, CORS, security headers, tool name sanitization, extra=forbid, JSON 413, naming standardization
+   - **P4 (2 items):** CI/CD — coverage reporting in GitHub, SDK tests in CI
+   - **P5 (7 items):** Strategic planning only — tier restructuring, enterprise tier, health check all DBs, x402 docs, bootstrap_agent, event_bus integration
+
+4. **Added implementation ordering** for overnight session (6 phases, 29 items).
+
+### Key Findings from v2 Customer Reports
+
+- **Security scored 3.0/10 (D)** — 4 critical (CVSS 9.0+), 7 high findings. pg_execute arbitrary SQL is the most severe.
+- **Data Integrity scored 6.2/10 (C+)** — Only 5.3% idempotency coverage (3/57 mutating tools). Zero concurrency controls.
+- **DX scored 5.7/10 (C)** — OpenAPI error schema mismatch, 29 opaque output schemas, inconsistent naming.
+- **Overall composite: 5.7/10 (C+)** — Vision is A+ (9.5/10), execution is lagging.
+- **Server-side performance is excellent** — 0.84ms avg, sub-300ms P99 at 100 concurrent. Zero 500-class errors.
+- **DNS latency is the dominant bottleneck** — 60-70% of requests hit 5s DNS penalty, violating 79.2% of SLA promises.
+
+### v2 Report Scores vs Current Implementation
+
+| v2 Finding | Status |
+|------------|--------|
+| S-01: pg_execute arbitrary SQL | NOT FIXED — in PLAN_v2 P0-1 |
+| S-02: No ownership validation | PARTIALLY FIXED — authorization.py exists, needs audit |
+| S-03: Escrow/payment IDOR | PARTIALLY FIXED — needs verification |
+| S-04: freeze_wallet at free tier | NOT FIXED — in PLAN_v2 P0-3 |
+| S-05: SSRF via webhooks | NOT FIXED — in PLAN_v2 P0-4 |
+| S-06: backup key leak / path traversal | NOT FIXED — in PLAN_v2 P0-5 |
+| H-1: No rate limiting | FIXED — functional rate limiting with per-tier limits |
+| H-8: Float64 for amounts | FIXED — INTEGER storage with SCALE=10^8 (Session 18) |
+| H-9: DNS latency | INFRASTRUCTURE — not code-fixable |
+| H-10: OpenAPI error schema mismatch | NOT FIXED — in PLAN_v2 P3-1 |
+
+### Files Created
+- `PLAN_v2.md` — 29-item implementation plan with priority tiers and ordering
+
+---
+
+## Session 20: P2-6 — Verify and Enforce API Key TTL/Expiration
+
+**Date:** 2026-03-31
+**Prompt:** Implement P2-6 from PLAN_v2.md: Verify and enforce API key TTL/expiration.
+
+### Research Findings
+
+Expiration enforcement is **already fully implemented** across all layers:
+
+1. **Storage layer** (`products/paywall/src/storage.py`): `expires_at REAL` column exists in `api_keys` table schema. The `store_key` method accepts and persists `expires_at`. The `lookup_key` method returns `expires_at` in the result.
+
+2. **Key manager** (`products/paywall/src/keys.py`): `validate_key` checks expiration at line 137:
+   ```python
+   if record.get("expires_at") is not None and record["expires_at"] < time.time():
+       raise ExpiredKeyError("API key has expired")
+   ```
+
+3. **Error handling** (`gateway/src/errors.py`): `ExpiredKeyError` is mapped to HTTP 401 with code `expired_key`.
+
+4. **Gateway execution** (`gateway/src/routes/execute.py`): `validate_key` is called at line 226 with exceptions routed through `handle_product_exception`, which correctly converts `ExpiredKeyError` to 401.
+
+5. **Key creation** (`products/paywall/src/keys.py`): `create_key` accepts optional `expires_at` parameter (defaults to None = no expiration).
+
+### Tests Added
+
+Created `gateway/tests/test_key_expiration.py` with 10 comprehensive tests:
+
+**Gateway HTTP layer (4 tests):**
+- `test_expired_key_returns_401` — expired key rejected with 401 and `expired_key` error code
+- `test_expired_key_error_message_is_informative` — error message mentions "expired"
+- `test_future_expiry_key_succeeds` — key with future expiration works (200)
+- `test_no_expiry_key_succeeds` — key with no expiration works (200)
+
+**KeyManager unit-level (3 tests):**
+- `test_key_manager_raises_expired_key_error` — validates `ExpiredKeyError` raised directly
+- `test_key_manager_accepts_future_key` — validates future key accepted
+- `test_key_manager_accepts_no_expiry_key` — validates None expiry accepted
+
+**Storage persistence (3 tests):**
+- `test_expires_at_stored_on_creation` — expires_at stored correctly
+- `test_expires_at_none_by_default` — defaults to None
+- `test_expires_at_persisted_in_lookup` — persisted and retrievable via lookup
+
+All 10 tests pass. No source code changes needed — only test coverage added.
+
+### Output
+```
+10 passed in 2.08s
+```
+
+### Files Created
+- `gateway/tests/test_key_expiration.py` — 10 tests for API key TTL/expiration enforcement
+
+---
+
+## Session: P3-1 Fix OpenAPI ErrorResponse Schema (2026-03-31)
+
+### Prompt
+Implement P3-1 from PLAN_v2.md: Fix the OpenAPI ErrorResponse schema to match the live API format.
+
+### Changes
+
+**Problem:** The OpenAPI spec documented `ErrorResponse` as `{"error": "string", "detail": "string"}`, but the live API (via `error_response()` in `gateway/src/errors.py`) returns `{"success": false, "error": {"code": "...", "message": "..."}, "request_id": "..."}`.
+
+**Fix:** Updated the `ErrorResponse` schema in `gateway/src/openapi.py` to match the actual format:
+- `success` (boolean, required) -- always false for errors
+- `error` (object, required) -- contains `code` (string) and `message` (string)
+- `request_id` (string, optional) -- correlation ID when available
+
+**Tests:** Created `gateway/tests/test_openapi_error_schema.py` with 3 tests:
+1. `test_error_response_schema_has_correct_structure` -- verifies schema shape
+2. `test_error_response_schema_must_not_have_legacy_fields` -- verifies old `detail` field is gone
+3. `test_actual_error_response_matches_schema` -- validates a real API error against the schema using jsonschema
+
+```
+gateway/tests/test_openapi_error_schema.py::test_error_response_schema_has_correct_structure PASSED
+gateway/tests/test_openapi_error_schema.py::test_error_response_schema_must_not_have_legacy_fields PASSED
+gateway/tests/test_openapi_error_schema.py::test_actual_error_response_matches_schema PASSED
+3 passed in 0.92s
+```
+
+### Files Modified
+- `gateway/src/openapi.py` -- updated ErrorResponse schema
+- `PLAN_v2.md` -- marked P3-1 checkboxes as done
+
+### Files Created
+- `gateway/tests/test_openapi_error_schema.py` -- 3 tests for ErrorResponse schema correctness
