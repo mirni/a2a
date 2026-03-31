@@ -1,15 +1,19 @@
 # =============================================================================
 # A2A Commerce Platform — CI Pipeline
 # =============================================================================
-# Runs on every push and pull request (all branches).
+# Runs on pushes to main and on all pull requests.
 # Tests all modules independently to catch import/isolation issues.
 # Quality checks run as independent jobs so one failure doesn't block others.
+#
+# NOTE: push is limited to main to avoid duplicate CI runs on PR branches
+# (GitHub fires both push and pull_request events for PR branch pushes).
 # =============================================================================
 
 name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 jobs:
