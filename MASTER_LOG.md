@@ -6002,3 +6002,38 @@ All 10 tests pass. No source code changes needed — only test coverage added.
 
 ### Files Created
 - `gateway/tests/test_key_expiration.py` — 10 tests for API key TTL/expiration enforcement
+
+---
+
+## Session: P3-1 Fix OpenAPI ErrorResponse Schema (2026-03-31)
+
+### Prompt
+Implement P3-1 from PLAN_v2.md: Fix the OpenAPI ErrorResponse schema to match the live API format.
+
+### Changes
+
+**Problem:** The OpenAPI spec documented `ErrorResponse` as `{"error": "string", "detail": "string"}`, but the live API (via `error_response()` in `gateway/src/errors.py`) returns `{"success": false, "error": {"code": "...", "message": "..."}, "request_id": "..."}`.
+
+**Fix:** Updated the `ErrorResponse` schema in `gateway/src/openapi.py` to match the actual format:
+- `success` (boolean, required) -- always false for errors
+- `error` (object, required) -- contains `code` (string) and `message` (string)
+- `request_id` (string, optional) -- correlation ID when available
+
+**Tests:** Created `gateway/tests/test_openapi_error_schema.py` with 3 tests:
+1. `test_error_response_schema_has_correct_structure` -- verifies schema shape
+2. `test_error_response_schema_must_not_have_legacy_fields` -- verifies old `detail` field is gone
+3. `test_actual_error_response_matches_schema` -- validates a real API error against the schema using jsonschema
+
+```
+gateway/tests/test_openapi_error_schema.py::test_error_response_schema_has_correct_structure PASSED
+gateway/tests/test_openapi_error_schema.py::test_error_response_schema_must_not_have_legacy_fields PASSED
+gateway/tests/test_openapi_error_schema.py::test_actual_error_response_matches_schema PASSED
+3 passed in 0.92s
+```
+
+### Files Modified
+- `gateway/src/openapi.py` -- updated ErrorResponse schema
+- `PLAN_v2.md` -- marked P3-1 checkboxes as done
+
+### Files Created
+- `gateway/tests/test_openapi_error_schema.py` -- 3 tests for ErrorResponse schema correctness

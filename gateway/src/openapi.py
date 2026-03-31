@@ -282,18 +282,35 @@ def generate_openapi_spec() -> dict:
                 "ErrorResponse": {
                     "type": "object",
                     "properties": {
-                        "error": {
-                            "type": "string",
-                            "description": "Machine-readable error code.",
-                            "example": "tool_not_found",
+                        "success": {
+                            "type": "boolean",
+                            "description": "Always false for error responses.",
+                            "example": False,
                         },
-                        "detail": {
+                        "error": {
+                            "type": "object",
+                            "description": "Error details.",
+                            "properties": {
+                                "code": {
+                                    "type": "string",
+                                    "description": "Machine-readable error code.",
+                                    "example": "tool_not_found",
+                                },
+                                "message": {
+                                    "type": "string",
+                                    "description": "Human-readable error description.",
+                                    "example": "Tool 'nonexistent' is not in the catalog.",
+                                },
+                            },
+                            "required": ["code", "message"],
+                        },
+                        "request_id": {
                             "type": "string",
-                            "description": "Human-readable error description.",
-                            "example": "Tool 'nonexistent' is not in the catalog.",
+                            "description": "Correlation ID for the request (present when available).",
+                            "example": "abc-123-def-456",
                         },
                     },
-                    "required": ["error", "detail"],
+                    "required": ["success", "error"],
                 },
                 # Per-tool output schemas for key tools
                 "GetBalanceOutput": {
