@@ -13,7 +13,6 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-
 from src.storage import StorageBackend
 from src.wallet import InsufficientCreditsError, Wallet
 
