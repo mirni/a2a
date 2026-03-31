@@ -104,6 +104,11 @@ build_deb() {
         cp -rL "$pkg_src/opt" "$dest/opt"
     fi
 
+    # Copy etc/ (nginx configs, systemd units) preserving structure
+    if [[ -d "$pkg_src/etc" ]]; then
+        cp -r "$pkg_src/etc" "$dest/etc"
+    fi
+
     # Copy usr/ preserving symlinks — these are install-time symlinks
     # (e.g., /usr/local/bin/deploy_a2a.sh → /opt/a2a/scripts/deploy_a2a.sh)
     # that should remain as symlinks in the deb
