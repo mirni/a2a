@@ -228,7 +228,11 @@ class Wallet:
         try:
             # Debit source currency
             debit_ok = await self.storage._debit_in_txn(
-                db, agent_id, amt_debit, from_currency, now,
+                db,
+                agent_id,
+                amt_debit,
+                from_currency,
+                now,
             )
             if not debit_ok:
                 available = await self.storage.get_currency_balance(agent_id, from_currency)
@@ -236,19 +240,37 @@ class Wallet:
 
             # Credit target currency
             await self.storage._credit_in_txn(
-                db, agent_id, amt_credit, to_currency, now,
+                db,
+                agent_id,
+                amt_credit,
+                to_currency,
+                now,
             )
 
             # Record transactions inside the same DB transaction
             await db.execute(
                 "INSERT INTO transactions (agent_id, amount, tx_type, description, currency, created_at) "
                 "VALUES (?, ?, ?, ?, ?, ?)",
-                (agent_id, -int(_Decimal(str(amount)) * self.storage._scale()), "withdrawal", description, from_currency, now),
+                (
+                    agent_id,
+                    -int(_Decimal(str(amount)) * self.storage._scale()),
+                    "withdrawal",
+                    description,
+                    from_currency,
+                    now,
+                ),
             )
             await db.execute(
                 "INSERT INTO transactions (agent_id, amount, tx_type, description, currency, created_at) "
                 "VALUES (?, ?, ?, ?, ?, ?)",
-                (agent_id, int(_Decimal(str(to_amount)) * self.storage._scale()), "deposit", description, to_currency, now),
+                (
+                    agent_id,
+                    int(_Decimal(str(to_amount)) * self.storage._scale()),
+                    "deposit",
+                    description,
+                    to_currency,
+                    now,
+                ),
             )
 
             await db.commit()

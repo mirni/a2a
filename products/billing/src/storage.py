@@ -696,8 +696,7 @@ CREATE INDEX IF NOT EXISTS idx_org_tx_agent ON org_transactions(org_id, agent_id
         """
         if currency == "CREDITS":
             cursor = await db.execute(
-                "UPDATE wallets SET balance = balance - ?, updated_at = ? "
-                "WHERE agent_id = ? AND balance >= ?",
+                "UPDATE wallets SET balance = balance - ?, updated_at = ? WHERE agent_id = ? AND balance >= ?",
                 (amt_atomic, now, agent_id, amt_atomic),
             )
         else:
@@ -722,8 +721,7 @@ CREATE INDEX IF NOT EXISTS idx_org_tx_agent ON org_transactions(org_id, agent_id
         """
         if currency == "CREDITS":
             await db.execute(
-                "UPDATE wallets SET balance = balance + ?, updated_at = ? "
-                "WHERE agent_id = ?",
+                "UPDATE wallets SET balance = balance + ?, updated_at = ? WHERE agent_id = ?",
                 (amt_atomic, now, agent_id),
             )
         else:
