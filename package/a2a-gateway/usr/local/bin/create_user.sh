@@ -1,1 +1,1 @@
-../../opt/a2a/scripts/create_user.sh
+../../../../../scripts/create_user.sh

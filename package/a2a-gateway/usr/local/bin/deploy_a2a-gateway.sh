@@ -1,1 +1,1 @@
-../../opt/a2a/scripts/deploy_a2a-gateway.sh
+../../../../../scripts/deploy_a2a-gateway.sh

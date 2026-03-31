@@ -109,11 +109,11 @@ build_deb() {
         cp -r "$pkg_src/etc" "$dest/etc"
     fi
 
-    # Copy usr/ preserving symlinks — these are install-time symlinks
-    # (e.g., /usr/local/bin/deploy_a2a.sh → /opt/a2a/scripts/deploy_a2a.sh)
-    # that should remain as symlinks in the deb
+    # Copy usr/ with symlink dereferencing — repo-relative symlinks
+    # (e.g., usr/local/bin/deploy_a2a.sh → ../../../../../scripts/deploy_a2a.sh)
+    # are resolved to real files in the deb
     if [[ -d "$pkg_src/usr" ]]; then
-        cp -r "$pkg_src/usr" "$dest/usr"
+        cp -rL "$pkg_src/usr" "$dest/usr"
     fi
 
     # Ensure DEBIAN scripts are executable
@@ -126,8 +126,8 @@ build_deb() {
     fi
 
     # Make all .sh scripts executable in the package (only real files)
-    find "$dest/opt" -name '*.sh' -type f -exec chmod 755 {} + 2>/dev/null || true
-    find "$dest/opt" -name '*.bash' -type f -exec chmod 644 {} + 2>/dev/null || true
+    find "$dest/opt" "$dest/usr" -name '*.sh' -type f -exec chmod 755 {} + 2>/dev/null || true
+    find "$dest/opt" "$dest/usr" -name '*.bash' -type f -exec chmod 644 {} + 2>/dev/null || true
 
     # Build the deb
     dpkg-deb --root-owner-group --build "$dest" "$DIST_DIR/${deb_name}.deb"
