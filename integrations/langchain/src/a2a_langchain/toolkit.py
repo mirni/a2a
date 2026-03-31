@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, List, Optional, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from langchain_core.tools import BaseTool, BaseToolkit
 
@@ -19,7 +20,7 @@ class A2AToolkit(BaseToolkit):
         # Pass tools to an agent
     """
 
-    tools: List[BaseTool] = []
+    tools: list[BaseTool] = []
 
     def get_tools(self) -> list[BaseTool]:
         return self.tools
@@ -28,8 +29,8 @@ class A2AToolkit(BaseToolkit):
     async def from_client(
         cls,
         client: Any,
-        services: Optional[Sequence[str]] = None,
-    ) -> "A2AToolkit":
+        services: Sequence[str] | None = None,
+    ) -> A2AToolkit:
         """Create a toolkit from an A2AClient.
 
         Args:
@@ -41,9 +42,7 @@ class A2AToolkit(BaseToolkit):
 
         if services is not None:
             service_set = set(services)
-            catalog = [
-                entry for entry in catalog if entry.get("service") in service_set
-            ]
+            catalog = [entry for entry in catalog if entry.get("service") in service_set]
 
         tools = [create_tool(client, entry) for entry in catalog]
 

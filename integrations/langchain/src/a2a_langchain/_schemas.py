@@ -6,7 +6,6 @@ All schemas use ``extra="forbid"`` per project conventions.
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -43,9 +42,7 @@ class CreatePaymentIntentInput(BaseModel):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [{"payer": "agent-1", "payee": "agent-2", "amount": "25.00"}]
-        },
+        json_schema_extra={"examples": [{"payer": "agent-1", "payee": "agent-2", "amount": "25.00"}]},
     )
 
 
@@ -69,9 +66,7 @@ class CreateEscrowInput(BaseModel):
 
     model_config = ConfigDict(
         extra="forbid",
-        json_schema_extra={
-            "examples": [{"payer": "agent-1", "payee": "agent-2", "amount": "50.00"}]
-        },
+        json_schema_extra={"examples": [{"payer": "agent-1", "payee": "agent-2", "amount": "50.00"}]},
     )
 
 
@@ -112,7 +107,7 @@ class RegisterAgentInput(BaseModel):
     """Input for register_agent tool."""
 
     agent_id: str
-    public_key: Optional[str] = None
+    public_key: str | None = None
 
     model_config = ConfigDict(
         extra="forbid",
@@ -127,8 +122,8 @@ class SendMessageInput(BaseModel):
     recipient: str
     message_type: str
     body: str
-    subject: Optional[str] = None
-    thread_id: Optional[str] = None
+    subject: str | None = None
+    thread_id: str | None = None
 
     model_config = ConfigDict(
         extra="forbid",

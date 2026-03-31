@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any, Optional, Type
+from typing import Any
 
 from langchain_core.tools import BaseTool, StructuredTool
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
-
-# JSON-schema type → Python type mapping
+# JSON-schema type -> Python type mapping
 _JSON_TYPE_MAP = {
     "string": str,
     "number": float,
@@ -37,14 +36,13 @@ class A2ABaseTool(BaseTool):
         loop = asyncio.get_event_loop()
         if loop.is_running():
             import concurrent.futures
+
             with concurrent.futures.ThreadPoolExecutor() as pool:
-                return pool.submit(
-                    asyncio.run, self._arun(**kwargs)
-                ).result()
+                return pool.submit(asyncio.run, self._arun(**kwargs)).result()
         return asyncio.run(self._arun(**kwargs))
 
 
-def _build_args_schema(tool_def: dict) -> Type[BaseModel]:
+def _build_args_schema(tool_def: dict) -> type[BaseModel]:
     """Dynamically build a Pydantic model from a catalog entry's JSON schema."""
     schema = tool_def.get("schema", {})
     properties = schema.get("properties", {})
@@ -58,7 +56,7 @@ def _build_args_schema(tool_def: dict) -> Type[BaseModel]:
             fields[name] = (py_type, Field(description=description))
         else:
             fields[name] = (
-                Optional[py_type],
+                py_type | None,
                 Field(default=None, description=description),
             )
 
@@ -68,7 +66,6 @@ def _build_args_schema(tool_def: dict) -> Type[BaseModel]:
 
 def create_tool(client: Any, tool_def: dict) -> BaseTool:
     """Factory: build a LangChain StructuredTool from an A2A catalog entry."""
-
     args_schema = _build_args_schema(tool_def)
     tool_name = tool_def["tool"]
 

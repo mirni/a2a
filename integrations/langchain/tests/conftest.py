@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import sys
-from decimal import Decimal
 from unittest.mock import AsyncMock
 
 import pytest
@@ -100,9 +99,7 @@ def mock_client():
     client._pricing_cache = None
     client._pricing_cache_time = 0.0
     client._client = None
-    client.execute = AsyncMock(
-        return_value=_make_exec_response({"balance": "100.00"})
-    )
+    client.execute = AsyncMock(return_value=_make_exec_response({"balance": "100.00"}))
     client.pricing = AsyncMock(return_value=SAMPLE_CATALOG)
     return client
 

@@ -7,8 +7,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import ConfigDict
-
 from a2a_langchain._base import A2ABaseTool
 from a2a_langchain._schemas import (
     CapturePaymentInput,
