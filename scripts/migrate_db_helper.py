@@ -106,16 +106,18 @@ def _load_migrations(product_name: str):
 # Product registry
 # ---------------------------------------------------------------------------
 
+_DATA_DIR = os.environ.get("A2A_DATA_DIR", "/var/lib/a2a")
+
 _PRODUCTS = [
     {
         "name": "billing",
         "env_var": "BILLING_DB",
-        "default_path": "/var/lib/a2a/billing.db",
+        "default_path": os.path.join(_DATA_DIR, "billing.db"),
     },
     {
         "name": "paywall",
         "env_var": "PAYWALL_DB",
-        "default_path": "/var/lib/a2a/paywall.db",
+        "default_path": os.path.join(_DATA_DIR, "paywall.db"),
     },
 ]
 
