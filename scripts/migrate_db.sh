@@ -106,6 +106,11 @@ while IFS=: read -r product env_var default_path expected_version; do
         continue
     fi
 
+    if [[ "$current_version" -gt "$expected_version" ]]; then
+        warn "$product: DB at v$current_version is ahead of code v$expected_version (OK, skipping)"
+        continue
+    fi
+
     log "$product: v$current_version → v$expected_version"
 
     if $DRY_RUN; then
