@@ -6,9 +6,8 @@ import logging
 import time
 from typing import Any
 
-from starlette.requests import Request
-from starlette.responses import JSONResponse
-from starlette.routing import Route
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 
 from gateway.src.auth import extract_api_key
 from gateway.src.catalog import get_tool
@@ -19,9 +18,12 @@ from gateway.src.tools import TOOL_REGISTRY
 
 logger = logging.getLogger("a2a.batch")
 
+router = APIRouter()
+
 _MAX_BATCH_SIZE = 10
 
 
+@router.post("/v1/batch")
 async def batch(request: Request) -> JSONResponse:
     """Execute multiple tool calls in a single request."""
     # --- Parse body ---
@@ -317,6 +319,3 @@ async def batch(request: Request) -> JSONResponse:
         headers.update(_rate_limit_headers(_tc.rate_limit_per_hour, rate_count))
 
     return JSONResponse({"results": results}, headers=headers)
-
-
-routes = [Route("/v1/batch", batch, methods=["POST"])]

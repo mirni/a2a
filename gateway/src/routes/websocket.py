@@ -36,12 +36,12 @@ import logging
 import time
 from typing import Any
 
-from starlette.requests import Request
-from starlette.responses import JSONResponse
-from starlette.routing import Route, WebSocketRoute
-from starlette.websockets import WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse
 
 logger = logging.getLogger("a2a.websocket")
+
+router = APIRouter()
 
 # Default heartbeat interval in seconds
 DEFAULT_HEARTBEAT_INTERVAL = 15
@@ -73,6 +73,7 @@ def _extract_ws_api_key(websocket: WebSocket) -> tuple[str | None, str]:
     return None, "none"
 
 
+@router.websocket("/v1/ws")
 async def websocket_handler(websocket: WebSocket) -> None:
     """Handle a WebSocket connection for real-time event streaming."""
     await websocket.accept()
@@ -137,6 +138,7 @@ async def websocket_handler(websocket: WebSocket) -> None:
     await session.run()
 
 
+@router.get("/v1/ws")
 async def websocket_upgrade_fallback(request: Request) -> JSONResponse:
     """Return a helpful error when a plain HTTP request hits the WS endpoint.
 
@@ -404,10 +406,3 @@ class _WebSocketSession:
         if isinstance(payload, dict):
             return payload.get("agent_id") == self._filter_agent_id
         return True
-
-
-routes = [
-    WebSocketRoute("/v1/ws", websocket_handler),
-    # Fallback: plain HTTP GET to /v1/ws returns 426 Upgrade Required
-    Route("/v1/ws", websocket_upgrade_fallback, methods=["GET"]),
-]

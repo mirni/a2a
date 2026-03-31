@@ -1,4 +1,4 @@
-"""Starlette lifespan: connect all storage backends on startup, close on shutdown."""
+"""FastAPI lifespan: connect all storage backends on startup, close on shutdown."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from dataclasses import dataclass
 # Bootstrap cross-product imports — MUST happen before any *_src imports
 import gateway.src.bootstrap  # noqa: F401, E402, I001
 
-from starlette.applications import Starlette
+from fastapi import FastAPI
 
 # Billing
 from billing_src.tracker import UsageTracker  # noqa: E402
@@ -101,7 +101,7 @@ class AppContext:
 
 
 @asynccontextmanager
-async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Initialize all backends on startup, tear down on shutdown."""
 
     # Setup structured logging

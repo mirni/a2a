@@ -41,7 +41,7 @@ COPY products/reputation/pyproject.toml products/reputation/pyproject.toml
 
 # Install core runtime deps
 RUN pip install --no-cache-dir \
-    "starlette>=0.37" \
+    "fastapi>=0.115" \
     "uvicorn>=0.29" \
     "httpx>=0.27" \
     "aiosqlite>=0.20" \

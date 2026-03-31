@@ -9,12 +9,13 @@ Returns an enriched OpenAPI 3.1.0 spec with:
 
 from __future__ import annotations
 
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 from shared_src.pricing_config import load_pricing_config
-from starlette.requests import Request
-from starlette.responses import JSONResponse
-from starlette.routing import Route
 
 from gateway.src.openapi import generate_openapi_spec
+
+router = APIRouter()
 
 _pricing = load_pricing_config()
 
@@ -74,6 +75,7 @@ def _build_onboarding_extension() -> dict:
     }
 
 
+@router.get("/v1/onboarding")
 async def onboarding_handler(request: Request) -> JSONResponse:
     """Return enriched OpenAPI spec with onboarding guide."""
     spec = generate_openapi_spec()
@@ -82,6 +84,3 @@ async def onboarding_handler(request: Request) -> JSONResponse:
     spec["info"]["x-onboarding"] = _build_onboarding_extension()
 
     return JSONResponse(spec)
-
-
-routes = [Route("/v1/onboarding", onboarding_handler, methods=["GET"])]

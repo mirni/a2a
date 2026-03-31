@@ -20,10 +20,10 @@ async def test_openapi_spec(client):
 
 @pytest.mark.asyncio
 async def test_openapi_has_tools(client):
-    """OpenAPI spec should include tool examples in POST /execute."""
+    """OpenAPI spec should include tool examples in POST /v1/execute."""
     resp = await client.get("/v1/openapi.json")
     data = resp.json()
-    execute_path = data["paths"].get("/execute", {})
+    execute_path = data["paths"].get("/v1/execute", {})
     post = execute_path.get("post", {})
     # Should have examples for each tool
     examples = post.get("requestBody", {}).get("content", {}).get("application/json", {}).get("examples", {})

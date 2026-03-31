@@ -13,12 +13,13 @@ from collections.abc import AsyncGenerator, Callable, Coroutine
 from dataclasses import dataclass
 from typing import Any
 
-from starlette.requests import Request
-from starlette.responses import Response, StreamingResponse
-from starlette.routing import Route
+from fastapi import APIRouter, Request
+from fastapi.responses import Response, StreamingResponse
 
 from gateway.src.auth import extract_api_key
 from gateway.src.errors import error_response
+
+router = APIRouter()
 
 
 @dataclass
@@ -100,6 +101,7 @@ async def sse_event_generator(
         await asyncio.sleep(config.poll_interval_seconds)
 
 
+@router.get("/v1/events/stream")
 async def event_stream(request: Request) -> Response:
     """Stream events via Server-Sent Events (SSE).
 
@@ -157,6 +159,3 @@ async def event_stream(request: Request) -> Response:
             "X-Accel-Buffering": "no",
         },
     )
-
-
-routes = [Route("/v1/events/stream", event_stream, methods=["GET"])]

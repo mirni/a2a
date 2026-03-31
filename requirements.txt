@@ -1,6 +1,6 @@
 # Pinned runtime dependencies for reproducible installs.
 # Regenerate with: pip-compile --generate-hashes pyproject.toml
-starlette>=0.37,<1.0
+fastapi>=0.115,<1.0
 uvicorn>=0.29,<1.0
 httpx>=0.27,<1.0
 aiosqlite>=0.20,<1.0

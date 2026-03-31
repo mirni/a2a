@@ -1,15 +1,15 @@
-"""Starlette application factory."""
+"""FastAPI application factory."""
 
 from __future__ import annotations
 
 import os
 
-from starlette.applications import Starlette
-from starlette.middleware.cors import CORSMiddleware
-from starlette.requests import Request
-from starlette.responses import RedirectResponse, Response
-from starlette.routing import BaseRoute, Route
+from fastapi import APIRouter, FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
+from fastapi.responses import RedirectResponse, Response
 
+from gateway.src._version import __version__
 from gateway.src.lifespan import lifespan
 from gateway.src.middleware import (
     BodySizeLimitMiddleware,
@@ -20,89 +20,113 @@ from gateway.src.middleware import (
     SecurityHeadersMiddleware,
     metrics_handler,
 )
-from gateway.src.openapi import openapi_handler
-from gateway.src.routes.batch import routes as batch_routes
-from gateway.src.routes.execute import routes as execute_routes
-from gateway.src.routes.health import routes as health_routes
-from gateway.src.routes.onboarding import routes as onboarding_routes
-from gateway.src.routes.pricing import routes as pricing_routes
-from gateway.src.routes.register import routes as register_routes
-from gateway.src.routes.sse import routes as sse_routes
-from gateway.src.routes.websocket import routes as ws_routes
+from gateway.src.openapi import generate_openapi_spec
+from gateway.src.routes.batch import router as batch_router
+from gateway.src.routes.execute import router as execute_router
+from gateway.src.routes.health import router as health_router
+from gateway.src.routes.onboarding import router as onboarding_router
+from gateway.src.routes.pricing import router as pricing_router
+from gateway.src.routes.register import router as register_router
+from gateway.src.routes.sse import router as sse_router
+from gateway.src.routes.websocket import router as ws_router
 from gateway.src.signing import signing_key_handler
-from gateway.src.stripe_checkout import routes as checkout_routes
-from gateway.src.swagger import swagger_ui_handler
+from gateway.src.stripe_checkout import router as checkout_router
 
 # ---------------------------------------------------------------------------
 # Backward-compatibility redirects: old paths -> /v1/ paths (301)
 # ---------------------------------------------------------------------------
 
+_redirect_router = APIRouter()
 
+
+@_redirect_router.get("/health")
 async def _redirect_health(request: Request) -> Response:
     return RedirectResponse(url="/v1/health", status_code=301)
 
 
+@_redirect_router.get("/pricing")
 async def _redirect_pricing(request: Request) -> Response:
     return RedirectResponse(url="/v1/pricing", status_code=301)
 
 
+@_redirect_router.get("/pricing/{tool}")
 async def _redirect_pricing_tool(request: Request) -> Response:
     tool = request.path_params["tool"]
     return RedirectResponse(url=f"/v1/pricing/{tool}", status_code=301)
 
 
+@_redirect_router.post("/execute")
 async def _redirect_execute(request: Request) -> Response:
     return RedirectResponse(url="/v1/execute", status_code=307)
 
 
-_redirect_routes = [
-    Route("/health", _redirect_health, methods=["GET"]),
-    Route("/pricing", _redirect_pricing, methods=["GET"]),
-    Route("/pricing/{tool}", _redirect_pricing_tool, methods=["GET"]),
-    Route("/execute", _redirect_execute, methods=["POST"]),
-]
-
-
-def create_app() -> Starlette:
-    """Build and return the Starlette application."""
-    all_routes: list[BaseRoute] = []
-
-    # Versioned routes
-    all_routes.extend(health_routes)
-    all_routes.extend(pricing_routes)
-    all_routes.extend(execute_routes)
-    all_routes.extend(batch_routes)
-
-    # New routes
-    all_routes.append(Route("/v1/openapi.json", openapi_handler, methods=["GET"]))
-    all_routes.append(Route("/v1/metrics", metrics_handler, methods=["GET"]))
-    all_routes.append(Route("/v1/signing-key", signing_key_handler, methods=["GET"]))
-    all_routes.append(Route("/docs", swagger_ui_handler, methods=["GET"]))
-
-    # SSE streaming
-    all_routes.extend(sse_routes)
-
-    # WebSocket streaming
-    all_routes.extend(ws_routes)
-
-    # Agentic Onboarding
-    all_routes.extend(onboarding_routes)
-
-    # Self-service registration (P2-7)
-    all_routes.extend(register_routes)
-
-    # Stripe Checkout (fiat on-ramp)
-    all_routes.extend(checkout_routes)
-
-    # Backward-compatibility redirects
-    all_routes.extend(_redirect_routes)
-
-    app = Starlette(
-        routes=all_routes,
+def create_app() -> FastAPI:
+    """Build and return the FastAPI application."""
+    app = FastAPI(
+        title="A2A Commerce Gateway",
+        version=__version__,
         lifespan=lifespan,
+        docs_url="/docs",
+        openapi_url="/v1/openapi.json",
     )
 
-    # Add middleware (Starlette wraps in reverse order: last add = outermost)
+    # Include all routers
+    app.include_router(health_router)
+    app.include_router(pricing_router)
+    app.include_router(execute_router)
+    app.include_router(batch_router)
+    app.include_router(sse_router)
+    app.include_router(ws_router)
+    app.include_router(onboarding_router)
+    app.include_router(register_router)
+    app.include_router(checkout_router)
+    app.include_router(_redirect_router)
+
+    # Standalone endpoints
+    @app.get("/v1/metrics", include_in_schema=False)
+    async def metrics(request: Request) -> Response:
+        return await metrics_handler(request)
+
+    @app.get("/v1/signing-key")
+    async def signing_key(request: Request) -> Response:
+        return await signing_key_handler(request)
+
+    # Custom OpenAPI spec: merge tool examples from hand-written spec
+    def custom_openapi() -> dict:
+        if app.openapi_schema:
+            return app.openapi_schema
+        schema = get_openapi(title=app.title, version=app.version, routes=app.routes)
+        # Merge tool examples from hand-written spec
+        old_spec = generate_openapi_spec()
+        execute_examples = (
+            old_spec["paths"]
+            .get("/execute", {})
+            .get("post", {})
+            .get("requestBody", {})
+            .get("content", {})
+            .get("application/json", {})
+            .get("examples", {})
+        )
+        # Inject into auto-generated spec's /v1/execute path
+        if "/v1/execute" in schema["paths"] and execute_examples:
+            execute_post = schema["paths"]["/v1/execute"].get("post", {})
+            execute_post.setdefault("requestBody", {}).setdefault("content", {}).setdefault("application/json", {})[
+                "examples"
+            ] = execute_examples
+        # Preserve components from hand-written spec
+        if "components" in old_spec:
+            schema.setdefault("components", {}).setdefault("schemas", {}).update(old_spec["components"]["schemas"])
+            if "securitySchemes" in old_spec["components"]:
+                schema["components"].setdefault("securitySchemes", {}).update(old_spec["components"]["securitySchemes"])
+        # Preserve security from hand-written spec
+        if "security" in old_spec:
+            schema["security"] = old_spec["security"]
+        app.openapi_schema = schema
+        return schema
+
+    app.openapi = custom_openapi  # type: ignore[assignment]
+
+    # Add middleware (FastAPI wraps in reverse order: last add = outermost)
     app.add_middleware(PublicRateLimitMiddleware)
     app.add_middleware(RequestTimeoutMiddleware)
     app.add_middleware(BodySizeLimitMiddleware)

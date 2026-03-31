@@ -1,6 +1,6 @@
 """Shared fixtures for gateway tests.
 
-Uses httpx AsyncClient with Starlette's ASGI transport — no real server needed.
+Uses httpx AsyncClient with FastAPI's ASGI transport — no real server needed.
 Lifespan is managed manually since httpx.ASGITransport does not handle it.
 """
 
@@ -33,7 +33,7 @@ def tmp_data_dir(tmp_path):
 
 @pytest.fixture
 async def app(tmp_data_dir, monkeypatch):
-    """Create a Starlette app with lifespan managed."""
+    """Create a FastAPI app with lifespan managed."""
     monkeypatch.setenv("A2A_DATA_DIR", tmp_data_dir)
     monkeypatch.setenv("BILLING_DSN", f"sqlite:///{tmp_data_dir}/billing.db")
     monkeypatch.setenv("PAYWALL_DSN", f"sqlite:///{tmp_data_dir}/paywall.db")

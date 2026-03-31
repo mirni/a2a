@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from starlette.requests import Request
+from fastapi import Request
 
 logger = logging.getLogger("a2a.auth")
 

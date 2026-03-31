@@ -45,7 +45,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install mypy and runtime deps
-        run: pip install mypy pydantic aiosqlite cryptography httpx starlette
+        run: pip install mypy pydantic aiosqlite cryptography httpx fastapi
       - name: Type check with mypy
         run: mypy $(find gateway/src products/*/src products/connectors/*/src -maxdepth 0 -type d 2>/dev/null | sort)
 

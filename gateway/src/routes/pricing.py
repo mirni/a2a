@@ -4,14 +4,16 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from starlette.requests import Request
-from starlette.responses import JSONResponse
-from starlette.routing import Route
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 
 from gateway.src.catalog import get_catalog, get_tool
 from gateway.src.rate_limit_headers import public_rate_limit_headers
 
+router = APIRouter()
 
+
+@router.get("/v1/pricing")
 async def pricing_list(request: Request) -> JSONResponse:
     """Return the tool catalog with optional pagination.
 
@@ -51,6 +53,7 @@ async def pricing_list(request: Request) -> JSONResponse:
     )
 
 
+@router.get("/v1/pricing/summary")
 async def pricing_summary(request: Request) -> JSONResponse:
     """Return pricing grouped by service for a quick overview."""
     catalog = get_catalog()
@@ -80,6 +83,7 @@ async def pricing_summary(request: Request) -> JSONResponse:
     return JSONResponse({"services": services})
 
 
+@router.get("/v1/pricing/{tool}")
 async def pricing_detail(request: Request) -> JSONResponse:
     """Return pricing info for a single tool."""
     tool_name = request.path_params["tool"]
@@ -90,10 +94,3 @@ async def pricing_detail(request: Request) -> JSONResponse:
             status_code=404,
         )
     return JSONResponse({"tool": tool})
-
-
-routes = [
-    Route("/v1/pricing", pricing_list, methods=["GET"]),
-    Route("/v1/pricing/summary", pricing_summary, methods=["GET"]),
-    Route("/v1/pricing/{tool}", pricing_detail, methods=["GET"]),
-]
