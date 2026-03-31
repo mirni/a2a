@@ -71,14 +71,21 @@ jobs:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
-          # Handle both base64-encoded and raw PEM key formats
-          if echo "$SSH_KEY" | base64 -d > ~/.ssh/deploy_key 2>/dev/null; then
-            echo "Decoded base64 key"
-          else
+          # Detect format: PEM starts with -----, otherwise assume base64
+          if [[ "$SSH_KEY" == -----* ]]; then
             printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          else
+            echo "$SSH_KEY" | base64 -d > ~/.ssh/deploy_key
           fi
           chmod 600 ~/.ssh/deploy_key
-          ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null || { echo "::error::DEPLOY_SSH_KEY is invalid — generate with: ssh-keygen -t ed25519 -f deploy_key -N ''"; exit 1; }
+          # Validate key (try empty passphrase explicitly)
+          if ! ssh-keygen -y -P "" -f ~/.ssh/deploy_key > /dev/null 2>&1; then
+            echo "::error::DEPLOY_SSH_KEY is invalid or passphrase-protected"
+            echo "File: $(wc -c < ~/.ssh/deploy_key) bytes, $(wc -l < ~/.ssh/deploy_key) lines"
+            echo "Header: $(head -1 ~/.ssh/deploy_key)"
+            echo "Generate a new key: ssh-keygen -t ed25519 -f deploy_key -N ''"
+            exit 1
+          fi
           cat >> ~/.ssh/config << 'EOF'
           Host *
             StrictHostKeyChecking accept-new
