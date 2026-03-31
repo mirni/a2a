@@ -390,11 +390,23 @@ async def _create_split_intent(ctx: AppContext, params: dict[str, Any]) -> dict[
     currency = _validate_currency(params.get("currency", "CREDITS"))
     idempotency_key = params.get("idempotency_key")
 
+    # Check idempotency BEFORE executing the split
+    if idempotency_key is not None:
+        existing = await ctx.tracker.storage.get_transaction_by_idempotency_key(
+            idempotency_key,
+        )
+        if existing is not None:
+            snapshot = existing.get("result_snapshot")
+            if snapshot:
+                return json.loads(snapshot)
+
     total_pct = sum(s["percentage"] for s in splits)
     if abs(total_pct - 100) > 0.01:
         raise ToolValidationError(f"Split percentages must sum to 100, got {total_pct}")
 
-    await ctx.tracker.wallet.withdraw(payer, amount, description=f"split:{description}", currency=currency)
+    await ctx.tracker.wallet.withdraw(
+        payer, amount, description=f"split:{description}", currency=currency,
+    )
 
     settlements = []
     for split in splits:

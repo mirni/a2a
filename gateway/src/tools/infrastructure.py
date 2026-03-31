@@ -103,13 +103,22 @@ async def _get_event_schema(ctx: AppContext, params: dict[str, Any]) -> dict[str
 
 async def _register_webhook(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     from gateway.src.tool_errors import ToolValidationError
+    from gateway.src.url_validator import validate_webhook_url
+
+    url = params["url"]
+    url_error = validate_webhook_url(url)
+    if url_error:
+        raise ToolValidationError(f"Invalid webhook URL: {url_error}")
 
     secret = params.get("secret", "")
     if not secret:
-        raise ToolValidationError("Webhook 'secret' is required and must be non-empty for HMAC signature verification")
+        raise ToolValidationError(
+            "Webhook 'secret' is required and must be non-empty"
+            " for HMAC signature verification"
+        )
     result = await ctx.webhook_manager.register(
         agent_id=params["agent_id"],
-        url=params["url"],
+        url=url,
         event_types=params["event_types"],
         secret=secret,
         filter_agent_ids=params.get("filter_agent_ids"),

@@ -23,64 +23,64 @@ These are CVSS 9.0+ findings from the v2 customer reports. Several overlap with 
 **Source:** Customer Report S-01 (CVSS 9.8), Agent 2/15
 **Current state:** `pg_execute` allows arbitrary SQL including DDL/DCL (CREATE, DROP, GRANT). No statement allowlisting, params optional.
 **Action:**
-- [ ] Add SQL statement parser/allowlist: only SELECT, INSERT, UPDATE, DELETE
-- [ ] Block DDL (CREATE, ALTER, DROP) and DCL (GRANT, REVOKE) statements
-- [ ] Require parameterized queries (params must be non-empty for INSERT/UPDATE/DELETE)
-- [ ] Add tests for SQL injection vectors via pg_execute
+- [x] Add SQL statement parser/allowlist: only SELECT, INSERT, UPDATE, DELETE
+- [x] Block DDL (CREATE, ALTER, DROP) and DCL (GRANT, REVOKE) statements
+- [x] Require parameterized queries (params must be non-empty for INSERT/UPDATE/DELETE)
+- [x] Add tests for SQL injection vectors via pg_execute
 **Files:** `gateway/src/tools/connectors.py` (or equivalent postgres tool), tests
 
 ### P0-2: Verify and harden ownership validation on financial ops
 **Source:** Customer Report S-02 (CVSS 9.8), C-2/C-3
 **Current state:** `authorization.py` was added in Session TODO Items (enforces agent_id match on 36 tools). Need to verify coverage is complete per v2 report findings -- specifically `withdraw`, `freeze_wallet`, `capture_intent`, `release_escrow`, `cancel_escrow`, `refund_intent`.
 **Action:**
-- [ ] Audit `authorization.py` guard coverage against v2 report tool list
-- [ ] Add negative tests: agent A cannot withdraw from agent B's wallet
-- [ ] Add negative tests: agent A cannot capture agent B's intent
-- [ ] Verify freeze/unfreeze wallet requires admin scope
+- [x] Audit `authorization.py` guard coverage against v2 report tool list
+- [x] Add negative tests: agent A cannot withdraw from agent B's wallet
+- [x] Add negative tests: agent A cannot capture agent B's intent
+- [x] Verify freeze/unfreeze wallet requires admin scope
 **Files:** `gateway/src/authorization.py`, `gateway/tests/test_authorization.py`
 
 ### P0-3: Fix freeze_wallet/unfreeze_wallet tier and access control
 **Source:** Customer Report S-04 (CVSS 9.1), C-4
 **Current state:** These are at free tier with no admin role check. Any agent can freeze any wallet.
 **Action:**
-- [ ] Move `freeze_wallet`/`unfreeze_wallet` to pro or enterprise tier in `catalog.json`
-- [ ] Require admin scope on the API key to invoke these tools
-- [ ] Add tests: non-admin cannot freeze, admin can freeze
+- [x] Move `freeze_wallet`/`unfreeze_wallet` to pro or enterprise tier in `catalog.json`
+- [x] Require admin scope on the API key to invoke these tools
+- [x] Add tests: non-admin cannot freeze, admin can freeze
 **Files:** `gateway/src/catalog.json`, `gateway/src/tools/billing.py`, tests
 
 ### P0-4: Validate webhook URLs against SSRF
 **Source:** Customer Report S-05 (CVSS 8.6), Agent 2/10
 **Current state:** `register_webhook` and `test_webhook` accept arbitrary URLs. Can target RFC 1918 ranges, link-local, cloud metadata (169.254.169.254).
 **Action:**
-- [ ] Create URL validator that blocks: private IPs (10.x, 172.16-31.x, 192.168.x), localhost, link-local (169.254.x), cloud metadata endpoints
-- [ ] Apply validator in `register_webhook` and `test_webhook`
-- [ ] Add tests for each blocked IP range
+- [x] Create URL validator that blocks: private IPs (10.x, 172.16-31.x, 192.168.x), localhost, link-local (169.254.x), cloud metadata endpoints
+- [x] Apply validator in `register_webhook` and `test_webhook`
+- [x] Add tests for each blocked IP range
 **Files:** `gateway/src/webhooks.py` or `gateway/src/tools/infrastructure.py`, tests
 
 ### P0-5: Fix backup_database key leak and restore_database path traversal
 **Source:** Customer Report S-06 (CVSS 8.6), Agent 2/12
 **Current state:** `backup_database` returns Fernet encryption key in response body. `restore_database` accepts arbitrary `file_path` parameter.
 **Action:**
-- [ ] Remove encryption key from `backup_database` response (store server-side only)
-- [ ] Sanitize `restore_database` file_path: reject `..`, absolute paths, only allow filenames from backup directory
-- [ ] Move admin tools to enterprise tier (or require admin scope)
-- [ ] Add tests for path traversal attempts
+- [x] Remove encryption key from `backup_database` response (store server-side only)
+- [x] Sanitize `restore_database` file_path: reject `..`, absolute paths, only allow filenames from backup directory
+- [x] Move admin tools to enterprise tier (or require admin scope)
+- [x] Add tests for path traversal attempts
 **Files:** `gateway/src/tools/admin.py` (or equivalent), tests
 
 ### P0-6: Prevent create_api_key tier escalation
 **Source:** Customer Report S-07 (CVSS 8.1)
 **Current state:** Caller-supplied `tier` parameter may allow self-upgrade (free caller creating pro key).
 **Action:**
-- [ ] Enforce: callers can only create keys at their own tier or below
-- [ ] Add test: free-tier agent cannot create pro-tier key
+- [x] Enforce: callers can only create keys at their own tier or below
+- [x] Add test: free-tier agent cannot create pro-tier key
 **Files:** `gateway/src/tools/paywall.py`, tests
 
 ### P0-7: Fix resolve_dispute impersonation
 **Source:** Customer Report S-08 (CVSS 8.1)
 **Current state:** `resolve_dispute` accepts caller-supplied `resolved_by` field -- allows impersonation.
 **Action:**
-- [ ] Override `resolved_by` with the authenticated agent_id from the API key
-- [ ] Add test: resolved_by field is ignored and replaced with caller identity
+- [x] Override `resolved_by` with the authenticated agent_id from the API key
+- [x] Add test: resolved_by field is ignored and replaced with caller identity
 **Files:** `gateway/src/tools/disputes.py` (or equivalent), tests
 
 ---
@@ -93,50 +93,50 @@ These are the persistent OperationalError bugs from Round 4 and data integrity f
 **Source:** Round 4 Customer Feedback, Customer Report H-2
 **Current state:** All three return `OperationalError`. Likely missing columns in payments DB that were added to DDL but never migrated on existing DBs.
 **Action:**
-- [ ] Identify missing columns in payments storage (check `_SCHEMA` vs actual DB)
-- [ ] Write migration(s) using the `Migration` framework from `products/shared/src/migrate.py`
-- [ ] Add `_MIGRATIONS` to payments `StorageBackend`
-- [ ] Update `_SCHEMA` DDL to reflect final state
-- [ ] Add migration regression tests (old-schema -> new-schema)
-- [ ] Verify capture_intent, release_escrow, partial_capture work end-to-end
+- [x] Identify missing columns in payments storage (check `_SCHEMA` vs actual DB)
+- [x] Write migration(s) using the `Migration` framework from `products/shared/src/migrate.py`
+- [x] Add `_MIGRATIONS` to payments `StorageBackend`
+- [x] Update `_SCHEMA` DDL to reflect final state
+- [x] Add migration regression tests (old-schema -> new-schema)
+- [x] Verify capture_intent, release_escrow, partial_capture work end-to-end
 **Files:** `products/payments/src/storage.py`, `products/payments/tests/test_migrations.py`
 
 ### P1-2: Fix messaging DB schema (send_message, negotiate_price)
 **Source:** Round 4 Customer Feedback
 **Current state:** Both return `OperationalError`. Same root cause as P1-1 -- missing columns.
 **Action:**
-- [ ] Identify missing columns in messaging storage
-- [ ] Write migration(s) using Migration framework
-- [ ] Add `_MIGRATIONS` to messaging `StorageBackend`
-- [ ] Add migration regression tests
-- [ ] Verify send_message and negotiate_price work
+- [x] Identify missing columns in messaging storage
+- [x] Write migration(s) using Migration framework
+- [x] Add `_MIGRATIONS` to messaging `StorageBackend`
+- [x] Add migration regression tests
+- [x] Verify send_message and negotiate_price work
 **Files:** `products/messaging/src/storage.py`, `products/messaging/tests/test_migrations.py`
 
 ### P1-3: Fix get_exchange_rate (UnsupportedCurrencyError)
 **Source:** Round 4 Customer Feedback (SkyScout, FinanceBot, TravelMate)
 **Current state:** Returns `UnsupportedCurrencyError` for ALL currency pairs despite schema advertising 6 currencies.
 **Action:**
-- [ ] Debug `get_exchange_rate` tool: check if exchange rate service is wired up correctly
-- [ ] Verify `ExchangeRateService` has rate data loaded (may need seed rates)
-- [ ] Add tests: USD->EUR, BTC->USD, CREDITS->USD all return valid rates
+- [x] Debug `get_exchange_rate` tool: check if exchange rate service is wired up correctly
+- [x] Verify `ExchangeRateService` has rate data loaded (may need seed rates)
+- [x] Add tests: USD->EUR, BTC->USD, CREDITS->USD all return valid rates
 **Files:** `products/billing/src/exchange.py`, `gateway/src/tools/billing.py`, tests
 
 ### P1-4: Add idempotency_key to more financial write tools
 **Source:** Customer Report H-2 (only 3/57 mutating tools have idempotency)
 **Current state:** Only `create_intent`, `create_escrow`, `create_subscription` have idempotency_key.
 **Action:**
-- [ ] Add `idempotency_key` to: `deposit`, `withdraw`, `create_split_intent`, `create_performance_escrow`, `refund_settlement`
-- [ ] Add UNIQUE constraint on idempotency_key in relevant storage tables
-- [ ] Add tests: duplicate calls with same key return same result
+- [x] Add `idempotency_key` to: `deposit`, `withdraw`, `create_split_intent`, `create_performance_escrow`, `refund_settlement`
+- [x] Add UNIQUE constraint on idempotency_key in relevant storage tables
+- [x] Add tests: duplicate calls with same key return same result
 **Files:** Billing storage, payments storage, gateway tools, tests
 
 ### P1-5: Make convert_currency atomic
 **Source:** Customer Report H-3
 **Current state:** Two-phase withdraw-then-deposit. Crash between phases = fund loss.
 **Action:**
-- [ ] Wrap withdraw + deposit in a single DB transaction
-- [ ] Add test: simulated crash after withdraw rolls back
-- [ ] Document the atomicity guarantee
+- [x] Wrap withdraw + deposit in a single DB transaction
+- [x] Add test: simulated crash after withdraw rolls back
+- [x] Document the atomicity guarantee
 **Files:** `products/billing/src/exchange.py` or `tracker.py`, tests
 
 ---
@@ -146,46 +146,46 @@ These are the persistent OperationalError bugs from Round 4 and data integrity f
 ### P2-1: Add `get_budget_cap` tool (set but can't retrieve)
 **Source:** Round 4 (FinanceBot), previous MASTER_LOG P1-5
 **Action:**
-- [ ] Add `get_budget_cap` tool or rename `get_budget_status` to include cap values
-- [ ] Register in catalog.json
-- [ ] Add tests
+- [x] Add `get_budget_cap` tool or rename `get_budget_status` to include cap values
+- [x] Register in catalog.json
+- [x] Add tests
 **Files:** `gateway/src/tools/billing.py`, `gateway/src/catalog.json`, tests
 
 ### P2-2: Expose multi-currency in gateway tools
 **Source:** Round 4 (SkyScout), Customer Report M-10/M-14
 **Current state:** Multi-currency is implemented in billing but `create_intent`, `create_escrow` have no `currency` parameter in the gateway tool layer.
 **Action:**
-- [ ] Add optional `currency` parameter (default: "CREDITS") to payment tools: `create_intent`, `create_escrow`, `create_subscription`, `create_split_intent`
-- [ ] Update catalog.json schemas
-- [ ] Add tests for non-CREDITS currency intents
+- [x] Add optional `currency` parameter (default: "CREDITS") to payment tools: `create_intent`, `create_escrow`, `create_subscription`, `create_split_intent`
+- [x] Update catalog.json schemas
+- [x] Add tests for non-CREDITS currency intents
 **Files:** `gateway/src/tools/payments.py`, `gateway/src/catalog.json`, tests
 
 ### P2-3: Add `list_intents` and `list_escrows` tools
 **Source:** Customer Report M-12, Agent 4/24
 **Current state:** No way to enumerate pending intents or escrows for reconciliation.
 **Action:**
-- [ ] Add `list_intents(agent_id, status?, limit?)` tool
-- [ ] Add `list_escrows(agent_id, status?, limit?)` tool
-- [ ] Register in catalog.json
-- [ ] Add tests
+- [x] Add `list_intents(agent_id, status?, limit?)` tool
+- [x] Add `list_escrows(agent_id, status?, limit?)` tool
+- [x] Register in catalog.json
+- [x] Add tests
 **Files:** `products/payments/src/engine.py`, `gateway/src/tools/payments.py`, `catalog.json`, tests
 
 ### P2-4: Implement offset/cursor pagination on list endpoints
 **Source:** Customer Report M-6, Agent 5/20
 **Current state:** 12+ list endpoints support `limit` but not `offset`, `cursor`, or pagination metadata.
 **Action:**
-- [ ] Add `offset` parameter to list_* tools (list_api_keys, list_webhooks, list_subscriptions, search_services, search_agents, get_events, get_messages, list_disputes, etc.)
-- [ ] Return pagination metadata: `{"items": [...], "total": N, "offset": M, "limit": L}`
-- [ ] Add tests for pagination
+- [x] Add `offset` parameter to list_* tools (list_api_keys, list_webhooks, list_subscriptions, search_services, search_agents, get_events, get_messages, list_disputes, etc.)
+- [x] Return pagination metadata: `{"items": [...], "total": N, "offset": M, "limit": L}`
+- [x] Add tests for pagination
 **Files:** Multiple tool files, storage layers, tests
 
 ### P2-5: Fix cross-tenant audit log exposure
 **Source:** Customer Report S-10 (CVSS 7.5)
 **Current state:** `get_global_audit_log` exposes all operations to any pro agent.
 **Action:**
-- [ ] Require admin scope for global audit log
-- [ ] Add `get_audit_log(agent_id)` that filters to caller's own operations
-- [ ] Add tests
+- [x] Require admin scope for global audit log
+- [x] Add `get_audit_log(agent_id)` that filters to caller's own operations
+- [x] Add tests
 **Files:** `gateway/src/tools/paywall.py`, tests
 
 ### P2-6: Implement API key TTL/expiration enforcement
@@ -201,17 +201,17 @@ These are the persistent OperationalError bugs from Round 4 and data integrity f
 **Source:** Round 3/4 (MediBot, HireBot, PetCare), Customer Report strategic
 **Current state:** `create_api_key` requires auth (chicken-and-egg). x402 facilitator unreliable.
 **Action:**
-- [ ] Add `POST /v1/register` endpoint: accepts no auth, creates free-tier key + wallet with signup bonus
-- [ ] Rate-limit registration (e.g., 5/hour per IP)
-- [ ] Add tests
+- [x] Add `POST /v1/register` endpoint: accepts no auth, creates free-tier key + wallet with signup bonus
+- [x] Rate-limit registration (e.g., 5/hour per IP)
+- [x] Add tests
 **Files:** `gateway/src/routes/register.py` (new), `gateway/src/app.py`, tests
 
 ### P2-8: Add `register_server` to trust service
 **Source:** Customer Report C-8 (incomplete CRUD lifecycle)
 **Action:**
-- [ ] Add `register_server` tool to trust service
-- [ ] Register in catalog.json
-- [ ] Add tests
+- [x] Add `register_server` tool to trust service
+- [x] Register in catalog.json
+- [x] Add tests
 **Files:** `products/trust/src/api.py`, `gateway/src/tools/trust.py`, `catalog.json`, tests
 
 ---
@@ -229,54 +229,54 @@ These are the persistent OperationalError bugs from Round 4 and data integrity f
 ### P3-2: Add CORS middleware
 **Source:** Round 4 (SecurityBot), Customer Report P1-4
 **Action:**
-- [ ] Add CORS middleware with configurable allowed origins
-- [ ] Add Strict-Transport-Security, X-Frame-Options, X-Content-Type-Options headers
-- [ ] Add tests
+- [x] Add CORS middleware with configurable allowed origins
+- [x] Add Strict-Transport-Security, X-Frame-Options, X-Content-Type-Options headers
+- [x] Add tests
 **Files:** `gateway/src/middleware.py`, tests
 
 ### P3-3: Add security headers middleware
 **Source:** Round 4 (SecurityBot P1-5)
 **Action:**
-- [ ] Add `X-Content-Type-Options: nosniff`
-- [ ] Add `X-Frame-Options: DENY`
-- [ ] Add `Strict-Transport-Security: max-age=31536000; includeSubDomains`
-- [ ] Add `Content-Security-Policy: default-src 'none'`
-- [ ] Add tests verifying headers present
+- [x] Add `X-Content-Type-Options: nosniff`
+- [x] Add `X-Frame-Options: DENY`
+- [x] Add `Strict-Transport-Security: max-age=31536000; includeSubDomains`
+- [x] Add `Content-Security-Policy: default-src 'none'`
+- [x] Add tests verifying headers present
 **Files:** `gateway/src/middleware.py`, tests
 
 ### P3-4: Truncate/sanitize tool name in error messages
 **Source:** Round 4 (SecurityBot P2-1/P2-2)
 **Current state:** Oversized/malicious tool names reflected verbatim in error responses (log flooding risk).
 **Action:**
-- [ ] Truncate tool name to 128 chars in error messages
-- [ ] Strip null bytes from all input params
-- [ ] Add tests
+- [x] Truncate tool name to 128 chars in error messages
+- [x] Strip null bytes from all input params
+- [x] Add tests
 **Files:** `gateway/src/routes/execute.py`, tests
 
 ### P3-5: Enforce `extra="forbid"` on ExecuteRequest body
 **Source:** Round 4 (CodeForge), Customer Report P1-6
 **Current state:** Extra fields in request body silently accepted.
 **Action:**
-- [ ] Apply Pydantic model with `extra="forbid"` to execute request parsing
-- [ ] Add test: extra field returns 422
+- [x] Apply Pydantic model with `extra="forbid"` to execute request parsing
+- [x] Add test: extra field returns 422
 **Files:** `gateway/src/routes/execute.py`, tests
 
 ### P3-6: Fix 413 to return JSON instead of HTML
 **Source:** Round 4 (ReadGate, GameDev)
 **Current state:** nginx returns raw HTML for 413. Breaks JSON-only clients.
 **Action:**
-- [ ] Add app-level body size check before nginx (e.g., middleware checking Content-Length)
-- [ ] Return structured JSON: `{"error": {"code": "payload_too_large", "message": "..."}}`
-- [ ] Add test
+- [x] Add app-level body size check before nginx (e.g., middleware checking Content-Length)
+- [x] Return structured JSON: `{"error": {"code": "payload_too_large", "message": "..."}}`
+- [x] Add test
 **Files:** `gateway/src/middleware.py`, tests
 
 ### P3-7: Standardize naming conventions
 **Source:** Customer Report M-11, multiple agents
 **Current state:** `server_id` vs `agent_id`, 5 different termination verbs, 6 agent reference patterns.
 **Action:**
-- [ ] Map `server_id` -> `agent_id` in trust tools (accept both, prefer `agent_id`)
-- [ ] Document naming conventions
-- [ ] Add deprecation aliases where needed
+- [x] Map `server_id` -> `agent_id` in trust tools (accept both, prefer `agent_id`)
+- [x] Document naming conventions
+- [x] Add deprecation aliases where needed
 **Files:** `gateway/src/tools/trust.py`, `catalog.json`
 
 ---
@@ -290,10 +290,10 @@ These are the persistent OperationalError bugs from Round 4 and data integrity f
 - Products have no coverage measurement
 - No coverage badge or PR comment
 **Action:**
-- [ ] Add `pytest-cov` with `--cov-report=xml` to all test steps (gateway + each product)
-- [ ] Combine coverage XMLs into a single report
-- [ ] Add coverage upload step (use `codecov/codecov-action@v4` or similar)
-- [ ] Add coverage summary as PR comment (use a coverage reporter action)
+- [x] Add `pytest-cov` with `--cov-report=xml` to all test steps (gateway + each product)
+- [x] Combine coverage XMLs into a single report
+- [x] Add coverage upload step (use `codecov/codecov-action@v4` or similar)
+- [x] Add coverage summary as PR comment (use a coverage reporter action)
 - [ ] Add `--cov-fail-under=70` to all product test steps (not just gateway)
 - [ ] Add coverage badge to README.md
 **Files:** `.github/workflows/ci.yml`, `scripts/run_tests.sh`, `README.md`
@@ -302,8 +302,8 @@ These are the persistent OperationalError bugs from Round 4 and data integrity f
 **Source:** MASTER_LOG (SDK tests exist but not in CI)
 **Current state:** `sdk` and `sdk-ts` tests are not in the CI pipeline test matrix.
 **Action:**
-- [ ] Add SDK Python test step to CI
-- [ ] Add SDK TypeScript test step to CI (if node available)
+- [x] Add SDK Python test step to CI
+- [x] Add SDK TypeScript test step to CI (if node available)
 **Files:** `.github/workflows/ci.yml`
 
 ---
