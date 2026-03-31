@@ -50,14 +50,9 @@ monitoring/prometheus/prometheus.yml
 *.log
 tmp/
 
-# Archived reports
-archive/*.md
-
-# Outside reports
-customer_reports/
-
-# Scratchpad
-next_tmrw.md
+# Reports (analysis output, not tracked in git)
+reports/archive/
+reports/customer/
 
 # Build artifacts
 *.deb

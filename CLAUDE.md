@@ -53,8 +53,46 @@ Infrastructure code is exempt from this rule.
 * The app checks schema version on startup and fails with `SchemaVersionMismatchError` if the DB hasn't been migrated.
 
 
-# Append all prompts and outputs into MASTER_LOG.md
+# Append all prompts and outputs into logs/MASTER_LOG.md
 * Both human prompt and claude terminal output should be appended.
+
+
+# Document Organization
+
+## Directory layout
+```
+CLAUDE.md              # Permanent coding rules (this file)
+README.md              # Project overview
+CHANGELOG.md           # Release history
+docs/                  # Reference documentation (stable)
+  infra/               # Infrastructure & ops docs
+  adr/                 # Architecture Decision Records
+  prd/                 # Product Requirements Documents
+  blog/                # Blog posts
+  api-reference.md     # API docs
+reports/               # Analysis & research output (read-only, gitignored)
+  customer/            # Customer agent analysis reports
+  archive/             # Historical reports & plans
+tasks/                 # Human ↔ Claude task queue
+  backlog/             # Pending tasks — human drops prompts here
+  active/              # Currently being worked on
+  done/                # Completed (moved here after completion)
+logs/                  # Session logs (append-only)
+  MASTER_LOG.md        # Full session transcript
+plans/                 # Living strategic/planning documents
+```
+
+## Task workflow
+* **Human**: create one `.md` file per task in `tasks/backlog/` with a clear prompt.
+* **Claude**: at session start, check `tasks/backlog/` for pending work.
+* **Claude**: move file to `tasks/active/` when starting, to `tasks/done/` when complete.
+* **Claude**: add a `## Completed` section at the bottom of finished task files (date, PR#, summary).
+* Never create new `.md` files in the repo root. Use the appropriate directory above.
+* Reports and analysis go in `reports/`, not `docs/` or root.
+
+## PR workflow
+* One PR per session consolidating all work. Avoid multiple parallel PRs.
+* Do not merge PRs — leave for human review. All CI jobs (including staging) must be green.
 
 
 # Use per-project memory, in workdir/.claude/memory.
