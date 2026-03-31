@@ -13,10 +13,9 @@ _VALID_CURRENCIES = {"CREDITS", "USD", "EUR", "GBP", "BTC", "ETH"}
 def _validate_currency(currency: str) -> str:
     """Validate currency code and return it, raising ToolValidationError on invalid."""
     if currency not in _VALID_CURRENCIES:
-        raise ToolValidationError(
-            f"Invalid currency '{currency}'; must be one of {sorted(_VALID_CURRENCIES)}"
-        )
+        raise ToolValidationError(f"Invalid currency '{currency}'; must be one of {sorted(_VALID_CURRENCIES)}")
     return currency
+
 
 # ---------------------------------------------------------------------------
 # Payment Intents
@@ -92,10 +91,16 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
     if intent.status.value == "settled":
         currency = (intent.metadata or {}).get("currency", "CREDITS")
         await ctx.tracker.wallet.withdraw(
-            intent.payee, float(intent.amount), description=f"refund:{intent.id}", currency=currency,
+            intent.payee,
+            float(intent.amount),
+            description=f"refund:{intent.id}",
+            currency=currency,
         )
         await ctx.tracker.wallet.deposit(
-            intent.payer, float(intent.amount), description=f"refund:{intent.id}", currency=currency,
+            intent.payer,
+            float(intent.amount),
+            description=f"refund:{intent.id}",
+            currency=currency,
         )
         return {"id": intent.id, "status": "refunded", "amount": float(intent.amount)}
 

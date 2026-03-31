@@ -16,6 +16,7 @@ pytestmark = pytest.mark.asyncio
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 async def _fund_usd(ctx, agent_id: str, amount: float) -> None:
     """Deposit USD into an agent's wallet (agent must already have a wallet)."""
     await ctx.tracker.wallet.deposit(agent_id, amount, description="test-usd-seed", currency="USD")
