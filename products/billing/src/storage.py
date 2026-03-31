@@ -139,6 +139,21 @@ CREATE TABLE IF NOT EXISTS org_transactions (
 
 CREATE INDEX IF NOT EXISTS idx_org_tx_org ON org_transactions(org_id);
 CREATE INDEX IF NOT EXISTS idx_org_tx_agent ON org_transactions(org_id, agent_id);
+
+CREATE TABLE IF NOT EXISTS admin_audit_log (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp       REAL NOT NULL,
+    agent_id        TEXT NOT NULL,
+    tool_name       TEXT NOT NULL,
+    params_json     TEXT NOT NULL,
+    client_ip       TEXT,
+    status          TEXT NOT NULL CHECK(status IN ('success', 'denied', 'error')),
+    result_summary  TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_audit_agent ON admin_audit_log(agent_id);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_tool ON admin_audit_log(tool_name);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_ts ON admin_audit_log(timestamp);
 """
 
     _MIGRATIONS: tuple[Migration, ...] = (
@@ -187,6 +202,23 @@ CREATE INDEX IF NOT EXISTS idx_org_tx_agent ON org_transactions(org_id, agent_id
             "    updated_at REAL NOT NULL,\n"
             "    PRIMARY KEY (agent_id, currency)\n"
             ");",
+        ),
+        Migration(
+            5,
+            "add admin_audit_log table for admin operation tracking",
+            "CREATE TABLE IF NOT EXISTS admin_audit_log (\n"
+            "    id              INTEGER PRIMARY KEY AUTOINCREMENT,\n"
+            "    timestamp       REAL NOT NULL,\n"
+            "    agent_id        TEXT NOT NULL,\n"
+            "    tool_name       TEXT NOT NULL,\n"
+            "    params_json     TEXT NOT NULL,\n"
+            "    client_ip       TEXT,\n"
+            "    status          TEXT NOT NULL CHECK(status IN ('success', 'denied', 'error')),\n"
+            "    result_summary  TEXT\n"
+            ");\n"
+            "CREATE INDEX IF NOT EXISTS idx_admin_audit_agent ON admin_audit_log(agent_id);\n"
+            "CREATE INDEX IF NOT EXISTS idx_admin_audit_tool ON admin_audit_log(tool_name);\n"
+            "CREATE INDEX IF NOT EXISTS idx_admin_audit_ts ON admin_audit_log(timestamp);",
         ),
     )
 
