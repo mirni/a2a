@@ -110,5 +110,3 @@ async def health(request: Request) -> JSONResponse:
         status_code=http_status,
         headers=public_rate_limit_headers(limiter=limiter, client_ip=client_ip),
     )
-
-

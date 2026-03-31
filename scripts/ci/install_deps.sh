@@ -12,7 +12,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 RUNTIME_DEPS=(
-    "starlette>=0.37"
+    "fastapi>=0.115"
     "uvicorn>=0.29"
     "httpx>=0.27"
     "aiosqlite>=0.20"

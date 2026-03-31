@@ -319,5 +319,3 @@ async def batch(request: Request) -> JSONResponse:
         headers.update(_rate_limit_headers(_tc.rate_limit_per_hour, rate_count))
 
     return JSONResponse({"results": results}, headers=headers)
-
-

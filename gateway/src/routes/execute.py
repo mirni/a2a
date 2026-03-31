@@ -550,5 +550,3 @@ async def execute(request: Request) -> JSONResponse:
         headers.update(sign_response(signing_manager, body_bytes))
 
     return JSONResponse(response_body, headers=headers)
-
-

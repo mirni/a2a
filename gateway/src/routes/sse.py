@@ -159,5 +159,3 @@ async def event_stream(request: Request) -> Response:
             "X-Accel-Buffering": "no",
         },
     )
-
-

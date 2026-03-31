@@ -68,5 +68,3 @@ async def register(request: Request) -> JSONResponse:
             },
         }
     )
-
-

@@ -94,5 +94,3 @@ async def pricing_detail(request: Request) -> JSONResponse:
             status_code=404,
         )
     return JSONResponse({"tool": tool})
-
-

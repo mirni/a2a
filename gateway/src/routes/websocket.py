@@ -406,5 +406,3 @@ class _WebSocketSession:
         if isinstance(payload, dict):
             return payload.get("agent_id") == self._filter_agent_id
         return True
-
-

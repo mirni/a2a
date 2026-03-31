@@ -252,5 +252,3 @@ async def stripe_webhook(request: Request) -> JSONResponse:
 
     # Always return 200 to acknowledge receipt
     return JSONResponse({"received": True})
-
-

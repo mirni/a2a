@@ -84,5 +84,3 @@ async def onboarding_handler(request: Request) -> JSONResponse:
     spec["info"]["x-onboarding"] = _build_onboarding_extension()
 
     return JSONResponse(spec)
-
-

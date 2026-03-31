@@ -110,18 +110,14 @@ def create_app() -> FastAPI:
         # Inject into auto-generated spec's /v1/execute path
         if "/v1/execute" in schema["paths"] and execute_examples:
             execute_post = schema["paths"]["/v1/execute"].get("post", {})
-            execute_post.setdefault("requestBody", {}).setdefault("content", {}).setdefault(
-                "application/json", {}
-            )["examples"] = execute_examples
+            execute_post.setdefault("requestBody", {}).setdefault("content", {}).setdefault("application/json", {})[
+                "examples"
+            ] = execute_examples
         # Preserve components from hand-written spec
         if "components" in old_spec:
-            schema.setdefault("components", {}).setdefault("schemas", {}).update(
-                old_spec["components"]["schemas"]
-            )
+            schema.setdefault("components", {}).setdefault("schemas", {}).update(old_spec["components"]["schemas"])
             if "securitySchemes" in old_spec["components"]:
-                schema["components"].setdefault("securitySchemes", {}).update(
-                    old_spec["components"]["securitySchemes"]
-                )
+                schema["components"].setdefault("securitySchemes", {}).update(old_spec["components"]["securitySchemes"])
         # Preserve security from hand-written spec
         if "security" in old_spec:
             schema["security"] = old_spec["security"]
