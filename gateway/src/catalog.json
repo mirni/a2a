@@ -100,6 +100,10 @@
           "type": "string",
           "description": "Currency code (default: CREDITS). One of: CREDITS, USD, EUR, GBP, BTC, ETH",
           "default": "CREDITS"
+        },
+        "idempotency_key": {
+          "type": "string",
+          "description": "Optional unique key to prevent duplicate deposits. If a deposit with this key already exists, the cached result is returned."
         }
       },
       "required": [
@@ -578,6 +582,10 @@
         "reason": {
           "type": "string",
           "description": "Optional reason for the refund"
+        },
+        "idempotency_key": {
+          "type": "string",
+          "description": "Optional unique key to prevent duplicate refunds."
         }
       },
       "required": [
@@ -2188,6 +2196,10 @@
           "type": "string",
           "description": "Currency code (default: CREDITS). One of: CREDITS, USD, EUR, GBP, BTC, ETH",
           "default": "CREDITS"
+        },
+        "idempotency_key": {
+          "type": "string",
+          "description": "Optional unique key to prevent duplicate withdrawals. If a withdrawal with this key already exists, the cached result is returned."
         }
       },
       "required": [
@@ -2301,6 +2313,10 @@
         },
         "description": {
           "type": "string"
+        },
+        "idempotency_key": {
+          "type": "string",
+          "description": "Optional unique key to prevent duplicate escrow creation."
         }
       },
       "required": [
@@ -3074,6 +3090,10 @@
         },
         "description": {
           "type": "string"
+        },
+        "idempotency_key": {
+          "type": "string",
+          "description": "Optional unique key to prevent duplicate split payments."
         }
       },
       "required": [

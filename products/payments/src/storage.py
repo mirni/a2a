@@ -119,10 +119,13 @@ CREATE TABLE IF NOT EXISTS refunds (
     amount          INTEGER NOT NULL DEFAULT 0,
     reason          TEXT NOT NULL DEFAULT '',
     status          TEXT NOT NULL DEFAULT 'completed',
+    idempotency_key TEXT,
     created_at      REAL NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_refund_settlement ON refunds(settlement_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_refund_idempotency
+    ON refunds(idempotency_key) WHERE idempotency_key IS NOT NULL;
 """
 
 
@@ -160,6 +163,7 @@ class PaymentStorage:
             ("payment_intents", "idempotency_key", "TEXT"),
             ("escrows", "idempotency_key", "TEXT"),
             ("subscriptions", "idempotency_key", "TEXT"),
+            ("refunds", "idempotency_key", "TEXT"),
         ]
         for table, column, col_type in migrations:
             cursor = await self._db.execute(  # nosemgrep: formatted-sql-query, sqlalchemy-execute-raw-query
@@ -600,17 +604,27 @@ class PaymentStorage:
         if isinstance(amount, (int, float)) and not isinstance(amount, Decimal):
             amount = credits_to_atomic(Decimal(str(amount)))
         await self.db.execute(
-            "INSERT INTO refunds (id, settlement_id, amount, reason, status, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO refunds (id, settlement_id, amount, reason, status, idempotency_key, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (
                 data["id"],
                 data["settlement_id"],
                 amount,
                 data.get("reason", ""),
                 data.get("status", "completed"),
+                data.get("idempotency_key"),
                 data["created_at"],
             ),
         )
         await self.db.commit()
+
+    async def get_refund_by_idempotency_key(self, key: str) -> dict[str, Any] | None:
+        """Look up a refund by its idempotency key."""
+        cursor = await self.db.execute("SELECT * FROM refunds WHERE idempotency_key = ?", (key,))
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        return self._convert_amount(dict(row))
 
     async def get_refunds_for_settlement(self, settlement_id: str) -> list[dict[str, Any]]:
         """Return all refunds for a given settlement."""

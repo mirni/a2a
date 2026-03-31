@@ -58,16 +58,20 @@ CREATE INDEX IF NOT EXISTS idx_usage_created ON usage_records(created_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_usage_idempotency ON usage_records(idempotency_key);
 
 CREATE TABLE IF NOT EXISTS transactions (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    agent_id    TEXT NOT NULL,
-    amount      INTEGER NOT NULL DEFAULT 0,
-    tx_type     TEXT NOT NULL,
-    description TEXT,
-    currency    TEXT NOT NULL DEFAULT 'CREDITS',
-    created_at  REAL NOT NULL
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_id        TEXT NOT NULL,
+    amount          INTEGER NOT NULL DEFAULT 0,
+    tx_type         TEXT NOT NULL,
+    description     TEXT,
+    currency        TEXT NOT NULL DEFAULT 'CREDITS',
+    created_at      REAL NOT NULL,
+    idempotency_key TEXT,
+    result_snapshot TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_tx_agent ON transactions(agent_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tx_idempotency
+    ON transactions(idempotency_key) WHERE idempotency_key IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS rate_policies (
     agent_id        TEXT PRIMARY KEY,
@@ -188,6 +192,14 @@ CREATE INDEX IF NOT EXISTS idx_org_tx_agent ON org_transactions(org_id, agent_id
             "    PRIMARY KEY (agent_id, currency)\n"
             ");",
         ),
+        Migration(
+            5,
+            "add idempotency_key and result_snapshot to transactions",
+            "ALTER TABLE transactions ADD COLUMN idempotency_key TEXT;\n"
+            "ALTER TABLE transactions ADD COLUMN result_snapshot TEXT;\n"
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_tx_idempotency "
+            "ON transactions(idempotency_key) WHERE idempotency_key IS NOT NULL;",
+        ),
     )
 
     # -----------------------------------------------------------------------
@@ -296,17 +308,37 @@ CREATE INDEX IF NOT EXISTS idx_org_tx_agent ON org_transactions(org_id, agent_id
     # -----------------------------------------------------------------------
 
     async def record_transaction(
-        self, agent_id: str, amount: float, tx_type: str, description: str = "", currency: str = "CREDITS"
+        self,
+        agent_id: str,
+        amount: float,
+        tx_type: str,
+        description: str = "",
+        currency: str = "CREDITS",
+        idempotency_key: str | None = None,
+        result_snapshot: str | None = None,
     ) -> int:
         now = time.time()
         amt_atomic = int(Decimal(str(amount)) * SCALE)  # allow negative for withdrawals
         cursor = await self.db.execute(
-            "INSERT INTO transactions (agent_id, amount, tx_type, description, currency, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (agent_id, amt_atomic, tx_type, description, currency, now),
+            "INSERT INTO transactions (agent_id, amount, tx_type, description, currency, created_at, "
+            "idempotency_key, result_snapshot) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (agent_id, amt_atomic, tx_type, description, currency, now, idempotency_key, result_snapshot),
         )
         await self.db.commit()
         return cursor.lastrowid  # type: ignore[return-value]
+
+    async def get_transaction_by_idempotency_key(self, key: str) -> dict[str, Any] | None:
+        """Look up a transaction by its idempotency key."""
+        cursor = await self.db.execute(
+            "SELECT * FROM transactions WHERE idempotency_key = ?", (key,)
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        d = dict(row)
+        d["amount"] = self._from_atomic(d["amount"])
+        return d
 
     async def get_transactions(self, agent_id: str, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
         cursor = await self.db.execute(
