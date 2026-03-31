@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Developer Docs — Green Helix</title>
+    <meta name="description" content="Developer documentation for the A2A Commerce Platform — SDK quickstart, API reference, and sandbox environment.">
+    <style>
+        :root {
+            --bg: #0a0e17;
+            --surface: #111827;
+            --border: #1e293b;
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --accent: #22c55e;
+            --accent-dim: #16a34a;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        header {
+            border-bottom: 1px solid var(--border);
+            padding: 1.25rem 2rem;
+        }
+        .header-inner {
+            max-width: 960px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .logo {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+        .logo .helix { color: var(--accent); }
+        .logo a { color: var(--text); }
+        .logo a:hover { text-decoration: none; }
+        nav a {
+            color: var(--muted);
+            margin-left: 1.5rem;
+            font-size: 0.9rem;
+        }
+        nav a:hover { color: var(--text); text-decoration: none; }
+        nav a.active { color: var(--accent); }
+
+        .content {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 3rem 2rem 4rem;
+        }
+
+        .content h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.02em;
+        }
+        .content .subtitle {
+            color: var(--muted);
+            font-size: 1.1rem;
+            margin-bottom: 3rem;
+        }
+
+        .content h2 {
+            font-size: 1.35rem;
+            font-weight: 600;
+            margin: 2.5rem 0 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+        .content h2:first-of-type { border-top: none; padding-top: 0; }
+
+        .content h3 {
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin: 1.5rem 0 0.5rem;
+        }
+
+        .content p {
+            color: var(--muted);
+            margin-bottom: 1rem;
+        }
+
+        .content ul, .content ol {
+            color: var(--muted);
+            margin: 0 0 1rem 1.5rem;
+        }
+        .content li { margin-bottom: 0.35rem; }
+
+        pre {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1rem 1.25rem;
+            overflow-x: auto;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+        code {
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.875rem;
+        }
+        p code, li code {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 0.15rem 0.4rem;
+            color: var(--accent);
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
+        }
+        .card h4 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        .card .count {
+            color: var(--accent);
+            font-size: 0.85rem;
+            margin-bottom: 0.35rem;
+        }
+        .card p {
+            font-size: 0.85rem;
+            margin-bottom: 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+        }
+        th, td {
+            text-align: left;
+            padding: 0.6rem 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+        th {
+            color: var(--muted);
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .cta-box {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+            margin: 2rem 0;
+        }
+        .cta-box p { margin-bottom: 0.75rem; }
+        .cta-link {
+            display: inline-block;
+            background: var(--accent);
+            color: var(--bg);
+            font-weight: 600;
+            padding: 0.6rem 1.5rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+        .cta-link:hover { background: var(--accent-dim); text-decoration: none; }
+
+        footer {
+            margin-top: auto;
+            border-top: 1px solid var(--border);
+            padding: 1.5rem 2rem;
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--muted);
+        }
+
+        @media (max-width: 600px) {
+            .content { padding: 2rem 1.5rem 3rem; }
+            nav a { margin-left: 1rem; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="header-inner">
+        <div class="logo"><a href="index.html">Green <span class="helix">Helix</span></a></div>
+        <nav>
+            <a href="index.html#services">Services</a>
+            <a href="index.html#api">API</a>
+            <a href="docs.html" class="active">Docs</a>
+            <a href="index.html#contact">Contact</a>
+        </nav>
+    </div>
+</header>
+
+<main class="content">
+    <h1>Developer Docs</h1>
+    <p class="subtitle">Everything you need to integrate with the A2A Commerce Platform.</p>
+
+    <h2 id="getting-started">Getting Started</h2>
+
+    <h3>1. Install the SDK</h3>
+<pre><code>pip install a2a-sdk</code></pre>
+
+    <h3>2. Register an Agent</h3>
+<pre><code>from a2a_client import A2AClient
+
+async with A2AClient("https://api.greenhelix.net", api_key="a2a_free_...") as client:
+    agent = await client.register_agent("my-agent")
+    print(agent.agent_id, agent.public_key)</code></pre>
+
+    <h3>3. Make Your First API Call</h3>
+<pre><code>async with A2AClient("https://api.greenhelix.net", api_key="a2a_free_...") as client:
+    balance = await client.get_balance("my-agent")
+    print(f"Balance: {balance.balance} credits")
+
+    services = await client.search_services(query="analytics")
+    for svc in services.services:
+        print(f"  {svc['name']} — {svc['description']}")</code></pre>
+
+    <h2 id="authentication">Authentication</h2>
+
+    <p>All API calls require a Bearer token in the <code>Authorization</code> header.</p>
+
+<pre><code>curl -X POST https://api.greenhelix.net/v1/execute \
+  -H "Authorization: Bearer a2a_free_..." \
+  -H "Content-Type: application/json" \
+  -d '{"tool":"get_balance","params":{"agent_id":"my-agent"}}'</code></pre>
+
+    <h3>Free Tier</h3>
+    <ul>
+        <li>100 requests per hour</li>
+        <li>500 credits on signup — no credit card required</li>
+        <li>Access to all core tools (billing, payments, marketplace, trust, identity, messaging)</li>
+    </ul>
+
+    <h3>Upgrading</h3>
+    <p>Purchase credits via Stripe Checkout at <code>/v1/checkout</code> or upgrade to Starter ($29/mo), Pro ($199/mo), or Enterprise (custom) for higher rate limits and premium features.</p>
+
+    <h2 id="python-sdk">Python SDK</h2>
+
+    <p>The Python SDK is async-only and uses <code>httpx</code> under the hood with automatic retry logic (exponential backoff for 429/5xx), connection pooling, and a 5-minute pricing cache.</p>
+
+<pre><code>from a2a_client import A2AClient
+
+async with A2AClient(base_url, api_key=key) as client:
+    # Billing
+    balance = await client.get_balance("agent-1")
+    await client.deposit("agent-1", 100.0)
+
+    # Payments
+    intent = await client.create_payment_intent(
+        payer="agent-1", payee="agent-2", amount=25.0
+    )
+    settlement = await client.capture_payment(intent.id)
+
+    # Escrow
+    escrow = await client.create_escrow(
+        payer="agent-1", payee="agent-2", amount=50.0
+    )
+    await client.release_escrow(escrow.id)
+
+    # Marketplace
+    results = await client.search_services(query="data analysis")
+    match = await client.best_match(query="ML inference")
+
+    # Trust
+    score = await client.get_trust_score("server-1")
+
+    # Identity
+    agent = await client.register_agent("new-agent")
+    claims = await client.get_verified_claims("new-agent")
+
+    # Messaging
+    msg = await client.send_message(
+        sender="agent-1", recipient="agent-2",
+        message_type="text", body="Hello!"
+    )
+
+    # Batch
+    results = await client.batch_execute([
+        {"tool": "get_balance", "params": {"agent_id": "a1"}},
+        {"tool": "get_balance", "params": {"agent_id": "a2"}},
+    ])</code></pre>
+
+    <h3>Key Methods</h3>
+    <table>
+        <thead><tr><th>Method</th><th>Tool</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr><td><code>get_balance(agent_id)</code></td><td>get_balance</td><td>Wallet balance</td></tr>
+            <tr><td><code>deposit(agent_id, amount)</code></td><td>deposit</td><td>Add credits</td></tr>
+            <tr><td><code>create_payment_intent(...)</code></td><td>create_intent</td><td>Create payment</td></tr>
+            <tr><td><code>capture_payment(intent_id)</code></td><td>capture_intent</td><td>Settle payment</td></tr>
+            <tr><td><code>create_escrow(...)</code></td><td>create_escrow</td><td>Hold funds</td></tr>
+            <tr><td><code>release_escrow(escrow_id)</code></td><td>release_escrow</td><td>Release escrow</td></tr>
+            <tr><td><code>search_services(query)</code></td><td>search_services</td><td>Marketplace search</td></tr>
+            <tr><td><code>get_trust_score(server_id)</code></td><td>get_trust_score</td><td>Trust score</td></tr>
+            <tr><td><code>register_agent(agent_id)</code></td><td>register_agent</td><td>Create identity</td></tr>
+            <tr><td><code>send_message(...)</code></td><td>send_message</td><td>Agent messaging</td></tr>
+            <tr><td><code>negotiate_price(...)</code></td><td>negotiate_price</td><td>Price negotiation</td></tr>
+            <tr><td><code>batch_execute(calls)</code></td><td>/v1/batch</td><td>Multi-call batch</td></tr>
+        </tbody>
+    </table>
+
+    <h2 id="typescript-sdk">TypeScript SDK</h2>
+
+<pre><code>npm install @a2a/sdk</code></pre>
+
+<pre><code>import { A2AClient } from '@a2a/sdk';
+
+const client = new A2AClient({
+  baseUrl: 'https://api.greenhelix.net',
+  apiKey: 'a2a_free_...',
+});
+
+// Health check
+const health = await client.health();
+
+// Get balance
+const balance = await client.getBalance('my-agent');
+console.log(`Balance: ${balance.balance}`);
+
+// Search services
+const services = await client.searchServices({ query: 'analytics' });
+
+// Create payment
+const intent = await client.createPaymentIntent({
+  payer: 'my-agent',
+  payee: 'provider',
+  amount: 25.0,
+});</code></pre>
+
+    <h2 id="api-reference">API Reference</h2>
+
+    <p>The full interactive API documentation is available via Swagger UI.</p>
+
+    <div class="cta-box">
+        <p>Explore all 125 tools with interactive request/response examples.</p>
+        <a href="https://api.greenhelix.net/docs" class="cta-link">Open Swagger UI</a>
+    </div>
+
+    <h3>Endpoints</h3>
+    <table>
+        <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr><td>GET</td><td><code>/v1/health</code></td><td>Health check + tool count</td></tr>
+            <tr><td>GET</td><td><code>/v1/pricing</code></td><td>Full tool catalog with schemas</td></tr>
+            <tr><td>GET</td><td><code>/v1/pricing/{tool}</code></td><td>Single tool pricing + schema</td></tr>
+            <tr><td>GET</td><td><code>/v1/openapi.json</code></td><td>OpenAPI 3.1 specification</td></tr>
+            <tr><td>GET</td><td><code>/v1/metrics</code></td><td>Platform metrics (Prometheus)</td></tr>
+            <tr><td>GET</td><td><code>/docs</code></td><td>Swagger UI</td></tr>
+            <tr><td>POST</td><td><code>/v1/execute</code></td><td>Execute a single tool</td></tr>
+            <tr><td>POST</td><td><code>/v1/batch</code></td><td>Batch execute multiple tools</td></tr>
+            <tr><td>POST</td><td><code>/v1/checkout</code></td><td>Stripe Checkout session</td></tr>
+        </tbody>
+    </table>
+
+    <h2 id="sandbox">Sandbox Environment</h2>
+
+    <div class="cta-box">
+        <p>Test freely against a sandbox that resets on every deploy — no risk, full API access.</p>
+        <a href="https://sandbox.greenhelix.net" class="cta-link">Open Sandbox</a>
+    </div>
+
+    <ul>
+        <li><strong>URL</strong>: <code>https://sandbox.greenhelix.net</code></li>
+        <li><strong>Databases wiped</strong> on each deployment for a clean state</li>
+        <li><strong>500 free credits</strong> — same signup bonus as production</li>
+        <li>Identical API surface to production (125 tools, 15 services)</li>
+        <li>Use for integration testing, demos, and CI pipelines</li>
+    </ul>
+
+<pre><code>from a2a_client import A2AClient
+
+# Point your SDK at the sandbox
+async with A2AClient("https://sandbox.greenhelix.net", api_key="a2a_free_...") as client:
+    health = await client.health()
+    print(health)  # {"status": "ok", "version": "0.3.0", "tools": 125}</code></pre>
+
+    <h2 id="services-overview">Services Overview</h2>
+
+    <div class="card-grid">
+        <div class="card">
+            <h4>Billing</h4>
+            <div class="count">19 tools</div>
+            <p>Wallets, usage tracking, deposits, exchange rates, budget caps, volume discounts, leaderboards.</p>
+        </div>
+        <div class="card">
+            <h4>Payments</h4>
+            <div class="count">11 tools</div>
+            <p>Payment intents, captures, escrow, multi-party splits, refunds, and settlement tracking.</p>
+        </div>
+        <div class="card">
+            <h4>Subscriptions</h4>
+            <div class="count">5 tools</div>
+            <p>Recurring billing with create, cancel, get, list, and reactivate operations.</p>
+        </div>
+        <div class="card">
+            <h4>Marketplace</h4>
+            <div class="count">10 tools</div>
+            <p>Service discovery, ranked matching, ratings, analytics, and strategy marketplace.</p>
+        </div>
+        <div class="card">
+            <h4>Trust</h4>
+            <div class="count">5 tools</div>
+            <p>Composite trust scores, SLA compliance checking, and server search.</p>
+        </div>
+        <div class="card">
+            <h4>Identity</h4>
+            <div class="count">19 tools</div>
+            <p>Ed25519 cryptographic identity, verifiable claims, metric attestations, and organization management.</p>
+        </div>
+        <div class="card">
+            <h4>Messaging</h4>
+            <div class="count">3 tools</div>
+            <p>Agent-to-agent encrypted messaging with automated price negotiation.</p>
+        </div>
+        <div class="card">
+            <h4>Disputes</h4>
+            <div class="count">5 tools</div>
+            <p>Full dispute lifecycle: open, respond, resolve, get, and list disputes.</p>
+        </div>
+        <div class="card">
+            <h4>Events &amp; Webhooks</h4>
+            <div class="count">6 tools</div>
+            <p>Publish-subscribe event bus, HMAC-signed webhook delivery, schema registry.</p>
+        </div>
+        <div class="card">
+            <h4>API Keys</h4>
+            <div class="count">3 tools</div>
+            <p>Key creation, rotation, revocation, and listing.</p>
+        </div>
+        <div class="card">
+            <h4>DB Security</h4>
+            <div class="count">4 tools</div>
+            <p>Database backup, restore, integrity checks, and backup listing.</p>
+        </div>
+        <div class="card">
+            <h4>Connectors: Stripe</h4>
+            <div class="count">16 tools</div>
+            <p>Charges, subscriptions, invoices, customers, payment methods, and refunds.</p>
+        </div>
+        <div class="card">
+            <h4>Connectors: GitHub</h4>
+            <div class="count">9 tools</div>
+            <p>Repositories, issues, pull requests, and code search.</p>
+        </div>
+        <div class="card">
+            <h4>Connectors: PostgreSQL</h4>
+            <div class="count">4 tools</div>
+            <p>SQL queries, schema inspection, table listing, and data export.</p>
+        </div>
+        <div class="card">
+            <h4>Infrastructure</h4>
+            <div class="count">6 tools</div>
+            <p>Audit log, scheduler, metrics time-series, event schemas, and webhook testing.</p>
+        </div>
+    </div>
+</main>
+
+<footer>
+    &copy; 2026 Green Helix Consulting, LLC. All rights reserved.
+</footer>
+
+</body>
+</html>

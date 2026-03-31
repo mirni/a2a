@@ -1,1 +1,1 @@
-../../opt/a2a/scripts/deploy_website.sh
+../../../../../scripts/deploy_website.sh

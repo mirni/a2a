@@ -20,7 +20,7 @@ Infrastructure code is exempt from this rule.
 * Never push directly to `main`. Always create a feature/fix branch, commit there, and open a PR.
 * Branch naming: `feat/<name>`, `fix/<name>`, `refactor/<name>`, etc.
 * Push branches using the `GITHUB_DEPLOYMENT_TOKEN` from `.env` (already configured in `.git/config` — do not strip it).
-* Open PRs with `gh pr create`. CI runs automatically on all branches and PRs.
+* Open PRs with `gh pr create`. CI runs automatically on all branches and PRs. Make sure that the CI pipeline is all green before you are done -- fix and iterate autonomously if pipeline fails.
 * Required status checks before merge: `lint`, `typecheck`, `semgrep`, `test`, `security`, `dependency-audit`.
 * Staging deployment runs automatically on PRs to `main` (via Tailscale — secrets `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `TAILSCALE_IP` are configured).
 * Production deployment is manual via `workflow_dispatch` on `main` with approval gate.

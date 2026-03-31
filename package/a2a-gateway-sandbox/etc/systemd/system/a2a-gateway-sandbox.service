@@ -1,0 +1,30 @@
+[Unit]
+Description=A2A Commerce Gateway (Sandbox)
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=a2a
+Group=a2a
+WorkingDirectory=/opt/a2a-sandbox
+EnvironmentFile=/opt/a2a-sandbox/.env
+ExecStart=/opt/a2a-sandbox/venv/bin/python -m uvicorn gateway.main:app \
+    --host 127.0.0.1 \
+    --port 8002 \
+    --workers 1 \
+    --log-level info \
+    --access-log
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/a2a-sandbox /var/log/a2a-sandbox
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

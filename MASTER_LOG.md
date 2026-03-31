@@ -4,6 +4,40 @@ This is the running log of all conversations, decisions, and next steps for the 
 
 ---
 
+## 2026-03-31 — Release 0.4.0 + CMO Distribution Plan
+
+### Human Prompt
+"Done. Please re-test. Once all green, merge it in and run release 0.4. Then process the prompt in PROMPTS.md"
+
+### Actions Taken
+
+1. **Merged PR #3** (`feat/release-script`) to main — extracted deployment logic into `scripts/deploy.sh` CLI with rollback, health checks, and SSH key auth for CI.
+
+2. **Released v0.4.0** — Created `release/0.4.0` branch, bumped all package versions, generated changelog, pushed branch, triggered production deployment workflow.
+
+3. **Processed PROMPTS.md** — CMO distribution research task:
+   - Reviewed `archive/CMO_MARKETING_REPORT.md` and `archive/CMO_ANALYSIS.md`
+   - Compared with current product state (125 tools, 10 modules, 3 connectors, 2 SDKs)
+   - Researched current distribution channels: MCP registries (mcp.so, Glama, Smithery, PulseMCP, Official MCP Registry), A2A protocol registries, agent skills ecosystem (SkillsMP, skills.sh), framework integrations (LangChain, CrewAI, Vercel AI SDK, Google ADK, OpenAI Agents SDK)
+   - Output: `docs/DISTRIBUTION.md` — comprehensive distribution plan with 40 prioritized action items
+
+### Key Findings
+- Platform is technically mature but has zero market presence
+- 12 P0 items identified (all zero-cost): publish SDKs to PyPI/npm, submit to MCP registries, host sandbox, add Swagger UI, build fiat on-ramp
+- Primary distribution channel in 2026 is the MCP server registry ecosystem (19K+ servers on mcp.so alone)
+- Agent Skills (SKILL.md) is a new distribution format with 96K+ indexed skills
+- Most distribution is free — estimated Year 1 budget $0-15K
+
+### Files Created/Modified
+- `docs/DISTRIBUTION.md` — NEW, 400+ lines, full distribution playbook
+- `PROMPTS.md` — Marked CMO prompt as DONE
+
+### Production Deploy Status
+- Release branch `release/0.4.0` pushed and CI triggered
+- Production deploy workflow triggered but requires manual environment approval in GitHub UI
+
+---
+
 ## Session 1 — 2026-03-27: Platform Build-Out (12 Improvements)
 
 ### Prompt

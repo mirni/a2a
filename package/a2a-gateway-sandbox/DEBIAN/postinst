@@ -1,0 +1,82 @@
+#!/bin/bash
+set -e
+
+case "$1" in
+    configure)
+        export A2A_SKIP_GIT=1
+        export A2A_SKIP_APT=1
+
+        # Override settings for the sandbox instance
+        export A2A_DOMAIN="sandbox.greenhelix.net"
+        export A2A_WWW_DOMAIN=""
+        export PORT=8002
+        export INSTALL_DIR="/opt/a2a-sandbox"
+        export DATA_DIR="/var/lib/a2a-sandbox"
+
+        # Wipe databases on each deploy for clean developer experience
+        rm -rf /var/lib/a2a-sandbox/*.db
+
+        # Create sandbox data directories
+        mkdir -p /var/lib/a2a-sandbox
+        mkdir -p /var/log/a2a-sandbox
+
+        # Create a2a system user if not exists
+        if ! id -u a2a >/dev/null 2>&1; then
+            useradd --system --shell /usr/sbin/nologin --home-dir /opt/a2a-sandbox a2a
+        fi
+
+        chown -R a2a:a2a /var/lib/a2a-sandbox /var/log/a2a-sandbox /opt/a2a-sandbox
+
+        # Run database migrations
+        if [[ -x /opt/a2a-sandbox/scripts/migrate_db.sh ]]; then
+            A2A_DATA_DIR=/var/lib/a2a-sandbox /opt/a2a-sandbox/scripts/migrate_db.sh || exit 1
+        fi
+
+        # Set up Python venv and install deps
+        python3.12 -m venv /opt/a2a-sandbox/venv
+        /opt/a2a-sandbox/venv/bin/pip install --upgrade pip wheel setuptools -q
+        /opt/a2a-sandbox/venv/bin/pip install \
+            'starlette>=0.37' 'uvicorn>=0.29' 'httpx>=0.27' \
+            'aiosqlite>=0.20' 'pydantic>=2.0' 'cryptography>=42.0' -q
+        /opt/a2a-sandbox/venv/bin/pip install -e /opt/a2a-sandbox/sdk -q 2>/dev/null \
+            || /opt/a2a-sandbox/venv/bin/pip install /opt/a2a-sandbox/sdk -q
+
+        # Create .env if missing
+        if [[ ! -f /opt/a2a-sandbox/.env ]]; then
+            cat > /opt/a2a-sandbox/.env << 'ENVEOF'
+HOST=127.0.0.1
+PORT=8002
+A2A_DATA_DIR=/var/lib/a2a-sandbox
+BILLING_DSN=sqlite:////var/lib/a2a-sandbox/billing.db
+PAYWALL_DSN=sqlite:////var/lib/a2a-sandbox/paywall.db
+PAYMENTS_DSN=sqlite:////var/lib/a2a-sandbox/payments.db
+MARKETPLACE_DSN=sqlite:////var/lib/a2a-sandbox/marketplace.db
+TRUST_DSN=sqlite:////var/lib/a2a-sandbox/trust.db
+EVENT_BUS_DSN=sqlite:////var/lib/a2a-sandbox/events.db
+WEBHOOK_DSN=sqlite:////var/lib/a2a-sandbox/webhooks.db
+IDENTITY_DSN=sqlite:////var/lib/a2a-sandbox/identity.db
+MESSAGING_DSN=sqlite:////var/lib/a2a-sandbox/messaging.db
+DISPUTE_DSN=sqlite:////var/lib/a2a-sandbox/disputes.db
+LOG_LEVEL=INFO
+ENVEOF
+            chmod 600 /opt/a2a-sandbox/.env
+        fi
+
+        # Enable the a2a-sandbox site in nginx
+        ln -sf /etc/nginx/sites-available/a2a-sandbox /etc/nginx/sites-enabled/a2a-sandbox
+        nginx -t && systemctl reload nginx
+
+        # systemd service
+        systemctl daemon-reload
+        systemctl enable a2a-gateway-sandbox
+        systemctl restart a2a-gateway-sandbox
+        ;;
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+    *)
+        echo "postinst called with unknown argument '$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0
