@@ -7,6 +7,9 @@
 #
 # NOTE: push is limited to main to avoid duplicate CI runs on PR branches
 # (GitHub fires both push and pull_request events for PR branch pushes).
+#
+# For PRs targeting main, the staging pipeline is called via workflow_call
+# after all CI jobs pass, so there is a single workflow run per push.
 # =============================================================================
 
 name: CI
@@ -176,3 +179,12 @@ jobs:
           name: sdk-wheel
           path: dist/*.whl
           retention-days: 14
+
+  # ---------------------------------------------------------------------------
+  # Staging deploy (PRs targeting main only, after all CI jobs pass)
+  # ---------------------------------------------------------------------------
+  staging:
+    needs: [lint, typecheck, security, dependency-audit, semgrep, test, docker-build, package]
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    uses: ./.github/workflows/staging.yml
+    secrets: inherit

@@ -1,37 +1,22 @@
 # =============================================================================
 # A2A Commerce Platform — Staging Pipeline
 # =============================================================================
-# Triggered on pull requests targeting main, after CI passes.
-# Deploys the test gateway package to the staging server
+# Called by the CI workflow (workflow_call) after all checks pass on PRs
+# targeting main. Deploys the test gateway package to the staging server
 # and runs smoke tests before allowing merge.
 # =============================================================================
 
 name: Staging
 
 on:
-  pull_request:
-    branches: [main]
-
-concurrency:
-  group: staging-${{ github.head_ref }}
-  cancel-in-progress: true
+  workflow_call:
 
 jobs:
-  # ---------------------------------------------------------------------------
-  # Wait for CI to pass before proceeding
-  # ---------------------------------------------------------------------------
-  ci-check:
-    runs-on: ubuntu-latest
-    steps:
-      - name: CI status gate
-        run: echo "CI checks are enforced via required status checks on the PR"
-
   # ---------------------------------------------------------------------------
   # Build all packages
   # ---------------------------------------------------------------------------
   package:
     runs-on: ubuntu-latest
-    needs: [ci-check]
     steps:
       - uses: actions/checkout@v4
 
@@ -118,7 +103,7 @@ jobs:
   # ---------------------------------------------------------------------------
   staging-report:
     runs-on: ubuntu-latest
-    needs: [staging-smoke]
+    needs: [staging-deploy, staging-smoke]
     if: always()
     steps:
       - name: Post staging result to PR
