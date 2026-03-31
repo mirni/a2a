@@ -1,5 +1,42 @@
 # Changelog
 
+# Release v0.5.1
+
+**Date:** 2026-03-31
+**Commit:** ffadd303
+**Previous:** v0.4.9
+
+## Changes
+
+### Features
+
+- feat: security hardening and data integrity improvements (#16) (`ffadd30`)
+- feat: verify and test API key TTL/expiration enforcement (P2-6) (#7) (`2f0f253`)
+- feat: add CORS middleware and security headers (P3-2, P3-3) (#6) (`7be0e4e`)
+
+### Bug Fixes
+
+- fix: restrict pg_execute to parameterized SELECT/DML only (#8) (`17ed1ef`)
+- fix: move release tagging from deploy workflow into release.sh (`7a7c61f`)
+- fix: treat 402 as expected in smoke test when no admin key provided (`cf13e4c`)
+- fix: correct version pins and add dpkg state repair to deploy (`ab102b6`)
+
+### Tests
+
+- fix: move release tagging from deploy workflow into release.sh (`7a7c61f`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 0.5.1 |
+| a2a-gateway | 0.5.1 |
+| a2a-gateway-sandbox | 0.5.1 |
+| a2a-gateway-test | 0.5.1 |
+| a2a-website | 0.5.1 |
+---
+
+
 # Release v0.4.9
 
 **Date:** 2026-03-31
