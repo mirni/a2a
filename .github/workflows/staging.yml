@@ -1,37 +1,22 @@
 # =============================================================================
 # A2A Commerce Platform — Staging Pipeline
 # =============================================================================
-# Triggered on pull requests targeting main, after CI passes.
-# Deploys the test gateway package to the staging server
+# Called by the CI workflow (workflow_call) after all checks pass on PRs
+# targeting main. Deploys the test gateway package to the staging server
 # and runs smoke tests before allowing merge.
 # =============================================================================
 
 name: Staging
 
 on:
-  pull_request:
-    branches: [main]
-
-concurrency:
-  group: staging-${{ github.head_ref }}
-  cancel-in-progress: true
+  workflow_call:
 
 jobs:
-  # ---------------------------------------------------------------------------
-  # Wait for CI to pass before proceeding
-  # ---------------------------------------------------------------------------
-  ci-check:
-    runs-on: ubuntu-latest
-    steps:
-      - name: CI status gate
-        run: echo "CI checks are enforced via required status checks on the PR"
-
   # ---------------------------------------------------------------------------
   # Build all packages
   # ---------------------------------------------------------------------------
   package:
     runs-on: ubuntu-latest
-    needs: [ci-check]
     steps:
       - uses: actions/checkout@v4
 
@@ -66,41 +51,55 @@ jobs:
     runs-on: ubuntu-latest
     needs: [package]
     steps:
+      - uses: actions/checkout@v4
+
       - name: Download deb artifacts
         uses: actions/download-artifact@v4
         with:
           name: staging-deb-packages
           path: dist/
 
-      - name: Deploy to staging server
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Configure SSH
         env:
-          STAGING_SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
-          STAGING_HOST: ${{ secrets.STAGING_HOST }}
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
-          # Set up SSH
           mkdir -p ~/.ssh
-          echo "$STAGING_SSH_KEY" > ~/.ssh/staging_key
-          chmod 600 ~/.ssh/staging_key
-          ssh-keyscan -H "$STAGING_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          # Detect format: PEM starts with -----, otherwise assume base64
+          if [[ "$SSH_KEY" == -----* ]]; then
+            printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          else
+            echo "$SSH_KEY" | base64 -d > ~/.ssh/deploy_key
+          fi
+          chmod 600 ~/.ssh/deploy_key
+          # Validate key (try empty passphrase explicitly)
+          if ! ssh-keygen -y -P "" -f ~/.ssh/deploy_key > /dev/null 2>&1; then
+            echo "::error::DEPLOY_SSH_KEY is invalid or passphrase-protected"
+            echo "File: $(wc -c < ~/.ssh/deploy_key) bytes, $(wc -l < ~/.ssh/deploy_key) lines"
+            echo "Header: $(head -1 ~/.ssh/deploy_key)"
+            echo "Generate a new key: ssh-keygen -t ed25519 -f deploy_key -N ''"
+            exit 1
+          fi
+          cat >> ~/.ssh/config << 'EOF'
+          Host *
+            StrictHostKeyChecking accept-new
+            IdentityFile ~/.ssh/deploy_key
+          EOF
+          chmod 600 ~/.ssh/config
 
-          SSH_OPTS="-o StrictHostKeyChecking=accept-new -i ~/.ssh/staging_key"
-
-          # Upload the test gateway deb
-          DEB_FILE=$(ls dist/a2a-gateway-test_*.deb | head -1)
-          scp $SSH_OPTS "$DEB_FILE" "root@${STAGING_HOST}:/tmp/"
-
-          # Install and verify service starts
-          DEB_BASENAME=$(basename "$DEB_FILE")
-          ssh $SSH_OPTS "root@${STAGING_HOST}" bash -s << REMOTE
-            set -euo pipefail
-            dpkg -i "/tmp/${DEB_BASENAME}" || apt-get install -f -y
-            sleep 3
-            systemctl is-active a2a-gateway-test
-            rm -f "/tmp/${DEB_BASENAME}"
-          REMOTE
-
-          # Clean up SSH key
-          rm -f ~/.ssh/staging_key
+      - name: Deploy to staging
+        run: |
+          scripts/deploy.sh \
+            --host "${{ secrets.TAILSCALE_IP }}" \
+            --deb "$(ls dist/a2a-gateway-test_*.deb | head -1)" \
+            --component a2a-gateway-test \
+            --health-url "https://test.greenhelix.net/v1/health"
 
   # ---------------------------------------------------------------------------
   # Smoke tests against the staging server
@@ -118,20 +117,6 @@ jobs:
       - name: Install test dependencies
         run: scripts/ci/install_deps.sh --with-test
 
-      - name: Health check
-        run: |
-          # Retry health check up to 10 times (service may still be starting)
-          for i in $(seq 1 10); do
-            if curl -sf "https://test.greenhelix.net/v1/health" -o /dev/null; then
-              echo "Health check passed (attempt $i)"
-              exit 0
-            fi
-            echo "Health check attempt $i failed, retrying in 5s..."
-            sleep 5
-          done
-          echo "Health check failed after 10 attempts"
-          exit 1
-
       - name: Smoke test (lightweight stress)
         run: |
           python scripts/stress_test.py \
@@ -144,7 +129,7 @@ jobs:
   # ---------------------------------------------------------------------------
   staging-report:
     runs-on: ubuntu-latest
-    needs: [staging-smoke]
+    needs: [staging-deploy, staging-smoke]
     if: always()
     steps:
       - name: Post staging result to PR

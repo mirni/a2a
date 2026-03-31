@@ -53,6 +53,9 @@ tmp/
 # Archived reports
 archive/*.md
 
+# Outside reports
+customer_reports/
+
 # Scratchpad
 next_tmrw.md
 

@@ -122,6 +122,22 @@ ensure_nginx_rate_limit() {
     fi
 }
 
+# ---------------------------------------------------------------------------
+# Component → systemd service mapping
+# ---------------------------------------------------------------------------
+
+# Map a deployment component name to its systemd service.
+# Returns empty string for components with no service (e.g. a2a-website).
+service_for_component() {
+    local component="$1"
+    case "$component" in
+        a2a-gateway)      echo "a2a-gateway" ;;
+        a2a-gateway-test) echo "a2a-gateway-test" ;;
+        a2a-website)      echo "" ;;
+        *)                err "Unknown component: $component" ;;
+    esac
+}
+
 # Enable a site and reload nginx
 enable_nginx_site() {
     local name="$1"

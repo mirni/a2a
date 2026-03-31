@@ -1,8 +1,13 @@
 # =============================================================================
 # A2A Commerce Platform — Production Deployment
 # =============================================================================
-# Manual deployment to production with approval gate and auto-rollback.
-# Triggered via workflow_dispatch on main only.
+# Deploy selected components to production with approval gate and auto-rollback.
+# Triggered via workflow_dispatch on main or release/* branches.
+#
+# Components:
+#   a2a-gateway  — Production API gateway (systemd service)
+#   a2a-website  — Static website (nginx)
+#   all          — Both gateway and website
 # =============================================================================
 
 name: Deploy Production
@@ -13,30 +18,67 @@ on:
       confirm:
         description: "Type 'deploy' to confirm production deployment"
         required: true
+      component:
+        description: "Component to deploy"
+        required: true
+        type: choice
+        options:
+          - all
+          - a2a-gateway
+          - a2a-website
+        default: all
+      version:
+        description: "Release version tag (e.g. 1.2.3) — optional, for tagging"
+        required: false
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Guard: only allow on main, require explicit confirmation
+  # Guard: require main or release/* branch + explicit confirmation
   # ---------------------------------------------------------------------------
   validate:
     runs-on: ubuntu-latest
+    outputs:
+      deploy_gateway: ${{ steps.check.outputs.deploy_gateway }}
+      deploy_website: ${{ steps.check.outputs.deploy_website }}
+      version: ${{ steps.check.outputs.version }}
     steps:
       - name: Validate branch and confirmation
+        id: check
         env:
           GIT_REF: ${{ github.ref }}
           CONFIRM: ${{ github.event.inputs.confirm }}
+          COMPONENT: ${{ github.event.inputs.component }}
+          VERSION: ${{ github.event.inputs.version }}
         run: |
-          if [[ "$GIT_REF" != "refs/heads/main" ]]; then
-            echo "Production deployments can only be triggered from main"
-            exit 1
-          fi
-          if [[ "$CONFIRM" != "deploy" ]]; then
-            echo "Confirmation required: type 'deploy' to proceed"
+          # Allow main and release/* branches
+          if [[ "$GIT_REF" != "refs/heads/main" && ! "$GIT_REF" =~ ^refs/heads/release/ ]]; then
+            echo "::error::Production deployments can only be triggered from main or release/* branches"
             exit 1
           fi
 
+          if [[ "$CONFIRM" != "deploy" ]]; then
+            echo "::error::Confirmation required: type 'deploy' to proceed"
+            exit 1
+          fi
+
+          # Set component flags
+          if [[ "$COMPONENT" == "all" || "$COMPONENT" == "a2a-gateway" ]]; then
+            echo "deploy_gateway=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy_gateway=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if [[ "$COMPONENT" == "all" || "$COMPONENT" == "a2a-website" ]]; then
+            echo "deploy_website=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy_website=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "version=${VERSION:-}" >> "$GITHUB_OUTPUT"
+          echo "Deploying component=$COMPONENT from ref=$GIT_REF"
+
   # ---------------------------------------------------------------------------
-  # Build production gateway package
+  # Build selected packages
   # ---------------------------------------------------------------------------
   package:
     runs-on: ubuntu-latest
@@ -51,106 +93,147 @@ jobs:
       - name: Install packaging tools
         run: pip install wheel setuptools
 
-      - name: Build production gateway
+      - name: Build gateway package
+        if: needs.validate.outputs.deploy_gateway == 'true'
         run: scripts/create_package.sh a2a-gateway
 
-      - name: Upload deb artifact
+      - name: Build website package
+        if: needs.validate.outputs.deploy_website == 'true'
+        run: scripts/create_package.sh a2a-website
+
+      - name: Upload deb artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: production-deb
+          name: production-debs
           path: dist/*.deb
           retention-days: 30
 
   # ---------------------------------------------------------------------------
-  # Deploy to production (requires manual approval via GitHub environment)
+  # Deploy gateway (requires manual approval via GitHub environment)
   # ---------------------------------------------------------------------------
-  deploy:
+  deploy-gateway:
     runs-on: ubuntu-latest
-    needs: [package]
+    needs: [validate, package]
+    if: needs.validate.outputs.deploy_gateway == 'true'
     environment: production
     steps:
-      - name: Download deb artifact
+      - uses: actions/checkout@v4
+
+      - name: Download deb artifacts
         uses: actions/download-artifact@v4
         with:
-          name: production-deb
+          name: production-debs
           path: dist/
 
-      - name: Deploy to production
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Configure SSH
         env:
-          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
-          PROD_HOST: ${{ secrets.PROD_HOST }}
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
-          set -euo pipefail
-
-          # Set up SSH
           mkdir -p ~/.ssh
-          echo "$PROD_SSH_KEY" > ~/.ssh/prod_key
-          chmod 600 ~/.ssh/prod_key
-          ssh-keyscan -H "$PROD_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          # Detect format: PEM starts with -----, otherwise assume base64
+          if [[ "$SSH_KEY" == -----* ]]; then
+            printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          else
+            echo "$SSH_KEY" | base64 -d > ~/.ssh/deploy_key
+          fi
+          chmod 600 ~/.ssh/deploy_key
+          # Validate key (try empty passphrase explicitly)
+          if ! ssh-keygen -y -P "" -f ~/.ssh/deploy_key > /dev/null 2>&1; then
+            echo "::error::DEPLOY_SSH_KEY is invalid or passphrase-protected"
+            echo "File: $(wc -c < ~/.ssh/deploy_key) bytes, $(wc -l < ~/.ssh/deploy_key) lines"
+            echo "Header: $(head -1 ~/.ssh/deploy_key)"
+            echo "Generate a new key: ssh-keygen -t ed25519 -f deploy_key -N ''"
+            exit 1
+          fi
+          cat >> ~/.ssh/config << 'EOF'
+          Host *
+            StrictHostKeyChecking accept-new
+            IdentityFile ~/.ssh/deploy_key
+          EOF
+          chmod 600 ~/.ssh/config
 
-          SSH_OPTS="-o StrictHostKeyChecking=accept-new -i ~/.ssh/prod_key"
-          DEB_FILE=$(ls dist/a2a-gateway_*.deb | head -1)
-          DEB_BASENAME=$(basename "$DEB_FILE")
+      - name: Deploy gateway
+        run: |
+          scripts/deploy.sh \
+            --host "${{ secrets.TAILSCALE_IP }}" \
+            --deb "$(ls dist/a2a-gateway_*.deb | head -1)" \
+            --component a2a-gateway \
+            --health-url "https://api.greenhelix.net/v1/health"
 
-          # Upload new deb
-          scp $SSH_OPTS "$DEB_FILE" "root@${PROD_HOST}:/tmp/"
+  # ---------------------------------------------------------------------------
+  # Deploy website
+  # ---------------------------------------------------------------------------
+  deploy-website:
+    runs-on: ubuntu-latest
+    needs: [validate, package]
+    if: needs.validate.outputs.deploy_website == 'true'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
 
-          # Deploy with rollback on failure
-          ssh $SSH_OPTS "root@${PROD_HOST}" bash -s -- "$DEB_BASENAME" << 'REMOTE'
-            set -euo pipefail
-            DEB_BASENAME="$1"
+      - name: Download deb artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: production-debs
+          path: dist/
 
-            BACKUP_DIR="/var/backups/a2a/deploy-$(date +%Y%m%d-%H%M%S)"
-            mkdir -p "$BACKUP_DIR"
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
 
-            # Back up current package state
-            dpkg-query -W -f='${Package}_${Version}_${Architecture}.deb\n' a2a-gateway 2>/dev/null \
-              > "$BACKUP_DIR/previous_version.txt" || true
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          # Detect format: PEM starts with -----, otherwise assume base64
+          if [[ "$SSH_KEY" == -----* ]]; then
+            printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          else
+            echo "$SSH_KEY" | base64 -d > ~/.ssh/deploy_key
+          fi
+          chmod 600 ~/.ssh/deploy_key
+          # Validate key (try empty passphrase explicitly)
+          if ! ssh-keygen -y -P "" -f ~/.ssh/deploy_key > /dev/null 2>&1; then
+            echo "::error::DEPLOY_SSH_KEY is invalid or passphrase-protected"
+            echo "File: $(wc -c < ~/.ssh/deploy_key) bytes, $(wc -l < ~/.ssh/deploy_key) lines"
+            echo "Header: $(head -1 ~/.ssh/deploy_key)"
+            echo "Generate a new key: ssh-keygen -t ed25519 -f deploy_key -N ''"
+            exit 1
+          fi
+          cat >> ~/.ssh/config << 'EOF'
+          Host *
+            StrictHostKeyChecking accept-new
+            IdentityFile ~/.ssh/deploy_key
+          EOF
+          chmod 600 ~/.ssh/config
 
-            # Save the currently installed deb for rollback
-            if dpkg -s a2a-gateway >/dev/null 2>&1; then
-              dpkg-repack a2a-gateway 2>/dev/null && mv a2a-gateway_*.deb "$BACKUP_DIR/" || true
-            fi
-
-            echo "[+] Installing new package..."
-            if dpkg -i "/tmp/$DEB_BASENAME"; then
-              echo "[+] Package installed successfully"
-              sleep 3
-
-              # Verify service is running
-              if systemctl is-active a2a-gateway; then
-                echo "[+] Service is active"
-              else
-                echo "[x] Service failed to start — rolling back"
-                ROLLBACK_DEB=$(ls "$BACKUP_DIR"/a2a-gateway_*.deb 2>/dev/null | head -1)
-                if [[ -n "$ROLLBACK_DEB" ]]; then
-                  dpkg -i "$ROLLBACK_DEB"
-                  systemctl restart a2a-gateway || true
-                fi
-                exit 1
-              fi
-            else
-              echo "[x] dpkg -i failed — rolling back"
-              ROLLBACK_DEB=$(ls "$BACKUP_DIR"/a2a-gateway_*.deb 2>/dev/null | head -1)
-              if [[ -n "$ROLLBACK_DEB" ]]; then
-                dpkg -i "$ROLLBACK_DEB"
-                systemctl restart a2a-gateway || true
-              fi
-              exit 1
-            fi
-
-            rm -f "/tmp/$DEB_BASENAME"
-          REMOTE
-
-          # Clean up SSH key
-          rm -f ~/.ssh/prod_key
+      - name: Deploy website
+        run: |
+          scripts/deploy.sh \
+            --host "${{ secrets.TAILSCALE_IP }}" \
+            --deb "$(ls dist/a2a-website_*.deb | head -1)" \
+            --component a2a-website \
+            --no-verify
 
   # ---------------------------------------------------------------------------
   # Post-deploy smoke tests
   # ---------------------------------------------------------------------------
   smoke:
     runs-on: ubuntu-latest
-    needs: [deploy]
+    needs: [validate, deploy-gateway, deploy-website]
+    # Run if at least one deploy job ran (skip if both were skipped)
+    if: always() && (needs.deploy-gateway.result == 'success' || needs.deploy-website.result == 'success')
     steps:
       - uses: actions/checkout@v4
 
@@ -161,22 +244,27 @@ jobs:
       - name: Install test dependencies
         run: scripts/ci/install_deps.sh --with-test
 
-      - name: Health check
-        run: |
-          for i in $(seq 1 10); do
-            if curl -sf "https://api.greenhelix.net/v1/health" -o /dev/null; then
-              echo "Health check passed (attempt $i)"
-              exit 0
-            fi
-            echo "Health check attempt $i failed, retrying in 5s..."
-            sleep 5
-          done
-          echo "Health check failed after 10 attempts"
-          exit 1
-
       - name: Post-deploy smoke tests
+        if: needs.deploy-gateway.result == 'success'
         run: |
           python scripts/stress_test.py \
             --base-url "https://api.greenhelix.net" \
             --customers 5 \
             --duration 15
+
+  # ---------------------------------------------------------------------------
+  # Tag release (if version was provided)
+  # ---------------------------------------------------------------------------
+  tag:
+    runs-on: ubuntu-latest
+    needs: [validate, smoke]
+    if: needs.validate.outputs.version != ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create git tag
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          git tag -a "v${VERSION}" -m "Release v${VERSION}"
+          git push origin "v${VERSION}"

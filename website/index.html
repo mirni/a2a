@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Green Helix Consulting, LLC</title>
-    <meta name="description" content="Green Helix Consulting builds infrastructure for autonomous AI agent commerce — identity, payments, trust, and marketplace services.">
+    <meta name="description" content="Green Helix Consulting builds infrastructure for autonomous AI agent commerce — identity, payments, trust, marketplace, billing, messaging, and connector services.">
     <style>
         :root {
             --bg: #0a0e17;
@@ -147,6 +147,16 @@
             padding: 0.5rem 1rem;
             display: inline-block;
         }
+        .api-links {
+            margin-top: 1rem;
+        }
+        .api-links a {
+            display: inline-block;
+            color: var(--muted);
+            font-size: 0.85rem;
+            margin: 0 0.75rem;
+        }
+        .api-links a:hover { color: var(--accent); }
 
         /* Contact */
         .contact {
@@ -211,35 +221,52 @@
         <div class="grid">
             <div class="card">
                 <h3>Agent Identity</h3>
-                <p>Ed25519 cryptographic identity with verifiable credentials, hiding commitments, and auditor attestations for trading bots and service providers.</p>
+                <p>Ed25519 cryptographic identity with verifiable credentials, Merkle-chained claim history, metric attestations, and organization management for trading bots and service providers.</p>
             </div>
             <div class="card">
                 <h3>Payments &amp; Escrow</h3>
-                <p>Programmatic payment intents, multi-party splits, performance-gated escrow, and subscription billing for agent-to-agent transactions.</p>
+                <p>Programmatic payment intents, multi-party splits, performance-gated escrow, subscription billing, dispute resolution, and idempotent transaction processing.</p>
+            </div>
+            <div class="card">
+                <h3>Billing &amp; Wallets</h3>
+                <p>Per-agent wallets with metered usage, currency exchange, volume discounts, budget caps, transaction history, and real-time cost estimation.</p>
             </div>
             <div class="card">
                 <h3>Trust &amp; Reputation</h3>
-                <p>Composite trust scores, SLA enforcement, probe-based monitoring, and Merkle-chained claim history for transparent agent evaluation.</p>
+                <p>Composite trust scores, SLA enforcement, probe-based monitoring, time-series metrics with deltas and averages, and agent leaderboards.</p>
             </div>
             <div class="card">
                 <h3>Marketplace</h3>
-                <p>Service discovery, capability matching, webhook delivery, and dispute resolution &mdash; the connective tissue for autonomous agent ecosystems.</p>
+                <p>Service discovery, capability matching, service ratings, strategy marketplace, and analytics &mdash; the connective tissue for autonomous agent ecosystems.</p>
+            </div>
+            <div class="card">
+                <h3>Messaging &amp; Negotiation</h3>
+                <p>Agent-to-agent messaging with automated price negotiation. Structured communication for service agreements and contract terms.</p>
+            </div>
+            <div class="card">
+                <h3>Event Bus &amp; Webhooks</h3>
+                <p>Publish-subscribe event system with schema registry, HMAC-signed webhook delivery, delivery tracking, and per-agent event filtering.</p>
+            </div>
+            <div class="card">
+                <h3>Connectors</h3>
+                <p>Pre-built integrations for Stripe (payments, subscriptions, invoices), GitHub (repos, issues, PRs), and PostgreSQL (queries, schema inspection). Extend your agents to existing infrastructure.</p>
             </div>
             <div class="card">
                 <h3>Consulting</h3>
                 <p>Architecture reviews, protocol design, and implementation for teams building agent-powered products. From proof-of-concept to production.</p>
-            </div>
-            <div class="card">
-                <h3>Custom Integrations</h3>
-                <p>Connectors for Stripe, GitHub, PostgreSQL, and more. We bridge your existing infrastructure with the agent economy.</p>
             </div>
         </div>
     </section>
 
     <section class="api-banner" id="api">
         <div class="api-box">
-            <p>The A2A Commerce Gateway is live. 56 tools, 11 services, one API.</p>
+            <p>The A2A Commerce Gateway is live. 118 tools, 15 services, one API.</p>
             <div class="api-url">https://api.greenhelix.net/v1/health</div>
+            <div class="api-links">
+                <a href="https://api.greenhelix.net/v1/openapi.json">OpenAPI Spec</a>
+                <a href="https://api.greenhelix.net/v1/pricing">Pricing &amp; Catalog</a>
+                <a href="https://api.greenhelix.net/v1/metrics">Metrics</a>
+            </div>
         </div>
     </section>
 

@@ -74,26 +74,81 @@ Edit `/opt/a2a-test/.env` to add any connector API keys or other secrets
 needed for staging tests. The default config uses SQLite databases in
 `/var/lib/a2a-test/`.
 
-## Step 5: SSH key setup for GitHub Actions
+## Step 5: Tailscale setup for GitHub Actions
 
-Create a deploy key so GitHub Actions can SSH to the server:
+The server is accessed via Tailscale (no public SSH port). GitHub Actions
+uses the official `tailscale/github-action@v4` to join the tailnet as an
+ephemeral node, then SSH to the server's Tailscale IP.
+
+### 5a. Create a Tailscale OAuth client
+
+1. Go to [Tailscale Admin Console → Settings → OAuth clients](https://login.tailscale.com/admin/settings/oauth)
+2. Create a new OAuth client with the scope **`auth_keys`** (write)
+3. Assign the tag **`tag:ci`** to the client (the CI runner will join as this tag)
+4. Save the **Client ID** and **Client Secret**
+
+### 5b. Enable Tailscale SSH on the server
+
+On the server, enable Tailscale SSH so it accepts Tailscale-authenticated
+connections without traditional SSH keys:
 
 ```bash
-# On your local machine
-ssh-keygen -t ed25519 -f ~/.ssh/a2a-staging-deploy -N "" -C "github-actions-staging"
+# Enable Tailscale SSH on the server
+sudo tailscale up --ssh
 
-# Copy public key to the server
-ssh-copy-id -i ~/.ssh/a2a-staging-deploy.pub root@SERVER
-
-# Add the private key as a GitHub secret
-# Go to Settings → Secrets → Actions → New repository secret
-# Name: STAGING_SSH_KEY
-# Value: contents of ~/.ssh/a2a-staging-deploy
-
-# Also add the server host
-# Name: STAGING_HOST
-# Value: the server's IP or hostname
+# Verify Tailscale SSH is active
+tailscale status
 ```
+
+This tells the server to accept SSH connections authenticated via Tailscale
+ACLs, bypassing the need for SSH keys or password auth.
+
+### 5c. Configure Tailscale ACLs
+
+In the [ACL editor](https://login.tailscale.com/admin/acls), allow `tag:ci`
+to SSH to the server. Example:
+
+```jsonc
+{
+  "tagOwners": {
+    "tag:ci": ["autogroup:admin"]
+  },
+  "acls": [
+    // ... existing rules ...
+    {
+      "action": "accept",
+      "src": ["tag:ci"],
+      "dst": ["YOUR-SERVER-HOSTNAME:*"]
+    }
+  ],
+  "ssh": [
+    // Allow CI runners to SSH as root to the server
+    {
+      "action": "accept",
+      "src": ["tag:ci"],
+      "dst": ["YOUR-SERVER-HOSTNAME"],
+      "users": ["root"]
+    }
+  ]
+}
+```
+
+**Important:** The `ssh` ACL section is what allows `tag:ci` nodes to SSH
+as root. Without this, even with `tailscale up --ssh` on the server,
+CI runners will get "Permission denied".
+
+### 5d. Add GitHub repository secrets
+
+Go to **Settings → Secrets and variables → Actions** and add:
+
+| Secret | Value |
+|--------|-------|
+| `TS_OAUTH_CLIENT_ID` | Tailscale OAuth Client ID |
+| `TS_OAUTH_SECRET` | Tailscale OAuth Client Secret |
+| `TAILSCALE_IP` | Server's Tailscale IP (e.g. `100.x.y.z`) |
+
+Find the server's Tailscale IP with `tailscale ip -4` on the server, or
+check the [Machines page](https://login.tailscale.com/admin/machines).
 
 ## Logs and Troubleshooting
 
