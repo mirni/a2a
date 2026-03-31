@@ -115,48 +115,48 @@ jobs:
         continue-on-error: true
 
       - name: Create coverage directory
-        run: mkdir -p coverage
+        run: mkdir -p cov-reports
 
       - name: Test gateway
-        run: scripts/run_tests.sh gateway --cov=gateway --cov-report=xml:coverage/gateway.xml --cov-fail-under=70
+        run: scripts/run_tests.sh gateway --cov=gateway --cov-report=xml:cov-reports/gateway.xml --cov-fail-under=70
 
       - name: Test billing
-        run: scripts/run_tests.sh products/billing --cov=src --cov-report=xml:coverage/billing.xml
+        run: scripts/run_tests.sh products/billing --cov=src --cov-report=xml:cov-reports/billing.xml
 
       - name: Test paywall
-        run: scripts/run_tests.sh products/paywall --cov=src --cov-report=xml:coverage/paywall.xml
+        run: scripts/run_tests.sh products/paywall --cov=src --cov-report=xml:cov-reports/paywall.xml
 
       - name: Test payments
-        run: scripts/run_tests.sh products/payments --cov=src --cov-report=xml:coverage/payments.xml
+        run: scripts/run_tests.sh products/payments --cov=src --cov-report=xml:cov-reports/payments.xml
 
       - name: Test marketplace
-        run: scripts/run_tests.sh products/marketplace --cov=src --cov-report=xml:coverage/marketplace.xml
+        run: scripts/run_tests.sh products/marketplace --cov=src --cov-report=xml:cov-reports/marketplace.xml
 
       - name: Test trust
-        run: scripts/run_tests.sh products/trust --cov=src --cov-report=xml:coverage/trust.xml
+        run: scripts/run_tests.sh products/trust --cov=src --cov-report=xml:cov-reports/trust.xml
 
       - name: Test shared
-        run: scripts/run_tests.sh products/shared --cov=src --cov-report=xml:coverage/shared.xml
+        run: scripts/run_tests.sh products/shared --cov=src --cov-report=xml:cov-reports/shared.xml
 
       - name: Test identity
-        run: scripts/run_tests.sh products/identity --cov=src --cov-report=xml:coverage/identity.xml
+        run: scripts/run_tests.sh products/identity --cov=src --cov-report=xml:cov-reports/identity.xml
 
       - name: Test messaging
-        run: scripts/run_tests.sh products/messaging --cov=src --cov-report=xml:coverage/messaging.xml
+        run: scripts/run_tests.sh products/messaging --cov=src --cov-report=xml:cov-reports/messaging.xml
 
       - name: Test reputation
-        run: scripts/run_tests.sh products/reputation --cov=src --cov-report=xml:coverage/reputation.xml
+        run: scripts/run_tests.sh products/reputation --cov=src --cov-report=xml:cov-reports/reputation.xml
 
       - name: Coverage summary
         if: always()
         run: |
           pip install coverage
           # Combine coverage data from all modules into a single report
-          coverage combine --keep coverage/*.xml 2>/dev/null || true
+          coverage combine --keep cov-reports/*.xml 2>/dev/null || true
           echo "## Coverage by module" >> $GITHUB_STEP_SUMMARY
           echo "| Module | Coverage |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|----------|" >> $GITHUB_STEP_SUMMARY
-          for f in coverage/*.xml; do
+          for f in cov-reports/*.xml; do
             mod=$(basename "$f" .xml)
             pct=$(python3 -c "
           import xml.etree.ElementTree as ET
@@ -174,7 +174,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.python-version }}
-          path: coverage/*.xml
+          path: cov-reports/*.xml
           retention-days: 14
 
   docker-build:
