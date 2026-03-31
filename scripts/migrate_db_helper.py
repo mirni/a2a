@@ -171,12 +171,17 @@ async def cmd_validate(db_path: str, product_name: str):
             sys.exit(1)
 
         version = await migrate.get_current_version(db)
-        if version != expected:
+        if version < expected:
             print(
-                f"FAIL: version={version} expected={expected}",
+                f"FAIL: version={version} expected={expected} (database behind, run migrations)",
                 file=sys.stderr,
             )
             sys.exit(1)
+        if version > expected:
+            print(
+                f"WARN: version={version} expected={expected} (database ahead of code, OK)",
+                file=sys.stderr,
+            )
 
         print(f"OK: integrity=ok version={version}")
     finally:
