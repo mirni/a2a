@@ -411,6 +411,7 @@ async def _get_exchange_rate(ctx: AppContext, params: dict[str, Any]) -> dict[st
     to_currency = Currency(params["to_currency"])
 
     exchange_svc = ExchangeRateService(storage=ctx.tracker.storage)
+    await exchange_svc.initialize_default_rates()
     rate = await exchange_svc.get_rate(from_currency, to_currency)
 
     return {
@@ -437,6 +438,7 @@ async def _convert_currency(ctx: AppContext, params: dict[str, Any]) -> dict[str
     to_currency = params["to_currency"]
 
     exchange_svc = ExchangeRateService(storage=ctx.tracker.storage)
+    await exchange_svc.initialize_default_rates()
 
     result = await ctx.tracker.wallet.convert_currency(
         agent_id=agent_id,

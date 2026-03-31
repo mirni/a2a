@@ -108,9 +108,31 @@ async def _partial_capture(ctx: AppContext, params: dict[str, Any]) -> dict[str,
     }
 
 
+async def _list_intents(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    """List payment intents for an agent, optionally filtered by status."""
+    intents = await ctx.payment_engine.storage.list_intents(
+        agent_id=params["agent_id"],
+        status=params.get("status"),
+        limit=params.get("limit", 50),
+        offset=params.get("offset", 0),
+    )
+    return {"intents": intents, "count": len(intents)}
+
+
 # ---------------------------------------------------------------------------
 # Escrow
 # ---------------------------------------------------------------------------
+
+
+async def _list_escrows(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    """List escrows for an agent, optionally filtered by status."""
+    escrows = await ctx.payment_engine.storage.list_escrows(
+        agent_id=params["agent_id"],
+        status=params.get("status"),
+        limit=params.get("limit", 50),
+        offset=params.get("offset", 0),
+    )
+    return {"escrows": escrows, "count": len(escrows)}
 
 
 async def _create_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
@@ -364,10 +386,12 @@ async def _list_disputes(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
 
 
 async def _resolve_dispute(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    # Security: override resolved_by with authenticated caller to prevent impersonation.
+    caller = params.get("_caller_agent_id", params["resolved_by"])
     return await ctx.dispute_engine.resolve_dispute(
         dispute_id=params["dispute_id"],
         resolution=params["resolution"],
-        resolved_by=params["resolved_by"],
+        resolved_by=caller,
         notes=params.get("notes", ""),
     )
 

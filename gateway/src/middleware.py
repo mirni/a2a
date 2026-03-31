@@ -364,6 +364,9 @@ class BodySizeLimitMiddleware:
             await self.app(scope, receive, send)
             return
 
+        # Extract correlation ID from scope state (set by CorrelationIDMiddleware)
+        request_id = (scope.get("state") or {}).get("correlation_id", "")
+
         # Fast path: check Content-Length header if present
         headers = dict(scope.get("headers", []))
         content_length_raw = headers.get(b"content-length", b"").decode("latin-1")
@@ -373,21 +376,22 @@ class BodySizeLimitMiddleware:
             except ValueError:
                 content_length = 0
             if content_length > self.max_bytes:
-                await self._send_413(send)
+                await self._send_413(send, request_id=request_id)
                 return
 
         await self.app(scope, receive, send)
 
     @staticmethod
-    async def _send_413(send: Callable) -> None:
+    async def _send_413(send: Callable, request_id: str = "") -> None:
         """Send a 413 Payload Too Large response."""
         body = json.dumps(
             {
                 "success": False,
                 "error": {
                     "code": "payload_too_large",
-                    "message": "Request body exceeds 1MB limit",
+                    "message": "Request body exceeds maximum size of 1MB",
                 },
+                "request_id": request_id,
             }
         ).encode()
         await send(

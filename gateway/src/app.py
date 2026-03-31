@@ -26,6 +26,7 @@ from gateway.src.routes.execute import routes as execute_routes
 from gateway.src.routes.health import routes as health_routes
 from gateway.src.routes.onboarding import routes as onboarding_routes
 from gateway.src.routes.pricing import routes as pricing_routes
+from gateway.src.routes.register import routes as register_routes
 from gateway.src.routes.sse import routes as sse_routes
 from gateway.src.routes.websocket import routes as ws_routes
 from gateway.src.signing import signing_key_handler
@@ -86,6 +87,9 @@ def create_app() -> Starlette:
 
     # Agentic Onboarding
     all_routes.extend(onboarding_routes)
+
+    # Self-service registration (P2-7)
+    all_routes.extend(register_routes)
 
     # Stripe Checkout (fiat on-ramp)
     all_routes.extend(checkout_routes)

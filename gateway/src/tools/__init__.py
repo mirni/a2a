@@ -101,6 +101,8 @@ from gateway.src.tools.payments import (
     _get_payment_history,
     _get_subscription,
     _list_disputes,
+    _list_escrows,
+    _list_intents,
     _list_subscriptions,
     _open_dispute,
     _partial_capture,
@@ -116,6 +118,7 @@ from gateway.src.tools.trust import (
     _check_sla_compliance,
     _delete_server,
     _get_trust_score,
+    _register_server,
     _search_servers,
     _update_server,
 )
@@ -158,6 +161,7 @@ TOOL_REGISTRY: dict[str, ToolFunc] = {
     "update_service": _update_service,
     "deactivate_service": _deactivate_service,
     # Trust
+    "register_server": _register_server,
     "get_trust_score": _get_trust_score,
     "search_servers": _search_servers,
     "delete_server": _delete_server,
@@ -241,6 +245,9 @@ TOOL_REGISTRY: dict[str, ToolFunc] = {
     "get_org": _get_org,
     "add_agent_to_org": _add_agent_to_org,
     "remove_agent_from_org": _remove_agent_from_org,
+    # List intents/escrows (P2-3)
+    "list_intents": _list_intents,
+    "list_escrows": _list_escrows,
     # Wallet freeze/unfreeze
     "freeze_wallet": _freeze_wallet,
     "unfreeze_wallet": _unfreeze_wallet,

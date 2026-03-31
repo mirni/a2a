@@ -294,8 +294,8 @@ async def test_execute_update_server_not_found(client, pro_api_key):
 
 
 @pytest.mark.asyncio
-async def test_execute_global_audit_log(client, pro_api_key, app):
-    """Pro tier should be able to query the global audit log."""
+async def test_execute_global_audit_log(client, admin_api_key, app):
+    """Admin tier should be able to query the global audit log."""
     ctx = app.state.ctx
 
     # Record some audit entries
@@ -313,7 +313,7 @@ async def test_execute_global_audit_log(client, pro_api_key, app):
     resp = await client.post(
         "/v1/execute",
         json={"tool": "get_global_audit_log", "params": {"limit": 50}},
-        headers={"Authorization": f"Bearer {pro_api_key}"},
+        headers={"Authorization": f"Bearer {admin_api_key}"},
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -327,15 +327,15 @@ async def test_execute_global_audit_log(client, pro_api_key, app):
 
 
 @pytest.mark.asyncio
-async def test_execute_global_audit_log_requires_pro(client, api_key):
-    """Free tier should not access the global audit log."""
+async def test_execute_global_audit_log_requires_admin(client, api_key):
+    """Non-admin tier should not access the global audit log."""
     resp = await client.post(
         "/v1/execute",
         json={"tool": "get_global_audit_log", "params": {}},
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 403
-    assert resp.json()["error"]["code"] == "insufficient_tier"
+    assert resp.json()["error"]["code"] == "admin_only"
 
 
 @pytest.mark.asyncio
