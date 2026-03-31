@@ -143,7 +143,7 @@ async def signing_key_handler(request: Any) -> Any:
 
     Expects ``request.app.state.signing_manager`` to be a :class:`SigningManager`.
     """
-    from starlette.responses import JSONResponse  # local import to avoid top-level dep
+    from fastapi.responses import JSONResponse  # local import to avoid top-level dep
 
     manager: SigningManager = request.app.state.signing_manager
     algorithm = "crystals-dilithium" if manager._is_dilithium() else "hmac-sha3-256"

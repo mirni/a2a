@@ -15,14 +15,15 @@ import os
 from typing import Any
 
 import httpx
-from starlette.requests import Request
-from starlette.responses import JSONResponse
-from starlette.routing import Route
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 
 from gateway.src.auth import extract_api_key
 from gateway.src.errors import error_response, handle_product_exception
 
 logger = logging.getLogger("a2a.stripe_checkout")
+
+router = APIRouter()
 
 # Credit pricing: $1 = 100 credits (configurable via env)
 CREDITS_PER_DOLLAR = int(os.environ.get("A2A_CREDITS_PER_DOLLAR", "100"))
@@ -71,6 +72,7 @@ def _verify_stripe_signature(payload: bytes, sig_header: str, secret: str) -> bo
     return hmac.compare_digest(expected, v1_sig)
 
 
+@router.post("/v1/checkout")
 async def create_checkout(request: Request) -> JSONResponse:
     """Create a Stripe Checkout session for credit purchase.
 
@@ -172,6 +174,7 @@ async def create_checkout(request: Request) -> JSONResponse:
         return await error_response(502, "Stripe API unavailable", "stripe_error")
 
 
+@router.post("/v1/stripe-webhook")
 async def stripe_webhook(request: Request) -> JSONResponse:
     """Handle Stripe webhook events.
 
@@ -251,7 +254,3 @@ async def stripe_webhook(request: Request) -> JSONResponse:
     return JSONResponse({"received": True})
 
 
-routes = [
-    Route("/v1/checkout", create_checkout, methods=["POST"]),
-    Route("/v1/stripe-webhook", stripe_webhook, methods=["POST"]),
-]

@@ -8,14 +8,15 @@ from __future__ import annotations
 
 import logging
 
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
-from starlette.requests import Request
-from starlette.responses import JSONResponse
-from starlette.routing import Route
 
 from gateway.src.errors import error_response
 
 logger = logging.getLogger("a2a.register")
+
+router = APIRouter()
 
 
 class RegisterRequestBody(BaseModel):
@@ -26,6 +27,7 @@ class RegisterRequestBody(BaseModel):
     agent_id: str
 
 
+@router.post("/v1/register")
 async def register(request: Request) -> JSONResponse:
     """Register a new agent: create wallet + free-tier API key."""
     try:
@@ -68,4 +70,3 @@ async def register(request: Request) -> JSONResponse:
     )
 
 
-routes = [Route("/v1/register", register, methods=["POST"])]

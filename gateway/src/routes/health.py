@@ -5,15 +5,16 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from starlette.requests import Request
-from starlette.responses import JSONResponse
-from starlette.routing import Route
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 
 from gateway.src._version import __version__
 from gateway.src.catalog import tool_count
 from gateway.src.rate_limit_headers import public_rate_limit_headers
 
 logger = logging.getLogger("a2a.health")
+
+router = APIRouter()
 
 
 def _get_db_connections(ctx: Any) -> dict[str, Any]:
@@ -67,6 +68,7 @@ async def _probe_db(name: str, conn: Any) -> str:
         return "error"
 
 
+@router.get("/v1/health")
 async def health(request: Request) -> JSONResponse:
     status = "ok"
     http_status = 200
@@ -110,4 +112,3 @@ async def health(request: Request) -> JSONResponse:
     )
 
 
-routes = [Route("/v1/health", health, methods=["GET"])]

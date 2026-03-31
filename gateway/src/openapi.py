@@ -6,9 +6,6 @@ including per-tool examples on the POST /execute endpoint.
 
 from __future__ import annotations
 
-from starlette.requests import Request
-from starlette.responses import JSONResponse
-
 from gateway.src.catalog import get_catalog
 
 
@@ -442,9 +439,3 @@ def generate_openapi_spec() -> dict:
     }
 
     return spec
-
-
-async def openapi_handler(request: Request) -> JSONResponse:
-    """Starlette route handler that returns the OpenAPI spec as JSON."""
-    spec = generate_openapi_spec()
-    return JSONResponse(spec)

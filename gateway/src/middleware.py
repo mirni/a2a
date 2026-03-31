@@ -11,8 +11,8 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
-from starlette.requests import Request
-from starlette.responses import Response
+from fastapi import Request
+from fastapi.responses import Response
 
 # ---------------------------------------------------------------------------
 # 1. Correlation ID Middleware (raw ASGI interface)

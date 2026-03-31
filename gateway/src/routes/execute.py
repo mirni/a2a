@@ -9,10 +9,9 @@ import math
 import time
 from typing import Any
 
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, ValidationError
-from starlette.requests import Request
-from starlette.responses import JSONResponse
-from starlette.routing import Route
 
 from gateway.src.auth import extract_api_key
 from gateway.src.authorization import ADMIN_ONLY_TOOLS, ADMIN_TIER, check_ownership_authorization
@@ -23,6 +22,8 @@ from gateway.src.tool_errors import X402ReplayError, X402VerificationError
 from gateway.src.tools import TOOL_REGISTRY
 
 logger = logging.getLogger("a2a.execute")
+
+router = APIRouter()
 
 _MAX_TOOL_NAME_LEN = 128
 
@@ -212,6 +213,7 @@ async def _try_x402_payment(
     return (proof.payload.authorization.from_address, proof)
 
 
+@router.post("/v1/execute")
 async def execute(request: Request) -> JSONResponse:
     """Execute a tool with authentication, tier checks, rate limiting, and billing."""
     _start_time = time.time()
@@ -550,4 +552,3 @@ async def execute(request: Request) -> JSONResponse:
     return JSONResponse(response_body, headers=headers)
 
 
-routes = [Route("/v1/execute", execute, methods=["POST"])]
