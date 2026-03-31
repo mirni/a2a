@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import os
+
 from starlette.applications import Starlette
+from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response
 from starlette.routing import BaseRoute, Route
@@ -14,6 +17,7 @@ from gateway.src.middleware import (
     MetricsMiddleware,
     PublicRateLimitMiddleware,
     RequestTimeoutMiddleware,
+    SecurityHeadersMiddleware,
     metrics_handler,
 )
 from gateway.src.openapi import openapi_handler
@@ -99,6 +103,21 @@ def create_app() -> Starlette:
     app.add_middleware(RequestTimeoutMiddleware)
     app.add_middleware(BodySizeLimitMiddleware)
     app.add_middleware(MetricsMiddleware)
+
+    # P3-2: Security headers on every response
+    app.add_middleware(SecurityHeadersMiddleware)
+
+    # P3-3: CORS — only enabled when CORS_ALLOWED_ORIGINS is set
+    cors_origins_raw = os.environ.get("CORS_ALLOWED_ORIGINS", "")
+    if cors_origins_raw:
+        allowed_origins = [o.strip() for o in cors_origins_raw.split(",") if o.strip()]
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=allowed_origins,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
     app.add_middleware(CorrelationIDMiddleware)
 
     return app
