@@ -179,13 +179,13 @@ async def execute(request: Request) -> JSONResponse:
         # Missing 'tool' or wrong types → fall through to legacy handling below
         body = None
 
+    tool_name: str | None
     if body is not None:
         tool_name = _sanitize_tool_name(body.tool)
         params = body.params
     else:
-        tool_name = raw_body.get("tool")
-        if isinstance(tool_name, str):
-            tool_name = _sanitize_tool_name(tool_name)
+        tool_name_raw = raw_body.get("tool")
+        tool_name = _sanitize_tool_name(tool_name_raw) if isinstance(tool_name_raw, str) else None
         params = raw_body.get("params", {})
 
     if not tool_name:
