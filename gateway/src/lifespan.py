@@ -185,6 +185,11 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     await ensure_event_schemas_table(event_bus.db)
     await ensure_x402_nonces_table(tracker.storage.db)
 
+    # --- Admin audit log table ---
+    from gateway.src.admin_audit import ensure_admin_audit_table
+
+    await ensure_admin_audit_table(tracker.storage.db)
+
     # --- Subscription Scheduler ---
     scheduler = None
     scheduler_task = None

@@ -44,6 +44,42 @@ def _sanitize_tool_name(name: str) -> str:
     return name
 
 
+async def _log_admin_audit(
+    ctx: Any,
+    request: Request,
+    *,
+    agent_id: str,
+    tool_name: str,
+    params: dict[str, Any],
+    status: str,
+    result_summary: str | None = None,
+) -> None:
+    """Log an admin operation to the admin audit log (best-effort)."""
+    try:
+        from gateway.src.admin_audit import log_admin_operation
+
+        client_ip: str | None = None
+        if request.client:
+            client_ip = request.client.host
+        db = ctx.tracker.storage.db
+        await log_admin_operation(
+            db=db,
+            agent_id=agent_id,
+            tool_name=tool_name,
+            params=params,
+            client_ip=client_ip,
+            status=status,
+            result_summary=result_summary,
+        )
+    except Exception:
+        logger.warning(
+            "Failed to log admin audit for agent=%s tool=%s",
+            agent_id,
+            tool_name,
+            exc_info=True,
+        )
+
+
 def _rate_limit_headers(limit: int, rate_count: int, window_seconds: float = 3600.0) -> dict[str, str]:
     """Build X-RateLimit-* headers."""
     remaining = max(0, limit - rate_count)
@@ -279,6 +315,8 @@ async def execute(request: Request) -> JSONResponse:
 
     # --- 2c. Admin-only tools: block non-admin callers ---
     if tool_name in ADMIN_ONLY_TOOLS and agent_tier != ADMIN_TIER:
+        # Log denied admin tool attempt
+        await _log_admin_audit(ctx, request, agent_id=agent_id, tool_name=tool_name, params=params, status="denied")
         return await error_response(
             403,
             f"Tool '{tool_name}' requires admin privileges",
@@ -373,10 +411,34 @@ async def execute(request: Request) -> JSONResponse:
     try:
         result = await tool_func(ctx, params)
     except Exception as exc:
+        # Log admin tool errors
+        if tool_name in ADMIN_ONLY_TOOLS:
+            await _log_admin_audit(
+                ctx,
+                request,
+                agent_id=agent_id,
+                tool_name=tool_name,
+                params=params,
+                status="error",
+                result_summary=str(exc)[:500],
+            )
         await Metrics.record_error()
         elapsed_ms = (time.time() - _start_time) * 1000
         await Metrics.record_latency(elapsed_ms)
         return await handle_product_exception(request, exc)
+
+    # Log successful admin tool calls
+    if tool_name in ADMIN_ONLY_TOOLS:
+        result_summary = str(result)[:500] if result is not None else None
+        await _log_admin_audit(
+            ctx,
+            request,
+            agent_id=agent_id,
+            tool_name=tool_name,
+            params=params,
+            status="success",
+            result_summary=result_summary,
+        )
 
     # --- 7. Record usage + charge ---
     correlation_id = getattr(request.state, "correlation_id", None) or ""
