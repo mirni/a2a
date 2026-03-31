@@ -1,26 +1,18 @@
 # =============================================================================
-# A2A Commerce Platform — CI Pipeline (Lightweight)
+# A2A Commerce Platform — Release Pipeline (Full)
 # =============================================================================
-# Runs on pull requests only. Skips docs-only changes via paths-ignore.
-# Three jobs: quality, test, package — then staging for PRs targeting main.
+# Runs on pushes to release/* branches (created by scripts/release.sh).
+# Full pipeline: quality, SAST, tests, docker build, packaging, staging.
 #
-# For full CI (SAST, docker, multi-Python), see release.yml which runs on
-# release/* branches.
+# release.sh step 7 polls `gh run list --branch release/X.Y.Z` waiting for
+# this workflow to complete before triggering deploy-production.yml.
 # =============================================================================
 
-name: CI
+name: Release
 
 on:
-  pull_request:
-    paths-ignore:
-      - 'docs/**'
-      - 'reports/**'
-      - 'tasks/**'
-      - 'plans/**'
-      - 'logs/**'
-      - '*.md'
-      - '.gitignore'
-      - 'LICENSE'
+  push:
+    branches: ['release/*']
 
 permissions:
   contents: read
@@ -52,6 +44,31 @@ jobs:
 
       - name: Security scan with bandit
         run: bandit -r gateway/src products/ -ll -q --skip B101,B108,B608 --exclude '*/tests/*'
+
+  # ---------------------------------------------------------------------------
+  # SAST: semgrep + dependency audit
+  # ---------------------------------------------------------------------------
+  sast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SAST with Semgrep
+        uses: docker://semgrep/semgrep
+        with:
+          args: semgrep scan --config auto --error --exclude='**/tests/**' .
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps and audit tool
+        run: |
+          pip install pip-audit
+          pip install -r requirements.txt
+
+      - name: Dependency audit
+        run: pip-audit
 
   # ---------------------------------------------------------------------------
   # Test: all modules on Python 3.12 with coverage
@@ -110,6 +127,17 @@ jobs:
         run: scripts/run_tests.sh products/reputation
 
   # ---------------------------------------------------------------------------
+  # Docker: build image and verify health check
+  # ---------------------------------------------------------------------------
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and verify Docker image
+        run: scripts/ci/docker_build_verify.sh
+
+  # ---------------------------------------------------------------------------
   # Package: build debs + SDK wheel
   # ---------------------------------------------------------------------------
   package:
@@ -141,10 +169,9 @@ jobs:
           retention-days: 14
 
   # ---------------------------------------------------------------------------
-  # Staging deploy (PRs targeting main only, after all CI jobs pass)
+  # Staging: deploy + smoke test (single consolidated job)
   # ---------------------------------------------------------------------------
   staging:
-    needs: [quality, test, package]
-    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    needs: [quality, sast, test, docker-build, package]
     uses: ./.github/workflows/staging.yml
     secrets: inherit

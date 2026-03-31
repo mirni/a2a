@@ -1,10 +1,8 @@
 # =============================================================================
 # A2A Commerce Platform — Staging Pipeline
 # =============================================================================
-# Called by the CI workflow (workflow_call) after all checks pass on PRs
-# targeting main. Downloads deb artifacts built by the CI package job,
-# deploys the test gateway package to the staging server, and runs smoke
-# tests before allowing merge.
+# Called by CI and Release workflows (workflow_call) after all checks pass.
+# Single consolidated job: deploy → smoke test → report to PR.
 # =============================================================================
 
 name: Staging
@@ -13,10 +11,7 @@ on:
   workflow_call:
 
 jobs:
-  # ---------------------------------------------------------------------------
-  # Deploy test gateway to staging server
-  # ---------------------------------------------------------------------------
-  staging-deploy:
+  staging:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -80,61 +75,48 @@ jobs:
             exit 1
           }
 
-  # ---------------------------------------------------------------------------
-  # Smoke tests against the staging server
-  # ---------------------------------------------------------------------------
-  staging-smoke:
-    runs-on: ubuntu-latest
-    needs: [staging-deploy]
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
+      - name: Install test dependencies
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install test dependencies
-        run: scripts/ci/install_deps.sh --with-test
-
-      - name: Smoke test (lightweight stress)
+      - name: Install deps and run smoke test
         run: |
+          scripts/ci/install_deps.sh --with-test
           python scripts/stress_test.py \
             --base-url "https://test.greenhelix.net" \
             --customers 5 \
             --duration 15
 
-  # ---------------------------------------------------------------------------
-  # Report results back to the PR
-  # ---------------------------------------------------------------------------
-  staging-report:
-    runs-on: ubuntu-latest
-    needs: [staging-deploy, staging-smoke]
-    if: always()
-    steps:
       - name: Post staging result to PR
+        if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
-            const smokeResult = '${{ needs.staging-smoke.result }}';
-            const deployResult = '${{ needs.staging-deploy.result }}';
-            const icon = smokeResult === 'success' ? '✅' : '❌';
-            const status = smokeResult === 'success' ? 'PASSED' : 'FAILED';
+            // Determine outcome from previous steps
+            const deployStep = '${{ steps.deploy.outcome }}' || 'unknown';
+            const jobStatus = '${{ job.status }}';
+            const icon = jobStatus === 'success' ? '✅' : '❌';
+            const status = jobStatus === 'success' ? 'PASSED' : 'FAILED';
 
             const body = [
               `## ${icon} Staging ${status}`,
               '',
               `| Step | Result |`,
               `|------|--------|`,
-              `| Deploy to staging | ${deployResult === 'success' ? '✅' : '❌'} ${deployResult} |`,
-              `| Smoke tests | ${smokeResult === 'success' ? '✅' : '❌'} ${smokeResult} |`,
+              `| Deploy to staging | ${jobStatus !== 'cancelled' ? (jobStatus === 'success' ? '✅' : '❌') : '⏭️'} |`,
+              `| Smoke tests | ${jobStatus === 'success' ? '✅' : '❌'} |`,
               '',
               `> Tested at \`https://test.greenhelix.net\``,
               `> Workflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
             ].join('\n');
 
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: body,
-            });
+            // Only post if this is a PR context
+            if (context.issue && context.issue.number) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body,
+              });
+            }
