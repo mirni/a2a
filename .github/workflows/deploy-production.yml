@@ -134,15 +134,13 @@ jobs:
 
       - name: Configure SSH
         env:
-          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
-          echo "StrictHostKeyChecking accept-new" >> ~/.ssh/config
+          echo "$SSH_KEY_B64" | base64 -d > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo -e "StrictHostKeyChecking accept-new\nIdentityFile ~/.ssh/deploy_key" >> ~/.ssh/config
           chmod 600 ~/.ssh/config
-          eval "$(ssh-agent -s)"
-          printf '%s\n' "$SSH_KEY" | ssh-add -
-          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
-          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
 
       - name: Deploy gateway
         run: |
@@ -178,15 +176,13 @@ jobs:
 
       - name: Configure SSH
         env:
-          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
-          echo "StrictHostKeyChecking accept-new" >> ~/.ssh/config
+          echo "$SSH_KEY_B64" | base64 -d > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo -e "StrictHostKeyChecking accept-new\nIdentityFile ~/.ssh/deploy_key" >> ~/.ssh/config
           chmod 600 ~/.ssh/config
-          eval "$(ssh-agent -s)"
-          printf '%s\n' "$SSH_KEY" | ssh-add -
-          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
-          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
 
       - name: Deploy website
         run: |
