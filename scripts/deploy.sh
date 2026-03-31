@@ -139,6 +139,24 @@ if [[ -n "$SERVICE" ]]; then
         NO_ROLLBACK="$4"
         NO_VERIFY="$5"
 
+        # Wait for dpkg lock then install (retries for up to 120s)
+        dpkg_install() {
+            local deb="$1" tries=0 max_tries=24
+            while (( tries < max_tries )); do
+                if dpkg -i "$deb"; then
+                    return 0
+                fi
+                if ! fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then
+                    return 1  # failed for a reason other than lock
+                fi
+                tries=$((tries + 1))
+                echo "[!] dpkg lock held, retrying ($tries/$max_tries)..."
+                sleep 5
+            done
+            echo "[x] dpkg lock held for >120s, giving up"
+            return 1
+        }
+
         BACKUP_DIR="/var/backups/a2a/deploy-$(date +%Y%m%d-%H%M%S)"
         mkdir -p "$BACKUP_DIR"
 
@@ -152,13 +170,13 @@ if [[ -n "$SERVICE" ]]; then
 
         # --- Install new package ---
         echo "[+] Installing /tmp/$DEB_BASENAME..."
-        if dpkg -i "/tmp/$DEB_BASENAME"; then
+        if dpkg_install "/tmp/$DEB_BASENAME"; then
             echo "[+] Package installed successfully"
         else
             echo "[x] dpkg -i failed — attempting rollback"
             ROLLBACK_DEB=$(ls "$BACKUP_DIR"/"${COMPONENT}"_*.deb 2>/dev/null | head -1)
             if [[ -n "${ROLLBACK_DEB:-}" ]]; then
-                dpkg -i "$ROLLBACK_DEB"
+                dpkg_install "$ROLLBACK_DEB"
                 systemctl restart "$SERVICE" || true
             fi
             exit 1
@@ -173,7 +191,7 @@ if [[ -n "$SERVICE" ]]; then
                 echo "[x] Service $SERVICE failed to start — rolling back"
                 ROLLBACK_DEB=$(ls "$BACKUP_DIR"/"${COMPONENT}"_*.deb 2>/dev/null | head -1)
                 if [[ -n "${ROLLBACK_DEB:-}" ]]; then
-                    dpkg -i "$ROLLBACK_DEB"
+                    dpkg_install "$ROLLBACK_DEB"
                     systemctl restart "$SERVICE" || true
                 fi
                 exit 1
@@ -196,6 +214,24 @@ else
         COMPONENT="$2"
         NO_ROLLBACK="$3"
 
+        # Wait for dpkg lock then install (retries for up to 120s)
+        dpkg_install() {
+            local deb="$1" tries=0 max_tries=24
+            while (( tries < max_tries )); do
+                if dpkg -i "$deb"; then
+                    return 0
+                fi
+                if ! fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then
+                    return 1  # failed for a reason other than lock
+                fi
+                tries=$((tries + 1))
+                echo "[!] dpkg lock held, retrying ($tries/$max_tries)..."
+                sleep 5
+            done
+            echo "[x] dpkg lock held for >120s, giving up"
+            return 1
+        }
+
         BACKUP_DIR="/var/backups/a2a/deploy-$(date +%Y%m%d-%H%M%S)"
         mkdir -p "$BACKUP_DIR"
 
@@ -207,13 +243,13 @@ else
 
         # --- Install new package ---
         echo "[+] Installing /tmp/$DEB_BASENAME..."
-        if dpkg -i "/tmp/$DEB_BASENAME"; then
+        if dpkg_install "/tmp/$DEB_BASENAME"; then
             echo "[+] Package installed successfully"
         else
             echo "[x] dpkg -i failed — rolling back"
             ROLLBACK_DEB=$(ls "$BACKUP_DIR"/"${COMPONENT}"_*.deb 2>/dev/null | head -1)
             if [[ -n "${ROLLBACK_DEB:-}" ]]; then
-                dpkg -i "$ROLLBACK_DEB"
+                dpkg_install "$ROLLBACK_DEB"
             fi
             exit 1
         fi
