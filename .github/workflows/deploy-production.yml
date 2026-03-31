@@ -134,12 +134,22 @@ jobs:
 
       - name: Configure SSH
         env:
-          SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
-          echo "$SSH_KEY_B64" | base64 -d > ~/.ssh/deploy_key
+          # Handle both base64-encoded and raw PEM key formats
+          if echo "$SSH_KEY" | base64 -d > ~/.ssh/deploy_key 2>/dev/null; then
+            echo "Decoded base64 key"
+          else
+            printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          fi
           chmod 600 ~/.ssh/deploy_key
-          echo -e "StrictHostKeyChecking accept-new\nIdentityFile ~/.ssh/deploy_key" >> ~/.ssh/config
+          ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null || { echo "::error::DEPLOY_SSH_KEY is invalid — generate with: ssh-keygen -t ed25519 -f deploy_key -N ''"; exit 1; }
+          cat >> ~/.ssh/config << 'EOF'
+          Host *
+            StrictHostKeyChecking accept-new
+            IdentityFile ~/.ssh/deploy_key
+          EOF
           chmod 600 ~/.ssh/config
 
       - name: Deploy gateway
@@ -176,12 +186,22 @@ jobs:
 
       - name: Configure SSH
         env:
-          SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
-          echo "$SSH_KEY_B64" | base64 -d > ~/.ssh/deploy_key
+          # Handle both base64-encoded and raw PEM key formats
+          if echo "$SSH_KEY" | base64 -d > ~/.ssh/deploy_key 2>/dev/null; then
+            echo "Decoded base64 key"
+          else
+            printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          fi
           chmod 600 ~/.ssh/deploy_key
-          echo -e "StrictHostKeyChecking accept-new\nIdentityFile ~/.ssh/deploy_key" >> ~/.ssh/config
+          ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null || { echo "::error::DEPLOY_SSH_KEY is invalid — generate with: ssh-keygen -t ed25519 -f deploy_key -N ''"; exit 1; }
+          cat >> ~/.ssh/config << 'EOF'
+          Host *
+            StrictHostKeyChecking accept-new
+            IdentityFile ~/.ssh/deploy_key
+          EOF
           chmod 600 ~/.ssh/config
 
       - name: Deploy website
