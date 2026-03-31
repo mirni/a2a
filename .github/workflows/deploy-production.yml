@@ -132,13 +132,18 @@ jobs:
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
 
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "StrictHostKeyChecking accept-new" >> ~/.ssh/config
+          chmod 600 ~/.ssh/config
+
       - name: Deploy gateway
         run: |
           scripts/deploy.sh \
             --host "${{ secrets.TAILSCALE_IP }}" \
             --deb "$(ls dist/a2a-gateway_*.deb | head -1)" \
             --component a2a-gateway \
-            --ssh-cmd "tailscale ssh -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null" \
             --health-url "https://api.greenhelix.net/v1/health"
 
   # ---------------------------------------------------------------------------
@@ -165,13 +170,18 @@ jobs:
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
 
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "StrictHostKeyChecking accept-new" >> ~/.ssh/config
+          chmod 600 ~/.ssh/config
+
       - name: Deploy website
         run: |
           scripts/deploy.sh \
             --host "${{ secrets.TAILSCALE_IP }}" \
             --deb "$(ls dist/a2a-website_*.deb | head -1)" \
             --component a2a-website \
-            --ssh-cmd "tailscale ssh -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null" \
             --no-verify
 
   # ---------------------------------------------------------------------------
