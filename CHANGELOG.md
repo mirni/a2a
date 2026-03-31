@@ -1,5 +1,36 @@
 # Changelog
 
+# Release v0.5.3
+
+**Date:** 2026-03-31
+**Commit:** 71a7a1f4
+**Previous:** v0.5.1
+
+## Changes
+
+### Bug Fixes
+
+- fix: add diagnostics to staging health check failures (#18) (`9437226`)
+- fix: health endpoint returns correct version from _version.py (#17) (`b42d0b7`)
+- fix: use gh run view instead of checks API in release.sh (`0b557c5`)
+
+### Other
+
+- Merge branch 'main' of https://github.com/mirni/a2a (`71a7a1f`)
+- Update CLAUDE.md github workflow instructions (`0e3d950`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 0.5.3 |
+| a2a-gateway | 0.5.3 |
+| a2a-gateway-sandbox | 0.5.3 |
+| a2a-gateway-test | 0.5.3 |
+| a2a-website | 0.5.3 |
+---
+
+
 # Release v0.4.9
 
 **Date:** 2026-03-31
