@@ -144,7 +144,30 @@ class PaymentStorage:
         self._db = await aiosqlite.connect(db_path)
         self._db.row_factory = aiosqlite.Row
         await harden_connection(self._db)
+        await self._apply_column_migrations()
         await self._db.executescript(_SCHEMA)
+        await self._db.commit()
+
+    async def _apply_column_migrations(self) -> None:
+        """Add columns introduced after the initial schema to existing tables.
+
+        SQLite's CREATE TABLE IF NOT EXISTS does not alter existing tables,
+        so columns added in later versions must be added via ALTER TABLE.
+        Each ALTER is guarded by a column-existence check so this is idempotent.
+        """
+        assert self._db is not None
+        migrations = [
+            ("payment_intents", "idempotency_key", "TEXT"),
+            ("escrows", "idempotency_key", "TEXT"),
+            ("subscriptions", "idempotency_key", "TEXT"),
+        ]
+        for table, column, col_type in migrations:
+            cursor = await self._db.execute(f"PRAGMA table_info({table})")
+            columns = [row[1] for row in await cursor.fetchall()]
+            if columns and column not in columns:
+                await self._db.execute(
+                    f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"
+                )
         await self._db.commit()
 
     async def close(self) -> None:
