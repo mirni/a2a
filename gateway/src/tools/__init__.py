@@ -267,11 +267,18 @@ TOOL_REGISTRY: dict[str, ToolFunc] = {
 def register_mcp_tools(proxy_manager) -> None:
     """Register proxy tool functions for all MCP connector tools."""
     from gateway.src.mcp_proxy import _TOOL_MAP
+    from gateway.src.sql_validator import validate_pg_execute_sql
 
     for tool_name in _TOOL_MAP:
 
         def _make_handler(tn: str):
             async def _handler(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+                # Security: validate SQL for pg_execute before proxying
+                if tn == "pg_execute":
+                    sql = params.get("sql", "")
+                    error = validate_pg_execute_sql(sql, params)
+                    if error:
+                        raise PermissionError(f"pg_execute blocked: {error}")
                 return await ctx.mcp_proxy.call_tool(tn, params)
 
             return _handler
