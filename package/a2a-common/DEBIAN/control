@@ -1,0 +1,9 @@
+Package: a2a-common
+Version: 0.4.8
+Architecture: all
+Maintainer: A2A Team <team@greenhelix.net>
+Section: web
+Priority: optional
+Description: A2A Commerce Platform — shared scripts and SDK
+ Common deployment scripts, helper libraries, and the Python SDK
+ shared by a2a-gateway, a2a-website, and other A2A packages.

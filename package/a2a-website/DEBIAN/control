@@ -1,7 +1,7 @@
 Package: a2a-website
 Version: 0.4.8
 Architecture: all
-Depends: nginx
+Depends: a2a-common (= 0.4.8), nginx
 Maintainer: A2A Team <team@greenhelix.net>
 Section: web
 Priority: optional

@@ -20,6 +20,7 @@
 #   --health-url <url>      Health check endpoint after deploy
 #   --health-retries <n>    Retry count (default: 10)
 #   --health-interval <s>   Seconds between retries (default: 5)
+#   --pre-deb <path>        Dependency .deb to install first (repeatable)
 #   --ssh-cmd <cmd>         SSH command (default: ssh; e.g. "tailscale ssh")
 #   --dry-run               Show what would happen
 #   -h, --help              Show help
@@ -48,6 +49,7 @@ HEALTH_URL=""
 HEALTH_RETRIES=10
 HEALTH_INTERVAL=5
 DRY_RUN=false
+PRE_DEBS=()
 
 # ---------------------------------------------------------------------------
 # CLI parsing
@@ -62,6 +64,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --host)             HOST="$2"; shift 2 ;;
         --deb)              DEB="$2"; shift 2 ;;
+        --pre-deb)          PRE_DEBS+=("$2"); shift 2 ;;
         --component)        COMPONENT="$2"; shift 2 ;;
         --user)             USER="$2"; shift 2 ;;
         --ssh-cmd)          SSH_CMD="$2"; shift 2 ;;
@@ -119,6 +122,39 @@ fi
 log "Copying $DEB_BASENAME to $SSH_TARGET:$REMOTE_DEB"
 # Use pipe-based transfer so any SSH command (e.g. "tailscale ssh") works.
 $SSH_CMD "$SSH_TARGET" "cat > '$REMOTE_DEB'" < "$DEB"
+
+# ---------------------------------------------------------------------------
+# Step 1b: Copy and install prerequisite .deb packages (e.g. a2a-common)
+# ---------------------------------------------------------------------------
+
+for pre_deb in "${PRE_DEBS[@]}"; do
+    [[ -f "$pre_deb" ]] || err "Pre-deb file not found: $pre_deb"
+    pre_basename=$(basename "$pre_deb")
+    log "Copying prerequisite $pre_basename to $SSH_TARGET:/tmp/$pre_basename"
+    $SSH_CMD "$SSH_TARGET" "cat > '/tmp/$pre_basename'" < "$pre_deb"
+    log "Installing prerequisite $pre_basename"
+    $SSH_CMD "$SSH_TARGET" bash -s -- "$pre_basename" << 'PRE_REMOTE'
+        set -euo pipefail
+        PRE_DEB="$1"
+        tries=0; max_tries=24
+        while (( tries < max_tries )); do
+            if dpkg -i "/tmp/$PRE_DEB"; then
+                echo "[+] $PRE_DEB installed"
+                rm -f "/tmp/$PRE_DEB"
+                exit 0
+            fi
+            if ! fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then
+                echo "[x] $PRE_DEB install failed"
+                exit 1
+            fi
+            tries=$((tries + 1))
+            echo "[!] dpkg lock held, retrying ($tries/$max_tries)..."
+            sleep 5
+        done
+        echo "[x] dpkg lock held for >120s, giving up"
+        exit 1
+PRE_REMOTE
+done
 
 # ---------------------------------------------------------------------------
 # Step 2: Remote install with optional rollback
