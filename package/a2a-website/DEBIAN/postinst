@@ -1,12 +1,29 @@
 #!/bin/bash
+# =============================================================================
+# a2a-website postinst — self-contained website configuration
+# =============================================================================
+# Copies static website files to the nginx document root and reloads nginx.
+# Self-contained to avoid dependency on external scripts.
+# =============================================================================
 set -e
+
+WWW_DOMAIN="greenhelix.net"
+WEBSITE_ROOT="/var/www/${WWW_DOMAIN}"
 
 case "$1" in
     configure)
-        export A2A_SKIP_GIT=1
-        export A2A_SKIP_APT=1
+        # --- Deploy static files ---
+        mkdir -p "$WEBSITE_ROOT"
+        if [[ -d /opt/a2a/website ]]; then
+            cp -r /opt/a2a/website/* "$WEBSITE_ROOT/"
+            chown -R www-data:www-data "$WEBSITE_ROOT"
+        fi
 
-        /usr/local/bin/deploy_website.sh
+        # --- Enable nginx site and reload ---
+        if [[ -f /etc/nginx/sites-available/website ]]; then
+            ln -sf /etc/nginx/sites-available/website /etc/nginx/sites-enabled/website
+            nginx -t && systemctl reload nginx
+        fi
         ;;
     abort-upgrade|abort-remove|abort-deconfigure)
         ;;

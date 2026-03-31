@@ -1,19 +1,78 @@
 #!/bin/bash
+# =============================================================================
+# a2a-gateway postinst — self-contained package configuration
+# =============================================================================
+# This script runs after dpkg installs the package files to /opt/a2a.
+# It is intentionally self-contained (no external script calls) to avoid
+# dependency on files that may not exist during first install or after
+# manual uninstall/reinstall.
+#
+# For full server provisioning (first-time setup with Tailscale, firewall,
+# SSL, etc.), use: scripts/deploy_a2a.sh
+# =============================================================================
 set -e
+
+INSTALL_DIR="/opt/a2a"
+DATA_DIR="/var/lib/a2a"
+A2A_USER="a2a"
+PORT=8000
 
 case "$1" in
     configure)
-        # Code is already installed from the deb — skip git clone/pull
-        export A2A_SKIP_GIT=1
-        export A2A_SKIP_APT=1  # dpkg holds the lock; deps satisfied via Depends:
-
-        # Run database migrations before starting the service.
-        # prerm already stopped the service; migrate_db.sh does shadow-copy + atomic swap.
-        if [[ -x /opt/a2a/scripts/migrate_db.sh ]]; then
-            /opt/a2a/scripts/migrate_db.sh || exit 1
+        # --- Create system user if not exists ---
+        if ! id -u "$A2A_USER" >/dev/null 2>&1; then
+            useradd --system --shell /usr/sbin/nologin --home-dir "$INSTALL_DIR" "$A2A_USER"
         fi
 
-        /usr/local/bin/deploy_a2a.sh
+        # --- Create data and log directories ---
+        mkdir -p "$DATA_DIR"
+        mkdir -p /var/log/a2a
+        mkdir -p /var/backups/a2a
+
+        # --- Run database migrations ---
+        if [[ -x "$INSTALL_DIR/scripts/migrate_db.sh" ]]; then
+            "$INSTALL_DIR/scripts/migrate_db.sh" || exit 1
+        fi
+
+        # --- Set up Python venv and install deps ---
+        python3.12 -m venv "$INSTALL_DIR/venv"
+        "$INSTALL_DIR/venv/bin/pip" install --upgrade pip wheel setuptools -q
+        "$INSTALL_DIR/venv/bin/pip" install \
+            'starlette>=0.37' 'uvicorn>=0.29' 'httpx>=0.27' \
+            'aiosqlite>=0.20' 'pydantic>=2.0' 'cryptography>=42.0' -q
+        "$INSTALL_DIR/venv/bin/pip" install -e "$INSTALL_DIR/sdk" -q 2>/dev/null \
+            || "$INSTALL_DIR/venv/bin/pip" install "$INSTALL_DIR/sdk" -q
+
+        # --- Create .env if missing ---
+        if [[ ! -f "$INSTALL_DIR/.env" ]]; then
+            cat > "$INSTALL_DIR/.env" << 'ENVEOF'
+HOST=127.0.0.1
+PORT=8000
+A2A_DATA_DIR=/var/lib/a2a
+BILLING_DSN=sqlite:////var/lib/a2a/billing.db
+PAYWALL_DSN=sqlite:////var/lib/a2a/paywall.db
+PAYMENTS_DSN=sqlite:////var/lib/a2a/payments.db
+MARKETPLACE_DSN=sqlite:////var/lib/a2a/marketplace.db
+TRUST_DSN=sqlite:////var/lib/a2a/trust.db
+EVENT_BUS_DSN=sqlite:////var/lib/a2a/events.db
+WEBHOOK_DSN=sqlite:////var/lib/a2a/webhooks.db
+IDENTITY_DSN=sqlite:////var/lib/a2a/identity.db
+MESSAGING_DSN=sqlite:////var/lib/a2a/messaging.db
+DISPUTE_DSN=sqlite:////var/lib/a2a/disputes.db
+LOG_LEVEL=INFO
+ENVEOF
+            chmod 600 "$INSTALL_DIR/.env"
+        fi
+
+        # --- Set ownership ---
+        chown -R "$A2A_USER:$A2A_USER" "$INSTALL_DIR"
+        chown -R "$A2A_USER:$A2A_USER" "$DATA_DIR"
+        chown -R "$A2A_USER:$A2A_USER" /var/log/a2a
+
+        # --- systemd service ---
+        systemctl daemon-reload
+        systemctl enable a2a-gateway
+        systemctl restart a2a-gateway
         ;;
     abort-upgrade|abort-remove|abort-deconfigure)
         ;;
