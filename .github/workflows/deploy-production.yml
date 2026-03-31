@@ -117,6 +117,8 @@ jobs:
     if: needs.validate.outputs.deploy_gateway == 'true'
     environment: production
     steps:
+      - uses: actions/checkout@v4
+
       - name: Download deb artifacts
         uses: actions/download-artifact@v4
         with:
@@ -140,63 +142,13 @@ jobs:
           SSHEOF
           chmod 600 ~/.ssh/config
 
-      - name: Deploy gateway to production
-        env:
-          DEPLOY_HOST: ${{ secrets.TAILSCALE_IP }}
+      - name: Deploy gateway
         run: |
-          set -euo pipefail
-
-          DEB_FILE=$(ls dist/a2a-gateway_*.deb | head -1)
-          DEB_BASENAME=$(basename "$DEB_FILE")
-
-          scp "$DEB_FILE" "root@${DEPLOY_HOST}:/tmp/"
-
-          # Deploy with rollback on failure
-          ssh "root@${DEPLOY_HOST}" bash -s -- "$DEB_BASENAME" << 'REMOTE'
-            set -euo pipefail
-            DEB_BASENAME="$1"
-
-            BACKUP_DIR="/var/backups/a2a/deploy-$(date +%Y%m%d-%H%M%S)"
-            mkdir -p "$BACKUP_DIR"
-
-            # Back up current package state
-            dpkg-query -W -f='${Package}_${Version}_${Architecture}.deb\n' a2a-gateway 2>/dev/null \
-              > "$BACKUP_DIR/previous_version.txt" || true
-
-            # Save the currently installed deb for rollback
-            if dpkg -s a2a-gateway >/dev/null 2>&1; then
-              dpkg-repack a2a-gateway 2>/dev/null && mv a2a-gateway_*.deb "$BACKUP_DIR/" || true
-            fi
-
-            echo "[+] Installing new package..."
-            if dpkg -i "/tmp/$DEB_BASENAME"; then
-              echo "[+] Package installed successfully"
-              sleep 3
-
-              # Verify service is running
-              if systemctl is-active a2a-gateway; then
-                echo "[+] Gateway service is active"
-              else
-                echo "[x] Gateway service failed to start — rolling back"
-                ROLLBACK_DEB=$(ls "$BACKUP_DIR"/a2a-gateway_*.deb 2>/dev/null | head -1)
-                if [[ -n "$ROLLBACK_DEB" ]]; then
-                  dpkg -i "$ROLLBACK_DEB"
-                  systemctl restart a2a-gateway || true
-                fi
-                exit 1
-              fi
-            else
-              echo "[x] dpkg -i failed — rolling back"
-              ROLLBACK_DEB=$(ls "$BACKUP_DIR"/a2a-gateway_*.deb 2>/dev/null | head -1)
-              if [[ -n "$ROLLBACK_DEB" ]]; then
-                dpkg -i "$ROLLBACK_DEB"
-                systemctl restart a2a-gateway || true
-              fi
-              exit 1
-            fi
-
-            rm -f "/tmp/$DEB_BASENAME"
-          REMOTE
+          scripts/deploy.sh \
+            --host "${{ secrets.TAILSCALE_IP }}" \
+            --deb "$(ls dist/a2a-gateway_*.deb | head -1)" \
+            --component a2a-gateway \
+            --health-url "https://api.greenhelix.net/v1/health"
 
   # ---------------------------------------------------------------------------
   # Deploy website
@@ -207,6 +159,8 @@ jobs:
     if: needs.validate.outputs.deploy_website == 'true'
     environment: production
     steps:
+      - uses: actions/checkout@v4
+
       - name: Download deb artifacts
         uses: actions/download-artifact@v4
         with:
@@ -230,43 +184,13 @@ jobs:
           SSHEOF
           chmod 600 ~/.ssh/config
 
-      - name: Deploy website to production
-        env:
-          DEPLOY_HOST: ${{ secrets.TAILSCALE_IP }}
+      - name: Deploy website
         run: |
-          set -euo pipefail
-
-          DEB_FILE=$(ls dist/a2a-website_*.deb | head -1)
-          DEB_BASENAME=$(basename "$DEB_FILE")
-
-          scp "$DEB_FILE" "root@${DEPLOY_HOST}:/tmp/"
-
-          ssh "root@${DEPLOY_HOST}" bash -s -- "$DEB_BASENAME" << 'REMOTE'
-            set -euo pipefail
-            DEB_BASENAME="$1"
-
-            BACKUP_DIR="/var/backups/a2a/deploy-$(date +%Y%m%d-%H%M%S)"
-            mkdir -p "$BACKUP_DIR"
-
-            # Back up current website package
-            if dpkg -s a2a-website >/dev/null 2>&1; then
-              dpkg-repack a2a-website 2>/dev/null && mv a2a-website_*.deb "$BACKUP_DIR/" || true
-            fi
-
-            echo "[+] Installing website package..."
-            if dpkg -i "/tmp/$DEB_BASENAME"; then
-              echo "[+] Website package installed successfully"
-            else
-              echo "[x] dpkg -i failed — rolling back"
-              ROLLBACK_DEB=$(ls "$BACKUP_DIR"/a2a-website_*.deb 2>/dev/null | head -1)
-              if [[ -n "$ROLLBACK_DEB" ]]; then
-                dpkg -i "$ROLLBACK_DEB"
-              fi
-              exit 1
-            fi
-
-            rm -f "/tmp/$DEB_BASENAME"
-          REMOTE
+          scripts/deploy.sh \
+            --host "${{ secrets.TAILSCALE_IP }}" \
+            --deb "$(ls dist/a2a-website_*.deb | head -1)" \
+            --component a2a-website \
+            --no-verify
 
   # ---------------------------------------------------------------------------
   # Post-deploy smoke tests
@@ -285,19 +209,6 @@ jobs:
 
       - name: Install test dependencies
         run: scripts/ci/install_deps.sh --with-test
-
-      - name: Health check
-        run: |
-          for i in $(seq 1 10); do
-            if curl -sf "https://api.greenhelix.net/v1/health" -o /dev/null; then
-              echo "Health check passed (attempt $i)"
-              exit 0
-            fi
-            echo "Health check attempt $i failed, retrying in 5s..."
-            sleep 5
-          done
-          echo "Health check failed after 10 attempts"
-          exit 1
 
       - name: Post-deploy smoke tests
         if: needs.deploy-gateway.result == 'success'
