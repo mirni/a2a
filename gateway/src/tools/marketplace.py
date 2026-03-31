@@ -5,34 +5,50 @@ from __future__ import annotations
 from typing import Any
 
 from gateway.src.lifespan import AppContext
+from gateway.src.tools._pagination import _paginate
 
 
 async def _search_services(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     from marketplace_src.models import ServiceSearchParams
+
+    paginate = params.get("paginate", False)
+    offset = max(0, int(params.get("offset", 0)))
+    limit = int(params.get("limit", 20))
 
     search_params = ServiceSearchParams(
         query=params.get("query"),
         category=params.get("category"),
         tags=params.get("tags"),
         max_cost=params.get("max_cost"),
-        limit=params.get("limit", 20),
+        limit=limit,
+        offset=offset,
     )
     services = await ctx.marketplace.search(search_params)
-    return {
-        "services": [
-            {
-                "id": s.id,
-                "name": s.name,
-                "description": s.description,
-                "category": s.category,
-                "pricing": s.pricing.to_dict(),
-                "tags": s.tags,
-                "endpoint": s.endpoint,
-                "trust_score": s.trust_score,
-            }
-            for s in services
-        ]
-    }
+
+    service_dicts = [
+        {
+            "id": s.id,
+            "name": s.name,
+            "description": s.description,
+            "category": s.category,
+            "pricing": s.pricing.to_dict(),
+            "tags": s.tags,
+            "endpoint": s.endpoint,
+            "trust_score": s.trust_score,
+        }
+        for s in services
+    ]
+
+    if paginate:
+        total = await ctx.marketplace.storage.count_search_results(
+            query=params.get("query"),
+            category=params.get("category"),
+            tags=params.get("tags"),
+            max_cost=params.get("max_cost"),
+        )
+        return _paginate(service_dicts, params, total_override=total)
+
+    return {"services": service_dicts}
 
 
 async def _best_match(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
@@ -271,7 +287,7 @@ async def _search_agents(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
     Groups results by provider (agent).
     """
     query = params["query"].lower()
-    limit = params.get("limit", 20)
+    limit = int(params.get("limit", 20))
 
     db = ctx.marketplace.storage.db
 
@@ -311,5 +327,9 @@ async def _search_agents(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
             }
         )
 
-    agents = list(agents_map.values())[:limit]
-    return {"agents": agents}
+    all_agents = list(agents_map.values())
+
+    if params.get("paginate"):
+        return _paginate(all_agents, params)
+
+    return {"agents": all_agents[:limit]}

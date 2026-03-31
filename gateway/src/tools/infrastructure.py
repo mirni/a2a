@@ -6,6 +6,7 @@ from datetime import UTC
 from typing import Any
 
 from gateway.src.lifespan import AppContext
+from gateway.src.tools._pagination import _paginate
 
 # ---------------------------------------------------------------------------
 # Paywall / Audit
@@ -118,6 +119,8 @@ async def _register_webhook(ctx: AppContext, params: dict[str, Any]) -> dict[str
 
 async def _list_webhooks(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     webhooks = await ctx.webhook_manager.list_webhooks(params["agent_id"])
+    if params.get("paginate"):
+        return _paginate(webhooks, params)
     return {"webhooks": webhooks}
 
 
@@ -220,6 +223,9 @@ async def _list_api_keys(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
                 "revoked": bool(k["revoked"]),
             }
         )
+
+    if params.get("paginate"):
+        return _paginate(sanitized_keys, params)
 
     return {"keys": sanitized_keys}
 
