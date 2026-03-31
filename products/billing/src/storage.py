@@ -167,7 +167,7 @@ CREATE INDEX IF NOT EXISTS idx_admin_audit_ts ON admin_audit_log(timestamp);
         Migration(
             1,
             "add idempotency_key to usage_records",
-            "ALTER TABLE usage_records ADD COLUMN idempotency_key TEXT;\n"
+            "ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS idempotency_key TEXT;\n"
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_usage_idempotency "
             "ON usage_records(idempotency_key);",
         ),
@@ -213,8 +213,8 @@ CREATE INDEX IF NOT EXISTS idx_admin_audit_ts ON admin_audit_log(timestamp);
         Migration(
             5,
             "add idempotency_key and result_snapshot to transactions",
-            "ALTER TABLE transactions ADD COLUMN idempotency_key TEXT;\n"
-            "ALTER TABLE transactions ADD COLUMN result_snapshot TEXT;\n"
+            "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS idempotency_key TEXT;\n"
+            "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS result_snapshot TEXT;\n"
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_tx_idempotency "
             "ON transactions(idempotency_key) WHERE idempotency_key IS NOT NULL;",
         ),
