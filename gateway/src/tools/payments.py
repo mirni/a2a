@@ -5,6 +5,18 @@ from __future__ import annotations
 from typing import Any
 
 from gateway.src.lifespan import AppContext
+from gateway.src.tool_errors import ToolValidationError
+
+_VALID_CURRENCIES = {"CREDITS", "USD", "EUR", "GBP", "BTC", "ETH"}
+
+
+def _validate_currency(currency: str) -> str:
+    """Validate currency code and return it, raising ToolValidationError on invalid."""
+    if currency not in _VALID_CURRENCIES:
+        raise ToolValidationError(
+            f"Invalid currency '{currency}'; must be one of {sorted(_VALID_CURRENCIES)}"
+        )
+    return currency
 
 # ---------------------------------------------------------------------------
 # Payment Intents
@@ -38,7 +50,7 @@ async def _get_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]
 
 
 async def _create_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
-    currency = params.get("currency", "CREDITS")
+    currency = _validate_currency(params.get("currency", "CREDITS"))
     intent = await ctx.payment_engine.create_intent(
         payer=params["payer"],
         payee=params["payee"],
@@ -46,6 +58,7 @@ async def _create_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
         description=params.get("description", ""),
         idempotency_key=params.get("idempotency_key"),
         metadata=params.get("metadata"),
+        currency=currency,
     )
     return {
         "id": intent.id,
@@ -77,8 +90,13 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
         return {"id": voided.id, "status": "voided", "amount": float(voided.amount)}
 
     if intent.status.value == "settled":
-        await ctx.tracker.wallet.withdraw(intent.payee, float(intent.amount), description=f"refund:{intent.id}")
-        await ctx.tracker.wallet.deposit(intent.payer, float(intent.amount), description=f"refund:{intent.id}")
+        currency = (intent.metadata or {}).get("currency", "CREDITS")
+        await ctx.tracker.wallet.withdraw(
+            intent.payee, float(intent.amount), description=f"refund:{intent.id}", currency=currency,
+        )
+        await ctx.tracker.wallet.deposit(
+            intent.payer, float(intent.amount), description=f"refund:{intent.id}", currency=currency,
+        )
         return {"id": intent.id, "status": "refunded", "amount": float(intent.amount)}
 
     from payments_src.engine import InvalidStateError
@@ -114,7 +132,7 @@ async def _partial_capture(ctx: AppContext, params: dict[str, Any]) -> dict[str,
 
 
 async def _create_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
-    currency = params.get("currency", "CREDITS")
+    currency = _validate_currency(params.get("currency", "CREDITS"))
     escrow = await ctx.payment_engine.create_escrow(
         payer=params["payer"],
         payee=params["payee"],
@@ -123,6 +141,7 @@ async def _create_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
         timeout_hours=params.get("timeout_hours"),
         metadata=params.get("metadata"),
         idempotency_key=params.get("idempotency_key"),
+        currency=currency,
     )
     return {
         "id": escrow.id,
@@ -210,6 +229,7 @@ async def _check_performance_escrow(ctx: AppContext, params: dict[str, Any]) -> 
 
 
 async def _create_subscription(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    currency = _validate_currency(params.get("currency", "CREDITS"))
     sub = await ctx.payment_engine.create_subscription(
         payer=params["payer"],
         payee=params["payee"],
@@ -218,6 +238,7 @@ async def _create_subscription(ctx: AppContext, params: dict[str, Any]) -> dict[
         description=params.get("description", ""),
         metadata=params.get("metadata"),
         idempotency_key=params.get("idempotency_key"),
+        currency=currency,
     )
     return {
         "id": sub.id,
@@ -225,6 +246,7 @@ async def _create_subscription(ctx: AppContext, params: dict[str, Any]) -> dict[
         "amount": float(sub.amount),
         "interval": sub.interval.value,
         "next_charge_at": sub.next_charge_at,
+        "currency": currency,
     }
 
 
@@ -295,26 +317,26 @@ async def _create_split_intent(ctx: AppContext, params: dict[str, Any]) -> dict[
     amount = float(params["amount"])
     splits = params["splits"]
     description = params.get("description", "")
-
-    from gateway.src.tool_errors import ToolValidationError
+    currency = _validate_currency(params.get("currency", "CREDITS"))
 
     total_pct = sum(s["percentage"] for s in splits)
     if abs(total_pct - 100) > 0.01:
         raise ToolValidationError(f"Split percentages must sum to 100, got {total_pct}")
 
-    await ctx.tracker.wallet.withdraw(payer, amount, description=f"split:{description}")
+    await ctx.tracker.wallet.withdraw(payer, amount, description=f"split:{description}", currency=currency)
 
     settlements = []
     for split in splits:
         payee = split["payee"]
         share = float(Decimal(str(amount)) * Decimal(str(split["percentage"])) / Decimal("100"))
-        await ctx.tracker.wallet.deposit(payee, share, description=f"split_from:{payer}")
+        await ctx.tracker.wallet.deposit(payee, share, description=f"split_from:{payer}", currency=currency)
         settlements.append({"payee": payee, "amount": share, "percentage": split["percentage"]})
 
     return {
         "status": "settled",
         "payer": payer,
         "total_amount": amount,
+        "currency": currency,
         "settlements": settlements,
     }
 
