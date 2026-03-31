@@ -23,7 +23,7 @@ DIST_DIR="$REPO_ROOT/dist"
 PACKAGE_DIR="$REPO_ROOT/package"
 
 # All deb packages available
-DEB_PACKAGES=(a2a-gateway a2a-gateway-test a2a-gateway-sandbox a2a-website)
+DEB_PACKAGES=(a2a-common a2a-gateway a2a-gateway-test a2a-gateway-sandbox a2a-website)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -37,6 +37,7 @@ usage() {
     echo "Usage: $0 <package-name|ALL>"
     echo ""
     echo "Packages:"
+    echo "  a2a-common        Shared scripts and SDK deb"
     echo "  a2a-gateway       Production gateway deb"
     echo "  a2a-gateway-test  Staging/test gateway deb"
     echo "  a2a-gateway-sandbox Sandbox gateway deb"
@@ -176,7 +177,7 @@ case "$TARGET" in
     a2a-sdk)
         build_sdk
         ;;
-    a2a-gateway|a2a-gateway-test|a2a-gateway-sandbox|a2a-website)
+    a2a-common|a2a-gateway|a2a-gateway-test|a2a-gateway-sandbox|a2a-website)
         build_deb "$TARGET"
         ;;
     *)

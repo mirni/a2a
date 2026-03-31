@@ -93,6 +93,9 @@ jobs:
       - name: Install packaging tools
         run: pip install wheel setuptools
 
+      - name: Build common package
+        run: scripts/create_package.sh a2a-common
+
       - name: Build gateway package
         if: needs.validate.outputs.deploy_gateway == 'true'
         run: scripts/create_package.sh a2a-gateway
@@ -163,6 +166,7 @@ jobs:
         run: |
           scripts/deploy.sh \
             --host "${{ secrets.TAILSCALE_IP }}" \
+            --pre-deb "$(ls dist/a2a-common_*.deb | head -1)" \
             --deb "$(ls dist/a2a-gateway_*.deb | head -1)" \
             --component a2a-gateway \
             --health-url "https://api.greenhelix.net/v1/health"
@@ -222,6 +226,7 @@ jobs:
         run: |
           scripts/deploy.sh \
             --host "${{ secrets.TAILSCALE_IP }}" \
+            --pre-deb "$(ls dist/a2a-common_*.deb | head -1)" \
             --deb "$(ls dist/a2a-website_*.deb | head -1)" \
             --component a2a-website \
             --no-verify
