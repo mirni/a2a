@@ -124,8 +124,49 @@ log "Copying $DEB_BASENAME to $SSH_TARGET:$REMOTE_DEB"
 $SSH_CMD "$SSH_TARGET" "cat > '$REMOTE_DEB'" < "$DEB"
 
 # ---------------------------------------------------------------------------
-# Step 1b: Copy and install prerequisite .deb packages (e.g. a2a-common)
+# Step 1b: Repair broken dpkg state and install prerequisites
 # ---------------------------------------------------------------------------
+
+if [[ ${#PRE_DEBS[@]} -gt 0 ]]; then
+    log "Repairing any broken dpkg state on $HOST"
+    $SSH_CMD "$SSH_TARGET" bash -s -- "$COMPONENT" << 'REPAIR_REMOTE'
+        set -euo pipefail
+        COMPONENT="$1"
+
+        # Wait for any running dpkg to finish
+        tries=0; max_tries=24
+        while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+            tries=$((tries + 1))
+            (( tries > max_tries )) && { echo "[x] dpkg lock held >120s"; exit 1; }
+            echo "[!] Waiting for dpkg lock ($tries/$max_tries)..."
+            sleep 5
+        done
+
+        # Fix any half-configured packages
+        dpkg --configure -a 2>/dev/null || true
+
+        # Force-remove packages in broken state to clear file conflicts
+        for pkg in a2a-gateway a2a-website a2a-common; do
+            status=$(dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null || echo "not-installed")
+            if [[ "$status" == *"half"* || "$status" == *"error"* || "$status" == *"reinst-required"* ]]; then
+                echo "[!] Removing broken package $pkg (status: $status)"
+                dpkg --remove --force-remove-reinstreq "$pkg" 2>/dev/null || true
+            fi
+        done
+
+        # If old a2a-gateway or a2a-website still owns /opt/a2a/scripts/,
+        # force-remove it so a2a-common can take over those files
+        if dpkg -S /opt/a2a/scripts/common.bash 2>/dev/null | grep -qv a2a-common; then
+            owner=$(dpkg -S /opt/a2a/scripts/common.bash 2>/dev/null | cut -d: -f1 || true)
+            if [[ -n "$owner" && "$owner" != "a2a-common" ]]; then
+                echo "[!] /opt/a2a/scripts/ owned by $owner — force-removing to clear conflict"
+                dpkg --purge --force-depends "$owner" 2>/dev/null || true
+            fi
+        fi
+
+        echo "[+] dpkg state repaired"
+REPAIR_REMOTE
+fi
 
 for pre_deb in "${PRE_DEBS[@]}"; do
     [[ -f "$pre_deb" ]] || err "Pre-deb file not found: $pre_deb"
