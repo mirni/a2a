@@ -330,7 +330,10 @@ async def _create_split_intent(ctx: AppContext, params: dict[str, Any]) -> dict[
     # Record idempotency marker
     if idempotency_key is not None:
         await ctx.tracker.storage.record_transaction(
-            payer, -amount, "split_intent", description,
+            payer,
+            -amount,
+            "split_intent",
+            description,
             idempotency_key=idempotency_key,
             result_snapshot=json.dumps(result),
         )

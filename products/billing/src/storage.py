@@ -330,9 +330,7 @@ CREATE INDEX IF NOT EXISTS idx_org_tx_agent ON org_transactions(org_id, agent_id
 
     async def get_transaction_by_idempotency_key(self, key: str) -> dict[str, Any] | None:
         """Look up a transaction by its idempotency key."""
-        cursor = await self.db.execute(
-            "SELECT * FROM transactions WHERE idempotency_key = ?", (key,)
-        )
+        cursor = await self.db.execute("SELECT * FROM transactions WHERE idempotency_key = ?", (key,))
         row = await cursor.fetchone()
         if row is None:
             return None

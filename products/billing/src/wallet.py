@@ -129,7 +129,10 @@ class Wallet:
 
         snapshot = _json.dumps({"new_balance": new_balance})
         await self.storage.record_transaction(
-            agent_id, amount, "deposit", description,
+            agent_id,
+            amount,
+            "deposit",
+            description,
             currency=currency,
             idempotency_key=idempotency_key,
             result_snapshot=snapshot,
@@ -184,7 +187,10 @@ class Wallet:
 
         snapshot = _json.dumps({"new_balance": new_balance})
         await self.storage.record_transaction(
-            agent_id, -amount, "withdrawal", description,
+            agent_id,
+            -amount,
+            "withdrawal",
+            description,
             currency=currency,
             idempotency_key=idempotency_key,
             result_snapshot=snapshot,
