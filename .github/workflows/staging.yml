@@ -67,9 +67,11 @@ jobs:
           tags: tag:ci
 
       - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           echo "StrictHostKeyChecking accept-new" >> ~/.ssh/config
           chmod 600 ~/.ssh/config
