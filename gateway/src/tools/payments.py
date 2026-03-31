@@ -4,7 +4,38 @@ from __future__ import annotations
 
 from typing import Any
 
+from gateway.src.authorization import ADMIN_TIER
 from gateway.src.lifespan import AppContext
+from gateway.src.tool_errors import ToolForbiddenError
+
+
+def _check_intent_ownership(caller: str, tier: str, intent) -> None:
+    """Verify the caller is a party to the intent (payer or payee).
+
+    Admin-tier callers bypass this check.
+    Raises ToolForbiddenError if the caller is not involved.
+    """
+    if tier == ADMIN_TIER:
+        return
+    if caller not in (intent.payer, intent.payee):
+        raise ToolForbiddenError(
+            f"Caller '{caller}' is not a party to intent (payer='{intent.payer}', payee='{intent.payee}')"
+        )
+
+
+def _check_escrow_ownership(caller: str, tier: str, escrow) -> None:
+    """Verify the caller is a party to the escrow (payer or payee).
+
+    Admin-tier callers bypass this check.
+    Raises ToolForbiddenError if the caller is not involved.
+    """
+    if tier == ADMIN_TIER:
+        return
+    if caller not in (escrow.payer, escrow.payee):
+        raise ToolForbiddenError(
+            f"Caller '{caller}' is not a party to escrow (payer='{escrow.payer}', payee='{escrow.payee}')"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Payment Intents
@@ -56,6 +87,10 @@ async def _create_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
 
 
 async def _capture_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    caller = params.get("_caller_agent_id", "")
+    tier = params.get("_caller_tier", "")
+    intent = await ctx.payment_engine.get_intent(params["intent_id"])
+    _check_intent_ownership(caller, tier, intent)
     settlement = await ctx.payment_engine.capture(params["intent_id"])
     return {
         "id": settlement.id,
@@ -70,7 +105,10 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
     - If pending: void it (no funds moved).
     - If settled: create a reverse transfer from payee to payer.
     """
+    caller = params.get("_caller_agent_id", "")
+    tier = params.get("_caller_tier", "")
     intent = await ctx.payment_engine.get_intent(params["intent_id"])
+    _check_intent_ownership(caller, tier, intent)
 
     if intent.status.value == "pending":
         voided = await ctx.payment_engine.void(intent.id)
@@ -133,6 +171,10 @@ async def _create_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
 
 
 async def _release_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    caller = params.get("_caller_agent_id", "")
+    tier = params.get("_caller_tier", "")
+    escrow = await ctx.payment_engine.get_escrow(params["escrow_id"])
+    _check_escrow_ownership(caller, tier, escrow)
     settlement = await ctx.payment_engine.release_escrow(params["escrow_id"])
     return {
         "id": settlement.id,
@@ -142,6 +184,10 @@ async def _release_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, 
 
 
 async def _cancel_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    caller = params.get("_caller_agent_id", "")
+    tier = params.get("_caller_tier", "")
+    escrow = await ctx.payment_engine.get_escrow(params["escrow_id"])
+    _check_escrow_ownership(caller, tier, escrow)
     escrow = await ctx.payment_engine.refund_escrow(params["escrow_id"])
     return {
         "id": escrow.id,
@@ -364,10 +410,12 @@ async def _list_disputes(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
 
 
 async def _resolve_dispute(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    # Use authenticated caller identity to prevent impersonation
+    caller = params.get("_caller_agent_id", params["resolved_by"])
     return await ctx.dispute_engine.resolve_dispute(
         dispute_id=params["dispute_id"],
         resolution=params["resolution"],
-        resolved_by=params["resolved_by"],
+        resolved_by=caller,
         notes=params.get("notes", ""),
     )
 

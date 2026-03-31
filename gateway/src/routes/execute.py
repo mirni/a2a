@@ -317,6 +317,7 @@ async def execute(request: Request) -> JSONResponse:
     # --- 6. Dispatch to tool function ---
     # Inject caller identity so tools can perform ownership checks
     params["_caller_agent_id"] = agent_id
+    params["_caller_tier"] = agent_tier
 
     # Record the request in metrics regardless of outcome
     await Metrics.record_request(tool_name)
