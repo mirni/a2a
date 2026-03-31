@@ -81,22 +81,13 @@ jobs:
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
 
-      - name: Configure SSH for Tailscale
-        run: |
-          mkdir -p ~/.ssh
-          cat >> ~/.ssh/config << 'SSHEOF'
-          Host *
-            StrictHostKeyChecking accept-new
-            ProxyCommand tailscale nc %h %p
-          SSHEOF
-          chmod 600 ~/.ssh/config
-
       - name: Deploy to staging
         run: |
           scripts/deploy.sh \
             --host "${{ secrets.TAILSCALE_IP }}" \
             --deb "$(ls dist/a2a-gateway-test_*.deb | head -1)" \
             --component a2a-gateway-test \
+            --ssh-cmd "tailscale ssh" \
             --health-url "https://test.greenhelix.net/v1/health"
 
   # ---------------------------------------------------------------------------

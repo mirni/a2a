@@ -20,11 +20,12 @@
 #   --health-url <url>      Health check endpoint after deploy
 #   --health-retries <n>    Retry count (default: 10)
 #   --health-interval <s>   Seconds between retries (default: 5)
+#   --ssh-cmd <cmd>         SSH command (default: ssh; e.g. "tailscale ssh")
 #   --dry-run               Show what would happen
 #   -h, --help              Show help
 #
 # Environment variable fallbacks:
-#   DEPLOY_HOST, DEPLOY_USER, DEPLOY_DEB, DEPLOY_COMPONENT
+#   DEPLOY_HOST, DEPLOY_USER, DEPLOY_DEB, DEPLOY_COMPONENT, DEPLOY_SSH_CMD
 # =============================================================================
 
 set -euo pipefail
@@ -40,6 +41,7 @@ HOST="${DEPLOY_HOST:-}"
 USER="${DEPLOY_USER:-root}"
 DEB="${DEPLOY_DEB:-}"
 COMPONENT="${DEPLOY_COMPONENT:-}"
+SSH_CMD="${DEPLOY_SSH_CMD:-ssh}"
 NO_ROLLBACK=false
 NO_VERIFY=false
 HEALTH_URL=""
@@ -62,6 +64,7 @@ while [[ $# -gt 0 ]]; do
         --deb)              DEB="$2"; shift 2 ;;
         --component)        COMPONENT="$2"; shift 2 ;;
         --user)             USER="$2"; shift 2 ;;
+        --ssh-cmd)          SSH_CMD="$2"; shift 2 ;;
         --no-rollback)      NO_ROLLBACK=true; shift ;;
         --no-verify)        NO_VERIFY=true; shift ;;
         --health-url)       HEALTH_URL="$2"; shift 2 ;;
@@ -96,6 +99,7 @@ REMOTE_DEB="/tmp/${DEB_BASENAME}"
 if [[ "$DRY_RUN" == true ]]; then
     echo "=== DRY RUN ==="
     echo "Host:        $SSH_TARGET"
+    echo "SSH cmd:     $SSH_CMD"
     echo "Deb:         $DEB → $REMOTE_DEB"
     echo "Component:   $COMPONENT"
     echo "Service:     ${SERVICE:-<none>}"
@@ -113,7 +117,8 @@ fi
 # ---------------------------------------------------------------------------
 
 log "Copying $DEB_BASENAME to $SSH_TARGET:$REMOTE_DEB"
-scp "$DEB" "${SSH_TARGET}:${REMOTE_DEB}"
+# Use pipe-based transfer so any SSH command (e.g. "tailscale ssh") works.
+$SSH_CMD "$SSH_TARGET" "cat > '$REMOTE_DEB'" < "$DEB"
 
 # ---------------------------------------------------------------------------
 # Step 2: Remote install with optional rollback
@@ -123,7 +128,7 @@ if [[ -n "$SERVICE" ]]; then
     # Component has a systemd service — full install with rollback
     log "Installing $DEB_BASENAME on $HOST (service: $SERVICE)"
 
-    ssh "$SSH_TARGET" bash -s -- \
+    $SSH_CMD "$SSH_TARGET" bash -s -- \
         "$DEB_BASENAME" "$COMPONENT" "$SERVICE" "$NO_ROLLBACK" "$NO_VERIFY" \
         << 'REMOTE'
         set -euo pipefail
@@ -182,7 +187,7 @@ else
     # Component has no systemd service (e.g. website) — simple install
     log "Installing $DEB_BASENAME on $HOST (no service)"
 
-    ssh "$SSH_TARGET" bash -s -- \
+    $SSH_CMD "$SSH_TARGET" bash -s -- \
         "$DEB_BASENAME" "$COMPONENT" "$NO_ROLLBACK" \
         << 'REMOTE'
         set -euo pipefail
