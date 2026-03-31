@@ -14,46 +14,48 @@ import re
 _ALLOWED_COMMANDS = frozenset({"SELECT", "INSERT", "UPDATE", "DELETE", "WITH"})
 
 # Blocked command prefixes — DDL, DCL, and other dangerous operations.
-_BLOCKED_COMMANDS = frozenset({
-    "CREATE",
-    "ALTER",
-    "DROP",
-    "TRUNCATE",
-    "GRANT",
-    "REVOKE",
-    "EXEC",
-    "EXECUTE",
-    "COPY",
-    "VACUUM",
-    "ANALYZE",
-    "CLUSTER",
-    "REINDEX",
-    "SET",
-    "RESET",
-    "SHOW",
-    "LISTEN",
-    "NOTIFY",
-    "PREPARE",
-    "DEALLOCATE",
-    "REASSIGN",
-    "COMMENT",
-    "SECURITY",
-    "LOCK",
-    "DO",
-    "CALL",
-    "LOAD",
-    "IMPORT",
-    "DISCARD",
-    "REFRESH",
-    "BEGIN",
-    "COMMIT",
-    "ROLLBACK",
-    "SAVEPOINT",
-    "RELEASE",
-    "START",
-    "END",
-    "ABORT",
-})
+_BLOCKED_COMMANDS = frozenset(
+    {
+        "CREATE",
+        "ALTER",
+        "DROP",
+        "TRUNCATE",
+        "GRANT",
+        "REVOKE",
+        "EXEC",
+        "EXECUTE",
+        "COPY",
+        "VACUUM",
+        "ANALYZE",
+        "CLUSTER",
+        "REINDEX",
+        "SET",
+        "RESET",
+        "SHOW",
+        "LISTEN",
+        "NOTIFY",
+        "PREPARE",
+        "DEALLOCATE",
+        "REASSIGN",
+        "COMMENT",
+        "SECURITY",
+        "LOCK",
+        "DO",
+        "CALL",
+        "LOAD",
+        "IMPORT",
+        "DISCARD",
+        "REFRESH",
+        "BEGIN",
+        "COMMIT",
+        "ROLLBACK",
+        "SAVEPOINT",
+        "RELEASE",
+        "START",
+        "END",
+        "ABORT",
+    }
+)
 
 # Write commands that require non-empty params for parameterization safety.
 _WRITE_COMMANDS = frozenset({"INSERT", "UPDATE", "DELETE"})
@@ -70,12 +72,12 @@ def _extract_command(sql: str) -> str:
         newline = stripped.find("\n")
         if newline == -1:
             return ""
-        stripped = stripped[newline + 1:].strip()
+        stripped = stripped[newline + 1 :].strip()
     while stripped.startswith("/*"):
         end = stripped.find("*/")
         if end == -1:
             return ""
-        stripped = stripped[end + 2:].strip()
+        stripped = stripped[end + 2 :].strip()
 
     match = re.match(r"[A-Za-z_]+", stripped)
     if match:
@@ -115,10 +117,7 @@ def validate_pg_execute_sql(sql: str, params_dict: dict) -> str | None:
 
     # 1. Check for multiple statements (semicolons outside strings)
     if _contains_semicolon_outside_strings(sql):
-        return (
-            "Multiple statements are not allowed. "
-            "Only single SQL statements can be executed."
-        )
+        return "Multiple statements are not allowed. Only single SQL statements can be executed."
 
     # 2. Extract the command type
     command = _extract_command(sql)
@@ -127,17 +126,11 @@ def validate_pg_execute_sql(sql: str, params_dict: dict) -> str | None:
 
     # 3. Block explicitly dangerous commands
     if command in _BLOCKED_COMMANDS:
-        return (
-            f"SQL command '{command}' is not allowed. "
-            f"Only SELECT, INSERT, UPDATE, and DELETE are permitted."
-        )
+        return f"SQL command '{command}' is not allowed. Only SELECT, INSERT, UPDATE, and DELETE are permitted."
 
     # 4. Check against allowed list
     if command not in _ALLOWED_COMMANDS:
-        return (
-            f"SQL command '{command}' is not allowed. "
-            f"Only SELECT, INSERT, UPDATE, and DELETE are permitted."
-        )
+        return f"SQL command '{command}' is not allowed. Only SELECT, INSERT, UPDATE, and DELETE are permitted."
 
     # 5. Write commands require non-empty params for parameterization safety
     if command in _WRITE_COMMANDS:
