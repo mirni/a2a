@@ -2,8 +2,9 @@
 # A2A Commerce Platform — Staging Pipeline
 # =============================================================================
 # Called by the CI workflow (workflow_call) after all checks pass on PRs
-# targeting main. Deploys the test gateway package to the staging server
-# and runs smoke tests before allowing merge.
+# targeting main. Downloads deb artifacts built by the CI package job,
+# deploys the test gateway package to the staging server, and runs smoke
+# tests before allowing merge.
 # =============================================================================
 
 name: Staging
@@ -13,50 +14,17 @@ on:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Build all packages
-  # ---------------------------------------------------------------------------
-  package:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install packaging tools
-        run: pip install wheel setuptools
-
-      - name: Build all packages
-        run: scripts/create_package.sh ALL
-
-      - name: Upload deb artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: staging-deb-packages
-          path: dist/*.deb
-          retention-days: 7
-
-      - name: Upload SDK wheel
-        uses: actions/upload-artifact@v4
-        with:
-          name: staging-sdk-wheel
-          path: dist/*.whl
-          retention-days: 7
-
-  # ---------------------------------------------------------------------------
   # Deploy test gateway to staging server
   # ---------------------------------------------------------------------------
   staging-deploy:
     runs-on: ubuntu-latest
-    needs: [package]
     steps:
       - uses: actions/checkout@v4
 
       - name: Download deb artifacts
         uses: actions/download-artifact@v4
         with:
-          name: staging-deb-packages
+          name: deb-packages
           path: dist/
 
       - name: Connect to Tailscale
