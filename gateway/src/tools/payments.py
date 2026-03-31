@@ -189,6 +189,7 @@ async def _create_performance_escrow(ctx: AppContext, params: dict[str, Any]) ->
             "metric_name": params["metric_name"],
             "threshold": params["threshold"],
         },
+        idempotency_key=params.get("idempotency_key"),
     )
     return {
         "escrow_id": escrow.id,
@@ -311,12 +312,20 @@ async def _create_split_intent(ctx: AppContext, params: dict[str, Any]) -> dict[
 
     Splits must sum to 100%. Withdraws full amount from payer, deposits to each payee.
     """
+    import json
     from decimal import Decimal
 
     payer = params["payer"]
     amount = float(params["amount"])
     splits = params["splits"]
     description = params.get("description", "")
+    idempotency_key = params.get("idempotency_key")
+
+    # Idempotency check
+    if idempotency_key is not None:
+        existing = await ctx.tracker.storage.get_transaction_by_idempotency_key(idempotency_key)
+        if existing is not None and existing.get("result_snapshot"):
+            return json.loads(existing["result_snapshot"])
 
     from gateway.src.tool_errors import ToolValidationError
 
@@ -333,12 +342,22 @@ async def _create_split_intent(ctx: AppContext, params: dict[str, Any]) -> dict[
         await ctx.tracker.wallet.deposit(payee, share, description=f"split_from:{payer}")
         settlements.append({"payee": payee, "amount": share, "percentage": split["percentage"]})
 
-    return {
+    result = {
         "status": "settled",
         "payer": payer,
         "total_amount": amount,
         "settlements": settlements,
     }
+
+    # Record idempotency marker
+    if idempotency_key is not None:
+        await ctx.tracker.storage.record_transaction(
+            payer, -amount, "split_intent", description,
+            idempotency_key=idempotency_key,
+            result_snapshot=json.dumps(result),
+        )
+
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -416,6 +435,7 @@ async def _refund_settlement(ctx: AppContext, params: dict[str, Any]) -> dict[st
         settlement_id=params["settlement_id"],
         amount=amount,
         reason=params.get("reason", ""),
+        idempotency_key=params.get("idempotency_key"),
     )
     return {
         "id": refund.id,

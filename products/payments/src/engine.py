@@ -244,6 +244,7 @@ class PaymentEngine:
         settlement_id: str,
         amount: Decimal | None = None,
         reason: str = "",
+        idempotency_key: str | None = None,
     ) -> Refund:
         """Refund a settled payment (full or partial).
 
@@ -251,6 +252,7 @@ class PaymentEngine:
             settlement_id: ID of the settlement to refund.
             amount: Amount to refund. If None, refunds the remaining (un-refunded) balance.
             reason: Optional reason for the refund.
+            idempotency_key: Optional key to prevent duplicate refunds.
 
         Returns:
             A Refund object with the details of this refund.
@@ -260,6 +262,12 @@ class PaymentEngine:
             InvalidStateError: If the settlement is already fully refunded.
             PaymentError: If amount is zero, negative, or exceeds the remaining refundable balance.
         """
+        # Idempotency check
+        if idempotency_key is not None:
+            existing = await self.storage.get_refund_by_idempotency_key(idempotency_key)
+            if existing is not None:
+                return Refund(**existing)
+
         settlement_data = await self.storage.get_settlement(settlement_id)
         if settlement_data is None:
             raise SettlementNotFoundError(f"Settlement {settlement_id} not found")
@@ -302,6 +310,7 @@ class PaymentEngine:
             settlement_id=settlement_id,
             amount=refund_amount,
             reason=reason,
+            idempotency_key=idempotency_key,
         )
         await self.storage.insert_refund(refund.model_dump())
 

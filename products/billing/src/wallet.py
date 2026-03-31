@@ -93,8 +93,30 @@ class Wallet:
             raise WalletNotFoundError(agent_id)
         return await self.storage.get_currency_balance(agent_id, currency)
 
-    async def deposit(self, agent_id: str, amount: float, description: str = "", currency: str = "CREDITS") -> float:
-        """Add funds to an agent's wallet in a specific currency. Returns new balance."""
+    async def deposit(
+        self,
+        agent_id: str,
+        amount: float,
+        description: str = "",
+        currency: str = "CREDITS",
+        idempotency_key: str | None = None,
+    ) -> float:
+        """Add funds to an agent's wallet in a specific currency. Returns new balance.
+
+        If *idempotency_key* is provided and a transaction with that key already
+        exists, the cached balance is returned without performing another deposit.
+        """
+        # Idempotency check
+        if idempotency_key is not None:
+            existing = await self.storage.get_transaction_by_idempotency_key(idempotency_key)
+            if existing is not None:
+                import json as _json
+
+                if existing.get("result_snapshot"):
+                    snapshot = _json.loads(existing["result_snapshot"])
+                    return snapshot["new_balance"]
+                return await self.get_balance(agent_id, currency=currency)
+
         if amount <= 0:
             raise ValueError("Deposit amount must be positive")
         if await self.storage.is_wallet_frozen(agent_id):
@@ -102,7 +124,16 @@ class Wallet:
         success, new_balance = await self.storage.atomic_currency_credit(agent_id, amount, currency)
         if not success:
             raise WalletNotFoundError(agent_id)
-        await self.storage.record_transaction(agent_id, amount, "deposit", description, currency=currency)
+
+        import json as _json
+
+        snapshot = _json.dumps({"new_balance": new_balance})
+        await self.storage.record_transaction(
+            agent_id, amount, "deposit", description,
+            currency=currency,
+            idempotency_key=idempotency_key,
+            result_snapshot=snapshot,
+        )
         await self.storage.emit_event(
             "wallet.deposit",
             agent_id,
@@ -110,12 +141,33 @@ class Wallet:
         )
         return new_balance
 
-    async def withdraw(self, agent_id: str, amount: float, description: str = "", currency: str = "CREDITS") -> float:
+    async def withdraw(
+        self,
+        agent_id: str,
+        amount: float,
+        description: str = "",
+        currency: str = "CREDITS",
+        idempotency_key: str | None = None,
+    ) -> float:
         """Remove funds from an agent's wallet in a specific currency. Returns new balance.
 
         Raises InsufficientCreditsError if balance is too low.
         Uses atomic UPDATE WHERE balance >= ? to prevent race conditions.
+
+        If *idempotency_key* is provided and a transaction with that key already
+        exists, the cached balance is returned without performing another withdrawal.
         """
+        # Idempotency check
+        if idempotency_key is not None:
+            existing = await self.storage.get_transaction_by_idempotency_key(idempotency_key)
+            if existing is not None:
+                import json as _json
+
+                if existing.get("result_snapshot"):
+                    snapshot = _json.loads(existing["result_snapshot"])
+                    return snapshot["new_balance"]
+                return await self.get_balance(agent_id, currency=currency)
+
         if amount <= 0:
             raise ValueError("Withdrawal amount must be positive")
         if await self.storage.is_wallet_frozen(agent_id):
@@ -127,7 +179,16 @@ class Wallet:
         if not success:
             available = await self.storage.get_currency_balance(agent_id, currency)
             raise InsufficientCreditsError(agent_id, amount, available)
-        await self.storage.record_transaction(agent_id, -amount, "withdrawal", description, currency=currency)
+
+        import json as _json
+
+        snapshot = _json.dumps({"new_balance": new_balance})
+        await self.storage.record_transaction(
+            agent_id, -amount, "withdrawal", description,
+            currency=currency,
+            idempotency_key=idempotency_key,
+            result_snapshot=snapshot,
+        )
         await self.storage.emit_event(
             "wallet.withdrawal",
             agent_id,

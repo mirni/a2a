@@ -29,6 +29,7 @@ async def _deposit(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
         params["amount"],
         description=params.get("description", ""),
         currency=currency,
+        idempotency_key=params.get("idempotency_key"),
     )
     return {"new_balance": new_balance}
 
@@ -58,6 +59,7 @@ async def _withdraw(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
         params["amount"],
         description=params.get("description", ""),
         currency=currency,
+        idempotency_key=params.get("idempotency_key"),
     )
     return {"new_balance": new_balance}
 
