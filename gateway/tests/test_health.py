@@ -6,6 +6,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from gateway.src._version import __version__
+
 
 @pytest.mark.asyncio
 async def test_health_returns_ok(client):
@@ -13,7 +15,7 @@ async def test_health_returns_ok(client):
     assert resp.status_code == 200
     data = resp.json()
     assert data["status"] == "ok"
-    assert data["version"] == "0.1.0"
+    assert data["version"] == __version__
     assert isinstance(data["tools"], int)
     assert data["tools"] > 0
 
