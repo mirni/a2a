@@ -4493,7 +4493,7 @@
   {
     "name": "get_agent_leaderboard",
     "service": "billing",
-    "description": "Rank agents by total spend, calls, or trust score.",
+    "description": "Rank agents by total spend, calls, trust score, revenue, or rating.",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -4502,7 +4502,9 @@
           "enum": [
             "spend",
             "calls",
-            "trust_score"
+            "trust_score",
+            "revenue",
+            "rating"
           ],
           "description": "Metric to rank by"
         },

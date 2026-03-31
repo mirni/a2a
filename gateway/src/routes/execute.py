@@ -84,15 +84,14 @@ def _validate_params(params: dict[str, Any], input_schema: dict[str, Any]) -> st
     """Validate tool params against the catalog's JSON Schema.
 
     Returns None if valid, or an error message string if invalid.
-    Enforces type checking and rejects undeclared parameters.
+    Validates types for declared properties. Extra properties are allowed
+    since the catalog may not document all accepted params (e.g. internal
+    flags like signup_bonus, idempotency_key).
     """
     import jsonschema
 
-    strict_schema = dict(input_schema)
-    strict_schema["additionalProperties"] = False
-
     try:
-        jsonschema.validate(instance=params, schema=strict_schema)
+        jsonschema.validate(instance=params, schema=input_schema)
     except jsonschema.ValidationError as exc:
         field = ".".join(str(p) for p in exc.absolute_path) if exc.absolute_path else ""
         if field:

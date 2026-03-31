@@ -111,23 +111,21 @@ async def test_rejects_string_for_integer_field(client, api_key):
     assert resp.status_code == 422
 
 
-async def test_rejects_extra_params_not_in_schema(client, api_key):
-    """Extra parameters not defined in the schema should be rejected."""
+async def test_extra_params_are_allowed(client, api_key):
+    """Extra params not in schema are allowed (catalog may be incomplete)."""
     resp = await client.post(
         "/v1/execute",
         json={
             "tool": "get_balance",
             "params": {
                 "agent_id": "test-agent",
-                "evil_injection": "DROP TABLE wallets",
+                "extra_field": "ignored",
             },
         },
         headers={"Authorization": f"Bearer {api_key}"},
     )
-    assert resp.status_code == 422
-    body = resp.json()
-    assert body["success"] is False
-    assert "evil_injection" in body["error"]["message"]
+    # Extra fields are NOT rejected — they pass through to the tool
+    assert resp.status_code == 200
 
 
 async def test_rejects_number_for_string_field(client, api_key):
