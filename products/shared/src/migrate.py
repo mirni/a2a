@@ -6,6 +6,7 @@ Provides sequential, version-tracked migrations so that schema changes
 
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import Sequence
 from typing import NamedTuple
@@ -78,6 +79,28 @@ def _validate_migrations(migrations: Sequence[Migration]) -> None:
         raise ValueError(f"Migration versions must be in ascending order: {versions}")
 
 
+_RE_DUPLICATE_COLUMN = re.compile(r"duplicate column name: \w+")
+
+
+async def _execute_migration_sql(db: aiosqlite.Connection, sql: str) -> None:
+    """Execute migration SQL, tolerating 'duplicate column name' errors.
+
+    ALTER TABLE ADD COLUMN can fail if the column already exists from a
+    previous partial migration that wasn't tracked.  We split the SQL
+    into individual statements and skip any ALTER TABLE that fails with
+    'duplicate column name', which is safe — it means the column is
+    already present.
+    """
+    statements = [s.strip() for s in sql.split(";") if s.strip()]
+    for stmt in statements:
+        try:
+            await db.execute(stmt)
+        except Exception as exc:
+            if _RE_DUPLICATE_COLUMN.search(str(exc)):
+                continue  # column already exists, safe to skip
+            raise
+
+
 async def run_migrations(
     db: aiosqlite.Connection,
     migrations: Sequence[Migration],
@@ -100,7 +123,7 @@ async def run_migrations(
 
         try:
             await db.execute("BEGIN")
-            await db.executescript(mig.sql)
+            await _execute_migration_sql(db, mig.sql)
             await db.execute(
                 "INSERT INTO schema_migrations (version, description, applied_at) VALUES (?, ?, ?)",
                 (mig.version, mig.description, time.time()),
