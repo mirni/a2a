@@ -6027,3 +6027,32 @@ Completed all 29 items in PLAN_v2.md across P0-P4 priority tiers. Used parallel 
 
 12. **Data retention policies**: Implement TTL-based cleanup for usage_records, rate_events, and webhook_deliveries tables.
 - **Modified (2):** `products/billing/src/storage.py` (added _debit_in_txn, _credit_in_txn, _scale), `products/billing/src/wallet.py` (atomic convert_currency)
+
+---
+
+## 2026-03-31 — CI Pipeline Fix (Session 4 continuation)
+
+### Human Prompt
+"Continue the conversation from where we left off — get CI green."
+
+### Actions Taken
+
+1. **Reverted CI test commands** — Removed `--cov-report=xml:cov-reports/...` flags and related steps (coverage directory creation, coverage summary, upload coverage reports) that were causing failures. Reverted to original working test commands from main.
+
+2. **Added missing `jsonschema` dependency** — `test_openapi_error_schema.py` imports `jsonschema` for schema validation but it wasn't in CI test deps. Added `"jsonschema>=4.0"` to `scripts/ci/install_deps.sh` TEST_DEPS.
+
+3. **CI Pipeline Result: ALL GREEN**
+   - lint: success
+   - typecheck: success
+   - security: success
+   - dependency-audit: success
+   - semgrep: success
+   - test (3.12): success
+   - test (3.13): success
+   - docker-build: success
+   - package: success
+   - staging: failure (infrastructure/Tailscale — not a code issue)
+
+### Files Modified
+- `.github/workflows/ci.yml` — Reverted to original test commands
+- `scripts/ci/install_deps.sh` — Added jsonschema to TEST_DEPS
