@@ -1,5 +1,37 @@
 # Changelog
 
+# Release v0.4.0
+
+**Date:** 2026-03-31
+**Commit:** aa207e5a
+**Previous:** v0.3
+
+## Changes
+
+### Features
+
+- feat: extract deployment logic into scripts/deploy.sh CLI (`aa207e5`)
+- feat: 21-item customer report fixes (security, auth, pagination, data quality, API) (#2) (`f09577a`)
+
+### Bug Fixes
+
+- feat: extract deployment logic into scripts/deploy.sh CLI (`aa207e5`)
+- fix: resolve CI failures — lint, typecheck, semgrep, test (#1) (`fe2dbb7`)
+
+### Documentation
+
+- docs: add INFRA.md — complete CI/CD pipeline reference for reuse (`da2cb4f`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-gateway-test | 0.4.0 |
+| a2a-gateway | 0.4.0 |
+| a2a-website | 0.4.0 |
+---
+
+
 All notable changes to the A2A Commerce Platform are documented in this file.
 
 ## [0.2.0] — 2026-03-28
