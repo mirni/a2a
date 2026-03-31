@@ -4,7 +4,48 @@ from __future__ import annotations
 
 from typing import Any
 
+from gateway.src.authorization import ADMIN_TIER
 from gateway.src.lifespan import AppContext
+from gateway.src.tool_errors import ToolForbiddenError, ToolValidationError
+
+
+def _check_intent_ownership(caller: str, tier: str, intent) -> None:
+    """Verify the caller is a party to the intent (payer or payee).
+
+    Admin-tier callers bypass this check.
+    Raises ToolForbiddenError if the caller is not involved.
+    """
+    if tier == ADMIN_TIER:
+        return
+    if caller not in (intent.payer, intent.payee):
+        raise ToolForbiddenError(
+            f"Caller '{caller}' is not a party to intent (payer='{intent.payer}', payee='{intent.payee}')"
+        )
+
+
+def _check_escrow_ownership(caller: str, tier: str, escrow) -> None:
+    """Verify the caller is a party to the escrow (payer or payee).
+
+    Admin-tier callers bypass this check.
+    Raises ToolForbiddenError if the caller is not involved.
+    """
+    if tier == ADMIN_TIER:
+        return
+    if caller not in (escrow.payer, escrow.payee):
+        raise ToolForbiddenError(
+            f"Caller '{caller}' is not a party to escrow (payer='{escrow.payer}', payee='{escrow.payee}')"
+        )
+
+
+_VALID_CURRENCIES = {"CREDITS", "USD", "EUR", "GBP", "BTC", "ETH"}
+
+
+def _validate_currency(currency: str) -> str:
+    """Validate currency code and return it, raising ToolValidationError on invalid."""
+    if currency not in _VALID_CURRENCIES:
+        raise ToolValidationError(f"Invalid currency '{currency}'; must be one of {sorted(_VALID_CURRENCIES)}")
+    return currency
+
 
 # ---------------------------------------------------------------------------
 # Payment Intents
@@ -38,7 +79,7 @@ async def _get_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]
 
 
 async def _create_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
-    currency = params.get("currency", "CREDITS")
+    currency = _validate_currency(params.get("currency", "CREDITS"))
     intent = await ctx.payment_engine.create_intent(
         payer=params["payer"],
         payee=params["payee"],
@@ -46,6 +87,7 @@ async def _create_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
         description=params.get("description", ""),
         idempotency_key=params.get("idempotency_key"),
         metadata=params.get("metadata"),
+        currency=currency,
     )
     return {
         "id": intent.id,
@@ -56,6 +98,10 @@ async def _create_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
 
 
 async def _capture_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    caller = params.get("_caller_agent_id", "")
+    tier = params.get("_caller_tier", "")
+    intent = await ctx.payment_engine.get_intent(params["intent_id"])
+    _check_intent_ownership(caller, tier, intent)
     settlement = await ctx.payment_engine.capture(params["intent_id"])
     return {
         "id": settlement.id,
@@ -70,15 +116,29 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
     - If pending: void it (no funds moved).
     - If settled: create a reverse transfer from payee to payer.
     """
+    caller = params.get("_caller_agent_id", "")
+    tier = params.get("_caller_tier", "")
     intent = await ctx.payment_engine.get_intent(params["intent_id"])
+    _check_intent_ownership(caller, tier, intent)
 
     if intent.status.value == "pending":
         voided = await ctx.payment_engine.void(intent.id)
         return {"id": voided.id, "status": "voided", "amount": float(voided.amount)}
 
     if intent.status.value == "settled":
-        await ctx.tracker.wallet.withdraw(intent.payee, float(intent.amount), description=f"refund:{intent.id}")
-        await ctx.tracker.wallet.deposit(intent.payer, float(intent.amount), description=f"refund:{intent.id}")
+        currency = (intent.metadata or {}).get("currency", "CREDITS")
+        await ctx.tracker.wallet.withdraw(
+            intent.payee,
+            float(intent.amount),
+            description=f"refund:{intent.id}",
+            currency=currency,
+        )
+        await ctx.tracker.wallet.deposit(
+            intent.payer,
+            float(intent.amount),
+            description=f"refund:{intent.id}",
+            currency=currency,
+        )
         return {"id": intent.id, "status": "refunded", "amount": float(intent.amount)}
 
     from payments_src.engine import InvalidStateError
@@ -108,13 +168,35 @@ async def _partial_capture(ctx: AppContext, params: dict[str, Any]) -> dict[str,
     }
 
 
+async def _list_intents(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    """List payment intents for an agent, optionally filtered by status."""
+    intents = await ctx.payment_engine.storage.list_intents(
+        agent_id=params["agent_id"],
+        status=params.get("status"),
+        limit=params.get("limit", 50),
+        offset=params.get("offset", 0),
+    )
+    return {"intents": intents, "count": len(intents)}
+
+
 # ---------------------------------------------------------------------------
 # Escrow
 # ---------------------------------------------------------------------------
 
 
+async def _list_escrows(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    """List escrows for an agent, optionally filtered by status."""
+    escrows = await ctx.payment_engine.storage.list_escrows(
+        agent_id=params["agent_id"],
+        status=params.get("status"),
+        limit=params.get("limit", 50),
+        offset=params.get("offset", 0),
+    )
+    return {"escrows": escrows, "count": len(escrows)}
+
+
 async def _create_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
-    currency = params.get("currency", "CREDITS")
+    currency = _validate_currency(params.get("currency", "CREDITS"))
     escrow = await ctx.payment_engine.create_escrow(
         payer=params["payer"],
         payee=params["payee"],
@@ -123,6 +205,7 @@ async def _create_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
         timeout_hours=params.get("timeout_hours"),
         metadata=params.get("metadata"),
         idempotency_key=params.get("idempotency_key"),
+        currency=currency,
     )
     return {
         "id": escrow.id,
@@ -133,6 +216,10 @@ async def _create_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
 
 
 async def _release_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    caller = params.get("_caller_agent_id", "")
+    tier = params.get("_caller_tier", "")
+    escrow = await ctx.payment_engine.get_escrow(params["escrow_id"])
+    _check_escrow_ownership(caller, tier, escrow)
     settlement = await ctx.payment_engine.release_escrow(params["escrow_id"])
     return {
         "id": settlement.id,
@@ -142,6 +229,10 @@ async def _release_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, 
 
 
 async def _cancel_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    caller = params.get("_caller_agent_id", "")
+    tier = params.get("_caller_tier", "")
+    escrow = await ctx.payment_engine.get_escrow(params["escrow_id"])
+    _check_escrow_ownership(caller, tier, escrow)
     escrow = await ctx.payment_engine.refund_escrow(params["escrow_id"])
     return {
         "id": escrow.id,
@@ -167,6 +258,7 @@ async def _create_performance_escrow(ctx: AppContext, params: dict[str, Any]) ->
             "metric_name": params["metric_name"],
             "threshold": params["threshold"],
         },
+        idempotency_key=params.get("idempotency_key"),
     )
     return {
         "escrow_id": escrow.id,
@@ -210,6 +302,7 @@ async def _check_performance_escrow(ctx: AppContext, params: dict[str, Any]) -> 
 
 
 async def _create_subscription(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    currency = _validate_currency(params.get("currency", "CREDITS"))
     sub = await ctx.payment_engine.create_subscription(
         payer=params["payer"],
         payee=params["payee"],
@@ -218,6 +311,7 @@ async def _create_subscription(ctx: AppContext, params: dict[str, Any]) -> dict[
         description=params.get("description", ""),
         metadata=params.get("metadata"),
         idempotency_key=params.get("idempotency_key"),
+        currency=currency,
     )
     return {
         "id": sub.id,
@@ -225,6 +319,7 @@ async def _create_subscription(ctx: AppContext, params: dict[str, Any]) -> dict[
         "amount": float(sub.amount),
         "interval": sub.interval.value,
         "next_charge_at": sub.next_charge_at,
+        "currency": currency,
     }
 
 
@@ -289,34 +384,64 @@ async def _create_split_intent(ctx: AppContext, params: dict[str, Any]) -> dict[
 
     Splits must sum to 100%. Withdraws full amount from payer, deposits to each payee.
     """
+    import json
     from decimal import Decimal
 
     payer = params["payer"]
     amount = float(params["amount"])
     splits = params["splits"]
     description = params.get("description", "")
+    currency = _validate_currency(params.get("currency", "CREDITS"))
+    idempotency_key = params.get("idempotency_key")
 
-    from gateway.src.tool_errors import ToolValidationError
+    # Check idempotency BEFORE executing the split
+    if idempotency_key is not None:
+        existing = await ctx.tracker.storage.get_transaction_by_idempotency_key(
+            idempotency_key,
+        )
+        if existing is not None:
+            snapshot = existing.get("result_snapshot")
+            if snapshot:
+                return json.loads(snapshot)
 
     total_pct = sum(s["percentage"] for s in splits)
     if abs(total_pct - 100) > 0.01:
         raise ToolValidationError(f"Split percentages must sum to 100, got {total_pct}")
 
-    await ctx.tracker.wallet.withdraw(payer, amount, description=f"split:{description}")
+    await ctx.tracker.wallet.withdraw(
+        payer,
+        amount,
+        description=f"split:{description}",
+        currency=currency,
+    )
 
     settlements = []
     for split in splits:
         payee = split["payee"]
         share = float(Decimal(str(amount)) * Decimal(str(split["percentage"])) / Decimal("100"))
-        await ctx.tracker.wallet.deposit(payee, share, description=f"split_from:{payer}")
+        await ctx.tracker.wallet.deposit(payee, share, description=f"split_from:{payer}", currency=currency)
         settlements.append({"payee": payee, "amount": share, "percentage": split["percentage"]})
 
-    return {
+    result = {
         "status": "settled",
         "payer": payer,
         "total_amount": amount,
+        "currency": currency,
         "settlements": settlements,
     }
+
+    # Record idempotency marker
+    if idempotency_key is not None:
+        await ctx.tracker.storage.record_transaction(
+            payer,
+            -amount,
+            "split_intent",
+            description,
+            idempotency_key=idempotency_key,
+            result_snapshot=json.dumps(result),
+        )
+
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -364,10 +489,12 @@ async def _list_disputes(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
 
 
 async def _resolve_dispute(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    # Security: override resolved_by with authenticated caller to prevent impersonation.
+    caller = params.get("_caller_agent_id", params["resolved_by"])
     return await ctx.dispute_engine.resolve_dispute(
         dispute_id=params["dispute_id"],
         resolution=params["resolution"],
-        resolved_by=params["resolved_by"],
+        resolved_by=caller,
         notes=params.get("notes", ""),
     )
 
@@ -392,6 +519,7 @@ async def _refund_settlement(ctx: AppContext, params: dict[str, Any]) -> dict[st
         settlement_id=params["settlement_id"],
         amount=amount,
         reason=params.get("reason", ""),
+        idempotency_key=params.get("idempotency_key"),
     )
     return {
         "id": refund.id,

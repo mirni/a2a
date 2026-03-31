@@ -21,11 +21,23 @@ OWNERSHIP_FIELDS: tuple[str, ...] = ("agent_id", "payer", "sender", "opener", "i
 ADMIN_TIER: str = "admin"
 
 # Tools that can only be executed by admin-tier agents.
-ADMIN_ONLY_TOOLS: frozenset[str] = frozenset({"resolve_dispute", "freeze_wallet", "unfreeze_wallet"})
+ADMIN_ONLY_TOOLS: frozenset[str] = frozenset(
+    {"resolve_dispute", "freeze_wallet", "unfreeze_wallet", "get_global_audit_log"}
+)
 
 # Tools where `agent_id` refers to a target (not the caller).
 # The ownership check skips `agent_id` for these tools.
-AGENT_ID_IS_TARGET: frozenset[str] = frozenset({"remove_agent_from_org", "add_agent_to_org"})
+# Trust tools accept `agent_id` as an alias for `server_id`.
+AGENT_ID_IS_TARGET: frozenset[str] = frozenset(
+    {
+        "remove_agent_from_org",
+        "add_agent_to_org",
+        "get_trust_score",
+        "delete_server",
+        "update_server",
+        "check_sla_compliance",
+    }
+)
 
 
 def check_ownership_authorization(

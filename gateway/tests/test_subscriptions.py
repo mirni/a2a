@@ -193,7 +193,8 @@ async def test_create_subscription_invalid_interval(client, pro_api_key, app):
         },
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
-    assert resp.status_code == 400
+    # 422 if caught by JSON Schema enum validation; 400 if caught by tool logic
+    assert resp.status_code in (400, 422)
     data = resp.json()
     assert data["success"] is False
     assert "error" in data

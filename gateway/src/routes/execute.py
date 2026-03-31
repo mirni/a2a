@@ -9,6 +9,7 @@ import math
 import time
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict, ValidationError
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
@@ -22,6 +23,81 @@ from gateway.src.tool_errors import X402ReplayError, X402VerificationError
 from gateway.src.tools import TOOL_REGISTRY
 
 logger = logging.getLogger("a2a.execute")
+
+_MAX_TOOL_NAME_LEN = 128
+
+
+class ExecuteRequestBody(BaseModel):
+    """Pydantic model for the /v1/execute request body."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tool: str
+    params: dict[str, Any] = {}
+
+
+def _sanitize_tool_name(name: str) -> str:
+    """Strip null bytes and truncate tool name for safe use in messages."""
+    name = name.replace("\x00", "")
+    if len(name) > _MAX_TOOL_NAME_LEN:
+        name = name[:_MAX_TOOL_NAME_LEN]
+    return name
+
+
+async def _log_admin_audit(
+    ctx: Any,
+    request: Request,
+    *,
+    agent_id: str,
+    tool_name: str,
+    params: dict[str, Any],
+    status: str,
+    result_summary: str | None = None,
+) -> None:
+    """Log an admin operation to the admin audit log (best-effort)."""
+    try:
+        from gateway.src.admin_audit import log_admin_operation
+
+        client_ip: str | None = None
+        if request.client:
+            client_ip = request.client.host
+        db = ctx.tracker.storage.db
+        await log_admin_operation(
+            db=db,
+            agent_id=agent_id,
+            tool_name=tool_name,
+            params=params,
+            client_ip=client_ip,
+            status=status,
+            result_summary=result_summary,
+        )
+    except Exception:
+        logger.warning(
+            "Failed to log admin audit for agent=%s tool=%s",
+            agent_id,
+            tool_name,
+            exc_info=True,
+        )
+
+
+def _validate_params(params: dict[str, Any], input_schema: dict[str, Any]) -> str | None:
+    """Validate tool params against the catalog's JSON Schema.
+
+    Returns None if valid, or an error message string if invalid.
+    Validates types for declared properties. Extra properties are allowed
+    since the catalog may not document all accepted params (e.g. internal
+    flags like signup_bonus, idempotency_key).
+    """
+    import jsonschema
+
+    try:
+        jsonschema.validate(instance=params, schema=input_schema)
+    except jsonschema.ValidationError as exc:
+        field = ".".join(str(p) for p in exc.absolute_path) if exc.absolute_path else ""
+        if field:
+            return f"Invalid parameter '{field}': {exc.message}"
+        return f"Parameter validation failed: {exc.message}"
+    return None
 
 
 def _rate_limit_headers(limit: int, rate_count: int, window_seconds: float = 3600.0) -> dict[str, str]:
@@ -142,15 +218,31 @@ async def execute(request: Request) -> JSONResponse:
 
     # --- Parse body ---
     try:
-        body: dict[str, Any] = await request.json()
+        raw_body: dict[str, Any] = await request.json()
     except (ValueError, TypeError):
         return await error_response(400, "Invalid JSON body", "bad_request", request=request)
 
-    if not isinstance(body, dict):
+    if not isinstance(raw_body, dict):
         return await error_response(400, "Request body must be a JSON object", "bad_request", request=request)
 
-    tool_name = body.get("tool")
-    params = body.get("params", {})
+    try:
+        body = ExecuteRequestBody.model_validate(raw_body)
+    except ValidationError as ve:
+        # Distinguish extra-field errors (422) from missing-field errors (400).
+        has_extra = any(e["type"] == "extra_forbidden" for e in ve.errors())
+        if has_extra:
+            return await error_response(422, "Extra fields are not allowed", "validation_error", request=request)
+        # Missing 'tool' or wrong types → fall through to legacy handling below
+        body = None
+
+    tool_name: str | None
+    if body is not None:
+        tool_name = _sanitize_tool_name(body.tool)
+        params = body.params
+    else:
+        tool_name_raw = raw_body.get("tool")
+        tool_name = _sanitize_tool_name(tool_name_raw) if isinstance(tool_name_raw, str) else None
+        params = raw_body.get("params", {})
 
     if not tool_name:
         return await error_response(400, "Missing 'tool' field", "bad_request", request=request)
@@ -194,6 +286,13 @@ async def execute(request: Request) -> JSONResponse:
         agent_id = key_info["agent_id"]
         agent_tier = key_info["tier"]
 
+        # Promote effective tier to admin when the key carries an admin scope.
+        # This ensures admin-scoped keys can use admin-only tools regardless
+        # of their nominal tier.
+        key_scopes = key_info.get("scopes", ["read", "write"])
+        if "admin" in key_scopes:
+            agent_tier = ADMIN_TIER
+
         # --- 2a. Enforce key scoping (allowed_tools, allowed_agent_ids, scopes) ---
         from paywall_src.scoping import KeyScopeError, ScopeChecker
 
@@ -205,9 +304,13 @@ async def execute(request: Request) -> JSONResponse:
         try:
             scope_checker.check_tool(tool_name)
             scope_checker.check_scope(tool_name)
-            # Check agent_id param if present
+            # Check agent_id param if present — skip for tools where
+            # agent_id is a target reference rather than caller identity
+            # (e.g. trust tools use agent_id as alias for server_id).
+            from gateway.src.authorization import AGENT_ID_IS_TARGET
+
             target_agent = params.get("agent_id")
-            if target_agent is not None:
+            if target_agent is not None and tool_name not in AGENT_ID_IS_TARGET:
                 scope_checker.check_agent_id(target_agent)
         except KeyScopeError as exc:
             return await error_response(403, exc.reason, "scope_violation", request=request)
@@ -224,7 +327,18 @@ async def execute(request: Request) -> JSONResponse:
             request=request,
         )
 
-    # --- 2b. Ownership authorization: caller must own the resource ---
+    # --- 2b-2. Validate parameter types against input_schema ---
+    if input_schema:
+        validation_error = _validate_params(params, input_schema)
+        if validation_error is not None:
+            return await error_response(
+                422,
+                validation_error,
+                "invalid_parameter",
+                request=request,
+            )
+
+    # --- 2b-3. Ownership authorization: caller must own the resource ---
     authz_result = check_ownership_authorization(agent_id, agent_tier, params, tool_name=tool_name)
     if authz_result is not None:
         status, message, code = authz_result
@@ -232,6 +346,8 @@ async def execute(request: Request) -> JSONResponse:
 
     # --- 2c. Admin-only tools: block non-admin callers ---
     if tool_name in ADMIN_ONLY_TOOLS and agent_tier != ADMIN_TIER:
+        # Log denied admin tool attempt
+        await _log_admin_audit(ctx, request, agent_id=agent_id, tool_name=tool_name, params=params, status="denied")
         return await error_response(
             403,
             f"Tool '{tool_name}' requires admin privileges",
@@ -317,6 +433,7 @@ async def execute(request: Request) -> JSONResponse:
     # --- 6. Dispatch to tool function ---
     # Inject caller identity so tools can perform ownership checks
     params["_caller_agent_id"] = agent_id
+    params["_caller_tier"] = agent_tier
 
     # Record the request in metrics regardless of outcome
     await Metrics.record_request(tool_name)
@@ -325,10 +442,34 @@ async def execute(request: Request) -> JSONResponse:
     try:
         result = await tool_func(ctx, params)
     except Exception as exc:
+        # Log admin tool errors
+        if tool_name in ADMIN_ONLY_TOOLS:
+            await _log_admin_audit(
+                ctx,
+                request,
+                agent_id=agent_id,
+                tool_name=tool_name,
+                params=params,
+                status="error",
+                result_summary=str(exc)[:500],
+            )
         await Metrics.record_error()
         elapsed_ms = (time.time() - _start_time) * 1000
         await Metrics.record_latency(elapsed_ms)
         return await handle_product_exception(request, exc)
+
+    # Log successful admin tool calls
+    if tool_name in ADMIN_ONLY_TOOLS:
+        result_summary = str(result)[:500] if result is not None else None
+        await _log_admin_audit(
+            ctx,
+            request,
+            agent_id=agent_id,
+            tool_name=tool_name,
+            params=params,
+            status="success",
+            result_summary=result_summary,
+        )
 
     # --- 7. Record usage + charge ---
     correlation_id = getattr(request.state, "correlation_id", None) or ""

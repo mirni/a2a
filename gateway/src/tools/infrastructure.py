@@ -6,6 +6,7 @@ from datetime import UTC
 from typing import Any
 
 from gateway.src.lifespan import AppContext
+from gateway.src.tools._pagination import _paginate
 
 # ---------------------------------------------------------------------------
 # Paywall / Audit
@@ -102,13 +103,19 @@ async def _get_event_schema(ctx: AppContext, params: dict[str, Any]) -> dict[str
 
 async def _register_webhook(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     from gateway.src.tool_errors import ToolValidationError
+    from gateway.src.url_validator import validate_webhook_url
+
+    url = params["url"]
+    url_error = validate_webhook_url(url)
+    if url_error:
+        raise ToolValidationError(f"Invalid webhook URL: {url_error}")
 
     secret = params.get("secret", "")
     if not secret:
         raise ToolValidationError("Webhook 'secret' is required and must be non-empty for HMAC signature verification")
     result = await ctx.webhook_manager.register(
         agent_id=params["agent_id"],
-        url=params["url"],
+        url=url,
         event_types=params["event_types"],
         secret=secret,
         filter_agent_ids=params.get("filter_agent_ids"),
@@ -118,6 +125,8 @@ async def _register_webhook(ctx: AppContext, params: dict[str, Any]) -> dict[str
 
 async def _list_webhooks(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     webhooks = await ctx.webhook_manager.list_webhooks(params["agent_id"])
+    if params.get("paginate"):
+        return _paginate(webhooks, params)
     return {"webhooks": webhooks}
 
 
@@ -221,6 +230,9 @@ async def _list_api_keys(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
             }
         )
 
+    if params.get("paginate"):
+        return _paginate(sanitized_keys, params)
+
     return {"keys": sanitized_keys}
 
 
@@ -251,15 +263,31 @@ async def _revoke_api_key(ctx: AppContext, params: dict[str, Any]) -> dict[str, 
 
 
 async def _create_api_key(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
-    """Create a new API key for an agent (self-service)."""
-    agent_id = params["agent_id"]
-    tier = params.get("tier", "free")
+    """Create a new API key for an agent (self-service).
 
-    key_info = await ctx.key_manager.create_key(agent_id, tier=tier)
+    Security: the requested tier must not exceed the caller's own tier.
+    """
+    from gateway.src.tool_errors import ToolForbiddenError
+
+    agent_id = params["agent_id"]
+    requested_tier = params.get("tier", "free")
+
+    # Prevent tier escalation: caller cannot create keys above their own tier.
+    caller_tier = params.get("_caller_tier", "free")
+    _TIER_RANK = {"free": 0, "starter": 1, "pro": 2, "admin": 3}
+    caller_rank = _TIER_RANK.get(caller_tier, 0)
+    requested_rank = _TIER_RANK.get(requested_tier, 99)
+
+    if requested_rank > caller_rank:
+        raise ToolForbiddenError(
+            f"Tier escalation denied: your tier '{caller_tier}' cannot create '{requested_tier}' keys"
+        )
+
+    key_info = await ctx.key_manager.create_key(agent_id, tier=requested_tier)
     return {
         "key": key_info["key"],
         "agent_id": agent_id,
-        "tier": tier,
+        "tier": requested_tier,
         "created_at": key_info["created_at"],
     }
 
@@ -299,6 +327,7 @@ def _resolve_db_path(db_name: str) -> str:
 
 
 async def _backup_database(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    import hashlib
     import os
     from datetime import datetime
 
@@ -321,8 +350,18 @@ async def _backup_database(ctx: AppContext, params: dict[str, Any]) -> dict[str,
         os.unlink(dest)
         meta["path"] = enc_dest
         meta["size_bytes"] = enc_meta["size_bytes"]
-        meta["key"] = enc_meta["key"]
         meta["encrypted"] = True
+
+        # Store key server-side instead of returning it in the response.
+        # The key is written to a restricted file and referenced by key_id.
+        key_id = hashlib.sha256(enc_meta["key"].encode()).hexdigest()[:16]
+        keys_dir = os.path.join(data_dir, "backup_keys")
+        os.makedirs(keys_dir, exist_ok=True)
+        key_path = os.path.join(keys_dir, f"{key_id}.key")
+        with open(key_path, "w") as f:
+            f.write(enc_meta["key"])
+        os.chmod(key_path, 0o600)
+        meta["key_id"] = key_id
 
     return meta
 
@@ -332,17 +371,36 @@ async def _restore_database(ctx: AppContext, params: dict[str, Any]) -> dict[str
 
     from shared_src.db_security import decrypt_backup, restore_database
 
+    from gateway.src.tool_errors import ToolValidationError
+
     db_name = params["database"]
     db_path = _resolve_db_path(db_name)
     backup_path = params["backup_path"]
+
+    # Security: prevent path traversal attacks
+    data_dir = os.environ.get("A2A_DATA_DIR", "/tmp/a2a_gateway")
+    backup_dir = os.path.realpath(os.path.join(data_dir, "backups"))
+    real_backup = os.path.realpath(backup_path)
+    if not real_backup.startswith(backup_dir + os.sep) and real_backup != backup_dir:
+        raise ToolValidationError(
+            "Invalid backup_path: path traversal detected. Backup files must reside in the backups directory."
+        )
 
     if not os.path.exists(backup_path):
         raise FileNotFoundError(f"Backup not found: {backup_path}")
 
     source = backup_path
-    if params.get("key"):
+    key = params.get("key")
+    # Support key_id-based retrieval of stored encryption keys
+    if not key and params.get("key_id"):
+        key_path = os.path.join(data_dir, "backup_keys", f"{params['key_id']}.key")
+        if os.path.exists(key_path):
+            with open(key_path) as f:
+                key = f.read().strip()
+
+    if key:
         dec_path = backup_path + ".dec"
-        await decrypt_backup(backup_path, dec_path, params["key"])
+        await decrypt_backup(backup_path, dec_path, key)
         source = dec_path
 
     meta = await restore_database(source, db_path)

@@ -12,7 +12,10 @@ import json
 import time
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import aiosqlite
 
 try:
     from shared_src.base_storage import BaseStorage
@@ -58,16 +61,20 @@ CREATE INDEX IF NOT EXISTS idx_usage_created ON usage_records(created_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_usage_idempotency ON usage_records(idempotency_key);
 
 CREATE TABLE IF NOT EXISTS transactions (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    agent_id    TEXT NOT NULL,
-    amount      INTEGER NOT NULL DEFAULT 0,
-    tx_type     TEXT NOT NULL,
-    description TEXT,
-    currency    TEXT NOT NULL DEFAULT 'CREDITS',
-    created_at  REAL NOT NULL
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_id        TEXT NOT NULL,
+    amount          INTEGER NOT NULL DEFAULT 0,
+    tx_type         TEXT NOT NULL,
+    description     TEXT,
+    currency        TEXT NOT NULL DEFAULT 'CREDITS',
+    created_at      REAL NOT NULL,
+    idempotency_key TEXT,
+    result_snapshot TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_tx_agent ON transactions(agent_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tx_idempotency
+    ON transactions(idempotency_key) WHERE idempotency_key IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS rate_policies (
     agent_id        TEXT PRIMARY KEY,
@@ -139,6 +146,21 @@ CREATE TABLE IF NOT EXISTS org_transactions (
 
 CREATE INDEX IF NOT EXISTS idx_org_tx_org ON org_transactions(org_id);
 CREATE INDEX IF NOT EXISTS idx_org_tx_agent ON org_transactions(org_id, agent_id);
+
+CREATE TABLE IF NOT EXISTS admin_audit_log (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp       REAL NOT NULL,
+    agent_id        TEXT NOT NULL,
+    tool_name       TEXT NOT NULL,
+    params_json     TEXT NOT NULL,
+    client_ip       TEXT,
+    status          TEXT NOT NULL CHECK(status IN ('success', 'denied', 'error')),
+    result_summary  TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_audit_agent ON admin_audit_log(agent_id);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_tool ON admin_audit_log(tool_name);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_ts ON admin_audit_log(timestamp);
 """
 
     _MIGRATIONS: tuple[Migration, ...] = (
@@ -187,6 +209,31 @@ CREATE INDEX IF NOT EXISTS idx_org_tx_agent ON org_transactions(org_id, agent_id
             "    updated_at REAL NOT NULL,\n"
             "    PRIMARY KEY (agent_id, currency)\n"
             ");",
+        ),
+        Migration(
+            5,
+            "add idempotency_key and result_snapshot to transactions",
+            "ALTER TABLE transactions ADD COLUMN idempotency_key TEXT;\n"
+            "ALTER TABLE transactions ADD COLUMN result_snapshot TEXT;\n"
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_tx_idempotency "
+            "ON transactions(idempotency_key) WHERE idempotency_key IS NOT NULL;",
+        ),
+        Migration(
+            6,
+            "add admin_audit_log table for admin operation tracking",
+            "CREATE TABLE IF NOT EXISTS admin_audit_log (\n"
+            "    id              INTEGER PRIMARY KEY AUTOINCREMENT,\n"
+            "    timestamp       REAL NOT NULL,\n"
+            "    agent_id        TEXT NOT NULL,\n"
+            "    tool_name       TEXT NOT NULL,\n"
+            "    params_json     TEXT NOT NULL,\n"
+            "    client_ip       TEXT,\n"
+            "    status          TEXT NOT NULL CHECK(status IN ('success', 'denied', 'error')),\n"
+            "    result_summary  TEXT\n"
+            ");\n"
+            "CREATE INDEX IF NOT EXISTS idx_admin_audit_agent ON admin_audit_log(agent_id);\n"
+            "CREATE INDEX IF NOT EXISTS idx_admin_audit_tool ON admin_audit_log(tool_name);\n"
+            "CREATE INDEX IF NOT EXISTS idx_admin_audit_ts ON admin_audit_log(timestamp);",
         ),
     )
 
@@ -296,17 +343,35 @@ CREATE INDEX IF NOT EXISTS idx_org_tx_agent ON org_transactions(org_id, agent_id
     # -----------------------------------------------------------------------
 
     async def record_transaction(
-        self, agent_id: str, amount: float, tx_type: str, description: str = "", currency: str = "CREDITS"
+        self,
+        agent_id: str,
+        amount: float,
+        tx_type: str,
+        description: str = "",
+        currency: str = "CREDITS",
+        idempotency_key: str | None = None,
+        result_snapshot: str | None = None,
     ) -> int:
         now = time.time()
         amt_atomic = int(Decimal(str(amount)) * SCALE)  # allow negative for withdrawals
         cursor = await self.db.execute(
-            "INSERT INTO transactions (agent_id, amount, tx_type, description, currency, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (agent_id, amt_atomic, tx_type, description, currency, now),
+            "INSERT INTO transactions (agent_id, amount, tx_type, description, currency, created_at, "
+            "idempotency_key, result_snapshot) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (agent_id, amt_atomic, tx_type, description, currency, now, idempotency_key, result_snapshot),
         )
         await self.db.commit()
         return cursor.lastrowid  # type: ignore[return-value]
+
+    async def get_transaction_by_idempotency_key(self, key: str) -> dict[str, Any] | None:
+        """Look up a transaction by its idempotency key."""
+        cursor = await self.db.execute("SELECT * FROM transactions WHERE idempotency_key = ?", (key,))
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        d = dict(row)
+        d["amount"] = self._from_atomic(d["amount"])
+        return d
 
     async def get_transactions(self, agent_id: str, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
         cursor = await self.db.execute(
@@ -669,6 +734,66 @@ CREATE INDEX IF NOT EXISTS idx_org_tx_agent ON org_transactions(org_id, agent_id
         if row is None:
             return (False, 0.0)
         return (affected > 0, self._from_atomic(row[0]))
+
+    # -----------------------------------------------------------------------
+    # In-transaction helpers (no commit — caller manages the transaction)
+    # -----------------------------------------------------------------------
+
+    def _scale(self) -> int:
+        """Return the SCALE factor for atomic unit conversion."""
+        return SCALE
+
+    async def _debit_in_txn(
+        self,
+        db: aiosqlite.Connection,
+        agent_id: str,
+        amt_atomic: int,
+        currency: str,
+        now: float,
+    ) -> bool:
+        """Debit *amt_atomic* from the agent's balance inside an existing transaction.
+
+        Does NOT commit.  Returns True if the debit was applied (sufficient
+        balance), False otherwise.
+        """
+        if currency == "CREDITS":
+            cursor = await db.execute(
+                "UPDATE wallets SET balance = balance - ?, updated_at = ? WHERE agent_id = ? AND balance >= ?",
+                (amt_atomic, now, agent_id, amt_atomic),
+            )
+        else:
+            cursor = await db.execute(
+                "UPDATE currency_balances SET balance = balance - ?, updated_at = ? "
+                "WHERE agent_id = ? AND currency = ? AND balance >= ?",
+                (amt_atomic, now, agent_id, currency, amt_atomic),
+            )
+        return cursor.rowcount > 0
+
+    async def _credit_in_txn(
+        self,
+        db: aiosqlite.Connection,
+        agent_id: str,
+        amt_atomic: int,
+        currency: str,
+        now: float,
+    ) -> None:
+        """Credit *amt_atomic* to the agent's balance inside an existing transaction.
+
+        Does NOT commit.
+        """
+        if currency == "CREDITS":
+            await db.execute(
+                "UPDATE wallets SET balance = balance + ?, updated_at = ? WHERE agent_id = ?",
+                (amt_atomic, now, agent_id),
+            )
+        else:
+            await db.execute(
+                "INSERT INTO currency_balances (agent_id, currency, balance, updated_at) "
+                "VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(agent_id, currency) DO UPDATE SET "
+                "balance = balance + ?, updated_at = ?",
+                (agent_id, currency, amt_atomic, now, amt_atomic, now),
+            )
 
     # -----------------------------------------------------------------------
     # Organization wallets

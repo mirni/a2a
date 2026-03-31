@@ -25,7 +25,7 @@ async def test_backup_database_tool(client, admin_api_key):
 
 
 async def test_backup_with_encryption(client, admin_api_key):
-    """Encrypted backup returns an encryption key."""
+    """Encrypted backup returns a key_id (key stored server-side, never in response)."""
     resp = await client.post(
         "/v1/execute",
         json={
@@ -36,8 +36,10 @@ async def test_backup_with_encryption(client, admin_api_key):
     )
     assert resp.status_code == 200
     result = resp.json()["result"]
-    assert "key" in result
-    assert len(result["key"]) > 0
+    # Security: key must NOT be in the response — only key_id for retrieval
+    assert "key" not in result, "Encryption key should not be in API response"
+    assert "key_id" in result
+    assert len(result["key_id"]) > 0
 
 
 async def test_restore_database_tool(client, admin_api_key):

@@ -100,6 +100,10 @@
           "type": "string",
           "description": "Currency code (default: CREDITS). One of: CREDITS, USD, EUR, GBP, BTC, ETH",
           "default": "CREDITS"
+        },
+        "idempotency_key": {
+          "type": "string",
+          "description": "Optional unique key to prevent duplicate deposits. If a deposit with this key already exists, the cached result is returned."
         }
       },
       "required": [
@@ -227,6 +231,9 @@
         },
         "amount": {
           "type": "number"
+        },
+        "currency": {
+          "type": "string"
         }
       }
     },
@@ -253,22 +260,42 @@
           "description": "The payment intent ID"
         }
       },
-      "required": ["intent_id"]
+      "required": [
+        "intent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string"},
-        "status": {"type": "string"},
-        "payer": {"type": "string"},
-        "payee": {"type": "string"},
-        "amount": {"type": "number"},
-        "description": {"type": "string"},
-        "created_at": {"type": "number"}
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "payer": {
+          "type": "string"
+        },
+        "payee": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "description": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "number"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 200},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   },
   {
@@ -283,22 +310,42 @@
           "description": "The escrow ID"
         }
       },
-      "required": ["escrow_id"]
+      "required": [
+        "escrow_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string"},
-        "status": {"type": "string"},
-        "payer": {"type": "string"},
-        "payee": {"type": "string"},
-        "amount": {"type": "number"},
-        "description": {"type": "string"},
-        "created_at": {"type": "number"}
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "payer": {
+          "type": "string"
+        },
+        "payee": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "description": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "number"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 200},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   },
   {
@@ -433,6 +480,9 @@
         },
         "amount": {
           "type": "number"
+        },
+        "currency": {
+          "type": "string"
         }
       }
     },
@@ -523,6 +573,112 @@
     "tier_required": "free"
   },
   {
+    "name": "list_intents",
+    "service": "payments",
+    "description": "List payment intents for an agent, optionally filtered by status.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "description": "The agent to list intents for (as payer or payee)"
+        },
+        "status": {
+          "type": "string",
+          "description": "Filter by status (pending, captured, voided, refunded)",
+          "enum": [
+            "pending",
+            "captured",
+            "voided",
+            "refunded"
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Max intents to return (default 50)"
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Offset for pagination (default 0)"
+        }
+      },
+      "required": [
+        "agent_id"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "intents": {
+          "type": "array"
+        },
+        "count": {
+          "type": "integer"
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
+    "tier_required": "free"
+  },
+  {
+    "name": "list_escrows",
+    "service": "payments",
+    "description": "List escrows for an agent, optionally filtered by status.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "description": "The agent to list escrows for (as payer or payee)"
+        },
+        "status": {
+          "type": "string",
+          "description": "Filter by status (held, released, refunded, expired)",
+          "enum": [
+            "held",
+            "released",
+            "refunded",
+            "expired"
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Max escrows to return (default 50)"
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Offset for pagination (default 0)"
+        }
+      },
+      "required": [
+        "agent_id"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "escrows": {
+          "type": "array"
+        },
+        "count": {
+          "type": "integer"
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
+    "tier_required": "free"
+  },
+  {
     "name": "refund_intent",
     "service": "payments",
     "description": "Refund a payment intent: voids if pending, reverse-transfers if settled.",
@@ -578,6 +734,10 @@
         "reason": {
           "type": "string",
           "description": "Optional reason for the refund"
+        },
+        "idempotency_key": {
+          "type": "string",
+          "description": "Optional unique key to prevent duplicate refunds."
         }
       },
       "required": [
@@ -615,7 +775,7 @@
   {
     "name": "search_services",
     "service": "marketplace",
-    "description": "Search the marketplace for available services.",
+    "description": "Search the marketplace for available services. Supports pagination via paginate=true.",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -637,7 +797,18 @@
         },
         "limit": {
           "type": "integer",
-          "default": 20
+          "default": 20,
+          "description": "Maximum number of results to return"
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "description": "Offset for pagination"
+        },
+        "paginate": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, returns paginated envelope {items, total, offset, limit, has_more}"
         }
       }
     },
@@ -672,7 +843,7 @@
   {
     "name": "search_agents",
     "service": "marketplace",
-    "description": "Search for agents by capability keywords. Searches service names, descriptions, tools, tags, and categories.",
+    "description": "Search for agents by capability keywords. Searches service names, descriptions, tools, tags, and categories. Supports pagination via paginate=true.",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -682,7 +853,18 @@
         },
         "limit": {
           "type": "integer",
-          "default": 20
+          "default": 20,
+          "description": "Maximum number of results to return"
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "description": "Offset for pagination"
+        },
+        "paginate": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, returns paginated envelope {items, total, offset, limit, has_more}"
         }
       },
       "required": [
@@ -1007,7 +1189,8 @@
       "type": "object",
       "properties": {
         "server_id": {
-          "type": "string"
+          "type": "string",
+          "description": "The server identifier. Alias: agent_id"
         },
         "window": {
           "type": "string",
@@ -1021,11 +1204,12 @@
         "recompute": {
           "type": "boolean",
           "default": false
+        },
+        "agent_id": {
+          "type": "string",
+          "description": "Alias for server_id (preferred). Supply either agent_id or server_id."
         }
-      },
-      "required": [
-        "server_id"
-      ]
+      }
     },
     "output_schema": {
       "type": "object",
@@ -1142,6 +1326,50 @@
     "tier_required": "free"
   },
   {
+    "name": "register_server",
+    "service": "trust",
+    "description": "Register a new server for trust tracking.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Human-readable server name."
+        },
+        "url": {
+          "type": "string",
+          "description": "Server endpoint URL."
+        },
+        "transport_type": {
+          "type": "string",
+          "description": "Transport protocol (http or stdio). Default: http."
+        },
+        "server_id": {
+          "type": "string",
+          "description": "Optional custom server ID; auto-generated if not provided."
+        }
+      },
+      "required": ["name", "url"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "name": {"type": "string"},
+        "url": {"type": "string"},
+        "transport_type": {"type": "string"}
+      }
+    },
+    "pricing": {
+      "model": "flat",
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
+    "tier_required": "free"
+  },
+  {
     "name": "delete_server",
     "service": "trust",
     "description": "Delete a server and all its associated trust data (probes, scans, scores).",
@@ -1150,12 +1378,13 @@
       "properties": {
         "server_id": {
           "type": "string",
-          "description": "The server identifier to delete"
+          "description": "The server identifier to delete. Alias: agent_id"
+        },
+        "agent_id": {
+          "type": "string",
+          "description": "Alias for server_id (preferred). Supply either agent_id or server_id."
         }
-      },
-      "required": [
-        "server_id"
-      ]
+      }
     },
     "output_schema": {
       "type": "object",
@@ -1182,7 +1411,7 @@
       "properties": {
         "server_id": {
           "type": "string",
-          "description": "The server identifier to update"
+          "description": "The server identifier to update. Alias: agent_id"
         },
         "name": {
           "type": "string",
@@ -1191,11 +1420,12 @@
         "url": {
           "type": "string",
           "description": "New server URL (optional)"
+        },
+        "agent_id": {
+          "type": "string",
+          "description": "Alias for server_id (preferred). Supply either agent_id or server_id."
         }
-      },
-      "required": [
-        "server_id"
-      ]
+      }
     },
     "output_schema": {
       "type": "object",
@@ -1446,13 +1676,28 @@
   {
     "name": "list_webhooks",
     "service": "webhooks",
-    "description": "List all registered webhooks for an agent.",
+    "description": "List all registered webhooks for an agent. Supports pagination via paginate=true.",
     "input_schema": {
       "type": "object",
       "properties": {
         "agent_id": {
           "type": "string",
           "description": "The agent whose webhooks to list"
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "description": "Offset for pagination (used with paginate=true)"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 50,
+          "description": "Maximum number of items to return (used with paginate=true)"
+        },
+        "paginate": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, returns paginated envelope {items, total, offset, limit, has_more}"
         }
       },
       "required": [
@@ -1915,6 +2160,11 @@
         "idempotency_key": {
           "type": "string",
           "description": "Unique key for idempotent creation. Same key returns same subscription."
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency code (default: CREDITS). One of: CREDITS, USD, EUR, GBP, BTC, ETH",
+          "default": "CREDITS"
         }
       },
       "required": [
@@ -1941,6 +2191,9 @@
         },
         "next_charge_at": {
           "type": "number"
+        },
+        "currency": {
+          "type": "string"
         }
       }
     },
@@ -2188,6 +2441,10 @@
           "type": "string",
           "description": "Currency code (default: CREDITS). One of: CREDITS, USD, EUR, GBP, BTC, ETH",
           "default": "CREDITS"
+        },
+        "idempotency_key": {
+          "type": "string",
+          "description": "Optional unique key to prevent duplicate withdrawals. If a withdrawal with this key already exists, the cached result is returned."
         }
       },
       "required": [
@@ -2301,6 +2558,10 @@
         },
         "description": {
           "type": "string"
+        },
+        "idempotency_key": {
+          "type": "string",
+          "description": "Optional unique key to prevent duplicate escrow creation."
         }
       },
       "required": [
@@ -2530,23 +2791,45 @@
           "description": "The dispute ID to look up"
         }
       },
-      "required": ["dispute_id"]
+      "required": [
+        "dispute_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string"},
-        "escrow_id": {"type": "string"},
-        "opener": {"type": "string"},
-        "respondent": {"type": "string"},
-        "status": {"type": "string"},
-        "reason": {"type": "string"},
-        "resolution": {"type": "string"},
-        "created_at": {"type": "number"}
+        "id": {
+          "type": "string"
+        },
+        "escrow_id": {
+          "type": "string"
+        },
+        "opener": {
+          "type": "string"
+        },
+        "respondent": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "resolution": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "number"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 200},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   },
   {
@@ -2571,19 +2854,27 @@
           "description": "Offset for pagination"
         }
       },
-      "required": ["agent_id"]
+      "required": [
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
         "disputes": {
           "type": "array",
-          "items": {"type": "object"}
+          "items": {
+            "type": "object"
+          }
         }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 300},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "free"
   },
   {
@@ -2882,16 +3173,18 @@
       "type": "object",
       "properties": {
         "server_id": {
-          "type": "string"
+          "type": "string",
+          "description": "The server identifier. Alias: agent_id"
         },
         "claimed_uptime": {
           "type": "number",
           "description": "Claimed uptime percentage (e.g. 99.5)"
+        },
+        "agent_id": {
+          "type": "string",
+          "description": "Alias for server_id (preferred). Supply either agent_id or server_id."
         }
-      },
-      "required": [
-        "server_id"
-      ]
+      }
     },
     "output_schema": {
       "type": "object",
@@ -3074,6 +3367,11 @@
         },
         "description": {
           "type": "string"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency code (default: CREDITS). One of: CREDITS, USD, EUR, GBP, BTC, ETH",
+          "default": "CREDITS"
         }
       },
       "required": [
@@ -3086,6 +3384,9 @@
       "type": "object",
       "properties": {
         "status": {
+          "type": "string"
+        },
+        "currency": {
           "type": "string"
         },
         "settlements": {
@@ -3139,8 +3440,9 @@
         "created_at": {
           "type": "string"
         },
-        "key": {
-          "type": "string"
+        "key_id": {
+          "type": "string",
+          "description": "Identifier for the server-stored encryption key (use with restore_database)"
         }
       }
     },
@@ -3170,6 +3472,10 @@
         "key": {
           "type": "string",
           "description": "Decryption key if backup is encrypted"
+        },
+        "key_id": {
+          "type": "string",
+          "description": "Key ID from backup_database (retrieves server-stored key)"
         }
       },
       "required": [
@@ -4187,7 +4493,7 @@
   {
     "name": "get_agent_leaderboard",
     "service": "billing",
-    "description": "Rank agents by total spend, calls, or trust score.",
+    "description": "Rank agents by total spend, calls, trust score, revenue, or rating.",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -4196,7 +4502,9 @@
           "enum": [
             "spend",
             "calls",
-            "trust_score"
+            "trust_score",
+            "revenue",
+            "rating"
           ],
           "description": "Metric to rank by"
         },
@@ -4726,18 +5034,28 @@
           "description": "The agent whose wallet to freeze"
         }
       },
-      "required": ["agent_id"]
+      "required": [
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string"},
-        "frozen": {"type": "boolean"}
+        "agent_id": {
+          "type": "string"
+        },
+        "frozen": {
+          "type": "boolean"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 200},
-    "tier_required": "free"
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
+    "tier_required": "pro"
   },
   {
     "name": "unfreeze_wallet",
@@ -4751,18 +5069,28 @@
           "description": "The agent whose wallet to unfreeze"
         }
       },
-      "required": ["agent_id"]
+      "required": [
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string"},
-        "frozen": {"type": "boolean"}
+        "agent_id": {
+          "type": "string"
+        },
+        "frozen": {
+          "type": "boolean"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 200},
-    "tier_required": "free"
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
+    "tier_required": "pro"
   },
   {
     "name": "create_org",
@@ -4929,13 +5257,28 @@
   {
     "name": "list_api_keys",
     "service": "paywall",
-    "description": "List all API keys for an agent. Returns truncated key hash prefix, tier, scopes, and created_at (never the full key or hash).",
+    "description": "List all API keys for an agent. Returns truncated key hash prefix, tier, scopes, and created_at (never the full key or hash). Supports pagination via paginate=true.",
     "input_schema": {
       "type": "object",
       "properties": {
         "agent_id": {
           "type": "string",
           "description": "The agent whose keys to list"
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "description": "Offset for pagination (used with paginate=true)"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 50,
+          "description": "Maximum number of items to return (used with paginate=true)"
+        },
+        "paginate": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, returns paginated envelope {items, total, offset, limit, has_more}"
         }
       },
       "required": [

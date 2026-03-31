@@ -250,6 +250,7 @@ class Refund(BaseModel):
     amount: Decimal
     reason: str = ""
     status: RefundStatus = RefundStatus.COMPLETED
+    idempotency_key: str | None = None
     created_at: float = Field(default_factory=time.time)
 
     @field_serializer("amount")

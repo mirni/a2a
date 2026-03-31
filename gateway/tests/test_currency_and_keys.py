@@ -365,6 +365,26 @@ class TestGetExchangeRate:
         assert result["to_currency"] == "CREDITS"
         assert float(result["rate"]) == 100.0
 
+    async def test_get_exchange_rate_auto_initializes(self, client, api_key):
+        """get_exchange_rate should auto-initialize default rates without manual setup.
+
+        Regression test: previously the tool never called initialize_default_rates(),
+        causing UnsupportedCurrencyError for all currency pairs on fresh databases.
+        """
+        # NO manual initialization — the tool itself must seed the rates table.
+        resp = await client.post(
+            "/v1/execute",
+            json={
+                "tool": "get_exchange_rate",
+                "params": {"from_currency": "USD", "to_currency": "CREDITS"},
+            },
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True, f"Expected success, got: {data}"
+        assert float(data["result"]["rate"]) == 100.0
+
     async def test_get_exchange_rate_same_currency(self, client, api_key):
         """get_exchange_rate for same currency should return rate=1."""
         resp = await client.post(
@@ -401,6 +421,32 @@ class TestConvertCurrency:
         )
         data = resp.json()
         assert data.get("error", {}).get("code") != "unknown_tool"
+
+    async def test_convert_currency_auto_initializes(self, client, api_key):
+        """convert_currency should auto-initialize rates on fresh databases.
+
+        Regression test: previously the tool never seeded the exchange_rates table.
+        """
+        # NO manual initialization
+        resp = await client.post(
+            "/v1/execute",
+            json={
+                "tool": "convert_currency",
+                "params": {
+                    "agent_id": "test-agent",
+                    "amount": 100.0,
+                    "from_currency": "CREDITS",
+                    "to_currency": "USD",
+                },
+            },
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        data = resp.json()
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {data}"
+        assert data["success"] is True
+        result = data["result"]
+        assert result["from_amount"] == 100.0
+        assert result["to_amount"] > 0
 
     async def test_convert_currency_converts_balance(self, client, app, api_key):
         """convert_currency should withdraw from source and deposit to target."""

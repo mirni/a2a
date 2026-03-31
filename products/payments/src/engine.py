@@ -94,6 +94,7 @@ class PaymentEngine:
         description: str = "",
         idempotency_key: str | None = None,
         metadata: dict[str, Any] | None = None,
+        currency: str = "CREDITS",
     ) -> PaymentIntent:
         """Create a payment intent. If idempotency_key already exists, return existing."""
         if amount <= 0:
@@ -107,13 +108,16 @@ class PaymentEngine:
             if existing is not None:
                 return PaymentIntent(**existing)
 
+        merged_metadata = metadata or {}
+        merged_metadata["currency"] = currency
+
         intent = PaymentIntent(
             payer=payer,
             payee=payee,
             amount=amount,
             description=description,
             idempotency_key=idempotency_key,
-            metadata=metadata or {},
+            metadata=merged_metadata,
         )
         await self.storage.insert_intent(intent.model_dump())
         return intent
@@ -133,15 +137,18 @@ class PaymentEngine:
 
         # Transfer funds: withdraw from payer, deposit to payee
         amount = float(intent.amount)
+        currency = (intent.metadata or {}).get("currency", "CREDITS")
         await self.wallet.withdraw(
             intent.payer,
             amount,
             description=f"payment:{intent.id}",
+            currency=currency,
         )
         await self.wallet.deposit(
             intent.payee,
             amount,
             description=f"payment:{intent.id}",
+            currency=currency,
         )
 
         # Create settlement record
@@ -196,15 +203,18 @@ class PaymentEngine:
             raise PaymentError(f"Capture amount {amount} exceeds intent amount {intent_amount_f}")
 
         # Transfer the partial amount
+        currency = (intent.metadata or {}).get("currency", "CREDITS")
         await self.wallet.withdraw(
             intent.payer,
             amount,
             description=f"partial_capture:{intent.id}",
+            currency=currency,
         )
         await self.wallet.deposit(
             intent.payee,
             amount,
             description=f"partial_capture:{intent.id}",
+            currency=currency,
         )
 
         # Create settlement for the partial amount
@@ -244,6 +254,7 @@ class PaymentEngine:
         settlement_id: str,
         amount: Decimal | None = None,
         reason: str = "",
+        idempotency_key: str | None = None,
     ) -> Refund:
         """Refund a settled payment (full or partial).
 
@@ -251,6 +262,7 @@ class PaymentEngine:
             settlement_id: ID of the settlement to refund.
             amount: Amount to refund. If None, refunds the remaining (un-refunded) balance.
             reason: Optional reason for the refund.
+            idempotency_key: Optional key to prevent duplicate refunds.
 
         Returns:
             A Refund object with the details of this refund.
@@ -260,6 +272,12 @@ class PaymentEngine:
             InvalidStateError: If the settlement is already fully refunded.
             PaymentError: If amount is zero, negative, or exceeds the remaining refundable balance.
         """
+        # Idempotency check
+        if idempotency_key is not None:
+            existing = await self.storage.get_refund_by_idempotency_key(idempotency_key)
+            if existing is not None:
+                return Refund(**existing)
+
         settlement_data = await self.storage.get_settlement(settlement_id)
         if settlement_data is None:
             raise SettlementNotFoundError(f"Settlement {settlement_id} not found")
@@ -302,6 +320,7 @@ class PaymentEngine:
             settlement_id=settlement_id,
             amount=refund_amount,
             reason=reason,
+            idempotency_key=idempotency_key,
         )
         await self.storage.insert_refund(refund.model_dump())
 
@@ -327,6 +346,7 @@ class PaymentEngine:
         timeout_hours: float | None = None,
         metadata: dict[str, Any] | None = None,
         idempotency_key: str | None = None,
+        currency: str = "CREDITS",
     ) -> Escrow:
         """Create an escrow: withdraw funds from payer and hold them."""
         if amount <= 0:
@@ -346,11 +366,15 @@ class PaymentEngine:
                 raise PaymentError("Timeout hours must be positive")
             timeout_at = time.time() + (timeout_hours * 3600)
 
+        merged_metadata = metadata or {}
+        merged_metadata["currency"] = currency
+
         # Withdraw funds from payer (locks them)
         await self.wallet.withdraw(
             payer,
             amount,
             description=f"escrow_hold:{payer}->{payee}",
+            currency=currency,
         )
 
         escrow = Escrow(
@@ -359,7 +383,7 @@ class PaymentEngine:
             amount=amount,
             description=description,
             timeout_at=timeout_at,
-            metadata=metadata or {},
+            metadata=merged_metadata,
             idempotency_key=idempotency_key,
         )
         await self.storage.insert_escrow(escrow.model_dump())
@@ -377,10 +401,12 @@ class PaymentEngine:
 
         # Deposit to payee
         escrow_amount = float(escrow.amount)
+        currency = (escrow.metadata or {}).get("currency", "CREDITS")
         await self.wallet.deposit(
             escrow.payee,
             escrow_amount,
             description=f"escrow_release:{escrow.id}",
+            currency=currency,
         )
 
         # Create settlement
@@ -410,10 +436,12 @@ class PaymentEngine:
             raise InvalidStateError(f"Cannot refund escrow in state '{escrow.status.value}'; must be 'held'")
 
         # Return funds to payer
+        currency = (escrow.metadata or {}).get("currency", "CREDITS")
         await self.wallet.deposit(
             escrow.payer,
             float(escrow.amount),
             description=f"escrow_refund:{escrow.id}",
+            currency=currency,
         )
 
         await self.storage.update_escrow_status(escrow.id, EscrowStatus.REFUNDED.value)
@@ -432,10 +460,12 @@ class PaymentEngine:
             raise InvalidStateError(f"Cannot expire escrow in state '{escrow.status.value}'; must be 'held'")
 
         # Return funds to payer
+        currency = (escrow.metadata or {}).get("currency", "CREDITS")
         await self.wallet.deposit(
             escrow.payer,
             float(escrow.amount),
             description=f"escrow_expired:{escrow.id}",
+            currency=currency,
         )
 
         await self.storage.update_escrow_status(escrow.id, EscrowStatus.EXPIRED.value)
@@ -472,6 +502,7 @@ class PaymentEngine:
         description: str = "",
         metadata: dict[str, Any] | None = None,
         idempotency_key: str | None = None,
+        currency: str = "CREDITS",
     ) -> Subscription:
         """Create a recurring payment subscription."""
         if amount <= 0:
@@ -492,13 +523,16 @@ class PaymentEngine:
             valid = [i.value for i in SubscriptionInterval]
             raise PaymentError(f"Invalid interval '{interval}'; must be one of {valid}") from None
 
+        merged_metadata = metadata or {}
+        merged_metadata["currency"] = currency
+
         sub = Subscription(
             payer=payer,
             payee=payee,
             amount=amount,
             interval=sub_interval,
             description=description,
-            metadata=metadata or {},
+            metadata=merged_metadata,
             idempotency_key=idempotency_key,
         )
         # Set next_charge_at to the first billing cycle from now
@@ -589,11 +623,13 @@ class PaymentEngine:
 
         # Attempt to transfer funds
         sub_amount = float(sub.amount)
+        currency = (sub.metadata or {}).get("currency", "CREDITS")
         try:
             await self.wallet.withdraw(
                 sub.payer,
                 sub_amount,
                 description=f"subscription:{sub.id}",
+                currency=currency,
             )
         except InsufficientCreditsError:
             # Suspend the subscription
@@ -609,6 +645,7 @@ class PaymentEngine:
             sub.payee,
             sub_amount,
             description=f"subscription:{sub.id}",
+            currency=currency,
         )
 
         # Create settlement

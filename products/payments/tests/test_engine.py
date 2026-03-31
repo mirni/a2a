@@ -44,7 +44,8 @@ class TestIntentLifecycle:
             amount=5.0,
             metadata={"service": "data-query"},
         )
-        assert intent.metadata == {"service": "data-query"}
+        assert intent.metadata["service"] == "data-query"
+        assert intent.metadata.get("currency") == "CREDITS"
 
     async def test_capture_intent(self, engine, funded_wallets):
         wallet, _, _ = funded_wallets
@@ -497,7 +498,8 @@ class TestEscrowLifecycle:
             amount=50.0,
             metadata={"task_id": "build-123"},
         )
-        assert escrow.metadata == {"task_id": "build-123"}
+        assert escrow.metadata["task_id"] == "build-123"
+        assert escrow.metadata.get("currency") == "CREDITS"
 
 
 # ---------------------------------------------------------------------------
@@ -777,7 +779,8 @@ class TestSubscriptionLifecycle:
             interval="monthly",
             metadata={"tier": "premium"},
         )
-        assert sub.metadata == {"tier": "premium"}
+        assert sub.metadata["tier"] == "premium"
+        assert sub.metadata.get("currency") == "CREDITS"
 
     async def test_multiple_charges(self, engine, funded_wallets):
         wallet, _, _ = funded_wallets
