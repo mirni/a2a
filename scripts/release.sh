@@ -453,7 +453,7 @@ if [[ "$SKIP_DEPLOY" == true ]]; then
     header "Deploy Skipped"
     info "Release branch pushed and CI passed."
     info "To deploy manually:"
-    info "  gh workflow run 'Deploy Production' --ref ${RELEASE_BRANCH} -f confirm=deploy -f component=${COMPONENT} -f version=${VERSION}"
+    info "  gh workflow run 'Deploy Production' --ref ${RELEASE_BRANCH} -f confirm=deploy -f component=${COMPONENT}"
     exit 0
 fi
 
@@ -464,8 +464,7 @@ info "Triggering production deployment for component=${COMPONENT}..."
 gh workflow run "Deploy Production" \
     --ref "$RELEASE_BRANCH" \
     -f confirm=deploy \
-    -f component="$COMPONENT" \
-    -f version="$VERSION"
+    -f component="$COMPONENT"
 
 log "Deploy workflow triggered"
 
@@ -532,7 +531,17 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Step 10: Summary
+# Step 10: Tag release
+# ---------------------------------------------------------------------------
+
+header "Step 10: Tag release"
+
+git -C "$REPO_ROOT" tag -a "v${VERSION}" -m "Release v${VERSION}" "$RELEASE_SHA"
+git -C "$REPO_ROOT" push origin "v${VERSION}"
+log "Created and pushed tag v${VERSION}"
+
+# ---------------------------------------------------------------------------
+# Step 11: Summary
 # ---------------------------------------------------------------------------
 
 header "Release v${VERSION} Complete"
