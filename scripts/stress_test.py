@@ -687,12 +687,12 @@ async def main(args: argparse.Namespace) -> int:
     stats = metrics.latency_stats()
     passed = metrics.error_rate < 5 and stats["p95"] < 5000 and stats["p99"] < 10000 and metrics.rps >= 5
 
-    # If no admin key, don't fail on auth errors (401s are expected)
+    # If no admin key, don't fail on auth/payment errors (401/402 are expected)
     if not args.admin_key:
         errors = metrics.errors_by_status()
-        auth_errors = errors.get(401, 0)
+        auth_errors = errors.get(401, 0) + errors.get(402, 0)
         if auth_errors == metrics.failed:
-            print("\nNote: All failures were 401 (no admin key provided). Treating as PASS.")
+            print("\nNote: All failures were auth/payment errors (no admin key provided). Treating as PASS.")
             passed = True
 
     return 0 if passed else 1
