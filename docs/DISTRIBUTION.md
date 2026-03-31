@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-The A2A Commerce Platform is technically mature — 125 tools, 10 product modules, 3 production-grade MCP connectors, Python + TypeScript SDKs, 159 test files, and a live production gateway at `api.greenhelix.net`. Despite this, the platform has **zero external users and zero market presence**.
+The A2A Commerce Platform is technically mature — 141 tools across 15 services, 10 product modules, 3 production-grade MCP connectors (gateway-routed with billing), Python + TypeScript SDKs, Stripe Checkout fiat on-ramp, 500 free signup credits, auto-reload billing, interactive Swagger UI, and a live production gateway at `api.greenhelix.net`. Despite this, the platform has **zero external users and zero market presence**.
 
 This document compares the CMO Marketing Report (2026-03-28) against the current product state, identifies distribution channels with concrete submission instructions, and provides a prioritized task list.
 
@@ -17,35 +17,41 @@ This document compares the CMO Marketing Report (2026-03-28) against the current
 
 ## 1. Product State vs. CMO Report Gap Analysis
 
-### Strong Points (Improved Since Report)
+### Product Capabilities (Verified Against Implementation)
 
-| Area | CMO Report State (03-28) | Current State (03-31) |
-|------|--------------------------|----------------------|
-| Tool count | 108 tools | **125 tools** (billing 18, payments 20, identity 17, marketplace 10, trust 5, connectors 29, admin 4, paywall 5, disputes 5, webhooks 5, events 4, messaging 3) |
-| Subscriptions | "Not tool-exposed" | **Fully exposed**: create_subscription, cancel_subscription, reactivate_subscription, get_subscription, list_subscriptions, process_due_subscriptions |
-| Disputes | Not mentioned | **Fully built**: open_dispute, respond_to_dispute, resolve_dispute, list_disputes, get_dispute |
-| Identity | "No agent identity" | **Full module**: register_agent, verify_agent, get_agent_reputation, Ed25519 keys, metric commitments, claim chains, org management |
-| Messaging | Not mentioned | **Built**: send_message, get_messages, negotiate_price |
-| Split payments | "Absent" | **Built**: create_split_intent |
-| TypeScript SDK | "Missing" | **v0.1.0 exists** (zero-dependency, Node 18+) |
-| Connectors | "Isolated, not gateway-routed" | **Gateway-routed**: all 29 connector tools in catalog with billing, rate limiting, audit |
-| Marketplace | "Basic CRUD" | **Enhanced**: service ratings, agent search, strategy marketplace, analytics |
-| Deployment | Manual | **Automated**: CI/CD with staging + production, one-command release script |
+| Area | Implementation Status |
+|------|----------------------|
+| Tool count | **141 tools** across 15 services (billing 18, payments 20, identity 17, marketplace 10, trust 5, stripe 16, github 9, postgres 4, admin 4, paywall 5, disputes 5, webhooks 5, events 4, messaging 3, event_bus 2) |
+| Fiat on-ramp | **Stripe Checkout** fully integrated (`/v1/checkout` + `/v1/stripe-webhook`). 4 credit packages: Starter $10/1K, Growth $45/5K, Scale $200/25K, Enterprise $750/100K. Webhook signature verification + dedup. |
+| Free credits | **500 signup bonus** via `pricing.json` `signup_bonus: 500`. Auto-applied on `create_wallet(signup_bonus=True)`. |
+| Auto-reload billing | **Implemented** in `products/billing/src/wallet.py`. Configurable threshold (default 100 credits) and reload amount (default 1,000 credits). Triggers automatically on debit. |
+| Interactive API docs | **Swagger UI** at `/docs` (gateway/src/swagger.py). OpenAPI 3.1.0 spec at `/v1/openapi.json`. |
+| Pricing tiers | **4 tiers** defined in `pricing.json`: Free (100 calls/hr, 0 cost), Starter ($29/mo, 3,500 credits), Pro ($199/mo, 25K credits), Enterprise ($5K-50K/yr). |
+| Subscriptions | **Fully exposed**: create_subscription, cancel_subscription, reactivate_subscription, get_subscription, list_subscriptions, process_due_subscriptions |
+| Disputes | **Full state machine**: open_dispute, respond_to_dispute, resolve_dispute, list_disputes, get_dispute. 7-day response deadline. Resolutions: refund or release. |
+| Identity | **Ed25519 cryptographic identity**: register_agent, verify_agent, get_agent_reputation, metric commitments, claim chains, org management (17 tools) |
+| Messaging | **End-to-end encrypted** (X25519-AES256-GCM): send_message, get_messages, negotiate_price (24h negotiation window) |
+| Split payments | **Built**: create_split_intent with percentage-based distribution |
+| Budget caps | **Implemented**: set_budget_cap (daily/monthly), get_budget_status, 80% alert threshold |
+| Currency exchange | **6 currencies**: CREDITS, USD, EUR, GBP, BTC, ETH via convert_currency |
+| Volume discounts | **3 tiers**: 5% (100+ calls), 10% (500+ calls), 15% (1,000+ calls) |
+| Service ratings | **Implemented**: rate_service (1-5 + review text), get_service_ratings |
+| TypeScript SDK | **v0.1.0** functional (800+ lines, zero-dependency, Node 18+), not published to npm |
+| Connectors | **29 tools gateway-routed**: Stripe (16), GitHub (9), PostgreSQL (4) — all with billing, rate limiting, audit |
+| Deployment | **Automated**: CI/CD with staging + production, one-command release script, .deb packages |
 
-### Weak Points (Still Unresolved)
+### Actual Gaps (Verified)
 
 | Gap | Impact | Priority |
 |-----|--------|----------|
-| **No fiat on-ramp** | Cannot collect real money. Revenue = $0 until this is built. | P0 |
-| **No hosted sandbox** | Developers must run gateway locally to try the platform. | P0 |
-| **No interactive API docs** | OpenAPI spec exists but no Swagger UI at the API endpoint. | P1 |
-| **No free credits on signup** | Cold-start friction for new agents. | P1 |
-| **No auto-reload billing** | Agents hit zero balance and stop working. | P1 |
-| **Website has no docs/guides** | greenhelix.net is a brochure site with zero developer content. | P0 |
-| **SDK not on PyPI or npm** | Cannot `pip install a2a-sdk` or `npm install @a2a/sdk`. | P0 |
-| **No MCP registry listing** | Platform is invisible to the MCP ecosystem. | P0 |
-| **No GitHub topics/README optimization** | Repo is not discoverable via GitHub search. | P1 |
+| **No hosted sandbox** | Developers must run gateway locally to try the platform. Production API requires real signup. | P0 |
+| **Website has no docs/guides** | greenhelix.net is a brochure site with zero developer content. Swagger UI exists at `/docs` but website doesn't link to it. | P0 |
+| **SDK not on PyPI or npm** | Cannot `pip install a2a-sdk` or `npm install @a2a/sdk`. Packages exist locally but have no publishing configuration. | P0 |
+| **No MCP registry listing** | Platform is invisible to the MCP ecosystem. Not registered on any MCP directory. | P0 |
+| **No GitHub topics/README optimization** | Repo is not discoverable via GitHub search. No topics, no badges. | P1 |
+| **No `/.well-known/agent-card.json`** | Not registered on any A2A protocol registry. | P1 |
 | **5 products lack READMEs** | identity, messaging, paywall, trust, shared have no documentation. | P2 |
+| **No Docker image published** | Cannot `docker run` the gateway. Dockerfile exists but no registry push. | P1 |
 
 ### Missing from CMO Report
 
@@ -186,11 +192,20 @@ Priority search terms:
 
 ---
 
-## 3. Pricing Assessment (Current vs. Recommended)
+## 3. Pricing Assessment
 
-### Current State (from catalog.json)
+### Current State (from pricing.json)
 
-Tools are priced in credits. Credit packages:
+**Subscription tiers:**
+
+| Tier | Price | Credits Included | Rate Limit |
+|------|-------|------------------|------------|
+| Free | $0 | 500 signup bonus | 100 calls/hr |
+| Starter | $29/mo | 3,500 | 1,000 calls/hr |
+| Pro | $199/mo | 25,000 | 10,000 calls/hr |
+| Enterprise | $5K-50K/yr | Custom | 100,000 calls/hr |
+
+**Credit packages (Stripe Checkout at `/v1/checkout`):**
 
 | Package | Credits | Price | Per-Credit |
 |---------|---------|-------|------------|
@@ -199,13 +214,13 @@ Tools are priced in credits. Credit packages:
 | Scale | 25,000 | $200 | $0.0080 |
 | Enterprise | 100,000 | $750 | $0.0075 |
 
-### Recommendations (Unchanged from CMO Report)
+**Already implemented:** 500 signup credits, auto-reload billing (threshold-based), volume discounts (5/10/15%), budget caps (daily/monthly with alerts), currency exchange (6 currencies).
 
-1. **Add 500 free credits on signup** — essential for removing cold-start friction
-2. **Add auto-reload** — agents set threshold, wallet auto-refills
-3. **Raise Enterprise to $1,000** for 100K credits
-4. **Add monthly plans:** Starter $29/mo (3,500 credits), Pro $199/mo (25,000 credits), Enterprise custom
-5. **Switch payment tools to percentage-based pricing** — 1-3% of transaction value instead of flat fee
+### Remaining Pricing Recommendations
+
+1. **Raise Enterprise credit package to $1,000** for 100K credits (currently $750)
+2. **Add percentage-based pricing for payment tools** — 1-3% of transaction value instead of flat credit cost
+3. **Add annual discount on subscription tiers** — 2 months free on annual billing
 
 ---
 
@@ -215,7 +230,7 @@ Tools are priced in credits. Credit packages:
 
 | # | Task | Owner | Dependency |
 |---|------|-------|------------|
-| 1 | **Publish `a2a-sdk` to PyPI** | Engineering | None. Run `python -m build && twine upload`. |
+| 1 | **Publish `a2a-sdk` to PyPI** | Engineering | None. Run `python -m build && twine upload`. Add classifiers and keywords. |
 | 2 | **Publish `@a2a/sdk` to npm** | Engineering | None. Run `npm publish --access public`. |
 | 3 | **Publish Docker image** to Docker Hub | Engineering | None. `docker build && docker push greenhelix/a2a-gateway`. |
 | 4 | **Add GitHub repository topics** | Human | None. Settings > Topics. Add: `ai-agents`, `mcp`, `mcp-servers`, `a2a`, `agent-commerce`, `agent-payments`, `developer-tools`. |
@@ -225,51 +240,47 @@ Tools are priced in credits. Credit packages:
 | 8 | **Submit to Smithery.ai** | Human/Agent | `smithery mcp publish`. |
 | 9 | **Register on Official MCP Registry** | Engineering | Publish to PyPI/npm first. Use `mcp-publisher` CLI. |
 | 10 | **Host sandbox at sandbox.greenhelix.net** | Engineering | Provision staging-like instance with pre-loaded demo data and free API keys. |
-| 11 | **Add Swagger UI at api.greenhelix.net/docs** | Engineering | OpenAPI spec exists. Add `swagger-ui-dist` or redirect to rendered spec. |
-| 12 | **Build fiat on-ramp (Stripe Checkout)** | Engineering | Stripe connector exists. Wire Checkout → deposit(). |
+| 11 | **Add developer docs/guides to website** | Engineering | Link to Swagger UI (`/docs`), SDK quickstart, API reference from greenhelix.net. |
 
 ### P1 — Do Next (Developer Adoption)
 
 | # | Task | Owner | Dependency |
 |---|------|-------|------------|
-| 13 | **Create SKILL.md** in repo root | Engineering | SDK published. Describe how to use A2A SDK for commerce. |
-| 14 | **Submit to awesome-mcp-servers** (GitHub PR) | Human/Agent | MCP registry listing. |
-| 15 | **Submit to awesome-ai-agents-2026** (GitHub PR) | Human/Agent | None. |
-| 16 | **Publish `/.well-known/agent-card.json`** at api.greenhelix.net | Engineering | A2A protocol spec compliance. |
-| 17 | **Register on a2aregistry.org** | Human/Agent | Agent card published. |
-| 18 | **Write LangChain tool wrapper** | Engineering | SDK on PyPI. Submit PR to langchain-community. |
-| 19 | **Write 3 tutorial blog posts** | Content | SDK published. "Agent Payments in 5 Minutes", "Building a Marketplace Agent", "Escrow for AI Contracts". |
-| 20 | **Launch on Hacker News** (Show HN) | Human | Tutorials, SDK, sandbox all ready. |
-| 21 | **Launch on Product Hunt** | Human | Prep 4-6 weeks after P0 items done. |
-| 22 | **Add 500 free credits on signup** | Engineering | Fiat on-ramp or pre-provisioned demo. |
-| 23 | **Optimize README** | Engineering | Add badges, quickstart, architecture diagram. |
-| 24 | **Add missing product READMEs** | Engineering | identity, messaging, paywall, trust, shared. |
+| 12 | **Create SKILL.md** in repo root | Engineering | SDK published. Describe how to use A2A SDK for commerce. |
+| 13 | **Submit to awesome-mcp-servers** (GitHub PR) | Human/Agent | MCP registry listing. |
+| 14 | **Submit to awesome-ai-agents-2026** (GitHub PR) | Human/Agent | None. |
+| 15 | **Publish `/.well-known/agent-card.json`** at api.greenhelix.net | Engineering | A2A protocol spec compliance. |
+| 16 | **Register on a2aregistry.org** | Human/Agent | Agent card published. |
+| 17 | **Write LangChain tool wrapper** | Engineering | SDK on PyPI. Submit PR to langchain-community. |
+| 18 | **Write 3 tutorial blog posts** | Content | SDK published. "Agent Payments in 5 Minutes", "Building a Marketplace Agent", "Escrow for AI Contracts". |
+| 19 | **Launch on Hacker News** (Show HN) | Human | Tutorials, SDK, sandbox all ready. |
+| 20 | **Launch on Product Hunt** | Human | Prep 4-6 weeks after P0 items done. |
+| 21 | **Optimize README** | Engineering | Add badges, quickstart, architecture diagram. |
+| 22 | **Add missing product READMEs** | Engineering | identity, messaging, paywall, trust, shared. |
 
 ### P2 — Growth Phase (Months 2-4)
 
 | # | Task | Owner | Dependency |
 |---|------|-------|------------|
-| 25 | **Submit CrewAI integration** | Engineering | MCP server published. |
-| 26 | **Submit to Vercel AI SDK Tools Registry** | Engineering | TypeScript SDK on npm. |
-| 27 | **Post on Reddit** | Human/Agent | r/AI_Agents, r/LLMDevs, r/LocalLLaMA. Authentic, technical posts. |
-| 28 | **Engage Discord communities** | Human | LangChain, CrewAI, Glama Discord servers. |
-| 29 | **List on AI Agent Store** | Human/Agent | Free listing at aiagentstore.ai. |
-| 30 | **List on AI Agents Directory** | Human/Agent | Free listing at aiagentsdirectory.com. |
-| 31 | **Build auto-reload billing** | Engineering | Fiat on-ramp working. |
-| 32 | **Add monthly subscription plans** | Engineering | Auto-reload working. |
-| 33 | **Create referral program** | Growth | Revenue flowing. 10% revenue share. |
-| 34 | **Partnership outreach to LangChain** | BD | Integration wrapper merged. |
-| 35 | **Register on a2a.ac and a2a-registry.org** | Human/Agent | Agent card published. |
+| 23 | **Submit CrewAI integration** | Engineering | MCP server published. |
+| 24 | **Submit to Vercel AI SDK Tools Registry** | Engineering | TypeScript SDK on npm. |
+| 25 | **Post on Reddit** | Human/Agent | r/AI_Agents, r/LLMDevs, r/LocalLLaMA. Authentic, technical posts. |
+| 26 | **Engage Discord communities** | Human | LangChain, CrewAI, Glama Discord servers. |
+| 27 | **List on AI Agent Store** | Human/Agent | Free listing at aiagentstore.ai. |
+| 28 | **List on AI Agents Directory** | Human/Agent | Free listing at aiagentsdirectory.com. |
+| 29 | **Create referral program** | Growth | Revenue flowing. 10% revenue share. |
+| 30 | **Partnership outreach to LangChain** | BD | Integration wrapper merged. |
+| 31 | **Register on a2a.ac and a2a-registry.org** | Human/Agent | Agent card published. |
 
 ### P3 — Scale Phase (Months 4-8)
 
 | # | Task | Owner | Dependency |
 |---|------|-------|------------|
-| 36 | **SOC 2 Type I certification** | Compliance | docs/SOC2_CERTIFICATION_PLAN.md exists. Execute it. |
-| 37 | **Enterprise features** (SSO, RBAC, dedicated instances) | Engineering | Revenue > $5K MRR. |
-| 38 | **Conference sponsorships** (AI Engineer Summit, NeurIPS) | Marketing | Budget allocated. $5-10K per event. |
-| 39 | **Outbound sales to AI SaaS companies** | Sales | Case studies, SOC 2, enterprise features ready. |
-| 40 | **Monthly "State of Agent Commerce" report** | Content | Trust data and marketplace data accumulated. |
+| 32 | **SOC 2 Type I certification** | Compliance | docs/SOC2_CERTIFICATION_PLAN.md exists. Execute it. |
+| 33 | **Enterprise features** (SSO, RBAC, dedicated instances) | Engineering | Revenue > $5K MRR. |
+| 34 | **Conference sponsorships** (AI Engineer Summit, NeurIPS) | Marketing | Budget allocated. $5-10K per event. |
+| 35 | **Outbound sales to AI SaaS companies** | Sales | Case studies, SOC 2, enterprise features ready. |
+| 36 | **Monthly "State of Agent Commerce" report** | Content | Trust data and marketplace data accumulated. |
 
 ---
 
@@ -301,7 +312,7 @@ Tools are priced in credits. Credit packages:
 | Domain for SDK docs | $0 | Subdomain of greenhelix.net |
 | Hacker News / Product Hunt launch | $0 | Free |
 | Tutorial blog posts (dev.to) | $0 | Self-authored |
-| Stripe Checkout integration (fiat on-ramp) | $0 | Engineering time only |
+| Configure Stripe live credentials in production | $0 | Stripe Checkout already implemented |
 | Hackathon prizes | $1-5K | Optional, deferred |
 | Conference sponsorships | $5-10K | P3, deferred |
 | **Year 1 Total** | **$0-15K** | Most distribution is free |
@@ -312,10 +323,10 @@ Tools are priced in credits. Credit packages:
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|------------|
-| Fiat on-ramp not built → $0 revenue | High | Critical | P0 priority. Existing Stripe connector + deposit() makes this straightforward. |
+| STRIPE_API_KEY / STRIPE_WEBHOOK_SECRET not configured in production | Medium | Critical | Stripe Checkout code exists but needs live credentials + webhook endpoint configured. Verify `/v1/checkout` returns 200 in production. |
 | MCP ecosystem fragments → wrong bet | Medium | High | Stay protocol-agnostic. Gateway abstracts protocol details. |
 | Stripe/AWS launches "Stripe for Agents" | Medium | High | Move fast. Trust data moat compounds over time. First-mover on reputation data. |
-| No developer adoption after launch | Medium | High | Free tier, sandbox, one-command install. Reduce friction to zero. |
+| No developer adoption after launch | Medium | High | Free tier (500 credits), sandbox, one-command install. Reduce friction to zero. |
 | Enterprise sales cycle too long | High | Medium | Self-serve first. Enterprise later when revenue flowing. |
 | PyPI/npm name squatting | Low | Medium | Publish packages immediately (P0). |
 
