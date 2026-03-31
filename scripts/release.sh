@@ -224,6 +224,13 @@ if [[ -f "$REPO_ROOT/sdk/pyproject.toml" ]]; then
     log "Bumped sdk/pyproject.toml → ${VERSION}"
 fi
 
+# Bump gateway version (used by /v1/health endpoint)
+VERSION_PY="$REPO_ROOT/gateway/src/_version.py"
+if [[ -f "$VERSION_PY" ]]; then
+    sed -i "s/^__version__ = \".*\"/__version__ = \"${VERSION}\"/" "$VERSION_PY"
+    log "Bumped gateway/_version.py → ${VERSION}"
+fi
+
 # ---------------------------------------------------------------------------
 # Step 3: Generate release notes and changelog
 # ---------------------------------------------------------------------------
@@ -359,6 +366,7 @@ git -C "$REPO_ROOT" add \
     CHANGELOG.md
 [[ -f "$REPO_ROOT/pyproject.toml" ]] && git -C "$REPO_ROOT" add pyproject.toml || true
 [[ -f "$REPO_ROOT/sdk/pyproject.toml" ]] && git -C "$REPO_ROOT" add sdk/pyproject.toml || true
+[[ -f "$REPO_ROOT/gateway/src/_version.py" ]] && git -C "$REPO_ROOT" add gateway/src/_version.py || true
 
 git -C "$REPO_ROOT" commit -m "$(cat <<EOF
 release: v${VERSION}

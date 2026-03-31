@@ -9,6 +9,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
+from gateway.src._version import __version__
 from gateway.src.catalog import tool_count
 from gateway.src.rate_limit_headers import public_rate_limit_headers
 
@@ -99,7 +100,7 @@ async def health(request: Request) -> JSONResponse:
     return JSONResponse(
         {
             "status": status,
-            "version": "0.1.0",
+            "version": __version__,
             "tools": tool_count(),
             "db": billing_status,
             "databases": databases,
