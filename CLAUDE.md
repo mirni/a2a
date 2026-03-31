@@ -16,15 +16,15 @@ You must follow a strict Test-Driven Development (TDD) cycle for all new feature
 
 Infrastructure code is exempt from this rule.
 
-## Git Workflow: Feature Branch Model
+## Git/Github Workflow: Feature Branch Model
 * Never push directly to `main`. Always create a feature/fix branch, commit there, and open a PR.
 * Branch naming: `feat/<name>`, `fix/<name>`, `refactor/<name>`, etc.
 * Push branches using the `GITHUB_DEPLOYMENT_TOKEN` from `.env` (already configured in `.git/config` — do not strip it).
 * Open PRs with `gh pr create`. CI runs automatically on all branches and PRs. Make sure that the CI pipeline is all green before you are done -- fix and iterate autonomously if pipeline fails.
-* Required status checks before merge: `lint`, `typecheck`, `semgrep`, `test`, `security`, `dependency-audit`.
+* PRs should be merged to `main` by human, unless instructed otherwise. Squash merge is used for PRs unless author (agent) instructs in the PR comment otherwise. E.g. a prompt with todo list with 5 multiple agents working individually should produce just one PR with 5 partial results merged into a feature branch (for the PR) and a comment "do not squash", since the partial work should be kept as separate commits.
+* Required status checks before merge: all CI jobs must be green before merging, including staging.
 * Staging deployment runs automatically on PRs to `main` (via Tailscale — secrets `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `TAILSCALE_IP` are configured).
 * Production deployment is manual via `workflow_dispatch` on `main` with approval gate.
-* Squash merge PRs to `main`.
 
 ## Packaging
 * Debian packages are built via `scripts/create_package.sh` (not the old `packaging/` dir).
