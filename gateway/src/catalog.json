@@ -231,6 +231,9 @@
         },
         "amount": {
           "type": "number"
+        },
+        "currency": {
+          "type": "string"
         }
       }
     },
@@ -477,6 +480,9 @@
         },
         "amount": {
           "type": "number"
+        },
+        "currency": {
+          "type": "string"
         }
       }
     },
@@ -2154,6 +2160,11 @@
         "idempotency_key": {
           "type": "string",
           "description": "Unique key for idempotent creation. Same key returns same subscription."
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency code (default: CREDITS). One of: CREDITS, USD, EUR, GBP, BTC, ETH",
+          "default": "CREDITS"
         }
       },
       "required": [
@@ -2180,6 +2191,9 @@
         },
         "next_charge_at": {
           "type": "number"
+        },
+        "currency": {
+          "type": "string"
         }
       }
     },
@@ -3354,9 +3368,10 @@
         "description": {
           "type": "string"
         },
-        "idempotency_key": {
+        "currency": {
           "type": "string",
-          "description": "Optional unique key to prevent duplicate split payments."
+          "description": "Currency code (default: CREDITS). One of: CREDITS, USD, EUR, GBP, BTC, ETH",
+          "default": "CREDITS"
         }
       },
       "required": [
@@ -3369,6 +3384,9 @@
       "type": "object",
       "properties": {
         "status": {
+          "type": "string"
+        },
+        "currency": {
           "type": "string"
         },
         "settlements": {
