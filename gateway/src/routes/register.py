@@ -55,15 +55,17 @@ async def register(request: Request) -> JSONResponse:
 
     logger.info("Agent registered: %s", agent_id)
 
-    return JSONResponse({
-        "success": True,
-        "result": {
-            "agent_id": agent_id,
-            "api_key": key_info["key"],
-            "tier": "free",
-            "balance": balance,
-        },
-    })
+    return JSONResponse(
+        {
+            "success": True,
+            "result": {
+                "agent_id": agent_id,
+                "api_key": key_info["key"],
+                "tier": "free",
+                "balance": balance,
+            },
+        }
+    )
 
 
 routes = [Route("/v1/register", register, methods=["POST"])]

@@ -69,10 +69,15 @@ class TestWithdrawOwnership:
         key_alice = await _create_agent(app, "alice-w")
         await _create_agent(app, "bob-w")
 
-        resp = await _execute(client, "withdraw", {
-            "agent_id": "bob-w",
-            "amount": 10,
-        }, key_alice)
+        resp = await _execute(
+            client,
+            "withdraw",
+            {
+                "agent_id": "bob-w",
+                "amount": 10,
+            },
+            key_alice,
+        )
 
         assert resp.status_code == 403
         assert resp.json()["error"]["code"] == "forbidden"
@@ -81,10 +86,15 @@ class TestWithdrawOwnership:
         """200: agent can withdraw from own wallet."""
         key_alice = await _create_agent(app, "alice-w2")
 
-        resp = await _execute(client, "withdraw", {
-            "agent_id": "alice-w2",
-            "amount": 10,
-        }, key_alice)
+        resp = await _execute(
+            client,
+            "withdraw",
+            {
+                "agent_id": "alice-w2",
+                "amount": 10,
+            },
+            key_alice,
+        )
 
         assert resp.status_code == 200
         assert resp.json()["success"] is True
@@ -103,10 +113,15 @@ class TestDepositOwnership:
         key_alice = await _create_agent(app, "alice-d")
         await _create_agent(app, "bob-d")
 
-        resp = await _execute(client, "deposit", {
-            "agent_id": "bob-d",
-            "amount": 100,
-        }, key_alice)
+        resp = await _execute(
+            client,
+            "deposit",
+            {
+                "agent_id": "bob-d",
+                "amount": 100,
+            },
+            key_alice,
+        )
 
         assert resp.status_code == 403
         assert resp.json()["error"]["code"] == "forbidden"
@@ -127,19 +142,29 @@ class TestCaptureIntentOwnership:
         key_eve = await _create_agent(app, "eve-ci")
 
         # Alice creates an intent where Alice pays Bob
-        create_resp = await _execute(client, "create_intent", {
-            "payer": "alice-ci",
-            "payee": "bob-ci",
-            "amount": 10.0,
-            "description": "test intent",
-        }, key_alice)
+        create_resp = await _execute(
+            client,
+            "create_intent",
+            {
+                "payer": "alice-ci",
+                "payee": "bob-ci",
+                "amount": 10.0,
+                "description": "test intent",
+            },
+            key_alice,
+        )
         assert create_resp.status_code == 200
         intent_id = create_resp.json()["result"]["id"]
 
         # Eve (unrelated) tries to capture it
-        resp = await _execute(client, "capture_intent", {
-            "intent_id": intent_id,
-        }, key_eve)
+        resp = await _execute(
+            client,
+            "capture_intent",
+            {
+                "intent_id": intent_id,
+            },
+            key_eve,
+        )
 
         assert resp.status_code == 403, f"Expected 403, got {resp.status_code}: {resp.json()}"
 
@@ -148,18 +173,28 @@ class TestCaptureIntentOwnership:
         key_alice = await _create_agent(app, "alice-ci2")
         await _create_agent(app, "bob-ci2")
 
-        create_resp = await _execute(client, "create_intent", {
-            "payer": "alice-ci2",
-            "payee": "bob-ci2",
-            "amount": 10.0,
-            "description": "test intent",
-        }, key_alice)
+        create_resp = await _execute(
+            client,
+            "create_intent",
+            {
+                "payer": "alice-ci2",
+                "payee": "bob-ci2",
+                "amount": 10.0,
+                "description": "test intent",
+            },
+            key_alice,
+        )
         assert create_resp.status_code == 200
         intent_id = create_resp.json()["result"]["id"]
 
-        resp = await _execute(client, "capture_intent", {
-            "intent_id": intent_id,
-        }, key_alice)
+        resp = await _execute(
+            client,
+            "capture_intent",
+            {
+                "intent_id": intent_id,
+            },
+            key_alice,
+        )
 
         assert resp.status_code == 200
 
@@ -168,18 +203,28 @@ class TestCaptureIntentOwnership:
         key_alice = await _create_agent(app, "alice-ci3")
         key_bob = await _create_agent(app, "bob-ci3")
 
-        create_resp = await _execute(client, "create_intent", {
-            "payer": "alice-ci3",
-            "payee": "bob-ci3",
-            "amount": 10.0,
-            "description": "test intent",
-        }, key_alice)
+        create_resp = await _execute(
+            client,
+            "create_intent",
+            {
+                "payer": "alice-ci3",
+                "payee": "bob-ci3",
+                "amount": 10.0,
+                "description": "test intent",
+            },
+            key_alice,
+        )
         assert create_resp.status_code == 200
         intent_id = create_resp.json()["result"]["id"]
 
-        resp = await _execute(client, "capture_intent", {
-            "intent_id": intent_id,
-        }, key_bob)
+        resp = await _execute(
+            client,
+            "capture_intent",
+            {
+                "intent_id": intent_id,
+            },
+            key_bob,
+        )
 
         assert resp.status_code == 200
 
@@ -200,19 +245,29 @@ class TestReleaseEscrowOwnership:
         key_eve = await _create_agent(app, "eve-re", tier="pro")
 
         # Alice creates an escrow (Alice pays Bob)
-        create_resp = await _execute(client, "create_escrow", {
-            "payer": "alice-re",
-            "payee": "bob-re",
-            "amount": 50.0,
-            "description": "test escrow",
-        }, key_alice)
+        create_resp = await _execute(
+            client,
+            "create_escrow",
+            {
+                "payer": "alice-re",
+                "payee": "bob-re",
+                "amount": 50.0,
+                "description": "test escrow",
+            },
+            key_alice,
+        )
         assert create_resp.status_code == 200, f"create_escrow failed: {create_resp.json()}"
         escrow_id = create_resp.json()["result"]["id"]
 
         # Eve tries to release it
-        resp = await _execute(client, "release_escrow", {
-            "escrow_id": escrow_id,
-        }, key_eve)
+        resp = await _execute(
+            client,
+            "release_escrow",
+            {
+                "escrow_id": escrow_id,
+            },
+            key_eve,
+        )
 
         assert resp.status_code == 403, f"Expected 403, got {resp.status_code}: {resp.json()}"
 
@@ -221,18 +276,28 @@ class TestReleaseEscrowOwnership:
         key_alice = await _create_agent(app, "alice-re2", tier="pro")
         await _create_agent(app, "bob-re2", tier="pro")
 
-        create_resp = await _execute(client, "create_escrow", {
-            "payer": "alice-re2",
-            "payee": "bob-re2",
-            "amount": 50.0,
-            "description": "test escrow",
-        }, key_alice)
+        create_resp = await _execute(
+            client,
+            "create_escrow",
+            {
+                "payer": "alice-re2",
+                "payee": "bob-re2",
+                "amount": 50.0,
+                "description": "test escrow",
+            },
+            key_alice,
+        )
         assert create_resp.status_code == 200, f"create_escrow failed: {create_resp.json()}"
         escrow_id = create_resp.json()["result"]["id"]
 
-        resp = await _execute(client, "release_escrow", {
-            "escrow_id": escrow_id,
-        }, key_alice)
+        resp = await _execute(
+            client,
+            "release_escrow",
+            {
+                "escrow_id": escrow_id,
+            },
+            key_alice,
+        )
 
         assert resp.status_code == 200
 
@@ -252,19 +317,29 @@ class TestCancelEscrowOwnership:
         await _create_agent(app, "bob-ce", tier="pro")
         key_eve = await _create_agent(app, "eve-ce")
 
-        create_resp = await _execute(client, "create_escrow", {
-            "payer": "alice-ce",
-            "payee": "bob-ce",
-            "amount": 50.0,
-            "description": "test escrow",
-        }, key_alice)
+        create_resp = await _execute(
+            client,
+            "create_escrow",
+            {
+                "payer": "alice-ce",
+                "payee": "bob-ce",
+                "amount": 50.0,
+                "description": "test escrow",
+            },
+            key_alice,
+        )
         assert create_resp.status_code == 200, f"create_escrow failed: {create_resp.json()}"
         escrow_id = create_resp.json()["result"]["id"]
 
         # Eve tries to cancel it
-        resp = await _execute(client, "cancel_escrow", {
-            "escrow_id": escrow_id,
-        }, key_eve)
+        resp = await _execute(
+            client,
+            "cancel_escrow",
+            {
+                "escrow_id": escrow_id,
+            },
+            key_eve,
+        )
 
         assert resp.status_code == 403, f"Expected 403, got {resp.status_code}: {resp.json()}"
 
@@ -273,18 +348,28 @@ class TestCancelEscrowOwnership:
         key_alice = await _create_agent(app, "alice-ce2", tier="pro")
         await _create_agent(app, "bob-ce2", tier="pro")
 
-        create_resp = await _execute(client, "create_escrow", {
-            "payer": "alice-ce2",
-            "payee": "bob-ce2",
-            "amount": 50.0,
-            "description": "test escrow",
-        }, key_alice)
+        create_resp = await _execute(
+            client,
+            "create_escrow",
+            {
+                "payer": "alice-ce2",
+                "payee": "bob-ce2",
+                "amount": 50.0,
+                "description": "test escrow",
+            },
+            key_alice,
+        )
         assert create_resp.status_code == 200, f"create_escrow failed: {create_resp.json()}"
         escrow_id = create_resp.json()["result"]["id"]
 
-        resp = await _execute(client, "cancel_escrow", {
-            "escrow_id": escrow_id,
-        }, key_alice)
+        resp = await _execute(
+            client,
+            "cancel_escrow",
+            {
+                "escrow_id": escrow_id,
+            },
+            key_alice,
+        )
 
         assert resp.status_code == 200
 
@@ -304,19 +389,29 @@ class TestRefundIntentOwnership:
         key_eve = await _create_agent(app, "eve-ri")
 
         # Alice creates an intent (Alice pays Bob)
-        create_resp = await _execute(client, "create_intent", {
-            "payer": "alice-ri",
-            "payee": "bob-ri",
-            "amount": 10.0,
-            "description": "refund test",
-        }, key_alice)
+        create_resp = await _execute(
+            client,
+            "create_intent",
+            {
+                "payer": "alice-ri",
+                "payee": "bob-ri",
+                "amount": 10.0,
+                "description": "refund test",
+            },
+            key_alice,
+        )
         assert create_resp.status_code == 200
         intent_id = create_resp.json()["result"]["id"]
 
         # Eve tries to refund it
-        resp = await _execute(client, "refund_intent", {
-            "intent_id": intent_id,
-        }, key_eve)
+        resp = await _execute(
+            client,
+            "refund_intent",
+            {
+                "intent_id": intent_id,
+            },
+            key_eve,
+        )
 
         assert resp.status_code == 403, f"Expected 403, got {resp.status_code}: {resp.json()}"
 
@@ -325,18 +420,28 @@ class TestRefundIntentOwnership:
         key_alice = await _create_agent(app, "alice-ri2")
         await _create_agent(app, "bob-ri2")
 
-        create_resp = await _execute(client, "create_intent", {
-            "payer": "alice-ri2",
-            "payee": "bob-ri2",
-            "amount": 10.0,
-            "description": "refund test",
-        }, key_alice)
+        create_resp = await _execute(
+            client,
+            "create_intent",
+            {
+                "payer": "alice-ri2",
+                "payee": "bob-ri2",
+                "amount": 10.0,
+                "description": "refund test",
+            },
+            key_alice,
+        )
         assert create_resp.status_code == 200
         intent_id = create_resp.json()["result"]["id"]
 
-        resp = await _execute(client, "refund_intent", {
-            "intent_id": intent_id,
-        }, key_alice)
+        resp = await _execute(
+            client,
+            "refund_intent",
+            {
+                "intent_id": intent_id,
+            },
+            key_alice,
+        )
 
         assert resp.status_code == 200
 
@@ -355,18 +460,28 @@ class TestAdminBypassResourceOwnership:
         await _create_agent(app, "bob-admin-ci")
         admin_key = await _create_admin_agent(app, "admin-ci")
 
-        create_resp = await _execute(client, "create_intent", {
-            "payer": "alice-admin-ci",
-            "payee": "bob-admin-ci",
-            "amount": 10.0,
-            "description": "admin capture test",
-        }, key_alice)
+        create_resp = await _execute(
+            client,
+            "create_intent",
+            {
+                "payer": "alice-admin-ci",
+                "payee": "bob-admin-ci",
+                "amount": 10.0,
+                "description": "admin capture test",
+            },
+            key_alice,
+        )
         assert create_resp.status_code == 200
         intent_id = create_resp.json()["result"]["id"]
 
-        resp = await _execute(client, "capture_intent", {
-            "intent_id": intent_id,
-        }, admin_key)
+        resp = await _execute(
+            client,
+            "capture_intent",
+            {
+                "intent_id": intent_id,
+            },
+            admin_key,
+        )
 
         assert resp.status_code == 200
 
@@ -376,18 +491,28 @@ class TestAdminBypassResourceOwnership:
         await _create_agent(app, "bob-admin-re", tier="pro")
         admin_key = await _create_admin_agent(app, "admin-re")
 
-        create_resp = await _execute(client, "create_escrow", {
-            "payer": "alice-admin-re",
-            "payee": "bob-admin-re",
-            "amount": 50.0,
-            "description": "admin release test",
-        }, key_alice)
+        create_resp = await _execute(
+            client,
+            "create_escrow",
+            {
+                "payer": "alice-admin-re",
+                "payee": "bob-admin-re",
+                "amount": 50.0,
+                "description": "admin release test",
+            },
+            key_alice,
+        )
         assert create_resp.status_code == 200, f"create_escrow failed: {create_resp.json()}"
         escrow_id = create_resp.json()["result"]["id"]
 
-        resp = await _execute(client, "release_escrow", {
-            "escrow_id": escrow_id,
-        }, admin_key)
+        resp = await _execute(
+            client,
+            "release_escrow",
+            {
+                "escrow_id": escrow_id,
+            },
+            admin_key,
+        )
 
         assert resp.status_code == 200
 
@@ -397,18 +522,28 @@ class TestAdminBypassResourceOwnership:
         await _create_agent(app, "bob-admin-ce", tier="pro")
         admin_key = await _create_admin_agent(app, "admin-ce")
 
-        create_resp = await _execute(client, "create_escrow", {
-            "payer": "alice-admin-ce",
-            "payee": "bob-admin-ce",
-            "amount": 50.0,
-            "description": "admin cancel test",
-        }, key_alice)
+        create_resp = await _execute(
+            client,
+            "create_escrow",
+            {
+                "payer": "alice-admin-ce",
+                "payee": "bob-admin-ce",
+                "amount": 50.0,
+                "description": "admin cancel test",
+            },
+            key_alice,
+        )
         assert create_resp.status_code == 200, f"create_escrow failed: {create_resp.json()}"
         escrow_id = create_resp.json()["result"]["id"]
 
-        resp = await _execute(client, "cancel_escrow", {
-            "escrow_id": escrow_id,
-        }, admin_key)
+        resp = await _execute(
+            client,
+            "cancel_escrow",
+            {
+                "escrow_id": escrow_id,
+            },
+            admin_key,
+        )
 
         assert resp.status_code == 200
 
@@ -418,17 +553,27 @@ class TestAdminBypassResourceOwnership:
         await _create_agent(app, "bob-admin-ri")
         admin_key = await _create_admin_agent(app, "admin-ri")
 
-        create_resp = await _execute(client, "create_intent", {
-            "payer": "alice-admin-ri",
-            "payee": "bob-admin-ri",
-            "amount": 10.0,
-            "description": "admin refund test",
-        }, key_alice)
+        create_resp = await _execute(
+            client,
+            "create_intent",
+            {
+                "payer": "alice-admin-ri",
+                "payee": "bob-admin-ri",
+                "amount": 10.0,
+                "description": "admin refund test",
+            },
+            key_alice,
+        )
         assert create_resp.status_code == 200
         intent_id = create_resp.json()["result"]["id"]
 
-        resp = await _execute(client, "refund_intent", {
-            "intent_id": intent_id,
-        }, admin_key)
+        resp = await _execute(
+            client,
+            "refund_intent",
+            {
+                "intent_id": intent_id,
+            },
+            admin_key,
+        )
 
         assert resp.status_code == 200

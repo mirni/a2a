@@ -112,10 +112,7 @@ async def _register_webhook(ctx: AppContext, params: dict[str, Any]) -> dict[str
 
     secret = params.get("secret", "")
     if not secret:
-        raise ToolValidationError(
-            "Webhook 'secret' is required and must be non-empty"
-            " for HMAC signature verification"
-        )
+        raise ToolValidationError("Webhook 'secret' is required and must be non-empty for HMAC signature verification")
     result = await ctx.webhook_manager.register(
         agent_id=params["agent_id"],
         url=url,
@@ -386,8 +383,7 @@ async def _restore_database(ctx: AppContext, params: dict[str, Any]) -> dict[str
     real_backup = os.path.realpath(backup_path)
     if not real_backup.startswith(backup_dir + os.sep) and real_backup != backup_dir:
         raise ToolValidationError(
-            "Invalid backup_path: path traversal detected. "
-            "Backup files must reside in the backups directory."
+            "Invalid backup_path: path traversal detected. Backup files must reside in the backups directory."
         )
 
     if not os.path.exists(backup_path):

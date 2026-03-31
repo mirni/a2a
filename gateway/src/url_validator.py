@@ -27,11 +27,13 @@ _BLOCKED_NETWORKS = [
     ipaddress.ip_network("fc00::/7"),
 ]
 
-_BLOCKED_HOSTNAMES = frozenset({
-    "localhost",
-    "metadata.google.internal",
-    "metadata.google.internal.",
-})
+_BLOCKED_HOSTNAMES = frozenset(
+    {
+        "localhost",
+        "metadata.google.internal",
+        "metadata.google.internal.",
+    }
+)
 
 
 def validate_webhook_url(url: str) -> str | None:

@@ -111,12 +111,10 @@ class TestConvertCurrencyAtomic:
         credits_after = await ctx.tracker.wallet.get_balance("test-agent", currency="CREDITS")
 
         assert usd_after == usd_before, (
-            f"USD balance should be restored after deposit failure. "
-            f"Expected {usd_before}, got {usd_after}"
+            f"USD balance should be restored after deposit failure. Expected {usd_before}, got {usd_after}"
         )
         assert credits_after == credits_before, (
-            f"CREDITS balance should be unchanged after deposit failure. "
-            f"Expected {credits_before}, got {credits_after}"
+            f"CREDITS balance should be unchanged after deposit failure. Expected {credits_before}, got {credits_after}"
         )
 
     async def test_balances_consistent_after_conversion_no_leakage(self, app, client, api_key):
@@ -140,9 +138,7 @@ class TestConvertCurrencyAtomic:
         usd_before = await ctx.tracker.wallet.get_balance("test-agent", currency="USD")
         credits_before = await ctx.tracker.wallet.get_balance("test-agent", currency="CREDITS")
 
-        usd_to_credits_rate = float(
-            await exchange_svc.get_rate(Currency.USD, Currency.CREDITS)
-        )
+        usd_to_credits_rate = float(await exchange_svc.get_rate(Currency.USD, Currency.CREDITS))
 
         total_credits_before = credits_before + usd_before * usd_to_credits_rate
 
@@ -209,12 +205,10 @@ class TestConvertCurrencyAtomic:
         expected_credits = credits_before + (len(successes) * 1000.0)
 
         assert abs(usd_after - expected_usd) < 0.01, (
-            f"USD balance mismatch after concurrent conversions. "
-            f"Expected {expected_usd}, got {usd_after}"
+            f"USD balance mismatch after concurrent conversions. Expected {expected_usd}, got {usd_after}"
         )
         assert abs(credits_after - expected_credits) < 0.01, (
-            f"CREDITS balance mismatch after concurrent conversions. "
-            f"Expected {expected_credits}, got {credits_after}"
+            f"CREDITS balance mismatch after concurrent conversions. Expected {expected_credits}, got {credits_after}"
         )
 
     async def test_invalid_target_currency_rolls_back(self, app, client, api_key):
@@ -246,8 +240,7 @@ class TestConvertCurrencyAtomic:
         credits_after = await ctx.tracker.wallet.get_balance("test-agent", currency="CREDITS")
 
         assert usd_after == usd_before, (
-            f"USD should be restored after exchange rate lookup failure. "
-            f"Expected {usd_before}, got {usd_after}"
+            f"USD should be restored after exchange rate lookup failure. Expected {usd_before}, got {usd_after}"
         )
         assert credits_after == credits_before, (
             f"CREDITS should be unchanged after exchange rate lookup failure. "

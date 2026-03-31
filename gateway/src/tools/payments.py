@@ -19,8 +19,7 @@ def _check_intent_ownership(caller: str, tier: str, intent) -> None:
         return
     if caller not in (intent.payer, intent.payee):
         raise ToolForbiddenError(
-            f"Caller '{caller}' is not a party to intent "
-            f"(payer='{intent.payer}', payee='{intent.payee}')"
+            f"Caller '{caller}' is not a party to intent (payer='{intent.payer}', payee='{intent.payee}')"
         )
 
 
@@ -34,9 +33,9 @@ def _check_escrow_ownership(caller: str, tier: str, escrow) -> None:
         return
     if caller not in (escrow.payer, escrow.payee):
         raise ToolForbiddenError(
-            f"Caller '{caller}' is not a party to escrow "
-            f"(payer='{escrow.payer}', payee='{escrow.payee}')"
+            f"Caller '{caller}' is not a party to escrow (payer='{escrow.payer}', payee='{escrow.payee}')"
         )
+
 
 _VALID_CURRENCIES = {"CREDITS", "USD", "EUR", "GBP", "BTC", "ETH"}
 
@@ -44,10 +43,9 @@ _VALID_CURRENCIES = {"CREDITS", "USD", "EUR", "GBP", "BTC", "ETH"}
 def _validate_currency(currency: str) -> str:
     """Validate currency code and return it, raising ToolValidationError on invalid."""
     if currency not in _VALID_CURRENCIES:
-        raise ToolValidationError(
-            f"Invalid currency '{currency}'; must be one of {sorted(_VALID_CURRENCIES)}"
-        )
+        raise ToolValidationError(f"Invalid currency '{currency}'; must be one of {sorted(_VALID_CURRENCIES)}")
     return currency
+
 
 # ---------------------------------------------------------------------------
 # Payment Intents
@@ -130,10 +128,16 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
     if intent.status.value == "settled":
         currency = (intent.metadata or {}).get("currency", "CREDITS")
         await ctx.tracker.wallet.withdraw(
-            intent.payee, float(intent.amount), description=f"refund:{intent.id}", currency=currency,
+            intent.payee,
+            float(intent.amount),
+            description=f"refund:{intent.id}",
+            currency=currency,
         )
         await ctx.tracker.wallet.deposit(
-            intent.payer, float(intent.amount), description=f"refund:{intent.id}", currency=currency,
+            intent.payer,
+            float(intent.amount),
+            description=f"refund:{intent.id}",
+            currency=currency,
         )
         return {"id": intent.id, "status": "refunded", "amount": float(intent.amount)}
 
@@ -405,7 +409,10 @@ async def _create_split_intent(ctx: AppContext, params: dict[str, Any]) -> dict[
         raise ToolValidationError(f"Split percentages must sum to 100, got {total_pct}")
 
     await ctx.tracker.wallet.withdraw(
-        payer, amount, description=f"split:{description}", currency=currency,
+        payer,
+        amount,
+        description=f"split:{description}",
+        currency=currency,
     )
 
     settlements = []
@@ -426,7 +433,10 @@ async def _create_split_intent(ctx: AppContext, params: dict[str, Any]) -> dict[
     # Record idempotency marker
     if idempotency_key is not None:
         await ctx.tracker.storage.record_transaction(
-            payer, -amount, "split_intent", description,
+            payer,
+            -amount,
+            "split_intent",
+            description,
             idempotency_key=idempotency_key,
             result_snapshot=json.dumps(result),
         )

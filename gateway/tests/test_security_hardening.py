@@ -37,9 +37,7 @@ class TestBackupKeyLeak:
         assert data["success"] is True
         result = data["result"]
         # The key must NOT be in the API response — it should be stored server-side
-        assert "key" not in result, (
-            f"SECURITY: encryption key leaked in API response: {result.get('key', '')[:10]}..."
-        )
+        assert "key" not in result, f"SECURITY: encryption key leaked in API response: {result.get('key', '')[:10]}..."
         # But should have a key_id for later retrieval
         assert "key_id" in result
 

@@ -173,9 +173,7 @@ async def test_create_split_intent_idempotency(client, pro_api_key, app):
     # The only balance change should be the gateway per-call fee (if any),
     # NOT another 100-credit split withdrawal.
     balance_drop = payer_balance_after_first - payer_balance_after_second
-    assert balance_drop < 100.0, (
-        f"Balance dropped by {balance_drop}, suggesting the split was executed twice"
-    )
+    assert balance_drop < 100.0, f"Balance dropped by {balance_drop}, suggesting the split was executed twice"
     # Results should match
     assert r1.json()["result"]["status"] == r2.json()["result"]["status"]
 
