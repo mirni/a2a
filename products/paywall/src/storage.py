@@ -82,10 +82,10 @@ _MIGRATIONS = (
     Migration(
         1,
         "add key scoping columns to api_keys",
-        "ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS allowed_tools TEXT;\n"
-        "ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS allowed_agent_ids TEXT;\n"
-        'ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS scopes TEXT NOT NULL DEFAULT \'["read","write"]\';\n'
-        "ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS expires_at REAL;",
+        "ALTER TABLE api_keys ADD COLUMN allowed_tools TEXT;\n"
+        "ALTER TABLE api_keys ADD COLUMN allowed_agent_ids TEXT;\n"
+        'ALTER TABLE api_keys ADD COLUMN scopes TEXT NOT NULL DEFAULT \'["read","write"]\';\n'
+        "ALTER TABLE api_keys ADD COLUMN expires_at REAL;",
     ),
     Migration(
         2,
