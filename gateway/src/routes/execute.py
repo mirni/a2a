@@ -9,6 +9,7 @@ import math
 import time
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict, ValidationError
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
@@ -22,6 +23,25 @@ from gateway.src.tool_errors import X402ReplayError, X402VerificationError
 from gateway.src.tools import TOOL_REGISTRY
 
 logger = logging.getLogger("a2a.execute")
+
+_MAX_TOOL_NAME_LEN = 128
+
+
+class ExecuteRequestBody(BaseModel):
+    """Pydantic model for the /v1/execute request body."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tool: str
+    params: dict[str, Any] = {}
+
+
+def _sanitize_tool_name(name: str) -> str:
+    """Strip null bytes and truncate tool name for safe use in messages."""
+    name = name.replace("\x00", "")
+    if len(name) > _MAX_TOOL_NAME_LEN:
+        name = name[:_MAX_TOOL_NAME_LEN]
+    return name
 
 
 def _rate_limit_headers(limit: int, rate_count: int, window_seconds: float = 3600.0) -> dict[str, str]:
@@ -142,15 +162,31 @@ async def execute(request: Request) -> JSONResponse:
 
     # --- Parse body ---
     try:
-        body: dict[str, Any] = await request.json()
+        raw_body: dict[str, Any] = await request.json()
     except (ValueError, TypeError):
         return await error_response(400, "Invalid JSON body", "bad_request", request=request)
 
-    if not isinstance(body, dict):
+    if not isinstance(raw_body, dict):
         return await error_response(400, "Request body must be a JSON object", "bad_request", request=request)
 
-    tool_name = body.get("tool")
-    params = body.get("params", {})
+    try:
+        body = ExecuteRequestBody.model_validate(raw_body)
+    except ValidationError as ve:
+        # Distinguish extra-field errors (422) from missing-field errors (400).
+        has_extra = any(e["type"] == "extra_forbidden" for e in ve.errors())
+        if has_extra:
+            return await error_response(422, "Extra fields are not allowed", "validation_error", request=request)
+        # Missing 'tool' or wrong types → fall through to legacy handling below
+        body = None
+
+    if body is not None:
+        tool_name = _sanitize_tool_name(body.tool)
+        params = body.params
+    else:
+        tool_name = raw_body.get("tool")
+        if isinstance(tool_name, str):
+            tool_name = _sanitize_tool_name(tool_name)
+        params = raw_body.get("params", {})
 
     if not tool_name:
         return await error_response(400, "Missing 'tool' field", "bad_request", request=request)
@@ -194,6 +230,13 @@ async def execute(request: Request) -> JSONResponse:
         agent_id = key_info["agent_id"]
         agent_tier = key_info["tier"]
 
+        # Promote effective tier to admin when the key carries an admin scope.
+        # This ensures admin-scoped keys can use admin-only tools regardless
+        # of their nominal tier.
+        key_scopes = key_info.get("scopes", ["read", "write"])
+        if "admin" in key_scopes:
+            agent_tier = ADMIN_TIER
+
         # --- 2a. Enforce key scoping (allowed_tools, allowed_agent_ids, scopes) ---
         from paywall_src.scoping import KeyScopeError, ScopeChecker
 
@@ -205,9 +248,13 @@ async def execute(request: Request) -> JSONResponse:
         try:
             scope_checker.check_tool(tool_name)
             scope_checker.check_scope(tool_name)
-            # Check agent_id param if present
+            # Check agent_id param if present — skip for tools where
+            # agent_id is a target reference rather than caller identity
+            # (e.g. trust tools use agent_id as alias for server_id).
+            from gateway.src.authorization import AGENT_ID_IS_TARGET
+
             target_agent = params.get("agent_id")
-            if target_agent is not None:
+            if target_agent is not None and tool_name not in AGENT_ID_IS_TARGET:
                 scope_checker.check_agent_id(target_agent)
         except KeyScopeError as exc:
             return await error_response(403, exc.reason, "scope_violation", request=request)
@@ -317,6 +364,7 @@ async def execute(request: Request) -> JSONResponse:
     # --- 6. Dispatch to tool function ---
     # Inject caller identity so tools can perform ownership checks
     params["_caller_agent_id"] = agent_id
+    params["_caller_tier"] = agent_tier
 
     # Record the request in metrics regardless of outcome
     await Metrics.record_request(tool_name)

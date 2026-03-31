@@ -253,22 +253,42 @@
           "description": "The payment intent ID"
         }
       },
-      "required": ["intent_id"]
+      "required": [
+        "intent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string"},
-        "status": {"type": "string"},
-        "payer": {"type": "string"},
-        "payee": {"type": "string"},
-        "amount": {"type": "number"},
-        "description": {"type": "string"},
-        "created_at": {"type": "number"}
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "payer": {
+          "type": "string"
+        },
+        "payee": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "description": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "number"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 200},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   },
   {
@@ -283,22 +303,42 @@
           "description": "The escrow ID"
         }
       },
-      "required": ["escrow_id"]
+      "required": [
+        "escrow_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string"},
-        "status": {"type": "string"},
-        "payer": {"type": "string"},
-        "payee": {"type": "string"},
-        "amount": {"type": "number"},
-        "description": {"type": "string"},
-        "created_at": {"type": "number"}
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "payer": {
+          "type": "string"
+        },
+        "payee": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "description": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "number"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 200},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   },
   {
@@ -511,6 +551,112 @@
         },
         "amount": {
           "type": "number"
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
+    "tier_required": "free"
+  },
+  {
+    "name": "list_intents",
+    "service": "payments",
+    "description": "List payment intents for an agent, optionally filtered by status.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "description": "The agent to list intents for (as payer or payee)"
+        },
+        "status": {
+          "type": "string",
+          "description": "Filter by status (pending, captured, voided, refunded)",
+          "enum": [
+            "pending",
+            "captured",
+            "voided",
+            "refunded"
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Max intents to return (default 50)"
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Offset for pagination (default 0)"
+        }
+      },
+      "required": [
+        "agent_id"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "intents": {
+          "type": "array"
+        },
+        "count": {
+          "type": "integer"
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
+    "tier_required": "free"
+  },
+  {
+    "name": "list_escrows",
+    "service": "payments",
+    "description": "List escrows for an agent, optionally filtered by status.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "description": "The agent to list escrows for (as payer or payee)"
+        },
+        "status": {
+          "type": "string",
+          "description": "Filter by status (held, released, refunded, expired)",
+          "enum": [
+            "held",
+            "released",
+            "refunded",
+            "expired"
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Max escrows to return (default 50)"
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Offset for pagination (default 0)"
+        }
+      },
+      "required": [
+        "agent_id"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "escrows": {
+          "type": "array"
+        },
+        "count": {
+          "type": "integer"
         }
       }
     },
@@ -1007,7 +1153,8 @@
       "type": "object",
       "properties": {
         "server_id": {
-          "type": "string"
+          "type": "string",
+          "description": "The server identifier. Alias: agent_id"
         },
         "window": {
           "type": "string",
@@ -1021,11 +1168,12 @@
         "recompute": {
           "type": "boolean",
           "default": false
+        },
+        "agent_id": {
+          "type": "string",
+          "description": "Alias for server_id (preferred). Supply either agent_id or server_id."
         }
-      },
-      "required": [
-        "server_id"
-      ]
+      }
     },
     "output_schema": {
       "type": "object",
@@ -1142,6 +1290,50 @@
     "tier_required": "free"
   },
   {
+    "name": "register_server",
+    "service": "trust",
+    "description": "Register a new server for trust tracking.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Human-readable server name."
+        },
+        "url": {
+          "type": "string",
+          "description": "Server endpoint URL."
+        },
+        "transport_type": {
+          "type": "string",
+          "description": "Transport protocol (http or stdio). Default: http."
+        },
+        "server_id": {
+          "type": "string",
+          "description": "Optional custom server ID; auto-generated if not provided."
+        }
+      },
+      "required": ["name", "url"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "name": {"type": "string"},
+        "url": {"type": "string"},
+        "transport_type": {"type": "string"}
+      }
+    },
+    "pricing": {
+      "model": "flat",
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
+    "tier_required": "free"
+  },
+  {
     "name": "delete_server",
     "service": "trust",
     "description": "Delete a server and all its associated trust data (probes, scans, scores).",
@@ -1150,12 +1342,13 @@
       "properties": {
         "server_id": {
           "type": "string",
-          "description": "The server identifier to delete"
+          "description": "The server identifier to delete. Alias: agent_id"
+        },
+        "agent_id": {
+          "type": "string",
+          "description": "Alias for server_id (preferred). Supply either agent_id or server_id."
         }
-      },
-      "required": [
-        "server_id"
-      ]
+      }
     },
     "output_schema": {
       "type": "object",
@@ -1182,7 +1375,7 @@
       "properties": {
         "server_id": {
           "type": "string",
-          "description": "The server identifier to update"
+          "description": "The server identifier to update. Alias: agent_id"
         },
         "name": {
           "type": "string",
@@ -1191,11 +1384,12 @@
         "url": {
           "type": "string",
           "description": "New server URL (optional)"
+        },
+        "agent_id": {
+          "type": "string",
+          "description": "Alias for server_id (preferred). Supply either agent_id or server_id."
         }
-      },
-      "required": [
-        "server_id"
-      ]
+      }
     },
     "output_schema": {
       "type": "object",
@@ -2530,23 +2724,45 @@
           "description": "The dispute ID to look up"
         }
       },
-      "required": ["dispute_id"]
+      "required": [
+        "dispute_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string"},
-        "escrow_id": {"type": "string"},
-        "opener": {"type": "string"},
-        "respondent": {"type": "string"},
-        "status": {"type": "string"},
-        "reason": {"type": "string"},
-        "resolution": {"type": "string"},
-        "created_at": {"type": "number"}
+        "id": {
+          "type": "string"
+        },
+        "escrow_id": {
+          "type": "string"
+        },
+        "opener": {
+          "type": "string"
+        },
+        "respondent": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "resolution": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "number"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 200},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
     "tier_required": "free"
   },
   {
@@ -2571,19 +2787,27 @@
           "description": "Offset for pagination"
         }
       },
-      "required": ["agent_id"]
+      "required": [
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
         "disputes": {
           "type": "array",
-          "items": {"type": "object"}
+          "items": {
+            "type": "object"
+          }
         }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 300},
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 300
+    },
     "tier_required": "free"
   },
   {
@@ -2882,16 +3106,18 @@
       "type": "object",
       "properties": {
         "server_id": {
-          "type": "string"
+          "type": "string",
+          "description": "The server identifier. Alias: agent_id"
         },
         "claimed_uptime": {
           "type": "number",
           "description": "Claimed uptime percentage (e.g. 99.5)"
+        },
+        "agent_id": {
+          "type": "string",
+          "description": "Alias for server_id (preferred). Supply either agent_id or server_id."
         }
-      },
-      "required": [
-        "server_id"
-      ]
+      }
     },
     "output_schema": {
       "type": "object",
@@ -3139,8 +3365,9 @@
         "created_at": {
           "type": "string"
         },
-        "key": {
-          "type": "string"
+        "key_id": {
+          "type": "string",
+          "description": "Identifier for the server-stored encryption key (use with restore_database)"
         }
       }
     },
@@ -3170,6 +3397,10 @@
         "key": {
           "type": "string",
           "description": "Decryption key if backup is encrypted"
+        },
+        "key_id": {
+          "type": "string",
+          "description": "Key ID from backup_database (retrieves server-stored key)"
         }
       },
       "required": [
@@ -4726,18 +4957,28 @@
           "description": "The agent whose wallet to freeze"
         }
       },
-      "required": ["agent_id"]
+      "required": [
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string"},
-        "frozen": {"type": "boolean"}
+        "agent_id": {
+          "type": "string"
+        },
+        "frozen": {
+          "type": "boolean"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 200},
-    "tier_required": "free"
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
+    "tier_required": "pro"
   },
   {
     "name": "unfreeze_wallet",
@@ -4751,18 +4992,28 @@
           "description": "The agent whose wallet to unfreeze"
         }
       },
-      "required": ["agent_id"]
+      "required": [
+        "agent_id"
+      ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "agent_id": {"type": "string"},
-        "frozen": {"type": "boolean"}
+        "agent_id": {
+          "type": "string"
+        },
+        "frozen": {
+          "type": "boolean"
+        }
       }
     },
-    "pricing": {"per_call": 0.0},
-    "sla": {"max_latency_ms": 200},
-    "tier_required": "free"
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 200
+    },
+    "tier_required": "pro"
   },
   {
     "name": "create_org",
