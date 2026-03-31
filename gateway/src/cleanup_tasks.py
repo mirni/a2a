@@ -204,9 +204,7 @@ class UsageRecordsCleanup:
     async def cleanup_once(self) -> int:
         """Delete usage records older than the TTL. Returns number deleted."""
         cutoff = time.time() - (_USAGE_RECORDS_TTL_DAYS * _DAY_SECONDS)
-        cursor = await self.billing_db.execute(
-            "DELETE FROM usage_records WHERE created_at < ?", (cutoff,)
-        )
+        cursor = await self.billing_db.execute("DELETE FROM usage_records WHERE created_at < ?", (cutoff,))
         await self.billing_db.commit()
         return cursor.rowcount
 
@@ -236,9 +234,7 @@ class WebhookDeliveriesCleanup:
     async def cleanup_once(self) -> int:
         """Delete webhook deliveries older than the TTL. Returns number deleted."""
         cutoff = time.time() - (_WEBHOOK_DELIVERIES_TTL_DAYS * _DAY_SECONDS)
-        cursor = await self.webhook_db.execute(
-            "DELETE FROM webhook_deliveries WHERE created_at < ?", (cutoff,)
-        )
+        cursor = await self.webhook_db.execute("DELETE FROM webhook_deliveries WHERE created_at < ?", (cutoff,))
         await self.webhook_db.commit()
         return cursor.rowcount
 
@@ -268,9 +264,7 @@ class AdminAuditLogCleanup:
     async def cleanup_once(self) -> int:
         """Delete admin audit records older than the TTL. Returns number deleted."""
         cutoff = time.time() - (_ADMIN_AUDIT_LOG_TTL_DAYS * _DAY_SECONDS)
-        cursor = await self.billing_db.execute(
-            "DELETE FROM admin_audit_log WHERE timestamp < ?", (cutoff,)
-        )
+        cursor = await self.billing_db.execute("DELETE FROM admin_audit_log WHERE timestamp < ?", (cutoff,))
         await self.billing_db.commit()
         return cursor.rowcount
 

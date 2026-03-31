@@ -214,6 +214,4 @@ class TestImmediateTransactionMode:
         import inspect
 
         source = inspect.getsource(wallet.convert_currency)
-        assert "BEGIN IMMEDIATE" in source, (
-            "convert_currency() must use BEGIN IMMEDIATE for transaction isolation"
-        )
+        assert "BEGIN IMMEDIATE" in source, "convert_currency() must use BEGIN IMMEDIATE for transaction isolation"

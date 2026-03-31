@@ -130,8 +130,7 @@ async def _insert_webhook_delivery(
 async def _insert_admin_audit(db: aiosqlite.Connection, agent_id: str, timestamp: float) -> int:
     """Insert an admin audit log record and return its id."""
     cursor = await db.execute(
-        "INSERT INTO admin_audit_log (timestamp, agent_id, tool_name, params_json, status) "
-        "VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO admin_audit_log (timestamp, agent_id, tool_name, params_json, status) VALUES (?, ?, ?, ?, ?)",
         (timestamp, agent_id, "test_tool", '{"key": "value"}', "success"),
     )
     await db.commit()

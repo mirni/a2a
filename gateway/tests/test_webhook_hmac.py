@@ -19,6 +19,7 @@ pytestmark = pytest.mark.asyncio
 # Helper: compute expected HMAC-SHA256 signature
 # ---------------------------------------------------------------------------
 
+
 def _compute_expected_signature(secret: str, payload_bytes: bytes) -> str:
     """Compute the HMAC-SHA256 hex digest that the webhook system should produce."""
     return hmac.new(
@@ -58,9 +59,7 @@ class TestSignPayload:
         payload = b'{"event": "test"}'
         sig = sign_payload(secret, payload)
 
-        expected = hmac.new(
-            secret.encode(), payload, hashlib.sha256
-        ).hexdigest()
+        expected = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
         assert sig == expected
 
     async def test_sign_payload_deterministic(self):
@@ -253,12 +252,8 @@ class TestWebhookDeliverySigning:
         payload_bytes = json.dumps(event).encode()
 
         # Compute what SHA-256 and SHA-3-256 would produce
-        sha256_sig = hmac.new(
-            secret.encode(), payload_bytes, hashlib.sha256
-        ).hexdigest()
-        sha3_sig = hmac.new(
-            secret.encode(), payload_bytes, hashlib.sha3_256
-        ).hexdigest()
+        sha256_sig = hmac.new(secret.encode(), payload_bytes, hashlib.sha256).hexdigest()
+        sha3_sig = hmac.new(secret.encode(), payload_bytes, hashlib.sha3_256).hexdigest()
 
         captured_sig = {}
 
