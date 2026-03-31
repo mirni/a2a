@@ -80,6 +80,27 @@ async def _log_admin_audit(
         )
 
 
+def _validate_params(params: dict[str, Any], input_schema: dict[str, Any]) -> str | None:
+    """Validate tool params against the catalog's JSON Schema.
+
+    Returns None if valid, or an error message string if invalid.
+    Enforces type checking and rejects undeclared parameters.
+    """
+    import jsonschema
+
+    strict_schema = dict(input_schema)
+    strict_schema["additionalProperties"] = False
+
+    try:
+        jsonschema.validate(instance=params, schema=strict_schema)
+    except jsonschema.ValidationError as exc:
+        field = ".".join(str(p) for p in exc.absolute_path) if exc.absolute_path else ""
+        if field:
+            return f"Invalid parameter '{field}': {exc.message}"
+        return f"Parameter validation failed: {exc.message}"
+    return None
+
+
 def _rate_limit_headers(limit: int, rate_count: int, window_seconds: float = 3600.0) -> dict[str, str]:
     """Build X-RateLimit-* headers."""
     remaining = max(0, limit - rate_count)
@@ -307,7 +328,18 @@ async def execute(request: Request) -> JSONResponse:
             request=request,
         )
 
-    # --- 2b. Ownership authorization: caller must own the resource ---
+    # --- 2b-2. Validate parameter types against input_schema ---
+    if input_schema:
+        validation_error = _validate_params(params, input_schema)
+        if validation_error is not None:
+            return await error_response(
+                422,
+                validation_error,
+                "invalid_parameter",
+                request=request,
+            )
+
+    # --- 2b-3. Ownership authorization: caller must own the resource ---
     authz_result = check_ownership_authorization(agent_id, agent_tier, params, tool_name=tool_name)
     if authz_result is not None:
         status, message, code = authz_result

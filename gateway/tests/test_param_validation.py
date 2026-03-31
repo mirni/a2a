@@ -75,3 +75,135 @@ async def test_metrics_record_after_requests(client, api_key):
             count = int(line.split()[-1])
             assert count >= 1, f"Expected requests_total >= 1, got {count}"
             break
+
+
+# ---------------------------------------------------------------------------
+# Type validation: gateway rejects wrong types before dispatch
+# ---------------------------------------------------------------------------
+
+
+async def test_rejects_string_for_number_field(client, api_key):
+    """Sending a string where a number is expected should return 422."""
+    resp = await client.post(
+        "/v1/execute",
+        json={
+            "tool": "deposit",
+            "params": {"agent_id": "test-agent", "amount": "not-a-number"},
+        },
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 422
+    body = resp.json()
+    assert body["success"] is False
+    assert "amount" in body["error"]["message"].lower()
+
+
+async def test_rejects_string_for_integer_field(client, api_key):
+    """Sending a string where an integer is expected should return 422."""
+    resp = await client.post(
+        "/v1/execute",
+        json={
+            "tool": "get_transactions",
+            "params": {"agent_id": "test-agent", "limit": "ten"},
+        },
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 422
+
+
+async def test_rejects_extra_params_not_in_schema(client, api_key):
+    """Extra parameters not defined in the schema should be rejected."""
+    resp = await client.post(
+        "/v1/execute",
+        json={
+            "tool": "get_balance",
+            "params": {
+                "agent_id": "test-agent",
+                "evil_injection": "DROP TABLE wallets",
+            },
+        },
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 422
+    body = resp.json()
+    assert body["success"] is False
+    assert "evil_injection" in body["error"]["message"]
+
+
+async def test_rejects_number_for_string_field(client, api_key):
+    """Sending a number where a string is expected should return 422."""
+    resp = await client.post(
+        "/v1/execute",
+        json={"tool": "get_balance", "params": {"agent_id": 12345}},
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 422
+
+
+async def test_rejects_boolean_for_string_field(client, api_key):
+    """Sending a boolean where a string is expected should return 422."""
+    resp = await client.post(
+        "/v1/execute",
+        json={"tool": "get_balance", "params": {"agent_id": True}},
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 422
+
+
+async def test_rejects_array_for_string_field(client, api_key):
+    """Sending an array where a string is expected should return 422."""
+    resp = await client.post(
+        "/v1/execute",
+        json={"tool": "get_balance", "params": {"agent_id": ["test-agent"]}},
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 422
+
+
+async def test_rejects_null_for_required_string(client, api_key):
+    """Sending null for a required string param should return 400 or 422."""
+    resp = await client.post(
+        "/v1/execute",
+        json={"tool": "get_balance", "params": {"agent_id": None}},
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code in (400, 422)
+
+
+async def test_rejects_float_for_integer_field(client, api_key):
+    """Sending a float where an integer is expected should return 422."""
+    resp = await client.post(
+        "/v1/execute",
+        json={
+            "tool": "get_transactions",
+            "params": {"agent_id": "test-agent", "limit": 10.5},
+        },
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 422
+
+
+async def test_accepts_valid_optional_params(client, api_key):
+    """Valid optional params with correct types should be accepted."""
+    resp = await client.post(
+        "/v1/execute",
+        json={
+            "tool": "get_balance",
+            "params": {"agent_id": "test-agent", "currency": "CREDITS"},
+        },
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code != 422
+
+
+async def test_accepts_integer_for_number_field(client, api_key):
+    """Integer values should be accepted for number fields (JSON compat)."""
+    resp = await client.post(
+        "/v1/execute",
+        json={
+            "tool": "deposit",
+            "params": {"agent_id": "test-agent", "amount": 100},
+        },
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code != 422
