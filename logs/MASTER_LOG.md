@@ -6281,3 +6281,42 @@ Reorganized all markdown files into structured directories:
 - `plans/` — living strategic documents
 
 Updated CLAUDE.md with directory layout, task workflow, and PR conventions.
+
+---
+
+## Session: 2026-03-31 — CI/CD Optimization + API Review Update
+
+### Prompt
+Implement the CI/CD optimization plan: lightweight PRs, thorough releases.
+Then process `tasks/backlog/update-api-review.md`.
+
+### Output
+
+**Task 1: CI/CD Optimization** (PR #20: `refactor/ci-optimization`)
+
+Rewrote CI/CD pipeline to reduce billed minutes from ~16 to ~5 per PR run (~70% reduction):
+
+- **`ci.yml`** — PR-only trigger, `paths-ignore` for docs/reports/tasks/plans/logs/*.md, 3 jobs (quality, test, package) instead of 10. Staging called for PRs targeting main.
+- **`release.yml`** (NEW) — Full pipeline for `release/*` branches: quality, SAST (semgrep + pip-audit), test, docker-build, package, staging. This is what `release.sh` step 7 waits for.
+- **`staging.yml`** — Consolidated 3 jobs (deploy, smoke, report) into 1 sequential job.
+- **`scripts/ci/quality.sh`** (NEW) — Local quality checks (ruff + mypy + bandit).
+
+CI results: quality, test, package all passed. Staging deploy failed (pre-existing infra issue, unrelated to changes).
+
+**Task 2: API Review Update**
+
+Updated `tasks/backlog/claude-api-review.md` to reflect:
+- FastAPI migration (auto-docs, APIRouter, Pydantic validation)
+- No current clients — removed backward-compatibility concerns
+- Collapsed 4 migration phases into 3 direct implementation phases
+- Removed obsolete Starlette references, sunset/deprecation items
+- Goal: reach HATEOAS directly
+
+**Task 3: Fix Staging Deployment** (same PR #20)
+
+Root cause: deb postinst scripts still installed `starlette>=0.37` instead of `fastapi>=0.115` after the Starlette→FastAPI migration. Fixed:
+- Updated all 3 postinst scripts (prod, test, sandbox) to install `fastapi>=0.115`
+- Bumped `cryptography` to `>=46.0` across all dep lists
+- Added Step 11 to `release.sh`: merge release branch back to main + cleanup
+
+CI result: all 4 jobs green (quality, test, package, staging).

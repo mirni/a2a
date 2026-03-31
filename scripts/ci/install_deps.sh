@@ -17,7 +17,7 @@ RUNTIME_DEPS=(
     "httpx>=0.27"
     "aiosqlite>=0.20"
     "pydantic>=2.0"
-    "cryptography>=42.0"
+    "cryptography>=46.0"
 )
 
 TEST_DEPS=(

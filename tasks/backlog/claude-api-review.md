@@ -1,8 +1,9 @@
 # API Design Review: Richardson Maturity Model Assessment
 
-**Date:** 2026-03-31
+**Date:** 2026-03-31 (updated)
 **Reviewer Role:** Sr. Software Architect
 **Scope:** Full A2A Commerce Gateway API surface (125+ tools, 15 services)
+**Framework:** FastAPI (migrated from Starlette)
 
 ---
 
@@ -10,7 +11,9 @@
 
 The A2A Commerce Gateway is a **Level 1** API with **partial Level 2** compliance. It uses a single-endpoint RPC pattern (`POST /v1/execute`) to dispatch 125+ tools, which is architecturally closer to JSON-RPC than REST. While this "universal gateway" pattern has operational simplicity, it sacrifices HTTP semantics, cacheability, and discoverability — all of which matter for a public-facing commerce API.
 
-This review identifies concrete gaps against Richardson Maturity Model Levels 2 and 3, and provides an actionable refactoring plan.
+The gateway was recently migrated to **FastAPI**, which gives us auto-generated OpenAPI docs, Swagger UI at `/docs`, and native Pydantic validation. This makes the RESTful refactor significantly simpler — FastAPI's `APIRouter` system is purpose-built for resource-oriented routing.
+
+**There are no current API clients.** Breaking changes are acceptable. The goal is to reach **HATEOAS (Level 3)** directly, without a gradual migration.
 
 ---
 
@@ -60,6 +63,7 @@ The API is not a single-endpoint XML/SOAP service. It uses JSON, HTTP status cod
 - Security headers (HSTS, CSP, X-Frame-Options) -- correct pattern
 - Error response structure (`{success, error: {code, message}}`) -- consistent
 - `extra = "forbid"` on all Pydantic request models -- strict validation
+- FastAPI auto-generates OpenAPI spec at `/v1/openapi.json` and Swagger UI at `/docs`
 
 ### Level 3 — Hypermedia Controls (HATEOAS)
 
@@ -133,7 +137,7 @@ Current error format:
 {"success": false, "error": {"code": "missing_key", "message": "Missing API key"}}
 ```
 
-This is custom. Consider adopting **RFC 9457 (Problem Details for HTTP APIs)**:
+This is custom. Should adopt **RFC 9457 (Problem Details for HTTP APIs)**:
 ```json
 {
   "type": "https://api.greenhelix.net/errors/missing-key",
@@ -148,11 +152,11 @@ This is custom. Consider adopting **RFC 9457 (Problem Details for HTTP APIs)**:
 
 Current: `POST /v1/batch {"calls": [{"tool": "...", "params": {...}}, ...]}`
 
-This is essentially JSON-RPC batching. In a RESTful design, batching is less necessary because each resource has its own endpoint, and clients can use HTTP/2 multiplexing for parallel requests.
+This is JSON-RPC batching. In a RESTful design, batching is less necessary because each resource has its own endpoint, and clients can use HTTP/2 multiplexing for parallel requests. **Remove after resource endpoints exist.**
 
 ### 2.6 Versioning
 
-Current: URL path prefix `/v1/`. This is acceptable and widely used. However, the backward-compatibility redirects mix 301 (permanent) and 307 (temporary) for no clear reason.
+Current: URL path prefix `/v1/`. This is acceptable and widely used. The backward-compatibility redirects can be removed (no clients to break).
 
 ### 2.7 Missing Standard Headers
 
@@ -163,13 +167,14 @@ Current: URL path prefix `/v1/`. This is acceptable and widely used. However, th
 | `ETag` / `Last-Modified` | Conditional GET | Not implemented |
 | `Link` | Pagination, related resources | Not implemented |
 | `Location` | Created resource URI (201) | Not implemented |
-| `Deprecation` | RFC 8594 sunset header | Not implemented |
 
 ---
 
 ## 3. Proposed RESTful Resource Model (Level 2)
 
 ### 3.1 Resource Hierarchy
+
+Each service gets its own `APIRouter` in FastAPI. Route registration is automatic.
 
 ```
 /v1/billing/
@@ -250,9 +255,9 @@ Current: URL path prefix `/v1/`. This is acceptable and widely used. However, th
     /postgres/*                       Proxy to PostgreSQL MCP
 ```
 
-### 3.2 Response Format (Level 2)
+### 3.2 Response Format (No Envelope)
 
-**Resource response (no envelope):**
+**Resource response:**
 ```json
 GET /v1/billing/wallets/agent-123
 
@@ -334,7 +339,7 @@ Move billing/observability data out of the response body into headers:
 
 ---
 
-## 4. Proposed HATEOAS Additions (Level 3)
+## 4. HATEOAS Design (Level 3)
 
 ### 4.1 Hypermedia Links in Responses
 
@@ -427,6 +432,8 @@ class ProblemDetail(BaseModel):
     instance: str     # URI of the request that caused the error
 ```
 
+FastAPI's exception handlers can return `application/problem+json` natively.
+
 ### 5.2 Adopt Cursor-Based Pagination
 
 Replace offset-based pagination with cursor-based for consistency under concurrent writes:
@@ -446,10 +453,7 @@ POST /v1/payments/intents
 Idempotency-Key: txn-abc-123
 ```
 
-Instead of the current body parameter:
-```json
-{"tool": "create_intent", "params": {"idempotency_key": "txn-abc-123", ...}}
-```
+Replace the current body parameter `idempotency_key`.
 
 ### 5.4 Use ISO 8601 Timestamps
 
@@ -459,11 +463,9 @@ Replace Unix epoch floats with ISO 8601 strings in all responses:
 // Current
 {"created_at": 1711876496.123}
 
-// Proposed
+// Target
 {"created_at": "2026-03-31T12:34:56.123Z"}
 ```
-
-Unix timestamps are fine internally but ISO 8601 is the REST standard for APIs.
 
 ### 5.5 Use Consistent Decimal Serialization
 
@@ -473,7 +475,7 @@ All monetary amounts should serialize as strings to preserve precision:
 // Current (float)
 {"balance": 500.0, "charged": 0.01}
 
-// Proposed (string)
+// Target (string)
 {"balance": "500.00", "charged": "0.01"}
 ```
 
@@ -483,136 +485,114 @@ For frequently-polled resources (balance, trust score, service listings):
 
 ```
 GET /v1/billing/wallets/agent-123
-→ ETag: "abc123"
+-> ETag: "abc123"
 
 GET /v1/billing/wallets/agent-123
 If-None-Match: "abc123"
-→ 304 Not Modified (no body, saves bandwidth)
+-> 304 Not Modified (no body, saves bandwidth)
 ```
 
-### 5.7 OpenAPI Spec Alignment
+### 5.7 OpenAPI Spec
 
-The current OpenAPI spec at `/v1/openapi.json` documents the execute-based API. After refactoring, it should:
-- Document each resource endpoint separately
-- Include `Link` header schemas
-- Include `_links` in response schemas
-- Use `$ref` for shared models (ProblemDetail, PaginatedResponse, etc.)
+FastAPI auto-generates the OpenAPI spec from route definitions and Pydantic models. After refactoring:
+- Each resource endpoint is automatically documented
+- `_links` fields appear in response schemas via Pydantic models
+- Shared models (`ProblemDetail`, `PaginatedResponse`, etc.) use `$ref` automatically
+- The custom `openapi.py` merge logic can be simplified since routes are now self-documenting
 
 ---
 
-## 6. Migration Strategy
+## 6. Implementation Plan
 
-### Phase 1: Level 2 Foundation (Non-Breaking)
+Since there are no existing clients, we can refactor directly without maintaining backward compatibility or migration phases.
 
-Add RESTful resource endpoints **alongside** the existing `/v1/execute`:
+### Phase 1: Foundation
 
-1. **Read-only resource endpoints** — Add `GET /v1/billing/wallets/{id}`, `GET /v1/payments/intents/{id}`, etc. These call the same underlying tool functions.
-2. **Standard headers** — Add `Idempotency-Key`, `Location`, `X-Charged` headers.
-3. **RFC 9457 errors** — Add `Content-Type: application/problem+json` error responses. Keep old format on `/v1/execute`.
-4. **Cursor pagination** — Add cursor support alongside offset.
+1. **Remove response envelope** — Return resources directly. Move `charged`, `request_id` to headers (`X-Charged`, `X-Request-ID`).
+2. **Adopt RFC 9457 errors** — Replace `{success: false, error: {code, message}}` with `application/problem+json`.
+3. **Adopt `Idempotency-Key` header** — Replace body parameter.
+4. **Adopt ISO 8601 timestamps** and **string-serialized Decimals** across all models.
+5. **Add `201 Created` + `Location` header** for POST endpoints that create resources.
+6. **Add cursor-based pagination** with `Link` header.
 
-**No breaking changes.** Both old and new endpoints work.
+### Phase 2: Resource Endpoints
 
-### Phase 2: Write Endpoints (Non-Breaking)
+1. **Create `APIRouter` per service** — `billing_router`, `payments_router`, `marketplace_router`, etc.
+2. **Map each tool to a resource endpoint** — e.g., `get_balance` -> `GET /v1/billing/wallets/{agent_id}`, `create_intent` -> `POST /v1/payments/intents`.
+3. **Use proper HTTP methods** — GET for reads, POST for creates, PATCH for updates, DELETE for deletes.
+4. **Remove `/v1/execute`** — All functionality is now on resource endpoints.
+5. **Remove `/v1/batch`** — HTTP/2 multiplexing replaces it.
+6. **Remove backward-compatibility redirects** — No clients to redirect.
 
-1. **POST for creates** — `POST /v1/payments/intents` returns `201 Created` with `Location` header.
-2. **Action sub-resources** — `POST /v1/payments/intents/{id}/capture` instead of `POST /v1/execute {"tool": "capture_intent"}`.
-3. **PATCH for updates** — `PATCH /v1/marketplace/services/{id}` instead of `POST /v1/execute {"tool": "update_service"}`.
-4. **DELETE for removals** — `DELETE /v1/trust/servers/{id}`.
+### Phase 3: HATEOAS
 
-### Phase 3: HATEOAS & Deprecation
-
-1. **Add `_links`** to all resource responses.
-2. **Add API root** — `GET /v1/` returns service index with links.
-3. **Deprecate `/v1/execute`** — Add `Deprecation` header (RFC 8594) and `Sunset` date.
-4. **Update SDK** — Python and TypeScript SDKs generate methods from OpenAPI spec.
-
-### Phase 4: Cleanup
-
-1. **Remove `/v1/execute`** after sunset period (6-12 months).
-2. **Remove `/v1/batch`** — HTTP/2 multiplexing replaces it.
-3. **Version bump** — Consider `/v2/` if breaking changes accumulate.
+1. **Add `_links`** to all resource responses with `self`, state transitions, and related resources.
+2. **Add `Link` header** for pagination (`rel="next"`, `rel="prev"`).
+3. **Add `GET /v1/`** API root with service index and links.
+4. **Add link templates** for search endpoints (`{?query,category,limit}`).
+5. **Add `ETag` / `If-None-Match`** support for read endpoints.
+6. **Add `Vary: Authorization`** header to enable CDN caching of public endpoints.
 
 ---
 
 ## 7. Actionable TODO List
 
-### Priority 0 (Do First — Foundation)
+### Priority 0 (Foundation)
 
 - [ ] **T1:** Create ADR `docs/adr/002-restful-resource-model.md` documenting the decision to move from RPC to REST
 - [ ] **T2:** Define the full resource URL hierarchy in a new PRD `docs/prd/015-rest-api-refactor.md`
-- [ ] **T3:** Adopt RFC 9457 (Problem Details) error format alongside the current format
-- [ ] **T4:** Adopt `Idempotency-Key` request header (IETF standard) alongside body parameter
-- [ ] **T5:** Add `201 Created` + `Location` header for POST endpoints that create resources
-- [ ] **T6:** Serialize all monetary values as strings in JSON responses (Decimal precision)
-- [ ] **T7:** Serialize all timestamps as ISO 8601 strings in responses
+- [ ] **T3:** Replace response envelope with direct resource responses; move `charged` to `X-Charged` header
+- [ ] **T4:** Adopt RFC 9457 (Problem Details) error format; add FastAPI exception handlers returning `application/problem+json`
+- [ ] **T5:** Adopt `Idempotency-Key` request header (replace body parameter)
+- [ ] **T6:** Add `201 Created` + `Location` header for POST endpoints that create resources
+- [ ] **T7:** Serialize all monetary values as strings in JSON responses (Decimal precision)
+- [ ] **T8:** Serialize all timestamps as ISO 8601 strings in responses
+- [ ] **T9:** Add cursor-based pagination with `Link` header to all list endpoints
 
-### Priority 1 (Level 2 — Resource Endpoints)
+### Priority 1 (Resource Endpoints)
 
-- [ ] **T8:** Add `GET /v1/billing/wallets/{agent_id}` (maps to `get_balance` tool)
-- [ ] **T9:** Add `GET /v1/billing/wallets/{agent_id}/transactions` (maps to `get_transactions`)
-- [ ] **T10:** Add `POST /v1/payments/intents` and `GET /v1/payments/intents/{id}` (maps to `create_intent`, `get_intent`)
-- [ ] **T11:** Add `POST /v1/payments/intents/{id}/capture` (maps to `capture_intent`)
-- [ ] **T12:** Add `POST /v1/payments/escrows` and `GET /v1/payments/escrows/{id}` (maps to `create_escrow`, `get_escrow`)
-- [ ] **T13:** Add `GET /v1/marketplace/services` and `POST /v1/marketplace/services` (maps to `search_services`, `register_service`)
-- [ ] **T14:** Add `GET /v1/trust/servers/{id}/score` (maps to `get_trust_score`)
-- [ ] **T15:** Add cursor-based pagination to all list endpoints
-- [ ] **T16:** Add `ETag` / `If-None-Match` support for read endpoints
-- [ ] **T17:** Move `charged` and `request_id` from response body to `X-Charged` and `X-Request-ID` headers
+- [ ] **T10:** Create `APIRouter` for billing: `GET /v1/billing/wallets/{agent_id}`, `GET .../transactions`, etc.
+- [ ] **T11:** Create `APIRouter` for payments: `POST /v1/payments/intents`, `GET .../intents/{id}`, action sub-resources (capture, void, refund)
+- [ ] **T12:** Create `APIRouter` for marketplace: `GET/POST /v1/marketplace/services`, `PATCH/DELETE .../services/{id}`, ratings
+- [ ] **T13:** Create `APIRouter` for trust: `GET/POST /v1/trust/servers`, `GET .../servers/{id}/score`
+- [ ] **T14:** Create `APIRouter` for identity: `POST /v1/identity/agents`, `GET .../agents/{id}`, keys, metrics
+- [ ] **T15:** Create `APIRouter` for messaging: `GET/POST /v1/messaging/messages`, threads, negotiations
+- [ ] **T16:** Create `APIRouter` for webhooks: `GET/POST /v1/webhooks`, deliveries, test
+- [ ] **T17:** Create `APIRouter` for disputes: `GET/POST /v1/disputes`, respond, resolve
+- [ ] **T18:** Remove `/v1/execute`, `/v1/batch`, and backward-compatibility redirects
+- [ ] **T19:** Add `ETag` / `If-None-Match` support for read endpoints
 
-### Priority 2 (Level 3 — HATEOAS)
+### Priority 2 (HATEOAS)
 
-- [ ] **T18:** Add `_links` with `self`, state transitions, and related resources to all responses
-- [ ] **T19:** Add `Link` header for pagination (`rel="next"`, `rel="prev"`)
-- [ ] **T20:** Add `GET /v1/` API root with service index and links
-- [ ] **T21:** Add link templates for search endpoints (`{?query,category,limit}`)
+- [ ] **T20:** Add `_links` with `self`, state transitions, and related resources to all responses
+- [ ] **T21:** Add `Link` header for pagination (`rel="next"`, `rel="prev"`)
+- [ ] **T22:** Add `GET /v1/` API root with service index and links
+- [ ] **T23:** Add link templates for search endpoints (`{?query,category,limit}`)
+- [ ] **T24:** Add `Vary: Authorization` header to enable CDN caching of public endpoints
 
-### Priority 3 (Deprecation & Cleanup)
+### Cross-Cutting
 
-- [ ] **T22:** Add `Deprecation` header (RFC 8594) to `/v1/execute` responses
-- [ ] **T23:** Update OpenAPI spec to document both old and new endpoints
-- [ ] **T24:** Update Python SDK to use resource endpoints
-- [ ] **T25:** Update TypeScript SDK to use resource endpoints
-- [ ] **T26:** Create migration guide for API consumers
-- [ ] **T27:** Remove `/v1/execute` after sunset period
-
-### Cross-Cutting Concerns
-
-- [ ] **T28:** Ensure all new endpoints pass through existing middleware (auth, rate limit, metrics, correlation ID, signing)
-- [ ] **T29:** Ensure billing/metering works on both old and new endpoints during transition
-- [ ] **T30:** Add integration tests verifying old and new endpoints return equivalent data
-- [ ] **T31:** Update `/v1/onboarding` to showcase the new RESTful endpoints
-- [ ] **T32:** Add `Vary: Authorization` header to enable CDN caching of public endpoints
+- [ ] **T25:** Ensure all new endpoints pass through existing middleware (auth, rate limit, metrics, correlation ID, signing)
+- [ ] **T26:** Ensure billing/metering works on new resource endpoints (use FastAPI dependency injection)
+- [ ] **T27:** Add integration tests verifying resource endpoints against Pydantic response models
+- [ ] **T28:** Update `/v1/onboarding` to showcase the RESTful endpoints
+- [ ] **T29:** Update Python SDK to use resource endpoints
+- [ ] **T30:** Update TypeScript SDK to use resource endpoints
 
 ---
 
 ## 8. What to Keep
 
-Not everything needs to change. These aspects of the current design are already good:
-
-1. **`POST /v1/execute` as a fallback** — Useful for AI agents that prefer a single-endpoint RPC style. Keep it available (just not the only option).
-2. **Rate limit headers** — Already follows standard patterns.
-3. **Correlation IDs** — `X-Request-ID` propagation is correct.
-4. **Security headers** — HSTS, CSP, X-Frame-Options are all correct.
-5. **Pydantic `extra="forbid"`** — Strict request validation is essential.
-6. **x402 payment protocol** — Innovative and well-designed.
-7. **Tier-based access control** — Clean hierarchy, well-enforced.
-8. **Response signing** — CRYSTALS-Dilithium/HMAC-SHA3 is forward-looking.
-9. **Event streaming** — SSE + WebSocket dual-channel is comprehensive.
-10. **Tool catalog** — `/v1/pricing` is a solid discovery mechanism.
-
----
-
-## 9. Risk Assessment
-
-| Risk | Mitigation |
-|------|-----------|
-| Breaking existing API consumers | Non-breaking migration: old endpoints stay active during transition |
-| Increased route complexity | Use Starlette route groups with shared middleware |
-| Billing duplication | Extract billing into middleware that works on both old and new routes |
-| Test coverage gaps | T30: equivalence tests between old/new endpoints |
-| Performance regression from more routes | Starlette routing is O(n) but fast; 50 routes adds <1ms |
-| SDK breaking changes | Version bump SDKs (v2), keep v1 SDK working against old endpoints |
+1. **Rate limit headers** — Already follows standard patterns.
+2. **Correlation IDs** — `X-Request-ID` propagation is correct.
+3. **Security headers** — HSTS, CSP, X-Frame-Options are all correct.
+4. **Pydantic `extra="forbid"`** — Strict request validation is essential.
+5. **x402 payment protocol** — Innovative and well-designed.
+6. **Tier-based access control** — Clean hierarchy, well-enforced.
+7. **Response signing** — CRYSTALS-Dilithium/HMAC-SHA3 is forward-looking.
+8. **Event streaming** — SSE + WebSocket dual-channel is comprehensive.
+9. **Tool catalog** — `/v1/pricing` is a solid discovery mechanism.
+10. **FastAPI auto-docs** — `/docs` (Swagger UI) and `/v1/openapi.json` are auto-generated.
 
 ---
 
@@ -620,7 +600,15 @@ Not everything needs to change. These aspects of the current design are already 
 
 - **Richardson Maturity Model:** https://martinfowler.com/articles/richardsonMaturityModel.html
 - **RFC 9457 — Problem Details for HTTP APIs:** https://www.rfc-editor.org/rfc/rfc9457
-- **RFC 8594 — Sunset Header:** https://www.rfc-editor.org/rfc/rfc8594
 - **IETF Idempotency-Key Header:** https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/
 - **HAL (Hypertext Application Language):** https://datatracker.ietf.org/doc/html/draft-kelly-json-hal
 - **JSON:API Specification:** https://jsonapi.org/
+
+## Appendix B: Changes from Previous Review
+
+This review was updated to reflect:
+1. **FastAPI migration** (from Starlette) — simplified OpenAPI/docs generation, APIRouter-based routing
+2. **No current clients** — backward compatibility concerns removed, no sunsetting/deprecation phases needed
+3. **Direct implementation** — collapsed 4 migration phases into 3 implementation phases (foundation, endpoints, HATEOAS)
+4. **Removed obsolete items** — Starlette-specific references, RFC 8594 Sunset header (no APIs to sunset), SDK version bumping strategy
+5. **Reduced TODO count** — from 32 to 30 (removed migration-specific tasks, added FastAPI-specific ones)
