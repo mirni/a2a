@@ -39,12 +39,17 @@ async def test_list_api_keys_paginate_first_page(client, app, api_key):
     for _ in range(3):
         await ctx.key_manager.create_key("test-agent", tier="free")
 
-    body = await _exec(client, api_key, "list_api_keys", {
-        "agent_id": "test-agent",
-        "offset": 0,
-        "limit": 2,
-        "paginate": True,
-    })
+    body = await _exec(
+        client,
+        api_key,
+        "list_api_keys",
+        {
+            "agent_id": "test-agent",
+            "offset": 0,
+            "limit": 2,
+            "paginate": True,
+        },
+    )
     result = body["result"]
 
     assert "items" in result, "Paginated response must contain 'items'"
@@ -66,12 +71,17 @@ async def test_list_api_keys_paginate_second_page(client, app, api_key):
     for _ in range(3):
         await ctx.key_manager.create_key("test-agent", tier="free")
 
-    body = await _exec(client, api_key, "list_api_keys", {
-        "agent_id": "test-agent",
-        "offset": 2,
-        "limit": 2,
-        "paginate": True,
-    })
+    body = await _exec(
+        client,
+        api_key,
+        "list_api_keys",
+        {
+            "agent_id": "test-agent",
+            "offset": 2,
+            "limit": 2,
+            "paginate": True,
+        },
+    )
     result = body["result"]
 
     assert len(result["items"]) == 2
@@ -82,9 +92,14 @@ async def test_list_api_keys_paginate_second_page(client, app, api_key):
 
 async def test_list_api_keys_without_paginate_returns_flat(client, app, api_key):
     """Without paginate=true, list_api_keys returns legacy flat format."""
-    body = await _exec(client, api_key, "list_api_keys", {
-        "agent_id": "test-agent",
-    })
+    body = await _exec(
+        client,
+        api_key,
+        "list_api_keys",
+        {
+            "agent_id": "test-agent",
+        },
+    )
     result = body["result"]
 
     # Legacy format: {"keys": [...]}
@@ -99,12 +114,17 @@ async def test_list_api_keys_paginate_metadata_total(client, app, api_key):
     for _ in range(4):
         await ctx.key_manager.create_key("test-agent", tier="free")
 
-    body = await _exec(client, api_key, "list_api_keys", {
-        "agent_id": "test-agent",
-        "offset": 0,
-        "limit": 100,
-        "paginate": True,
-    })
+    body = await _exec(
+        client,
+        api_key,
+        "list_api_keys",
+        {
+            "agent_id": "test-agent",
+            "offset": 0,
+            "limit": 100,
+            "paginate": True,
+        },
+    )
     result = body["result"]
 
     assert result["total"] == 5
@@ -136,12 +156,17 @@ async def test_search_services_paginate(client, app, api_key):
         )
         await ctx.marketplace.register_service(spec)
 
-    body = await _exec(client, api_key, "search_services", {
-        "category": "analytics",
-        "offset": 0,
-        "limit": 2,
-        "paginate": True,
-    })
+    body = await _exec(
+        client,
+        api_key,
+        "search_services",
+        {
+            "category": "analytics",
+            "offset": 0,
+            "limit": 2,
+            "paginate": True,
+        },
+    )
     result = body["result"]
 
     assert "items" in result
@@ -171,18 +196,28 @@ async def test_search_services_offset_returns_different_subset(client, app, api_
         )
         await ctx.marketplace.register_service(spec)
 
-    body_page1 = await _exec(client, api_key, "search_services", {
-        "category": "data",
-        "offset": 0,
-        "limit": 2,
-        "paginate": True,
-    })
-    body_page2 = await _exec(client, api_key, "search_services", {
-        "category": "data",
-        "offset": 2,
-        "limit": 2,
-        "paginate": True,
-    })
+    body_page1 = await _exec(
+        client,
+        api_key,
+        "search_services",
+        {
+            "category": "data",
+            "offset": 0,
+            "limit": 2,
+            "paginate": True,
+        },
+    )
+    body_page2 = await _exec(
+        client,
+        api_key,
+        "search_services",
+        {
+            "category": "data",
+            "offset": 2,
+            "limit": 2,
+            "paginate": True,
+        },
+    )
 
     page1_ids = {s["id"] for s in body_page1["result"]["items"]}
     page2_ids = {s["id"] for s in body_page2["result"]["items"]}
@@ -193,9 +228,14 @@ async def test_search_services_offset_returns_different_subset(client, app, api_
 
 async def test_search_services_without_paginate_returns_flat(client, app, api_key):
     """Without paginate=true, search_services returns legacy flat format."""
-    body = await _exec(client, api_key, "search_services", {
-        "category": "analytics",
-    })
+    body = await _exec(
+        client,
+        api_key,
+        "search_services",
+        {
+            "category": "analytics",
+        },
+    )
     result = body["result"]
     assert "services" in result
     assert "items" not in result
@@ -225,12 +265,17 @@ async def test_search_agents_paginate(client, app, api_key):
         )
         await ctx.marketplace.register_service(spec)
 
-    body = await _exec(client, api_key, "search_agents", {
-        "query": "ml",
-        "offset": 0,
-        "limit": 2,
-        "paginate": True,
-    })
+    body = await _exec(
+        client,
+        api_key,
+        "search_agents",
+        {
+            "query": "ml",
+            "offset": 0,
+            "limit": 2,
+            "paginate": True,
+        },
+    )
     result = body["result"]
 
     assert "items" in result
@@ -256,12 +301,17 @@ async def test_list_webhooks_paginate(client, app, pro_api_key):
             secret=f"secret-{i}",
         )
 
-    body = await _exec(client, pro_api_key, "list_webhooks", {
-        "agent_id": "pro-agent",
-        "offset": 0,
-        "limit": 2,
-        "paginate": True,
-    })
+    body = await _exec(
+        client,
+        pro_api_key,
+        "list_webhooks",
+        {
+            "agent_id": "pro-agent",
+            "offset": 0,
+            "limit": 2,
+            "paginate": True,
+        },
+    )
     result = body["result"]
 
     assert "items" in result
@@ -281,9 +331,14 @@ async def test_list_webhooks_without_paginate_returns_flat(client, app, pro_api_
         secret="secret-flat",
     )
 
-    body = await _exec(client, pro_api_key, "list_webhooks", {
-        "agent_id": "pro-agent",
-    })
+    body = await _exec(
+        client,
+        pro_api_key,
+        "list_webhooks",
+        {
+            "agent_id": "pro-agent",
+        },
+    )
     result = body["result"]
     assert "webhooks" in result
     assert "items" not in result
@@ -296,12 +351,17 @@ async def test_list_webhooks_without_paginate_returns_flat(client, app, pro_api_
 
 async def test_paginate_with_negative_offset_returns_error_or_empty(client, app, api_key):
     """Negative offset should be treated as 0."""
-    body = await _exec(client, api_key, "list_api_keys", {
-        "agent_id": "test-agent",
-        "offset": -1,
-        "limit": 10,
-        "paginate": True,
-    })
+    body = await _exec(
+        client,
+        api_key,
+        "list_api_keys",
+        {
+            "agent_id": "test-agent",
+            "offset": -1,
+            "limit": 10,
+            "paginate": True,
+        },
+    )
     result = body["result"]
     # Should clamp to 0
     assert result["offset"] == 0
@@ -309,12 +369,17 @@ async def test_paginate_with_negative_offset_returns_error_or_empty(client, app,
 
 async def test_paginate_with_zero_limit(client, app, api_key):
     """limit=0 with paginate should return empty items but correct total."""
-    body = await _exec(client, api_key, "list_api_keys", {
-        "agent_id": "test-agent",
-        "offset": 0,
-        "limit": 0,
-        "paginate": True,
-    })
+    body = await _exec(
+        client,
+        api_key,
+        "list_api_keys",
+        {
+            "agent_id": "test-agent",
+            "offset": 0,
+            "limit": 0,
+            "paginate": True,
+        },
+    )
     result = body["result"]
     assert result["items"] == []
     assert result["total"] >= 1
