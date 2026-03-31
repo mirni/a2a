@@ -16,6 +16,42 @@ import httpx
 
 logger = logging.getLogger("a2a.webhooks")
 
+
+# ------------------------------------------------------------------
+# HMAC-SHA256 signing / verification helpers
+# ------------------------------------------------------------------
+
+
+def sign_payload(secret: str, payload: bytes) -> str:
+    """Compute an HMAC-SHA256 hex digest for *payload* using *secret*."""
+    return hmac.new(
+        secret.encode(),
+        payload,
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def verify_signature(
+    secret: str,
+    payload: bytes,
+    signature: str | None,
+) -> bool:
+    """Verify an HMAC-SHA256 *signature* for *payload* using *secret*.
+
+    Uses ``hmac.compare_digest`` for timing-safe comparison.
+    Returns ``False`` for empty, ``None``, or malformed signatures.
+    """
+    if not signature:
+        return False
+    expected = sign_payload(secret, payload)
+    try:
+        # Ensure the supplied signature is valid hex before comparing
+        int(signature, 16)
+    except (ValueError, TypeError):
+        return False
+    return hmac.compare_digest(expected, signature)
+
+
 _SCHEMA_WEBHOOKS = """
 CREATE TABLE IF NOT EXISTS webhooks (
     id               TEXT PRIMARY KEY,
@@ -243,15 +279,11 @@ class WebhookManager:
         delivery_id: int,
         event: dict[str, Any],
     ) -> None:
-        """POST the event payload to the webhook URL with HMAC-SHA3 signature."""
+        """POST the event payload to the webhook URL with HMAC-SHA256 signature."""
         self._require_db()
 
         payload_bytes = json.dumps(event).encode()
-        signature = hmac.new(
-            webhook["secret"].encode(),
-            payload_bytes,
-            hashlib.sha3_256,
-        ).hexdigest()
+        signature = sign_payload(webhook["secret"], payload_bytes)
 
         now = time.time()
 
