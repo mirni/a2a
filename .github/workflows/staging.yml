@@ -67,7 +67,18 @@ jobs:
             --host "${{ secrets.TAILSCALE_IP }}" \
             --deb "$(ls dist/a2a-gateway-test_*.deb | head -1)" \
             --component a2a-gateway-test \
-            --health-url "https://test.greenhelix.net/v1/health"
+            --health-url "https://test.greenhelix.net/v1/health" \
+          || {
+            echo "::group::Server diagnostics (journalctl)"
+            ssh root@"${{ secrets.TAILSCALE_IP }}" \
+              "journalctl -u a2a-gateway-test --no-pager -n 80 --since '5 minutes ago'" 2>&1 || true
+            echo "::endgroup::"
+            echo "::group::Server diagnostics (systemctl status)"
+            ssh root@"${{ secrets.TAILSCALE_IP }}" \
+              "systemctl status a2a-gateway-test --no-pager -l" 2>&1 || true
+            echo "::endgroup::"
+            exit 1
+          }
 
   # ---------------------------------------------------------------------------
   # Smoke tests against the staging server

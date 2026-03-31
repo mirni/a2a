@@ -40,12 +40,17 @@ done
 [[ -n "$URL" ]] || err "Missing required option: --url <url>"
 
 for i in $(seq 1 "$RETRIES"); do
-    if curl -sf "$URL" -o /dev/null; then
-        log "Health check passed (attempt $i/$RETRIES)"
+    http_code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$URL" 2>/dev/null || echo "000")
+    if [[ "$http_code" =~ ^2 ]]; then
+        log "Health check passed (attempt $i/$RETRIES, HTTP $http_code)"
         exit 0
     fi
-    warn "Health check attempt $i/$RETRIES failed, retrying in ${INTERVAL}s..."
+    warn "Health check attempt $i/$RETRIES failed (HTTP $http_code), retrying in ${INTERVAL}s..."
     sleep "$INTERVAL"
 done
+
+# Final verbose attempt for diagnostics
+warn "Final diagnostic attempt:"
+curl -sv --max-time 10 "$URL" 2>&1 || true
 
 err "Health check failed after $RETRIES attempts: $URL"
