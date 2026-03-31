@@ -12,7 +12,10 @@ import json
 import time
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import aiosqlite
 
 try:
     from shared_src.base_storage import BaseStorage
@@ -669,6 +672,68 @@ CREATE INDEX IF NOT EXISTS idx_org_tx_agent ON org_transactions(org_id, agent_id
         if row is None:
             return (False, 0.0)
         return (affected > 0, self._from_atomic(row[0]))
+
+    # -----------------------------------------------------------------------
+    # In-transaction helpers (no commit — caller manages the transaction)
+    # -----------------------------------------------------------------------
+
+    def _scale(self) -> int:
+        """Return the SCALE factor for atomic unit conversion."""
+        return SCALE
+
+    async def _debit_in_txn(
+        self,
+        db: aiosqlite.Connection,
+        agent_id: str,
+        amt_atomic: int,
+        currency: str,
+        now: float,
+    ) -> bool:
+        """Debit *amt_atomic* from the agent's balance inside an existing transaction.
+
+        Does NOT commit.  Returns True if the debit was applied (sufficient
+        balance), False otherwise.
+        """
+        if currency == "CREDITS":
+            cursor = await db.execute(
+                "UPDATE wallets SET balance = balance - ?, updated_at = ? "
+                "WHERE agent_id = ? AND balance >= ?",
+                (amt_atomic, now, agent_id, amt_atomic),
+            )
+        else:
+            cursor = await db.execute(
+                "UPDATE currency_balances SET balance = balance - ?, updated_at = ? "
+                "WHERE agent_id = ? AND currency = ? AND balance >= ?",
+                (amt_atomic, now, agent_id, currency, amt_atomic),
+            )
+        return cursor.rowcount > 0
+
+    async def _credit_in_txn(
+        self,
+        db: aiosqlite.Connection,
+        agent_id: str,
+        amt_atomic: int,
+        currency: str,
+        now: float,
+    ) -> None:
+        """Credit *amt_atomic* to the agent's balance inside an existing transaction.
+
+        Does NOT commit.
+        """
+        if currency == "CREDITS":
+            await db.execute(
+                "UPDATE wallets SET balance = balance + ?, updated_at = ? "
+                "WHERE agent_id = ?",
+                (amt_atomic, now, agent_id),
+            )
+        else:
+            await db.execute(
+                "INSERT INTO currency_balances (agent_id, currency, balance, updated_at) "
+                "VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(agent_id, currency) DO UPDATE SET "
+                "balance = balance + ?, updated_at = ?",
+                (agent_id, currency, amt_atomic, now, amt_atomic, now),
+            )
 
     # -----------------------------------------------------------------------
     # Organization wallets

@@ -178,8 +178,11 @@ class Wallet:
     ) -> dict[str, Any]:
         """Convert funds between currency balances for an agent.
 
-        Withdraws ``amount`` from ``from_currency`` balance and deposits the
-        converted amount into ``to_currency`` balance using the exchange service.
+        Atomically withdraws ``amount`` from ``from_currency`` balance and
+        deposits the converted amount into ``to_currency`` balance using the
+        exchange service.  Both operations are wrapped in a single SQLite
+        transaction so that if either step fails, the entire operation is
+        rolled back and no funds are lost.
 
         Args:
             agent_id: The agent whose balances to modify.
@@ -191,21 +194,79 @@ class Wallet:
         Returns:
             Dict with from_amount, to_amount, from_currency, to_currency.
         """
+        import time as _time
         from decimal import Decimal as _Decimal
 
         from .models import Currency
 
-        # Withdraw from source currency (raises InsufficientCreditsError if not enough)
-        await self.withdraw(agent_id, amount, f"convert:{from_currency}->{to_currency}", currency=from_currency)
+        if amount <= 0:
+            raise ValueError("Conversion amount must be positive")
 
-        # Convert using exchange service
+        # --- Pre-transaction checks (read-only) ---
+        if await self.storage.is_wallet_frozen(agent_id):
+            raise WalletFrozenError(agent_id)
+        wallet = await self.storage.get_wallet(agent_id)
+        if wallet is None:
+            raise WalletNotFoundError(agent_id)
+
+        # Look up exchange rate *before* starting the transaction so the
+        # rate lookup (which may hit the DB) doesn't conflict with our
+        # explicit transaction.
         from_cur = Currency(from_currency)
         to_cur = Currency(to_currency)
         converted = await exchange_service.convert(_Decimal(str(amount)), from_cur, to_cur)
         to_amount = float(converted.amount)
 
-        # Deposit to target currency
-        await self.deposit(agent_id, to_amount, f"convert:{from_currency}->{to_currency}", currency=to_currency)
+        # --- Atomic transaction: withdraw + deposit ---
+        db = self.storage.db
+        description = f"convert:{from_currency}->{to_currency}"
+        amt_debit = self.storage._to_atomic(amount)
+        amt_credit = self.storage._to_atomic(to_amount)
+        now = _time.time()
+
+        await db.execute("BEGIN IMMEDIATE")
+        try:
+            # Debit source currency
+            debit_ok = await self.storage._debit_in_txn(
+                db, agent_id, amt_debit, from_currency, now,
+            )
+            if not debit_ok:
+                available = await self.storage.get_currency_balance(agent_id, from_currency)
+                raise InsufficientCreditsError(agent_id, amount, available)
+
+            # Credit target currency
+            await self.storage._credit_in_txn(
+                db, agent_id, amt_credit, to_currency, now,
+            )
+
+            # Record transactions inside the same DB transaction
+            await db.execute(
+                "INSERT INTO transactions (agent_id, amount, tx_type, description, currency, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (agent_id, -int(_Decimal(str(amount)) * self.storage._scale()), "withdrawal", description, from_currency, now),
+            )
+            await db.execute(
+                "INSERT INTO transactions (agent_id, amount, tx_type, description, currency, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (agent_id, int(_Decimal(str(to_amount)) * self.storage._scale()), "deposit", description, to_currency, now),
+            )
+
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise
+
+        # --- Post-transaction side effects (events) ---
+        await self.storage.emit_event(
+            "wallet.withdrawal",
+            agent_id,
+            {"amount": amount, "currency": from_currency, "description": description},
+        )
+        await self.storage.emit_event(
+            "wallet.deposit",
+            agent_id,
+            {"amount": to_amount, "currency": to_currency, "description": description},
+        )
 
         return {
             "from_amount": amount,
