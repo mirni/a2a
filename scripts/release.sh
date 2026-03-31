@@ -407,31 +407,43 @@ if [[ "$SKIP_CI" == false ]]; then
     # Give GitHub a moment to register the push
     sleep 5
 
-    while (( elapsed < CI_TIMEOUT )); do
-        # Get the combined status of all checks
-        status=$(gh api "repos/{owner}/{repo}/commits/${RELEASE_SHA}/status" \
-            --jq '.state' 2>/dev/null || echo "unknown")
-
-        # Also check GitHub Actions check runs
-        check_conclusion=$(gh api "repos/{owner}/{repo}/commits/${RELEASE_SHA}/check-runs" \
-            --jq '
-                if .total_count == 0 then "pending"
-                elif [.check_runs[].status] | all(. == "completed") then
-                    if [.check_runs[].conclusion] | all(. == "success" or . == "skipped") then "success"
-                    else "failure"
-                    end
-                else "pending"
-                end
-            ' 2>/dev/null || echo "pending")
-
-        if [[ "$check_conclusion" == "success" ]]; then
-            ci_passed=true
+    # Find the workflow run triggered by our push
+    RUN_ID=""
+    for attempt in $(seq 1 10); do
+        RUN_ID=$(gh run list \
+            --branch "$RELEASE_BRANCH" \
+            --limit 1 \
+            --json databaseId \
+            --jq '.[0].databaseId' 2>/dev/null || echo "")
+        if [[ -n "$RUN_ID" && "$RUN_ID" != "null" ]]; then
             break
-        elif [[ "$check_conclusion" == "failure" ]]; then
-            err "CI failed on ${RELEASE_BRANCH}. Check: gh run list --branch ${RELEASE_BRANCH}"
+        fi
+        sleep 3
+    done
+
+    if [[ -z "$RUN_ID" || "$RUN_ID" == "null" ]]; then
+        err "Could not find CI run for ${RELEASE_BRANCH}. Check: gh run list --branch ${RELEASE_BRANCH}"
+    fi
+
+    info "CI run ID: ${RUN_ID}"
+
+    while (( elapsed < CI_TIMEOUT )); do
+        run_result=$(gh run view "$RUN_ID" --json status,conclusion \
+            --jq '.status + ":" + (.conclusion // "")' 2>/dev/null || echo "unknown:")
+
+        run_status="${run_result%%:*}"
+        run_conclusion="${run_result##*:}"
+
+        if [[ "$run_status" == "completed" ]]; then
+            if [[ "$run_conclusion" == "success" ]]; then
+                ci_passed=true
+            else
+                err "CI failed (conclusion: ${run_conclusion}) on ${RELEASE_BRANCH}. Check: gh run view ${RUN_ID}"
+            fi
+            break
         fi
 
-        info "CI status: ${check_conclusion} (${elapsed}s / ${CI_TIMEOUT}s)"
+        info "CI status: ${run_status} (${elapsed}s / ${CI_TIMEOUT}s)"
         sleep "$POLL_INTERVAL"
         elapsed=$((elapsed + POLL_INTERVAL))
     done
