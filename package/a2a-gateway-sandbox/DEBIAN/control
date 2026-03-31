@@ -1,0 +1,12 @@
+Package: a2a-gateway-sandbox
+Version: 0.3.0
+Architecture: all
+Depends: python3 (>= 3.12), sqlite3, curl
+Maintainer: A2A Team <team@greenhelix.net>
+Section: web
+Priority: optional
+Description: A2A Commerce Gateway — sandbox deployment
+ Sandbox instance of the A2A gateway running on port 8002
+ with separate data directory at /var/lib/a2a-sandbox/.
+ Databases are wiped on each deploy for a clean developer experience.
+ Does not manage nginx or ufw (handled by production package).

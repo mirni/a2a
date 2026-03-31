@@ -1,0 +1,18 @@
+#!/bin/bash
+set -e
+
+case "$1" in
+    remove|deconfigure)
+        systemctl stop a2a-gateway-sandbox 2>/dev/null || true
+        systemctl disable a2a-gateway-sandbox 2>/dev/null || true
+        ;;
+    upgrade|failed-upgrade)
+        systemctl stop a2a-gateway-sandbox 2>/dev/null || true
+        ;;
+    *)
+        echo "prerm called with unknown argument '$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0

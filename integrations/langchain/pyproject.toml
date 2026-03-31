@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "a2a-langchain"
+version = "0.1.0"
+description = "LangChain tool wrapper for the A2A Commerce Platform SDK"
+requires-python = ">=3.12"
+dependencies = [
+    "langchain-core>=0.2",
+    "a2a-sdk",
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
