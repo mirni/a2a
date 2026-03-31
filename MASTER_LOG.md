@@ -5893,3 +5893,41 @@ Implement the CI/CD Pipeline Overhaul and Packaging Overhaul from DEPLOYMENT_REF
 - **New (10):** `scripts/create_package.sh`, `.github/workflows/staging.yml`, `.github/workflows/deploy-production.yml`, `docs/BRANCH_PROTECTION.md`, `docs/TEST_SERVER_SETUP.md`, `package/a2a-gateway/DEBIAN/{control,postinst,prerm}`, `package/a2a-gateway-test/DEBIAN/{control,postinst,prerm}`, `package/a2a-website/DEBIAN/{control,postinst,prerm}`, plus symlinks
 - **Modified (1):** `.github/workflows/ci.yml` (trigger all branches, add package job)
 - **Deleted (4):** `packaging/{build-deb.sh,control,postinst,prerm}`
+
+---
+
+## 2026-03-31 — P1-5: Make convert_currency Atomic
+
+### Human Prompt
+Implement P1-5 from PLAN_v2.md: Make convert_currency atomic. The convert_currency tool does a two-phase withdraw-then-deposit. If there's a crash between phases, funds are lost. Need to wrap both in a single DB transaction.
+
+### Claude Output
+Followed TDD workflow (Red/Green/Refactor):
+
+**RED Phase:**
+- Wrote 5 tests in `gateway/tests/test_convert_currency_atomic.py`
+- Confirmed 2 tests failed showing the atomicity bug:
+  - `test_deposit_failure_rolls_back_withdraw`: USD dropped from 10.0 to 5.0 and was NOT restored
+  - `test_invalid_target_currency_rolls_back`: Same fund leakage after exchange rate failure
+
+**GREEN Phase:**
+- Added `_debit_in_txn` and `_credit_in_txn` helpers to `StorageBackend` (no-commit SQL operations)
+- Added `_scale()` helper to expose the SCALE constant
+- Rewrote `Wallet.convert_currency` to:
+  1. Perform exchange rate lookup *before* starting the transaction
+  2. Use `BEGIN IMMEDIATE` to start an explicit transaction
+  3. Execute debit + credit + transaction records inside the transaction
+  4. `COMMIT` on success, `ROLLBACK` on any exception
+  5. Emit events only after successful commit
+
+**REFACTOR Phase:**
+- All 5 new tests pass
+- Full gateway test suite: 636 passed
+- Full billing test suite: 191 passed
+- Ruff linting: clean
+
+**PR:** https://github.com/mirni/a2a/pull/9
+
+#### Files Changed
+- **New (1):** `gateway/tests/test_convert_currency_atomic.py`
+- **Modified (2):** `products/billing/src/storage.py` (added _debit_in_txn, _credit_in_txn, _scale), `products/billing/src/wallet.py` (atomic convert_currency)
