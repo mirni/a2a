@@ -615,7 +615,7 @@
   {
     "name": "search_services",
     "service": "marketplace",
-    "description": "Search the marketplace for available services.",
+    "description": "Search the marketplace for available services. Supports pagination via paginate=true.",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -637,7 +637,18 @@
         },
         "limit": {
           "type": "integer",
-          "default": 20
+          "default": 20,
+          "description": "Maximum number of results to return"
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "description": "Offset for pagination"
+        },
+        "paginate": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, returns paginated envelope {items, total, offset, limit, has_more}"
         }
       }
     },
@@ -672,7 +683,7 @@
   {
     "name": "search_agents",
     "service": "marketplace",
-    "description": "Search for agents by capability keywords. Searches service names, descriptions, tools, tags, and categories.",
+    "description": "Search for agents by capability keywords. Searches service names, descriptions, tools, tags, and categories. Supports pagination via paginate=true.",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -682,7 +693,18 @@
         },
         "limit": {
           "type": "integer",
-          "default": 20
+          "default": 20,
+          "description": "Maximum number of results to return"
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "description": "Offset for pagination"
+        },
+        "paginate": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, returns paginated envelope {items, total, offset, limit, has_more}"
         }
       },
       "required": [
@@ -1446,13 +1468,28 @@
   {
     "name": "list_webhooks",
     "service": "webhooks",
-    "description": "List all registered webhooks for an agent.",
+    "description": "List all registered webhooks for an agent. Supports pagination via paginate=true.",
     "input_schema": {
       "type": "object",
       "properties": {
         "agent_id": {
           "type": "string",
           "description": "The agent whose webhooks to list"
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "description": "Offset for pagination (used with paginate=true)"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 50,
+          "description": "Maximum number of items to return (used with paginate=true)"
+        },
+        "paginate": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, returns paginated envelope {items, total, offset, limit, has_more}"
         }
       },
       "required": [
@@ -4929,13 +4966,28 @@
   {
     "name": "list_api_keys",
     "service": "paywall",
-    "description": "List all API keys for an agent. Returns truncated key hash prefix, tier, scopes, and created_at (never the full key or hash).",
+    "description": "List all API keys for an agent. Returns truncated key hash prefix, tier, scopes, and created_at (never the full key or hash). Supports pagination via paginate=true.",
     "input_schema": {
       "type": "object",
       "properties": {
         "agent_id": {
           "type": "string",
           "description": "The agent whose keys to list"
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "description": "Offset for pagination (used with paginate=true)"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 50,
+          "description": "Maximum number of items to return (used with paginate=true)"
+        },
+        "paginate": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, returns paginated envelope {items, total, offset, limit, has_more}"
         }
       },
       "required": [
