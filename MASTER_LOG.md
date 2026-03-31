@@ -6056,3 +6056,58 @@ Completed all 29 items in PLAN_v2.md across P0-P4 priority tiers. Used parallel 
 ### Files Modified
 - `.github/workflows/ci.yml` — Reverted to original test commands
 - `scripts/ci/install_deps.sh` — Added jsonschema to TEST_DEPS
+
+---
+
+## 2026-03-31 — Security Hardening (feat/security branch)
+
+### Human Prompt
+"Execute the security/architecture/data integrity plan from PLAN_v2.md in a new `feat/security` branch."
+
+### Actions Taken (PR #16)
+
+1. **JSON Schema parameter validation** — Added `_validate_params()` to execute.py using `jsonschema.validate()`. Validates declared property types but allows extra properties (catalog schemas are incomplete). Returns 422 for type mismatches. Fixed leaderboard metric enum (added revenue, rating). 15 tests.
+
+2. **Admin audit trail** — New `gateway/src/admin_audit.py` module logging all admin-only tool operations to `admin_audit_log` table with param sanitization (strips secrets, tokens, internal fields). Logs both successful and denied operations. Migration 6 in billing storage. 12+ tests.
+
+3. **Multi-database health checks** — Extended `/v1/health` to probe all 10 product databases. Returns per-DB status breakdown. Overall "degraded" (503) if any DB fails. 4 tests.
+
+4. **HMAC webhook verification** — Added `sign_payload()`/`verify_signature()` helpers with `hmac.compare_digest` timing-safe comparison. Fixed SHA-3 vs SHA-256 bug in existing `_send()`. 9 tests.
+
+5. **Transaction isolation verification** — 11 tests verifying concurrent withdrawal safety (only one of 5 concurrent withdrawals succeeds), atomic debit prevention of overdraft, `convert_currency` atomicity with `BEGIN IMMEDIATE`, failed operation rollback.
+
+6. **Data retention policies** — Added `UsageRecordsCleanup` (90d), `WebhookDeliveriesCleanup` (30d), `AdminAuditLogCleanup` (365d) TTL-based cleanup tasks in `cleanup_tasks.py`. 18 tests covering deletion, boundaries, error handling, empty tables.
+
+7. **Pre-existing implementations confirmed** — API key rotation (already in infrastructure.py), WAL mode (harden_connection in db_security.py), foreign keys (harden_connection), per-IP rate limiting (PublicRateLimitMiddleware with 429 responses, 13 tests).
+
+### CI Pipeline Result: ALL GREEN
+- lint: success
+- typecheck: success
+- semgrep: success
+- test (3.12): success
+- test (3.13): success
+- security: success
+- dependency-audit: success
+- package: success
+- docker-build: success
+
+### Files Modified/Created
+- `gateway/src/routes/execute.py` — Added `_validate_params()`, admin audit logging
+- `gateway/src/catalog.json` — Fixed leaderboard enum
+- `gateway/src/admin_audit.py` — New admin audit module
+- `gateway/src/routes/health.py` — Multi-database health probing
+- `gateway/src/webhooks.py` — HMAC sign/verify helpers
+- `gateway/src/cleanup_tasks.py` — TTL cleanup tasks
+- `gateway/src/lifespan.py` — Admin audit table initialization
+- `products/billing/src/storage.py` — Migration 6 for admin_audit_log
+- `gateway/tests/test_param_validation.py` — 15 param validation tests
+- `gateway/tests/test_admin_audit.py` — Admin audit tests
+- `gateway/tests/test_health_all_dbs.py` — Health check tests
+- `gateway/tests/test_webhook_hmac.py` — HMAC verification tests
+- `gateway/tests/test_data_retention.py` — Data retention tests
+- `gateway/tests/test_subscriptions.py` — Updated boundary assertion
+- `products/billing/tests/test_transaction_isolation.py` — Transaction isolation tests
+
+### Test Counts
+- Gateway: 871 tests passing
+- Billing: 202 tests passing
