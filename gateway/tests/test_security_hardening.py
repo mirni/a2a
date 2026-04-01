@@ -34,12 +34,10 @@ class TestBackupKeyLeak:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        result = data["result"]
         # The key must NOT be in the API response — it should be stored server-side
-        assert "key" not in result, f"SECURITY: encryption key leaked in API response: {result.get('key', '')[:10]}..."
+        assert "key" not in data, f"SECURITY: encryption key leaked in API response: {data.get('key', '')[:10]}..."
         # But should have a key_id for later retrieval
-        assert "key_id" in result
+        assert "key_id" in data
 
 
 # ---------------------------------------------------------------------------
@@ -64,9 +62,7 @@ class TestKeyTierEscalation:
         if resp.status_code == 200:
             data = resp.json()
             # If it returns 200, the tier should NOT be "pro"
-            assert not data.get("success") or data["result"]["tier"] != "pro", (
-                "SECURITY: free-tier user escalated to pro tier"
-            )
+            assert data.get("tier") != "pro", "SECURITY: free-tier user escalated to pro tier"
         else:
             assert resp.status_code == 403
 
@@ -82,9 +78,7 @@ class TestKeyTierEscalation:
         )
         if resp.status_code == 200:
             data = resp.json()
-            assert not data.get("success") or data["result"]["tier"] != "admin", (
-                "SECURITY: free-tier user escalated to admin tier"
-            )
+            assert data.get("tier") != "admin", "SECURITY: free-tier user escalated to admin tier"
         else:
             assert resp.status_code == 403
 
@@ -100,9 +94,7 @@ class TestKeyTierEscalation:
         )
         if resp.status_code == 200:
             data = resp.json()
-            assert not data.get("success") or data["result"]["tier"] != "admin", (
-                "SECURITY: pro-tier user escalated to admin tier"
-            )
+            assert data.get("tier") != "admin", "SECURITY: pro-tier user escalated to admin tier"
         else:
             assert resp.status_code == 403
 
@@ -135,8 +127,8 @@ class TestDisputeImpersonation:
             },
             headers={"Authorization": f"Bearer {admin_api_key}"},
         )
-        assert resp.status_code == 200, f"create_escrow failed: {resp.json()}"
-        escrow_id = resp.json()["result"]["id"]
+        assert resp.status_code in (200, 201), f"create_escrow failed: {resp.json()}"
+        escrow_id = resp.json()["id"]
 
         # Open a dispute via API
         resp = await client.post(
@@ -151,8 +143,8 @@ class TestDisputeImpersonation:
             },
             headers={"Authorization": f"Bearer {admin_api_key}"},
         )
-        assert resp.status_code == 200, f"open_dispute failed: {resp.json()}"
-        dispute_id = resp.json()["result"]["id"]
+        assert resp.status_code in (200, 201), f"open_dispute failed: {resp.json()}"
+        dispute_id = resp.json()["id"]
 
         # Try to resolve with a spoofed resolved_by
         resp = await client.post(
@@ -169,12 +161,11 @@ class TestDisputeImpersonation:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
         # resolved_by must be the authenticated agent, NOT the spoofed value
-        assert data["result"]["resolved_by"] != "malicious-agent", (
+        assert data["resolved_by"] != "malicious-agent", (
             "SECURITY: resolved_by was spoofed — should use authenticated caller"
         )
-        assert data["result"]["resolved_by"] == "admin-agent"
+        assert data["resolved_by"] == "admin-agent"
 
 
 # ---------------------------------------------------------------------------
@@ -271,5 +262,4 @@ class TestFreezeWalletTier:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["frozen"] is True
+        assert data["frozen"] is True

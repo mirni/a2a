@@ -32,8 +32,8 @@ async def test_create_performance_escrow(client, pro_api_key, app):
         },
         headers={"Authorization": f"Bearer {buyer_key['key']}"},
     )
-    assert resp.status_code == 200
-    result = resp.json()["result"]
+    assert resp.status_code in (200, 201)
+    result = resp.json()
     assert result["status"] == "held"
     assert result["metric_name"] == "sharpe_30d"
     assert result["threshold"] == 2.0
@@ -63,7 +63,7 @@ async def test_check_performance_escrow_releases(client, pro_api_key, app):
         },
         headers={"Authorization": f"Bearer {buyer_key['key']}"},
     )
-    escrow_id = resp.json()["result"]["escrow_id"]
+    escrow_id = resp.json()["escrow_id"]
 
     # Seller submits metrics that meet threshold
     await ctx.identity_api.submit_metrics("seller-a", {"sharpe_30d": 2.0})
@@ -78,7 +78,7 @@ async def test_check_performance_escrow_releases(client, pro_api_key, app):
         headers={"Authorization": f"Bearer {buyer_key['key']}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["released"] is True
 
     # Verify seller received funds
@@ -109,7 +109,7 @@ async def test_check_performance_escrow_not_met(client, pro_api_key, app):
         },
         headers={"Authorization": f"Bearer {buyer_key['key']}"},
     )
-    escrow_id = resp.json()["result"]["escrow_id"]
+    escrow_id = resp.json()["escrow_id"]
 
     # Seller submits metrics BELOW threshold
     await ctx.identity_api.submit_metrics("seller-b", {"sharpe_30d": 1.5})
@@ -123,5 +123,5 @@ async def test_check_performance_escrow_not_met(client, pro_api_key, app):
         headers={"Authorization": f"Bearer {buyer_key['key']}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["released"] is False

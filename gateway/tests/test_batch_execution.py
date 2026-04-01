@@ -81,7 +81,7 @@ class TestBatchExecution:
         )
         assert resp.status_code == 400
         data = resp.json()
-        assert data["success"] is False
+        assert data["type"].endswith("/batch-too-large")
 
     async def test_batch_empty_calls(self, client, api_key):
         """Should handle empty calls list."""

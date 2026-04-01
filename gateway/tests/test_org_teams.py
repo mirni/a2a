@@ -17,8 +17,8 @@ async def test_create_org(client, api_key):
         },
         headers={"Authorization": f"Bearer {api_key}"},
     )
-    assert resp.status_code == 200
-    result = resp.json()["result"]
+    assert resp.status_code in (200, 201)
+    result = resp.json()
     assert result["name"] == "Acme Corp"
     assert "org_id" in result
     assert "created_at" in result
@@ -35,7 +35,7 @@ async def test_get_org(client, api_key):
         },
         headers={"Authorization": f"Bearer {api_key}"},
     )
-    org_id = resp1.json()["result"]["org_id"]
+    org_id = resp1.json()["org_id"]
 
     resp = await client.post(
         "/v1/execute",
@@ -46,7 +46,7 @@ async def test_get_org(client, api_key):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["org_id"] == org_id
     assert result["name"] == "Beta Inc"
     assert result["members"] == []
@@ -68,7 +68,7 @@ async def test_add_agent_to_org(client, api_key, app):
         },
         headers={"Authorization": f"Bearer {api_key}"},
     )
-    org_id = resp1.json()["result"]["org_id"]
+    org_id = resp1.json()["org_id"]
 
     # Add agent to org (agent_id must match caller)
     resp2 = await client.post(
@@ -80,7 +80,7 @@ async def test_add_agent_to_org(client, api_key, app):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp2.status_code == 200
-    result = resp2.json()["result"]
+    result = resp2.json()
     assert result["agent_id"] == "test-agent"
     assert result["org_id"] == org_id
 
@@ -93,7 +93,7 @@ async def test_add_agent_to_org(client, api_key, app):
         },
         headers={"Authorization": f"Bearer {api_key}"},
     )
-    result3 = resp3.json()["result"]
+    result3 = resp3.json()
     assert any(m["agent_id"] == "test-agent" for m in result3["members"])
 
 
@@ -107,11 +107,9 @@ async def test_get_org_not_found(client, api_key):
         },
         headers={"Authorization": f"Bearer {api_key}"},
     )
-    # Should return error or empty result
-    body = resp.json()
+    # Tool may raise (404) or return an error dict (200)
     if resp.status_code == 200:
-        result = body["result"]
-        assert result.get("error") or result.get("org_id") is None
+        assert "error" in resp.json() or "not found" in str(resp.json()).lower()
     else:
         assert resp.status_code in (404, 400, 500)
 
@@ -129,9 +127,8 @@ async def test_add_agent_to_nonexistent_org(client, api_key, app):
         },
         headers={"Authorization": f"Bearer {api_key}"},
     )
-    body = resp.json()
     if resp.status_code == 200:
-        assert "error" in body.get("result", {})
+        assert "error" in resp.json() or "not found" in str(resp.json()).lower()
     else:
         assert resp.status_code in (404, 400, 500)
 

@@ -73,9 +73,8 @@ async def test_expired_key_returns_401(client, expired_key):
     )
     assert resp.status_code == 401
     body = resp.json()
-    assert body["success"] is False
-    assert body["error"]["code"] == "expired_key"
-    assert "expired" in body["error"]["message"].lower()
+    assert body["type"].endswith("/expired-key")
+    assert "expired" in body["detail"].lower()
 
 
 @pytest.mark.asyncio
@@ -87,7 +86,7 @@ async def test_expired_key_error_message_is_informative(client, expired_key):
         headers={"Authorization": f"Bearer {expired_key}"},
     )
     assert resp.status_code == 401
-    message = resp.json()["error"]["message"]
+    message = resp.json()["detail"]
     assert "expired" in message.lower()
 
 
@@ -100,7 +99,6 @@ async def test_future_expiry_key_succeeds(client, future_key):
         headers={"Authorization": f"Bearer {future_key}"},
     )
     assert resp.status_code == 200
-    assert resp.json()["success"] is True
 
 
 @pytest.mark.asyncio
@@ -112,7 +110,6 @@ async def test_no_expiry_key_succeeds(client, no_expiry_key):
         headers={"Authorization": f"Bearer {no_expiry_key}"},
     )
     assert resp.status_code == 200
-    assert resp.json()["success"] is True
 
 
 # ---------------------------------------------------------------------------

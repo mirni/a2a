@@ -34,8 +34,7 @@ async def test_pricing_detail_not_found(client):
     resp = await client.get("/v1/pricing/nonexistent_tool")
     assert resp.status_code == 404
     data = resp.json()
-    assert data["success"] is False
-    assert data["error"]["code"] == "tool_not_found"
+    assert data["type"].endswith("/tool-not-found")
 
 
 @pytest.mark.asyncio

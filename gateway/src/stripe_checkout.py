@@ -159,13 +159,10 @@ async def create_checkout(request: Request) -> JSONResponse:
         session = resp.json()
         return JSONResponse(
             {
-                "success": True,
-                "result": {
-                    "checkout_url": session["url"],
-                    "session_id": session["id"],
-                    "credits": credits,
-                    "amount_usd": price_cents / 100,
-                },
+                "checkout_url": session["url"],
+                "session_id": session["id"],
+                "credits": credits,
+                "amount_usd": price_cents / 100,
             }
         )
 

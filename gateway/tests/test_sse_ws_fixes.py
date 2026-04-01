@@ -81,17 +81,16 @@ class TestSSEInvalidKeyReturns401:
             headers={"Authorization": "Bearer a2a_bad_totally_invalid_key"},
         )
         body = resp.json()
-        assert body["success"] is False
-        assert body["error"]["code"] == "invalid_key"
+        assert body["type"].endswith("/invalid-key")
 
-    async def test_sse_invalid_key_content_type_is_json(self, client):
-        """SSE with invalid key returns application/json, not text/event-stream."""
+    async def test_sse_invalid_key_content_type_is_problem_json(self, client):
+        """SSE with invalid key returns application/problem+json, not text/event-stream."""
         resp = await client.get(
             "/v1/events/stream",
             headers={"Authorization": "Bearer a2a_bad_totally_invalid_key"},
         )
         content_type = resp.headers.get("content-type", "")
-        assert "application/json" in content_type
+        assert "application/problem+json" in content_type
         assert "text/event-stream" not in content_type
 
     async def test_sse_no_key_returns_401(self, client):
@@ -99,8 +98,7 @@ class TestSSEInvalidKeyReturns401:
         resp = await client.get("/v1/events/stream")
         assert resp.status_code == 401
         body = resp.json()
-        assert body["success"] is False
-        assert body["error"]["code"] == "missing_key"
+        assert body["type"].endswith("/missing-key")
 
     async def test_sse_valid_key_still_streams(self, client, api_key):
         """SSE with a valid key still returns 200 with text/event-stream."""

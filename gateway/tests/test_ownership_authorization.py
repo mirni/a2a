@@ -80,7 +80,7 @@ class TestWithdrawOwnership:
         )
 
         assert resp.status_code == 403
-        assert resp.json()["error"]["code"] == "forbidden"
+        assert resp.json()["type"].endswith("/forbidden")
 
     async def test_agent_can_withdraw_from_own_wallet(self, client, app):
         """200: agent can withdraw from own wallet."""
@@ -97,7 +97,6 @@ class TestWithdrawOwnership:
         )
 
         assert resp.status_code == 200
-        assert resp.json()["success"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -124,7 +123,7 @@ class TestDepositOwnership:
         )
 
         assert resp.status_code == 403
-        assert resp.json()["error"]["code"] == "forbidden"
+        assert resp.json()["type"].endswith("/forbidden")
 
 
 # ---------------------------------------------------------------------------
@@ -153,8 +152,8 @@ class TestCaptureIntentOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200
-        intent_id = create_resp.json()["result"]["id"]
+        assert create_resp.status_code in (200, 201)
+        intent_id = create_resp.json()["id"]
 
         # Eve (unrelated) tries to capture it
         resp = await _execute(
@@ -184,8 +183,8 @@ class TestCaptureIntentOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200
-        intent_id = create_resp.json()["result"]["id"]
+        assert create_resp.status_code in (200, 201)
+        intent_id = create_resp.json()["id"]
 
         resp = await _execute(
             client,
@@ -214,8 +213,8 @@ class TestCaptureIntentOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200
-        intent_id = create_resp.json()["result"]["id"]
+        assert create_resp.status_code in (200, 201)
+        intent_id = create_resp.json()["id"]
 
         resp = await _execute(
             client,
@@ -256,8 +255,8 @@ class TestReleaseEscrowOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200, f"create_escrow failed: {create_resp.json()}"
-        escrow_id = create_resp.json()["result"]["id"]
+        assert create_resp.status_code in (200, 201), f"create failed: {create_resp.json()}"
+        escrow_id = create_resp.json()["id"]
 
         # Eve tries to release it
         resp = await _execute(
@@ -287,8 +286,8 @@ class TestReleaseEscrowOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200, f"create_escrow failed: {create_resp.json()}"
-        escrow_id = create_resp.json()["result"]["id"]
+        assert create_resp.status_code in (200, 201), f"create failed: {create_resp.json()}"
+        escrow_id = create_resp.json()["id"]
 
         resp = await _execute(
             client,
@@ -328,8 +327,8 @@ class TestCancelEscrowOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200, f"create_escrow failed: {create_resp.json()}"
-        escrow_id = create_resp.json()["result"]["id"]
+        assert create_resp.status_code in (200, 201), f"create failed: {create_resp.json()}"
+        escrow_id = create_resp.json()["id"]
 
         # Eve tries to cancel it
         resp = await _execute(
@@ -359,8 +358,8 @@ class TestCancelEscrowOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200, f"create_escrow failed: {create_resp.json()}"
-        escrow_id = create_resp.json()["result"]["id"]
+        assert create_resp.status_code in (200, 201), f"create failed: {create_resp.json()}"
+        escrow_id = create_resp.json()["id"]
 
         resp = await _execute(
             client,
@@ -400,8 +399,8 @@ class TestRefundIntentOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200
-        intent_id = create_resp.json()["result"]["id"]
+        assert create_resp.status_code in (200, 201)
+        intent_id = create_resp.json()["id"]
 
         # Eve tries to refund it
         resp = await _execute(
@@ -431,8 +430,8 @@ class TestRefundIntentOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200
-        intent_id = create_resp.json()["result"]["id"]
+        assert create_resp.status_code in (200, 201)
+        intent_id = create_resp.json()["id"]
 
         resp = await _execute(
             client,
@@ -471,8 +470,8 @@ class TestAdminBypassResourceOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200
-        intent_id = create_resp.json()["result"]["id"]
+        assert create_resp.status_code in (200, 201)
+        intent_id = create_resp.json()["id"]
 
         resp = await _execute(
             client,
@@ -502,8 +501,8 @@ class TestAdminBypassResourceOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200, f"create_escrow failed: {create_resp.json()}"
-        escrow_id = create_resp.json()["result"]["id"]
+        assert create_resp.status_code in (200, 201), f"create failed: {create_resp.json()}"
+        escrow_id = create_resp.json()["id"]
 
         resp = await _execute(
             client,
@@ -533,8 +532,8 @@ class TestAdminBypassResourceOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200, f"create_escrow failed: {create_resp.json()}"
-        escrow_id = create_resp.json()["result"]["id"]
+        assert create_resp.status_code in (200, 201), f"create failed: {create_resp.json()}"
+        escrow_id = create_resp.json()["id"]
 
         resp = await _execute(
             client,
@@ -564,8 +563,8 @@ class TestAdminBypassResourceOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200
-        intent_id = create_resp.json()["result"]["id"]
+        assert create_resp.status_code in (200, 201)
+        intent_id = create_resp.json()["id"]
 
         resp = await _execute(
             client,

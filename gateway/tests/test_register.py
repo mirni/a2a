@@ -13,14 +13,12 @@ async def test_register_returns_key_and_wallet(client):
         "/v1/register",
         json={"agent_id": "new-agent-register"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 201)
     data = resp.json()
-    assert data["success"] is True
-    result = data["result"]
-    assert "api_key" in result
-    assert result["agent_id"] == "new-agent-register"
-    assert result["tier"] == "free"
-    assert result["balance"] >= 0
+    assert "api_key" in data
+    assert data["agent_id"] == "new-agent-register"
+    assert data["tier"] == "free"
+    assert data["balance"] >= 0
 
 
 async def test_register_duplicate_agent_returns_409(client):
@@ -29,14 +27,14 @@ async def test_register_duplicate_agent_returns_409(client):
         "/v1/register",
         json={"agent_id": "dup-agent"},
     )
-    assert resp1.status_code == 200
+    assert resp1.status_code in (200, 201)
 
     resp2 = await client.post(
         "/v1/register",
         json={"agent_id": "dup-agent"},
     )
     assert resp2.status_code == 409
-    assert resp2.json()["error"]["code"] == "already_exists"
+    assert resp2.json()["type"].endswith("/already-exists")
 
 
 async def test_register_missing_agent_id_returns_400(client):
@@ -54,8 +52,8 @@ async def test_register_key_works_for_tool_call(client):
         "/v1/register",
         json={"agent_id": "working-agent"},
     )
-    assert resp.status_code == 200
-    api_key = resp.json()["result"]["api_key"]
+    assert resp.status_code in (200, 201)
+    api_key = resp.json()["api_key"]
 
     # Use the key to call get_balance
     resp2 = await client.post(
@@ -67,7 +65,6 @@ async def test_register_key_works_for_tool_call(client):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp2.status_code == 200
-    assert resp2.json()["success"] is True
 
 
 async def test_register_no_auth_required(client):

@@ -34,8 +34,8 @@ async def _create_intent(client, api_key):
         },
         headers={"Authorization": f"Bearer {api_key}"},
     )
-    assert resp.status_code == 200, resp.text
-    return resp.json()["result"]["id"]
+    assert resp.status_code in (200, 201), resp.text
+    return resp.json()["id"]
 
 
 async def test_refund_pending_intent_voids_it(client, api_key, app):
@@ -50,9 +50,8 @@ async def test_refund_pending_intent_voids_it(client, api_key, app):
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["success"] is True
-    assert body["result"]["status"] == "voided"
-    assert body["result"]["id"] == intent_id
+    assert body["status"] == "voided"
+    assert body["id"] == intent_id
 
 
 async def test_refund_settled_intent_creates_reverse_transfer(client, api_key, app):
@@ -82,9 +81,8 @@ async def test_refund_settled_intent_creates_reverse_transfer(client, api_key, a
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["success"] is True
-    assert body["result"]["status"] == "refunded"
-    assert body["result"]["amount"] == 100.0
+    assert body["status"] == "refunded"
+    assert float(body["amount"]) == 100.0
 
     # Payee should have been debited and payer credited
     payee_after = await ctx.tracker.get_balance("ri-payee")

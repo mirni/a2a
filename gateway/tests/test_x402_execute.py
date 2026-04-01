@@ -92,7 +92,7 @@ class TestX402ExecuteNoApiKey:
             json={"tool": "get_balance", "params": {"agent_id": "test"}},
         )
         assert resp.status_code == 401
-        assert resp.json()["error"]["code"] == "missing_key"
+        assert resp.json()["type"].endswith("/missing-key")
 
     @pytest.mark.asyncio
     async def test_no_key_x402_enabled_no_payment_header_returns_402(self, x402_client):
@@ -108,7 +108,7 @@ class TestX402ExecuteNoApiKey:
         pr = json.loads(base64.b64decode(pr_b64))
         assert pr["pay_to"] == "0xTestMerchant"
         assert pr["network"] == "base"
-        assert resp.json()["error"]["code"] == "payment_required"
+        assert resp.json()["type"].endswith("/payment-required")
 
     @pytest.mark.asyncio
     async def test_no_key_x402_valid_proof_returns_200(self, x402_client, x402_app):
@@ -139,8 +139,6 @@ class TestX402ExecuteNoApiKey:
             )
 
         assert resp.status_code == 200
-        data = resp.json()
-        assert data["success"] is True
 
     @pytest.mark.asyncio
     async def test_no_key_x402_expired_proof_returns_402(self, x402_client):
@@ -154,7 +152,7 @@ class TestX402ExecuteNoApiKey:
             headers={"X-PAYMENT": encoded},
         )
         assert resp.status_code == 402
-        assert resp.json()["error"]["code"] == "payment_verification_failed"
+        assert resp.json()["type"].endswith("/payment-verification-failed")
 
     @pytest.mark.asyncio
     async def test_no_key_x402_replayed_nonce_returns_402(self, x402_client, x402_app):
@@ -173,7 +171,7 @@ class TestX402ExecuteNoApiKey:
             headers={"X-PAYMENT": encoded},
         )
         assert resp.status_code == 402
-        assert resp.json()["error"]["code"] == "payment_replay_detected"
+        assert resp.json()["type"].endswith("/payment-replay-detected")
 
     @pytest.mark.asyncio
     async def test_no_key_x402_wrong_recipient_returns_402(self, x402_client):
@@ -187,7 +185,7 @@ class TestX402ExecuteNoApiKey:
             headers={"X-PAYMENT": encoded},
         )
         assert resp.status_code == 402
-        assert resp.json()["error"]["code"] == "payment_verification_failed"
+        assert resp.json()["type"].endswith("/payment-verification-failed")
 
     @pytest.mark.asyncio
     async def test_no_key_x402_insufficient_value_returns_402(self, x402_client):
@@ -228,4 +226,3 @@ class TestX402ExecuteWithApiKey:
             headers={"Authorization": f"Bearer {key_info['key']}"},
         )
         assert resp.status_code == 200
-        assert resp.json()["success"] is True

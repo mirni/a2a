@@ -25,7 +25,7 @@ async def _register_service(client, api_key):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200, resp.text
-    return resp.json()["result"]["id"]
+    return resp.json()["id"]
 
 
 async def test_get_service(client, pro_api_key):
@@ -38,9 +38,7 @@ async def test_get_service(client, pro_api_key):
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 200
-    body = resp.json()
-    assert body["success"] is True
-    result = body["result"]
+    result = resp.json()
     assert result["id"] == service_id
     assert result["name"] == "Test Service"
     assert result["description"] == "A test service"
@@ -74,9 +72,7 @@ async def test_update_service(client, pro_api_key):
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 200
-    body = resp.json()
-    assert body["success"] is True
-    result = body["result"]
+    result = resp.json()
     assert result["id"] == service_id
     assert result["name"] == "Updated Service"
     assert result["description"] == "Updated description"
@@ -108,9 +104,7 @@ async def test_deactivate_service(client, pro_api_key):
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 200
-    body = resp.json()
-    assert body["success"] is True
-    result = body["result"]
+    result = resp.json()
     assert result["id"] == service_id
     assert result["status"] == "inactive"
 

@@ -22,7 +22,8 @@ class TestSearchAgentsByCapability:
             headers={"Authorization": f"Bearer {api_key}"},
         )
         data = resp.json()
-        assert data.get("error", {}).get("code") != "unknown_tool"
+        # If error, it's RFC 9457 format; just confirm it's not unknown_tool
+        assert not data.get("type", "").endswith("/unknown-tool")
 
     async def test_search_by_tool_name(self, client, api_key, app):
         """Should find agents whose services include a matching tool."""
@@ -53,7 +54,7 @@ class TestSearchAgentsByCapability:
         )
         assert resp.status_code == 200
         data = resp.json()
-        agents = data["result"]["agents"]
+        agents = data["agents"]
         assert any(a["agent_id"] == "agent-data" for a in agents)
         assert not any(a["agent_id"] == "agent-ml" for a in agents)
 
@@ -75,7 +76,7 @@ class TestSearchAgentsByCapability:
             headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 200
-        agents = resp.json()["result"]["agents"]
+        agents = resp.json()["agents"]
         assert any(a["agent_id"] == "agent-ai" for a in agents)
 
     async def test_search_by_description(self, client, api_key, app):
@@ -96,7 +97,7 @@ class TestSearchAgentsByCapability:
             headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 200
-        agents = resp.json()["result"]["agents"]
+        agents = resp.json()["agents"]
         assert any(a["agent_id"] == "agent-translate" for a in agents)
 
     async def test_search_respects_limit(self, client, api_key, app):
@@ -118,7 +119,7 @@ class TestSearchAgentsByCapability:
             headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 200
-        agents = resp.json()["result"]["agents"]
+        agents = resp.json()["agents"]
         assert len(agents) <= 3
 
     async def test_search_returns_agent_info(self, client, api_key, app):
@@ -140,7 +141,7 @@ class TestSearchAgentsByCapability:
             headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 200
-        agents = resp.json()["result"]["agents"]
+        agents = resp.json()["agents"]
         agent = [a for a in agents if a["agent_id"] == "agent-info"][0]
         assert "services" in agent
         assert len(agent["services"]) >= 1
@@ -154,4 +155,4 @@ class TestSearchAgentsByCapability:
             headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 200
-        assert resp.json()["result"]["agents"] == []
+        assert resp.json()["agents"] == []

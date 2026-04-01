@@ -22,7 +22,7 @@ async def test_volume_discount_zero_history(client, api_key, app):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["agent_id"] == "test-agent"
     assert result["tool_name"] == "get_balance"
     assert result["historical_calls"] == 0
@@ -50,7 +50,7 @@ async def test_volume_discount_tier_5pct(client, api_key, app):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["historical_calls"] == 150
     assert result["discount_pct"] == 5
 
@@ -74,7 +74,7 @@ async def test_volume_discount_tier_10pct(client, api_key, app):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["historical_calls"] == 600
     assert result["discount_pct"] == 10
 
@@ -98,7 +98,7 @@ async def test_volume_discount_tier_15pct(client, api_key, app):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["historical_calls"] == 1050
     assert result["discount_pct"] == 15
 
@@ -118,9 +118,9 @@ async def test_volume_discount_discounted_price(client, api_key, app):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
-    expected_discounted = result["unit_price"] * (1 - result["discount_pct"] / 100)
-    assert abs(result["discounted_price"] - expected_discounted) < 0.001
+    result = resp.json()
+    expected_discounted = float(result["unit_price"]) * (1 - result["discount_pct"] / 100)
+    assert abs(float(result["discounted_price"]) - expected_discounted) < 0.001
 
 
 async def test_volume_discount_missing_params(client, api_key):

@@ -72,7 +72,7 @@ async def _register_marketplace_service(client, api_key, provider_id: str, name:
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200, resp.text
-    return resp.json()["result"]
+    return resp.json()
 
 
 # ---------------------------------------------------------------------------
@@ -100,9 +100,8 @@ class TestGatewayTrustMarketplace:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
 
-        services = data["result"]["services"]
+        services = data["services"]
         assert len(services) == 1
         assert "trust_score" in services[0]
         assert services[0]["trust_score"] is not None
@@ -120,7 +119,7 @@ class TestGatewayTrustMarketplace:
             headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 200
-        services = resp.json()["result"]["services"]
+        services = resp.json()["services"]
         assert len(services) == 1
         assert services[0]["trust_score"] is None
 
@@ -164,7 +163,7 @@ class TestGatewayTrustMarketplace:
             headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 200
-        matches = resp.json()["result"]["matches"]
+        matches = resp.json()["matches"]
         assert len(matches) >= 2
 
         # The match with the higher trust score should come first

@@ -29,8 +29,8 @@ async def _create_escrow(client, api_key, app, payer="pro-agent"):
         },
         headers={"Authorization": f"Bearer {api_key}"},
     )
-    assert resp.status_code == 200, resp.text
-    return resp.json()["result"]["id"]
+    assert resp.status_code in (200, 201), resp.text
+    return resp.json()["id"]
 
 
 async def test_cancel_escrow_refunds_payer(client, pro_api_key, app):
@@ -48,9 +48,8 @@ async def test_cancel_escrow_refunds_payer(client, pro_api_key, app):
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["success"] is True
-    assert body["result"]["id"] == escrow_id
-    assert body["result"]["status"] == "refunded"
+    assert body["id"] == escrow_id
+    assert body["status"] == "refunded"
 
     # Payer should have been refunded
     balance_after = await ctx.tracker.get_balance("pro-agent")

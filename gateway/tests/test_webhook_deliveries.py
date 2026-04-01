@@ -26,8 +26,7 @@ async def test_get_webhook_deliveries_returns_empty_list(client, pro_api_key, ap
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["success"] is True
-    assert body["result"]["deliveries"] == []
+    assert body["deliveries"] == []
 
 
 async def test_get_webhook_deliveries_returns_delivery_records(client, pro_api_key, app):
@@ -56,8 +55,7 @@ async def test_get_webhook_deliveries_returns_delivery_records(client, pro_api_k
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["success"] is True
-    deliveries = body["result"]["deliveries"]
+    deliveries = body["deliveries"]
     assert len(deliveries) == 1
     assert deliveries[0]["webhook_id"] == webhook_id
     assert deliveries[0]["event_type"] == "billing.deposit"
@@ -95,7 +93,7 @@ async def test_get_webhook_deliveries_respects_limit(client, pro_api_key, app):
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert len(body["result"]["deliveries"]) == 3
+    assert len(body["deliveries"]) == 3
 
 
 async def test_get_webhook_deliveries_requires_pro_tier(client, api_key, app):
@@ -127,4 +125,4 @@ async def test_get_webhook_deliveries_missing_webhook_id(client, pro_api_key):
     )
     assert resp.status_code == 400
     body = resp.json()
-    assert body["error"]["code"] == "missing_parameter"
+    assert body["type"].endswith("/missing-parameter")

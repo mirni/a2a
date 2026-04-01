@@ -119,7 +119,7 @@ class TestResolveDisputeAdminOnly:
             admin_key,
         )
         assert resp.status_code == 200
-        assert resp.json()["result"]["status"] == "resolved"
+        assert resp.json()["status"] == "resolved"
 
 
 # ============================================================================
@@ -148,7 +148,7 @@ class TestWebhookOwnership:
             },
             key_a,
         )
-        webhook_id = resp.json()["result"]["id"]
+        webhook_id = resp.json()["id"]
 
         # Agent B tries to delete it
         resp = await _exec(client, "delete_webhook", {"webhook_id": webhook_id}, key_b)
@@ -170,7 +170,7 @@ class TestWebhookOwnership:
             },
             key_a,
         )
-        webhook_id = resp.json()["result"]["id"]
+        webhook_id = resp.json()["id"]
 
         resp = await _exec(client, "get_webhook_deliveries", {"webhook_id": webhook_id}, key_b)
         assert resp.status_code == 403
@@ -191,7 +191,7 @@ class TestWebhookOwnership:
             },
             key_a,
         )
-        webhook_id = resp.json()["result"]["id"]
+        webhook_id = resp.json()["id"]
 
         resp = await _exec(client, "test_webhook", {"webhook_id": webhook_id}, key_b)
         assert resp.status_code == 403
@@ -211,11 +211,11 @@ class TestWebhookOwnership:
             },
             key_a,
         )
-        webhook_id = resp.json()["result"]["id"]
+        webhook_id = resp.json()["id"]
 
         resp = await _exec(client, "delete_webhook", {"webhook_id": webhook_id}, key_a)
         assert resp.status_code == 200
-        assert resp.json()["result"]["deleted"] is True
+        assert resp.json()["deleted"] is True
 
 
 # ============================================================================
@@ -336,7 +336,7 @@ class TestWebhookSSRF:
             },
             key,
         )
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 201)
 
 
 # ============================================================================
@@ -355,7 +355,7 @@ class TestRevokeApiKeyFreeTier:
         # List keys to get hash prefix
         resp = await _exec(client, "list_api_keys", {"agent_id": "revoke-free-agent"}, key)
         assert resp.status_code == 200
-        keys = resp.json()["result"]["keys"]
+        keys = resp.json()["keys"]
         active_keys = [k for k in keys if not k["revoked"]]
         assert len(active_keys) >= 1
         hash_prefix = active_keys[0]["key_hash_prefix"]
@@ -372,7 +372,7 @@ class TestRevokeApiKeyFreeTier:
             key2,
         )
         assert resp.status_code == 200
-        assert resp.json()["result"]["revoked"] is True
+        assert resp.json()["revoked"] is True
 
 
 # ============================================================================

@@ -29,7 +29,7 @@ async def test_build_claim_chain_via_gateway(client, pro_api_key, app):
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["leaf_count"] == 2
     assert len(result["merkle_root"]) == 64  # SHA3-256 hex
 
@@ -50,7 +50,7 @@ async def test_get_claim_chains_via_gateway(client, pro_api_key, app):
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert len(result["chains"]) == 1
 
 
@@ -76,7 +76,7 @@ async def test_send_message_via_gateway(client, pro_api_key):
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["sender"] == "pro-agent"
     assert result["recipient"] == "other-agent"
     assert "id" in result
@@ -96,7 +96,7 @@ async def test_get_messages_via_gateway(client, pro_api_key, app):
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert len(result["messages"]) >= 1
 
 
@@ -116,7 +116,7 @@ async def test_negotiate_price_via_gateway(client, pro_api_key):
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["status"] == "proposed"
     assert result["proposed_amount"] == 50.0
 
@@ -148,7 +148,7 @@ async def test_check_sla_compliance_via_gateway(client, pro_api_key, app):
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert "compliant" in result
     assert "actual_uptime" in result
 
@@ -184,7 +184,7 @@ async def test_list_strategies_via_gateway(client, pro_api_key, app):
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert len(result["strategies"]) >= 1
     assert result["strategies"][0]["category"] == "strategy"
 
@@ -211,7 +211,7 @@ async def test_get_service_analytics_via_gateway(client, api_key, app):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["total_calls"] >= 3
     assert result["total_cost"] >= 0.5
 
@@ -232,7 +232,7 @@ async def test_get_revenue_report_via_gateway(client, pro_api_key, app):
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert "total_revenue" in result
     assert "payment_count" in result
 
@@ -266,8 +266,8 @@ async def test_create_split_intent(client, pro_api_key, app):
         },
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
-    assert resp.status_code == 200
-    result = resp.json()["result"]
+    assert resp.status_code in (200, 201)
+    result = resp.json()
     assert result["status"] == "settled"
     assert len(result["settlements"]) == 3
 

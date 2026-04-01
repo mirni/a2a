@@ -1,9 +1,31 @@
-"""Error mapping from product exceptions to HTTP JSON responses."""
+"""Error mapping from product exceptions to HTTP JSON responses.
+
+All error responses use RFC 9457 Problem Details format:
+  Content-Type: application/problem+json
+  Body: {type, title, status, detail, instance}
+"""
 
 from __future__ import annotations
 
+import http
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
+
+_BASE_URI = "https://api.greenhelix.net/errors"
+
+
+def _code_to_type_uri(code: str) -> str:
+    """Map an error code like 'unknown_tool' to a URI like '.../unknown-tool'."""
+    return f"{_BASE_URI}/{code.replace('_', '-')}"
+
+
+def _title_for_status(status: int) -> str:
+    """Return a short human-readable title for an HTTP status code."""
+    try:
+        return http.HTTPStatus(status).phrase
+    except ValueError:
+        return "Error"
 
 
 async def error_response(
@@ -12,12 +34,31 @@ async def error_response(
     code: str = "error",
     request: Request | None = None,
 ) -> JSONResponse:
-    """Build a standard error JSON response with optional request_id."""
-    body: dict = {"success": False, "error": {"code": code, "message": message}}
+    """Build an RFC 9457 Problem Details error response."""
+    body: dict = {
+        "type": _code_to_type_uri(code),
+        "title": _title_for_status(status),
+        "status": status,
+        "detail": message,
+    }
     if request is not None:
-        request_id = getattr(request.state, "correlation_id", None) or ""
-        body["request_id"] = request_id
-    return JSONResponse(body, status_code=status)
+        body["instance"] = request.url.path
+    return JSONResponse(body, status_code=status, media_type="application/problem+json")
+
+
+def problem_json_bytes(status: int, code: str, message: str, instance: str = "") -> bytes:
+    """Build RFC 9457 Problem Details as bytes for raw ASGI middleware use."""
+    import json
+
+    body = {
+        "type": _code_to_type_uri(code),
+        "title": _title_for_status(status),
+        "status": status,
+        "detail": message,
+    }
+    if instance:
+        body["instance"] = instance
+    return json.dumps(body).encode("utf-8")
 
 
 async def handle_product_exception(request: Request, exc: Exception) -> JSONResponse:

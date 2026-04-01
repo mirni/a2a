@@ -15,12 +15,15 @@ import pytest
 # ---------------------------------------------------------------------------
 
 
-async def _execute(client, api_key: str, tool: str, params: dict):
+async def _execute(client, api_key: str, tool: str, params: dict, *, idempotency_key: str | None = None):
     """Shorthand for POST /v1/execute."""
+    headers = {"Authorization": f"Bearer {api_key}"}
+    if idempotency_key is not None:
+        headers["Idempotency-Key"] = idempotency_key
     resp = await client.post(
         "/v1/execute",
         json={"tool": tool, "params": params},
-        headers={"Authorization": f"Bearer {api_key}"},
+        headers=headers,
     )
     return resp
 
@@ -42,11 +45,11 @@ async def test_deposit_idempotency_returns_same_result(client, api_key, app):
 
     r1 = await _execute(client, api_key, "deposit", params)
     assert r1.status_code == 200
-    balance_after_first = r1.json()["result"]["new_balance"]
+    balance_after_first = r1.json()["new_balance"]
 
     r2 = await _execute(client, api_key, "deposit", params)
     assert r2.status_code == 200
-    balance_after_second = r2.json()["result"]["new_balance"]
+    balance_after_second = r2.json()["new_balance"]
 
     # The balance should not have increased on the retry
     assert balance_after_second == balance_after_first
@@ -59,11 +62,11 @@ async def test_deposit_without_idempotency_key_creates_separate(client, api_key,
 
     r1 = await _execute(client, api_key, "deposit", params)
     assert r1.status_code == 200
-    b1 = r1.json()["result"]["new_balance"]
+    b1 = r1.json()["new_balance"]
 
     r2 = await _execute(client, api_key, "deposit", params)
     assert r2.status_code == 200
-    b2 = r2.json()["result"]["new_balance"]
+    b2 = r2.json()["new_balance"]
 
     # Second deposit should increase the balance further
     assert b2 > b1
@@ -85,13 +88,13 @@ async def test_deposit_different_idempotency_keys_create_separate(client, api_ke
 
     r1 = await _execute(client, api_key, "deposit", params_a)
     assert r1.status_code == 200
-    b1 = r1.json()["result"]["new_balance"]
+    b1 = r1.json()["new_balance"]
 
     r2 = await _execute(client, api_key, "deposit", params_b)
     assert r2.status_code == 200
-    b2 = r2.json()["result"]["new_balance"]
+    b2 = r2.json()["new_balance"]
 
-    assert b2 == b1 + 25.0
+    assert float(b2) == float(b1) + 25.0
 
 
 # ---------------------------------------------------------------------------
@@ -111,11 +114,11 @@ async def test_withdraw_idempotency_returns_same_result(client, api_key, app):
 
     r1 = await _execute(client, api_key, "withdraw", params)
     assert r1.status_code == 200
-    balance_after_first = r1.json()["result"]["new_balance"]
+    balance_after_first = r1.json()["new_balance"]
 
     r2 = await _execute(client, api_key, "withdraw", params)
     assert r2.status_code == 200
-    balance_after_second = r2.json()["result"]["new_balance"]
+    balance_after_second = r2.json()["new_balance"]
 
     assert balance_after_second == balance_after_first
 
@@ -127,11 +130,11 @@ async def test_withdraw_without_idempotency_key_creates_separate(client, api_key
 
     r1 = await _execute(client, api_key, "withdraw", params)
     assert r1.status_code == 200
-    b1 = r1.json()["result"]["new_balance"]
+    b1 = r1.json()["new_balance"]
 
     r2 = await _execute(client, api_key, "withdraw", params)
     assert r2.status_code == 200
-    b2 = r2.json()["result"]["new_balance"]
+    b2 = r2.json()["new_balance"]
 
     assert b2 < b1
 
@@ -161,12 +164,12 @@ async def test_create_split_intent_idempotency(client, pro_api_key, app):
     }
 
     r1 = await _execute(client, pro_api_key, "create_split_intent", params)
-    assert r1.status_code == 200, r1.json()
+    assert r1.status_code in (200, 201), r1.json()
 
     payer_balance_after_first = await ctx.tracker.wallet.get_balance("pro-agent")
 
     r2 = await _execute(client, pro_api_key, "create_split_intent", params)
-    assert r2.status_code == 200, r2.json()
+    assert r2.status_code in (200, 201), r2.json()
 
     payer_balance_after_second = await ctx.tracker.wallet.get_balance("pro-agent")
 
@@ -175,7 +178,7 @@ async def test_create_split_intent_idempotency(client, pro_api_key, app):
     balance_drop = payer_balance_after_first - payer_balance_after_second
     assert balance_drop < 100.0, f"Balance dropped by {balance_drop}, suggesting the split was executed twice"
     # Results should match
-    assert r1.json()["result"]["status"] == r2.json()["result"]["status"]
+    assert r1.json()["status"] == r2.json()["status"]
 
 
 # ---------------------------------------------------------------------------
@@ -201,13 +204,13 @@ async def test_create_performance_escrow_idempotency(client, pro_api_key, app):
     }
 
     r1 = await _execute(client, pro_api_key, "create_performance_escrow", params)
-    assert r1.status_code == 200, r1.json()
+    assert r1.status_code in (200, 201), r1.json()
 
     r2 = await _execute(client, pro_api_key, "create_performance_escrow", params)
-    assert r2.status_code == 200, r2.json()
+    assert r2.status_code in (200, 201), r2.json()
 
     # Same escrow_id must be returned
-    assert r1.json()["result"]["escrow_id"] == r2.json()["result"]["escrow_id"]
+    assert r1.json()["escrow_id"] == r2.json()["escrow_id"]
 
     # Payer balance should reflect only ONE escrow withdrawal (200 credits)
     # plus any per-call gateway fees, but NOT two 200-credit escrow withdrawals
@@ -252,6 +255,43 @@ async def test_refund_settlement_idempotency(client, pro_api_key, app):
     assert r2.status_code == 200, r2.json()
 
     # Same refund id
-    assert r1.json()["result"]["id"] == r2.json()["result"]["id"]
+    assert r1.json()["id"] == r2.json()["id"]
     # Amount should match
-    assert r1.json()["result"]["amount"] == r2.json()["result"]["amount"]
+    assert r1.json()["amount"] == r2.json()["amount"]
+
+
+# ---------------------------------------------------------------------------
+# Idempotency-Key HTTP header (T5)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_idempotency_key_header_prevents_duplicate(client, api_key, app):
+    """Idempotency-Key as HTTP header prevents duplicate deposits."""
+    params = {"agent_id": "test-agent", "amount": 100.0, "description": "header-test"}
+
+    r1 = await _execute(client, api_key, "deposit", params, idempotency_key="hdr-idem-001")
+    assert r1.status_code == 200
+    b1 = r1.json()["new_balance"]
+
+    r2 = await _execute(client, api_key, "deposit", params, idempotency_key="hdr-idem-001")
+    assert r2.status_code == 200
+    b2 = r2.json()["new_balance"]
+
+    assert b1 == b2, "Duplicate request with same Idempotency-Key header should not double-credit"
+
+
+@pytest.mark.asyncio
+async def test_idempotency_key_header_different_keys_create_separate(client, api_key, app):
+    """Different Idempotency-Key headers should each produce a distinct deposit."""
+    params = {"agent_id": "test-agent", "amount": 25.0}
+
+    r1 = await _execute(client, api_key, "deposit", params, idempotency_key="hdr-A")
+    assert r1.status_code == 200
+    b1 = r1.json()["new_balance"]
+
+    r2 = await _execute(client, api_key, "deposit", params, idempotency_key="hdr-B")
+    assert r2.status_code == 200
+    b2 = r2.json()["new_balance"]
+
+    assert float(b2) == float(b1) + 25.0

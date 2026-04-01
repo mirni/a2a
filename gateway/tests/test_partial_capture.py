@@ -27,11 +27,9 @@ async def test_partial_capture_basic(client, pro_api_key, app):
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["success"] is True
-    result = body["result"]
-    assert result["amount"] == 30.0
-    assert result["status"] == "settled"
-    assert "id" in result
+    assert float(body["amount"]) == 30.0
+    assert body["status"] == "settled"
+    assert "id" in body
 
 
 async def test_partial_capture_updates_remaining(client, pro_api_key, app):
@@ -52,7 +50,7 @@ async def test_partial_capture_updates_remaining(client, pro_api_key, app):
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["remaining_amount"] == 60.0
 
 
@@ -73,7 +71,7 @@ async def test_partial_capture_full_amount_voids_intent(client, pro_api_key, app
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["remaining_amount"] == 0.0
 
     # Verify the intent status is now settled/voided
@@ -98,8 +96,6 @@ async def test_partial_capture_exceeds_amount_fails(client, pro_api_key, app):
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 400
-    body = resp.json()
-    assert body["success"] is False
 
 
 async def test_partial_capture_missing_params(client, pro_api_key):
@@ -111,7 +107,7 @@ async def test_partial_capture_missing_params(client, pro_api_key):
     )
     assert resp.status_code == 400
     body = resp.json()
-    assert body["error"]["code"] == "missing_parameter"
+    assert body["type"].endswith("/missing-parameter")
 
 
 async def test_partial_capture_not_found(client, pro_api_key):

@@ -33,8 +33,7 @@ class TestMultiCurrencyPaymentTools:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert "balance" in data["result"]
+        assert "balance" in data
 
     async def test_get_balance_default_currency(self, client, api_key):
         """get_balance without currency should still work (default CREDITS)."""
@@ -48,8 +47,7 @@ class TestMultiCurrencyPaymentTools:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert "balance" in data["result"]
+        assert "balance" in data
 
     async def test_get_balance_with_usd_currency(self, client, api_key):
         """get_balance with currency=USD should return 0.0 for a new wallet."""
@@ -63,9 +61,8 @@ class TestMultiCurrencyPaymentTools:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["balance"] == 0.0
-        assert data["result"]["currency"] == "USD"
+        assert float(data["balance"]) == 0.0
+        assert data["currency"] == "USD"
 
     async def test_deposit_with_currency_param(self, client, api_key):
         """deposit with currency=CREDITS should work."""
@@ -83,8 +80,7 @@ class TestMultiCurrencyPaymentTools:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert "new_balance" in data["result"]
+        assert "new_balance" in data
 
     async def test_withdraw_with_currency_param(self, client, api_key):
         """withdraw with currency=CREDITS should work."""
@@ -102,8 +98,7 @@ class TestMultiCurrencyPaymentTools:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert "new_balance" in data["result"]
+        assert "new_balance" in data
 
     async def test_create_intent_with_currency_param(self, client, app, api_key):
         """create_intent with currency param should pass it through."""
@@ -124,10 +119,9 @@ class TestMultiCurrencyPaymentTools:
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 201)
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["currency"] == "CREDITS"
+        assert data["currency"] == "CREDITS"
 
     async def test_create_escrow_with_currency_param(self, client, app, pro_api_key):
         """create_escrow with currency param should pass it through."""
@@ -147,10 +141,9 @@ class TestMultiCurrencyPaymentTools:
             },
             headers={"Authorization": f"Bearer {pro_api_key}"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 201)
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["currency"] == "CREDITS"
+        assert data["currency"] == "CREDITS"
 
     async def test_create_intent_currency_in_catalog(self, client, api_key):
         """create_intent should accept currency param without validation error."""
@@ -212,12 +205,10 @@ class TestListApiKeys:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        result = data["result"]
-        assert "keys" in result
-        assert len(result["keys"]) >= 1  # at least the key used for auth
+        assert "keys" in data
+        assert len(data["keys"]) >= 1  # at least the key used for auth
         # Should NOT expose full key hashes (security)
-        for key_entry in result["keys"]:
+        for key_entry in data["keys"]:
             assert "key_hash_prefix" in key_entry
             assert "tier" in key_entry
             assert "created_at" in key_entry
@@ -274,8 +265,7 @@ class TestRevokeApiKey:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["revoked"] is True
+        assert data["revoked"] is True
 
     async def test_revoke_api_key_nonexistent_prefix(self, client, pro_api_key):
         """Revoking a key with a nonexistent prefix should report not found."""
@@ -289,8 +279,7 @@ class TestRevokeApiKey:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["revoked"] is False
+        assert data["revoked"] is False
 
     async def test_revoke_api_key_ownership_enforced(self, client, pro_api_key):
         """revoke_api_key for a different agent should be forbidden."""
@@ -358,12 +347,10 @@ class TestGetExchangeRate:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        result = data["result"]
-        assert "rate" in result
-        assert result["from_currency"] == "USD"
-        assert result["to_currency"] == "CREDITS"
-        assert float(result["rate"]) == 100.0
+        assert "rate" in data
+        assert data["from_currency"] == "USD"
+        assert data["to_currency"] == "CREDITS"
+        assert float(data["rate"]) == 100.0
 
     async def test_get_exchange_rate_auto_initializes(self, client, api_key):
         """get_exchange_rate should auto-initialize default rates without manual setup.
@@ -382,8 +369,7 @@ class TestGetExchangeRate:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True, f"Expected success, got: {data}"
-        assert float(data["result"]["rate"]) == 100.0
+        assert float(data["rate"]) == 100.0
 
     async def test_get_exchange_rate_same_currency(self, client, api_key):
         """get_exchange_rate for same currency should return rate=1."""
@@ -397,8 +383,7 @@ class TestGetExchangeRate:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert float(data["result"]["rate"]) == 1.0
+        assert float(data["rate"]) == 1.0
 
 
 class TestConvertCurrency:
@@ -443,10 +428,8 @@ class TestConvertCurrency:
         )
         data = resp.json()
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {data}"
-        assert data["success"] is True
-        result = data["result"]
-        assert result["from_amount"] == 100.0
-        assert result["to_amount"] > 0
+        assert float(data["from_amount"]) == 100.0
+        assert float(data["to_amount"]) > 0
 
     async def test_convert_currency_converts_balance(self, client, app, api_key):
         """convert_currency should withdraw from source and deposit to target."""
@@ -471,12 +454,10 @@ class TestConvertCurrency:
         )
         data = resp.json()
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {data}"
-        assert data["success"] is True
-        result = data["result"]
-        assert result["from_amount"] == 100.0
-        assert result["from_currency"] == "CREDITS"
-        assert result["to_currency"] == "USD"
-        assert result["to_amount"] > 0
+        assert float(data["from_amount"]) == 100.0
+        assert data["from_currency"] == "CREDITS"
+        assert data["to_currency"] == "USD"
+        assert float(data["to_amount"]) > 0
 
     async def test_convert_currency_ownership_enforced(self, client, api_key):
         """convert_currency for a different agent should be forbidden."""

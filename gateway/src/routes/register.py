@@ -59,12 +59,10 @@ async def register(request: Request) -> JSONResponse:
 
     return JSONResponse(
         {
-            "success": True,
-            "result": {
-                "agent_id": agent_id,
-                "api_key": key_info["key"],
-                "tier": "free",
-                "balance": balance,
-            },
-        }
+            "agent_id": agent_id,
+            "api_key": key_info["key"],
+            "tier": "free",
+            "balance": balance,
+        },
+        status_code=201,
     )

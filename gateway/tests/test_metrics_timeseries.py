@@ -40,9 +40,7 @@ class TestMetricsTimeseries:
             headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 200
-        data = resp.json()
-        assert data["success"] is True
-        result = data["result"]
+        result = resp.json()
         assert "buckets" in result
         assert isinstance(result["buckets"], list)
         # Should have at least one bucket with calls and cost
@@ -52,7 +50,7 @@ class TestMetricsTimeseries:
         assert "calls" in bucket
         assert "cost" in bucket
         assert bucket["calls"] >= 2
-        assert bucket["cost"] >= 0.3 - 0.01  # floating point tolerance
+        assert float(bucket["cost"]) >= 0.3 - 0.01  # floating point tolerance
 
     async def test_returns_buckets_for_daily_interval(self, client, api_key, app):
         """Should return bucketed usage data with daily interval."""
@@ -68,9 +66,7 @@ class TestMetricsTimeseries:
             headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 200
-        data = resp.json()
-        assert data["success"] is True
-        result = data["result"]
+        result = resp.json()
         assert "buckets" in result
         assert len(result["buckets"]) >= 1
 
@@ -94,9 +90,8 @@ class TestMetricsTimeseries:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
         # No buckets should match a future since timestamp
-        assert len(data["result"]["buckets"]) == 0
+        assert len(data["buckets"]) == 0
 
     async def test_limit_constrains_bucket_count(self, client, api_key, app):
         """The limit parameter should constrain the number of returned buckets."""
@@ -117,7 +112,7 @@ class TestMetricsTimeseries:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data["result"]["buckets"]) <= 2
+        assert len(data["buckets"]) <= 2
 
     async def test_empty_agent_returns_empty_buckets(self, client, api_key):
         """An agent with no usage records should get empty buckets."""
@@ -132,8 +127,7 @@ class TestMetricsTimeseries:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["buckets"] == []
+        assert data["buckets"] == []
 
     async def test_missing_required_params(self, client, api_key):
         """Should fail when required params (agent_id, interval) are missing."""

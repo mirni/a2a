@@ -99,7 +99,7 @@ class TestX402Batch:
         pr_b64 = resp.headers["payment-required"]
         pr = json.loads(base64.b64decode(pr_b64))
         assert pr["pay_to"] == "0xTestMerchant"
-        assert resp.json()["error"]["code"] == "payment_required"
+        assert resp.json()["type"].endswith("/payment-required")
 
     @pytest.mark.asyncio
     async def test_batch_valid_proof_succeeds(self, x402_client, x402_app):

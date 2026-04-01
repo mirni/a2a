@@ -18,7 +18,7 @@ async def test_backup_database_tool(client, admin_api_key):
         headers={"Authorization": f"Bearer {admin_api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["size_bytes"] > 0
     assert "created_at" in result
     assert result["path"].endswith(".db")
@@ -35,7 +35,7 @@ async def test_backup_with_encryption(client, admin_api_key):
         headers={"Authorization": f"Bearer {admin_api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     # Security: key must NOT be in the response — only key_id for retrieval
     assert "key" not in result, "Encryption key should not be in API response"
     assert "key_id" in result
@@ -54,7 +54,7 @@ async def test_restore_database_tool(client, admin_api_key):
         headers={"Authorization": f"Bearer {admin_api_key}"},
     )
     assert backup_resp.status_code == 200
-    backup_path = backup_resp.json()["result"]["path"]
+    backup_path = backup_resp.json()["path"]
 
     # Restore it
     resp = await client.post(
@@ -66,7 +66,7 @@ async def test_restore_database_tool(client, admin_api_key):
         headers={"Authorization": f"Bearer {admin_api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["size_bytes"] > 0
     assert "restored_at" in result
 
@@ -82,7 +82,7 @@ async def test_integrity_check_tool(client, admin_api_key):
         headers={"Authorization": f"Bearer {admin_api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["ok"] is True
     assert result["page_count"] > 0
 
@@ -98,7 +98,7 @@ async def test_list_backups_empty(client, admin_api_key):
         headers={"Authorization": f"Bearer {admin_api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["backups"] == []
 
 
@@ -121,7 +121,7 @@ async def test_list_backups_after_backup(client, admin_api_key):
         headers={"Authorization": f"Bearer {admin_api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert len(result["backups"]) >= 1
 
 
@@ -137,8 +137,8 @@ async def test_backup_unknown_db_error(client, admin_api_key):
     )
     assert resp.status_code == 400
     body = resp.json()
-    assert body["success"] is False
-    assert "error" in body
+    assert "type" in body
+    assert body["status"] == 400
 
 
 async def test_check_all_databases_integrity(client, admin_api_key):
@@ -165,5 +165,5 @@ async def test_check_all_databases_integrity(client, admin_api_key):
             headers={"Authorization": f"Bearer {admin_api_key}"},
         )
         assert resp.status_code == 200, f"Failed for {db_name}"
-        result = resp.json()["result"]
+        result = resp.json()
         assert result["ok"] is True, f"Integrity check failed for {db_name}"

@@ -37,10 +37,8 @@ async def test_register_server_creates_server(client, api_key):
         },
         headers={"Authorization": f"Bearer {api_key}"},
     )
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["success"] is True
-    result = data["result"]
+    assert resp.status_code in (200, 201)
+    result = resp.json()
     assert result["name"] == "my-server"
     assert result["url"] == "https://my-server.example.com"
     assert "id" in result

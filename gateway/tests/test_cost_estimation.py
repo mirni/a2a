@@ -21,7 +21,7 @@ async def test_estimate_cost_basic(client, api_key):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["tool_name"] == "get_balance"
     assert result["quantity"] == 100
     assert "unit_price" in result
@@ -52,7 +52,7 @@ async def test_estimate_cost_with_agent_discount(client, api_key, app):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["discount_pct"] == 5
     expected_total = result["unit_price"] * result["quantity"] * (1 - 5 / 100)
     assert abs(result["total_cost"] - expected_total) < 0.01
@@ -73,7 +73,7 @@ async def test_estimate_cost_unknown_tool(client, api_key):
     )
     assert resp.status_code == 404
     body = resp.json()
-    assert body["error"]["code"] == "not_found"
+    assert body["type"].endswith("/not-found")
 
 
 async def test_estimate_cost_missing_params(client, api_key):

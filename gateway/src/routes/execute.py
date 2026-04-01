@@ -437,6 +437,11 @@ async def execute(request: Request) -> JSONResponse:
     params["_caller_agent_id"] = agent_id
     params["_caller_tier"] = agent_tier
 
+    # Inject Idempotency-Key header into params if not already present
+    header_idem = request.headers.get("idempotency-key")
+    if header_idem and "idempotency_key" not in params:
+        params["idempotency_key"] = header_idem
+
     # Record the request in metrics regardless of outcome
     await Metrics.record_request(tool_name)
 
@@ -475,7 +480,12 @@ async def execute(request: Request) -> JSONResponse:
 
     # --- 7. Record usage + charge ---
     correlation_id = getattr(request.state, "correlation_id", None) or ""
-    idem_key = f"{correlation_id}:{tool_name}" if correlation_id else None
+    # Prefer Idempotency-Key header; fall back to body param; then correlation-based
+    idem_key = (
+        request.headers.get("idempotency-key")
+        or params.get("idempotency_key")
+        or (f"{correlation_id}:{tool_name}" if correlation_id else None)
+    )
     try:
         await ctx.tracker.storage.record_usage(
             agent_id=agent_id,
@@ -532,12 +542,57 @@ async def execute(request: Request) -> JSONResponse:
         _tc = _get_tier_config(agent_tier)
         headers.update(_rate_limit_headers(_tc.rate_limit_per_hour, rate_count))
 
-    response_body: dict[str, Any] = {
-        "success": True,
-        "result": result,
-        "charged": cost,
-        "request_id": correlation_id,
+    # Serialize monetary values as strings and timestamps as ISO 8601
+    from gateway.src.serialization import serialize_money, serialize_response
+
+    result = serialize_response(result)
+
+    # Envelope-free: result is the body; cost goes in X-Charged header
+    headers["X-Charged"] = serialize_money(cost)
+
+    # Determine status code: 201 for create tools, 200 otherwise
+    _CREATE_TOOLS: frozenset[str] = frozenset(
+        {
+            "create_intent",
+            "create_escrow",
+            "create_performance_escrow",
+            "create_subscription",
+            "create_split_intent",
+            "open_dispute",
+            "register_webhook",
+            "register_server",
+            "register_agent",
+            "create_org",
+            "create_api_key",
+        }
+    )
+    _LOCATION_TEMPLATES: dict[str, str] = {
+        "create_intent": "/v1/intents/{id}",
+        "create_escrow": "/v1/escrows/{id}",
+        "create_performance_escrow": "/v1/escrows/{escrow_id}",
+        "create_subscription": "/v1/subscriptions/{id}",
+        "create_split_intent": "/v1/intents/{id}",
+        "open_dispute": "/v1/disputes/{id}",
+        "register_webhook": "/v1/webhooks/{id}",
+        "create_org": "/v1/orgs/{org_id}",
     }
+
+    status_code = 201 if tool_name in _CREATE_TOOLS else 200
+
+    # Add Location header for create tools when result has an id
+    if tool_name in _LOCATION_TEMPLATES and isinstance(result, dict):
+        tpl = _LOCATION_TEMPLATES[tool_name]
+        # Try common id field names
+        resource_id = result.get("id") or result.get("escrow_id") or result.get("org_id")
+        if resource_id:
+            headers["Location"] = tpl.format(id=resource_id, escrow_id=resource_id, org_id=resource_id)
+
+    # Add Link header for cursor-based pagination when has_more is true
+    if isinstance(result, dict) and result.get("has_more") and result.get("next_cursor"):
+        cursor = result["next_cursor"]
+        limit = result.get("limit", 50)
+        link_url = f"/v1/execute?cursor={cursor}&limit={limit}"
+        headers["Link"] = f'<{link_url}>; rel="next"'
 
     # Sign response if signing manager available
     signing_manager = getattr(request.app.state, "signing_manager", None)
@@ -546,7 +601,7 @@ async def execute(request: Request) -> JSONResponse:
 
         from gateway.src.signing import sign_response
 
-        body_bytes = _json.dumps({"success": True, "result": result, "charged": cost}).encode()
+        body_bytes = _json.dumps(result).encode()
         headers.update(sign_response(signing_manager, body_bytes))
 
-    return JSONResponse(response_body, headers=headers)
+    return JSONResponse(result, status_code=status_code, headers=headers)

@@ -24,13 +24,11 @@ class TestRegisterAgent:
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 201)
         data = resp.json()
-        assert data["success"] is True
-        result = data["result"]
-        assert result["agent_id"] == "test-agent"
-        assert len(result["public_key"]) == 64  # 32 bytes hex
-        assert result["created_at"] > 0
+        assert data["agent_id"] == "test-agent"
+        assert len(data["public_key"]) == 64  # 32 bytes hex
+        assert isinstance(data["created_at"], str) and "T" in data["created_at"]
 
 
 class TestVerifyAgent:
@@ -50,7 +48,7 @@ class TestVerifyAgent:
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 201)
 
         # Sign a message
         message = "prove identity"
@@ -71,8 +69,7 @@ class TestVerifyAgent:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["valid"] is True
+        assert data["valid"] is True
 
 
 class TestSubmitMetrics:
@@ -90,7 +87,7 @@ class TestSubmitMetrics:
             },
             headers={"Authorization": f"Bearer {pro_api_key}"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 201)
 
         # Submit metrics
         resp = await client.post(
@@ -107,12 +104,10 @@ class TestSubmitMetrics:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        result = data["result"]
-        assert result["agent_id"] == "pro-agent"
-        assert len(result["commitment_hashes"]) == 2
-        assert result["data_source"] == "self_reported"
-        assert len(result["signature"]) > 0
+        assert data["agent_id"] == "pro-agent"
+        assert len(data["commitment_hashes"]) == 2
+        assert data["data_source"] == "self_reported"
+        assert len(data["signature"]) > 0
 
     @pytest.mark.asyncio
     async def test_submit_metrics_invalid_metric_returns_400(self, app, client, pro_api_key):
@@ -135,7 +130,7 @@ class TestSubmitMetrics:
             headers={"Authorization": f"Bearer {pro_api_key}"},
         )
         assert resp.status_code == 400
-        assert "invalid_metric" in resp.json()["error"]["code"]
+        assert resp.json()["type"].endswith("/invalid-metric")
 
     @pytest.mark.asyncio
     async def test_submit_metrics_requires_pro_tier(self, app, client, api_key):
@@ -149,7 +144,7 @@ class TestSubmitMetrics:
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 201)
 
         # Try submit_metrics with free tier key
         resp = await client.post(
@@ -202,8 +197,7 @@ class TestGetVerifiedClaims:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        claims = data["result"]["claims"]
+        claims = data["claims"]
         assert len(claims) == 2
         metric_names = {c["metric_name"] for c in claims}
         assert "sharpe_30d" in metric_names
@@ -226,8 +220,7 @@ class TestGetReputation:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["found"] is False
+        assert data["found"] is False
 
     @pytest.mark.asyncio
     async def test_get_reputation_after_compute(self, app, client, pro_api_key):
@@ -265,8 +258,6 @@ class TestGetReputation:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        result = data["result"]
-        assert result["found"] is True
-        assert result["composite_score"] > 0
-        assert result["confidence"] > 0
+        assert data["found"] is True
+        assert data["composite_score"] > 0
+        assert data["confidence"] > 0

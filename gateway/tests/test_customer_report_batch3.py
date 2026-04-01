@@ -57,7 +57,7 @@ class TestGetMessagesOffset:
             {"agent_id": "msg-offset-agent", "limit": 50},
             key,
         )
-        all_msgs = resp_all.json()["result"]["messages"]
+        all_msgs = resp_all.json()["messages"]
         assert len(all_msgs) == 5
 
         # Get with offset=2
@@ -68,7 +68,7 @@ class TestGetMessagesOffset:
             key,
         )
         assert resp.status_code == 200
-        messages = resp.json()["result"]["messages"]
+        messages = resp.json()["messages"]
         assert len(messages) == 2
         # Offset=2 should skip first 2 (newest-first) and return the 3rd and 4th
         assert messages[0] != all_msgs[0]
@@ -98,7 +98,7 @@ class TestSearchServersOffset:
             key,
         )
         assert resp.status_code == 200
-        servers = resp.json()["result"]["servers"]
+        servers = resp.json()["servers"]
         assert len(servers) == 2
 
 
@@ -138,5 +138,5 @@ class TestWebhookDeliveriesOffset:
             key,
         )
         assert resp.status_code == 200
-        deliveries = resp.json()["result"]["deliveries"]
+        deliveries = resp.json()["deliveries"]
         assert len(deliveries) == 2

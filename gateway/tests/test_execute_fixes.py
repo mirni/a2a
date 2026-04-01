@@ -31,7 +31,7 @@ async def test_unauth_known_tool_missing_params_returns_401_not_400(client):
         f"Expected 401 but got {resp.status_code}: unauthenticated request "
         f"should fail at auth, not at param validation. Body: {resp.json()}"
     )
-    assert resp.json()["error"]["code"] == "missing_key"
+    assert resp.json()["type"].endswith("/missing-key")
 
 
 async def test_invalid_key_known_tool_missing_params_returns_401_not_400(client):
@@ -58,8 +58,8 @@ async def test_authenticated_missing_params_returns_400_with_param_names(client,
     )
     assert resp.status_code == 400
     body = resp.json()
-    assert body["error"]["code"] == "missing_parameter"
-    assert "agent_id" in body["error"]["message"]
+    assert body["type"].endswith("/missing-parameter")
+    assert "agent_id" in body["detail"]
 
 
 # ---------------------------------------------------------------------------

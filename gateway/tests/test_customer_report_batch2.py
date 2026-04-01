@@ -90,7 +90,7 @@ class TestRespondToDisputeCallerCheck:
             key_seller,
         )
         assert resp.status_code == 200
-        assert resp.json()["result"]["status"] == "responded"
+        assert resp.json()["status"] == "responded"
 
 
 # ============================================================================
@@ -144,7 +144,7 @@ class TestDisputeQueryTools:
 
         resp = await _exec(client, "get_dispute", {"dispute_id": dispute["id"]}, key)
         assert resp.status_code == 200
-        result = resp.json()["result"]
+        result = resp.json()
         assert result["id"] == dispute["id"]
         assert result["status"] == "open"
         assert result["escrow_id"] == escrow.id
@@ -166,6 +166,6 @@ class TestDisputeQueryTools:
 
         resp = await _exec(client, "list_disputes", {"agent_id": "buyer-ld8"}, key)
         assert resp.status_code == 200
-        result = resp.json()["result"]
+        result = resp.json()
         assert "disputes" in result
         assert len(result["disputes"]) >= 1

@@ -46,7 +46,7 @@ class TestGetIntentTool:
 
         resp = await _exec(client, "get_intent", {"intent_id": intent.id}, key)
         assert resp.status_code == 200
-        result = resp.json()["result"]
+        result = resp.json()
         assert result["id"] == intent.id
         assert result["status"] == "pending"
         assert result["payer"] == "payer-gi12"
@@ -73,7 +73,7 @@ class TestGetEscrowTool:
 
         resp = await _exec(client, "get_escrow", {"escrow_id": escrow.id}, key)
         assert resp.status_code == 200
-        result = resp.json()["result"]
+        result = resp.json()
         assert result["id"] == escrow.id
         assert result["status"] == "held"
         assert float(result["amount"]) == 50.0
@@ -106,12 +106,12 @@ class TestEscrowIdempotency:
         }
 
         resp1 = await _exec(client, "create_escrow", params, key)
-        assert resp1.status_code == 200
-        id1 = resp1.json()["result"]["id"]
+        assert resp1.status_code in (200, 201)
+        id1 = resp1.json()["id"]
 
         resp2 = await _exec(client, "create_escrow", params, key)
-        assert resp2.status_code == 200
-        id2 = resp2.json()["result"]["id"]
+        assert resp2.status_code in (200, 201)
+        id2 = resp2.json()["id"]
 
         assert id1 == id2
 
@@ -142,7 +142,7 @@ class TestEscrowIdempotency:
             },
             key,
         )
-        assert resp1.json()["result"]["id"] != resp2.json()["result"]["id"]
+        assert resp1.json()["id"] != resp2.json()["id"]
 
 
 class TestSubscriptionIdempotency:
@@ -162,11 +162,11 @@ class TestSubscriptionIdempotency:
         }
 
         resp1 = await _exec(client, "create_subscription", params, key)
-        assert resp1.status_code == 200
-        id1 = resp1.json()["result"]["id"]
+        assert resp1.status_code in (200, 201)
+        id1 = resp1.json()["id"]
 
         resp2 = await _exec(client, "create_subscription", params, key)
-        assert resp2.status_code == 200
-        id2 = resp2.json()["result"]["id"]
+        assert resp2.status_code in (200, 201)
+        id2 = resp2.json()["id"]
 
         assert id1 == id2

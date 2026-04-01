@@ -32,7 +32,7 @@ async def test_search_agents_by_metric(client, pro_api_key, app):
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     agent_ids = [a["agent_id"] for a in result["agents"]]
     assert "bot-alpha" in agent_ids
     assert "bot-gamma" in agent_ids
@@ -61,7 +61,7 @@ async def test_search_agents_by_max_drawdown(client, pro_api_key, app):
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     agent_ids = [a["agent_id"] for a in result["agents"]]
     assert "dd-bot-a" in agent_ids
     assert "dd-bot-b" not in agent_ids
@@ -81,4 +81,4 @@ async def test_search_agents_empty_result(client, pro_api_key, app):
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 200
-    assert resp.json()["result"]["agents"] == []
+    assert resp.json()["agents"] == []

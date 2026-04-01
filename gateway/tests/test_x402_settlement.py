@@ -265,7 +265,7 @@ class TestFacilitatorTimeout:
             )
 
         assert resp.status_code == 402
-        assert "verification_failed" in resp.json()["error"]["code"]
+        assert resp.json()["type"].endswith("/payment-verification-failed")
 
 
 class TestFreeTool:
@@ -287,7 +287,7 @@ class TestFreeTool:
             )
 
         assert resp.status_code == 200
-        assert resp.json()["charged"] == 0.0
+        assert float(resp.headers["x-charged"]) == 0.0
 
 
 class TestSettlementFailureHandling:
@@ -329,4 +329,3 @@ class TestSettlementFailureHandling:
 
         # Response should still succeed despite settlement failure
         assert resp.status_code == 200
-        assert resp.json()["success"] is True

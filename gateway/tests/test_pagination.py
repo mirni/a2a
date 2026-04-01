@@ -50,19 +50,18 @@ async def test_list_api_keys_paginate_first_page(client, app, api_key):
             "paginate": True,
         },
     )
-    result = body["result"]
 
-    assert "items" in result, "Paginated response must contain 'items'"
-    assert "total" in result, "Paginated response must contain 'total'"
-    assert "offset" in result, "Paginated response must contain 'offset'"
-    assert "limit" in result, "Paginated response must contain 'limit'"
-    assert "has_more" in result, "Paginated response must contain 'has_more'"
+    assert "items" in body, "Paginated response must contain 'items'"
+    assert "total" in body, "Paginated response must contain 'total'"
+    assert "offset" in body, "Paginated response must contain 'offset'"
+    assert "limit" in body, "Paginated response must contain 'limit'"
+    assert "has_more" in body, "Paginated response must contain 'has_more'"
 
-    assert len(result["items"]) == 2
-    assert result["total"] >= 4
-    assert result["offset"] == 0
-    assert result["limit"] == 2
-    assert result["has_more"] is True
+    assert len(body["items"]) == 2
+    assert float(body["total"]) >= 4
+    assert body["offset"] == 0
+    assert body["limit"] == 2
+    assert body["has_more"] is True
 
 
 async def test_list_api_keys_paginate_second_page(client, app, api_key):
@@ -82,12 +81,11 @@ async def test_list_api_keys_paginate_second_page(client, app, api_key):
             "paginate": True,
         },
     )
-    result = body["result"]
 
-    assert len(result["items"]) == 2
-    assert result["offset"] == 2
-    assert result["limit"] == 2
-    assert result["total"] >= 4
+    assert len(body["items"]) == 2
+    assert body["offset"] == 2
+    assert body["limit"] == 2
+    assert float(body["total"]) >= 4
 
 
 async def test_list_api_keys_without_paginate_returns_flat(client, app, api_key):
@@ -100,11 +98,10 @@ async def test_list_api_keys_without_paginate_returns_flat(client, app, api_key)
             "agent_id": "test-agent",
         },
     )
-    result = body["result"]
 
     # Legacy format: {"keys": [...]}
-    assert "keys" in result
-    assert "items" not in result
+    assert "keys" in body
+    assert "items" not in body
 
 
 async def test_list_api_keys_paginate_metadata_total(client, app, api_key):
@@ -125,11 +122,10 @@ async def test_list_api_keys_paginate_metadata_total(client, app, api_key):
             "paginate": True,
         },
     )
-    result = body["result"]
 
-    assert result["total"] == 5
-    assert len(result["items"]) == 5
-    assert result["has_more"] is False
+    assert float(body["total"]) == 5
+    assert len(body["items"]) == 5
+    assert body["has_more"] is False
 
 
 # ---------------------------------------------------------------------------
@@ -167,15 +163,14 @@ async def test_search_services_paginate(client, app, api_key):
             "paginate": True,
         },
     )
-    result = body["result"]
 
-    assert "items" in result
-    assert "total" in result
-    assert len(result["items"]) == 2
-    assert result["total"] >= 5
-    assert result["offset"] == 0
-    assert result["limit"] == 2
-    assert result["has_more"] is True
+    assert "items" in body
+    assert "total" in body
+    assert len(body["items"]) == 2
+    assert float(body["total"]) >= 5
+    assert body["offset"] == 0
+    assert body["limit"] == 2
+    assert body["has_more"] is True
 
 
 async def test_search_services_offset_returns_different_subset(client, app, api_key):
@@ -219,8 +214,8 @@ async def test_search_services_offset_returns_different_subset(client, app, api_
         },
     )
 
-    page1_ids = {s["id"] for s in body_page1["result"]["items"]}
-    page2_ids = {s["id"] for s in body_page2["result"]["items"]}
+    page1_ids = {s["id"] for s in body_page1["items"]}
+    page2_ids = {s["id"] for s in body_page2["items"]}
 
     # Pages must not overlap
     assert page1_ids.isdisjoint(page2_ids), "Paginated pages must return different items"
@@ -236,9 +231,8 @@ async def test_search_services_without_paginate_returns_flat(client, app, api_ke
             "category": "analytics",
         },
     )
-    result = body["result"]
-    assert "services" in result
-    assert "items" not in result
+    assert "services" in body
+    assert "items" not in body
 
 
 # ---------------------------------------------------------------------------
@@ -276,13 +270,12 @@ async def test_search_agents_paginate(client, app, api_key):
             "paginate": True,
         },
     )
-    result = body["result"]
 
-    assert "items" in result
-    assert "total" in result
-    assert len(result["items"]) == 2
-    assert result["total"] >= 4
-    assert result["has_more"] is True
+    assert "items" in body
+    assert "total" in body
+    assert len(body["items"]) == 2
+    assert float(body["total"]) >= 4
+    assert body["has_more"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -312,13 +305,12 @@ async def test_list_webhooks_paginate(client, app, pro_api_key):
             "paginate": True,
         },
     )
-    result = body["result"]
 
-    assert "items" in result
-    assert "total" in result
-    assert len(result["items"]) == 2
-    assert result["total"] >= 4
-    assert result["has_more"] is True
+    assert "items" in body
+    assert "total" in body
+    assert len(body["items"]) == 2
+    assert float(body["total"]) >= 4
+    assert body["has_more"] is True
 
 
 async def test_list_webhooks_without_paginate_returns_flat(client, app, pro_api_key):
@@ -339,9 +331,8 @@ async def test_list_webhooks_without_paginate_returns_flat(client, app, pro_api_
             "agent_id": "pro-agent",
         },
     )
-    result = body["result"]
-    assert "webhooks" in result
-    assert "items" not in result
+    assert "webhooks" in body
+    assert "items" not in body
 
 
 # ---------------------------------------------------------------------------
@@ -362,9 +353,8 @@ async def test_paginate_with_negative_offset_returns_error_or_empty(client, app,
             "paginate": True,
         },
     )
-    result = body["result"]
     # Should clamp to 0
-    assert result["offset"] == 0
+    assert body["offset"] == 0
 
 
 async def test_paginate_with_zero_limit(client, app, api_key):
@@ -380,7 +370,155 @@ async def test_paginate_with_zero_limit(client, app, api_key):
             "paginate": True,
         },
     )
-    result = body["result"]
-    assert result["items"] == []
-    assert result["total"] >= 1
-    assert result["limit"] == 0
+    assert body["items"] == []
+    assert float(body["total"]) >= 1
+    assert body["limit"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Cursor-based pagination (T9)
+# ---------------------------------------------------------------------------
+
+
+async def _exec_with_resp(client, api_key, tool: str, params: dict):
+    """Execute a tool and return (body, response) for header inspection."""
+    resp = await client.post(
+        "/v1/execute",
+        json={"tool": tool, "params": params},
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 200, resp.text
+    return resp.json(), resp
+
+
+async def test_cursor_pagination_returns_next_cursor(client, app, api_key):
+    """When has_more=True, response includes next_cursor."""
+    ctx = app.state.ctx
+    for _ in range(4):
+        await ctx.key_manager.create_key("test-agent", tier="free")
+
+    body, resp = await _exec_with_resp(
+        client,
+        api_key,
+        "list_api_keys",
+        {
+            "agent_id": "test-agent",
+            "offset": 0,
+            "limit": 2,
+            "paginate": True,
+        },
+    )
+
+    assert body["has_more"] is True
+    assert "next_cursor" in body, "Paginated response with has_more must include next_cursor"
+    assert isinstance(body["next_cursor"], str)
+    assert len(body["next_cursor"]) > 0
+
+
+async def test_cursor_pagination_link_header(client, app, api_key):
+    """When has_more=True, Link header with rel=next is present."""
+    ctx = app.state.ctx
+    for _ in range(4):
+        await ctx.key_manager.create_key("test-agent", tier="free")
+
+    body, resp = await _exec_with_resp(
+        client,
+        api_key,
+        "list_api_keys",
+        {
+            "agent_id": "test-agent",
+            "offset": 0,
+            "limit": 2,
+            "paginate": True,
+        },
+    )
+
+    assert body["has_more"] is True
+    link = resp.headers.get("link")
+    assert link is not None, "Link header must be present when has_more=True"
+    assert 'rel="next"' in link
+
+
+async def test_cursor_pagination_using_cursor_param(client, app, api_key):
+    """Using cursor param from page 1 returns page 2 items."""
+    ctx = app.state.ctx
+    for _ in range(4):
+        await ctx.key_manager.create_key("test-agent", tier="free")
+
+    # First page
+    body1 = await _exec(
+        client,
+        api_key,
+        "list_api_keys",
+        {
+            "agent_id": "test-agent",
+            "offset": 0,
+            "limit": 2,
+            "paginate": True,
+        },
+    )
+    assert body1["has_more"] is True
+    cursor = body1["next_cursor"]
+
+    # Second page using cursor
+    body2 = await _exec(
+        client,
+        api_key,
+        "list_api_keys",
+        {
+            "agent_id": "test-agent",
+            "cursor": cursor,
+            "limit": 2,
+            "paginate": True,
+        },
+    )
+    assert "items" in body2
+    assert len(body2["items"]) > 0
+    # Page 2 items should differ from page 1 (compare by key_hash_prefix)
+    prefixes1 = {k["key_hash_prefix"] for k in body1["items"]}
+    prefixes2 = {k["key_hash_prefix"] for k in body2["items"]}
+    assert prefixes1.isdisjoint(prefixes2), "Cursor-based page 2 should not overlap page 1"
+
+
+async def test_no_link_header_when_no_more_pages(client, app, api_key):
+    """When has_more=False, no Link header and no next_cursor."""
+    body, resp = await _exec_with_resp(
+        client,
+        api_key,
+        "list_api_keys",
+        {
+            "agent_id": "test-agent",
+            "offset": 0,
+            "limit": 100,
+            "paginate": True,
+        },
+    )
+
+    assert body["has_more"] is False
+    assert "next_cursor" not in body
+    assert resp.headers.get("link") is None
+
+
+async def test_pricing_cursor_pagination(client, app, api_key):
+    """GET /v1/pricing with cursor param returns correct page."""
+    # First page
+    resp1 = await client.get(
+        "/v1/pricing?limit=2&offset=0",
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp1.status_code == 200
+    body1 = resp1.json()
+    assert len(body1["tools"]) == 2
+
+    # If there are more tools, check Link header
+    if body1.get("has_more") or body1.get("next_cursor"):
+        cursor = body1["next_cursor"]
+        resp2 = await client.get(
+            f"/v1/pricing?cursor={cursor}&limit=2",
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp2.status_code == 200
+        body2 = resp2.json()
+        names1 = {t["name"] for t in body1["tools"]}
+        names2 = {t["name"] for t in body2["tools"]}
+        assert names1.isdisjoint(names2)
