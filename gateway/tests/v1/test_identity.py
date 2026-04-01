@@ -21,10 +21,10 @@ async def _register_agent(client, key, agent_id="id-agent-1"):
 
 
 async def test_register_agent_via_rest(client, api_key):
-    resp = await _register_agent(client, api_key, "rest-agent-1")
+    resp = await _register_agent(client, api_key, "test-agent")
     assert resp.status_code == 201
     body = resp.json()
-    assert body["agent_id"] == "rest-agent-1"
+    assert body["agent_id"] == "test-agent"
 
 
 async def test_register_agent_no_auth(client):
@@ -41,14 +41,14 @@ async def test_register_agent_no_auth(client):
 
 
 async def test_get_agent_identity_via_rest(client, api_key):
-    await _register_agent(client, api_key, "id-get-1")
+    await _register_agent(client, api_key, "test-agent")
     resp = await client.get(
-        "/v1/identity/agents/id-get-1",
+        "/v1/identity/agents/test-agent",
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["agent_id"] == "id-get-1"
+    assert body["agent_id"] == "test-agent"
 
 
 async def test_get_agent_identity_not_found(client, api_key):
@@ -66,10 +66,10 @@ async def test_get_agent_identity_not_found(client, api_key):
 
 
 async def test_verify_agent_via_rest(client, api_key):
-    await _register_agent(client, api_key, "verify-1")
+    await _register_agent(client, api_key, "test-agent")
     # Sign with key (will use identity API's built-in signing)
     resp = await client.post(
-        "/v1/identity/agents/verify-1/verify",
+        "/v1/identity/agents/test-agent/verify",
         json={"message": "hello", "signature": "00" * 64},
         headers={"Authorization": f"Bearer {api_key}"},
     )
@@ -111,9 +111,9 @@ async def test_get_verified_claims_via_rest(client, api_key):
 
 
 async def test_submit_metrics_via_rest(client, pro_api_key):
-    await _register_agent(client, pro_api_key, "metric-agent")
+    await _register_agent(client, pro_api_key, "pro-agent")
     resp = await client.post(
-        "/v1/identity/agents/metric-agent/metrics",
+        "/v1/identity/agents/pro-agent/metrics",
         json={"metrics": {"p99_latency_ms": 150, "win_rate_30d": 0.75}},
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
@@ -142,9 +142,9 @@ async def test_search_agents_by_metrics_via_rest(client, pro_api_key):
 
 
 async def test_build_claim_chain_via_rest(client, pro_api_key):
-    await _register_agent(client, pro_api_key, "chain-agent")
+    await _register_agent(client, pro_api_key, "pro-agent")
     resp = await client.post(
-        "/v1/identity/agents/chain-agent/claim-chains",
+        "/v1/identity/agents/pro-agent/claim-chains",
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 200
@@ -202,33 +202,33 @@ async def test_add_agent_to_org_via_rest(client, api_key):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     org_id = create_resp.json()["org_id"]
-    await _register_agent(client, api_key, "org-member-1")
+    await _register_agent(client, api_key, "test-agent")
     resp = await client.post(
         f"/v1/identity/orgs/{org_id}/members",
-        json={"agent_id": "org-member-1"},
+        json={"agent_id": "test-agent"},
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    assert resp.json()["agent_id"] == "org-member-1"
+    assert resp.json()["agent_id"] == "test-agent"
 
 
-async def test_remove_agent_from_org_via_rest(client, api_key):
+async def test_remove_agent_from_org_via_rest(client, admin_api_key, api_key, app):
+    # Use admin key (bypasses ownership) to set up multi-member org
     create_resp = await client.post(
         "/v1/identity/orgs",
-        json={"org_name": "RemOrg", "agent_id": "test-agent"},
-        headers={"Authorization": f"Bearer {api_key}"},
+        json={"org_name": "RemOrg"},
+        headers={"Authorization": f"Bearer {admin_api_key}"},
     )
     org_id = create_resp.json()["org_id"]
-    # Add a second owner so we can remove one
-    await _register_agent(client, api_key, "org-rem-agent")
+    await _register_agent(client, api_key, "test-agent")
     await client.post(
         f"/v1/identity/orgs/{org_id}/members",
-        json={"agent_id": "org-rem-agent", "role": "owner"},
-        headers={"Authorization": f"Bearer {api_key}"},
+        json={"agent_id": "test-agent", "role": "member"},
+        headers={"Authorization": f"Bearer {admin_api_key}"},
     )
     resp = await client.delete(
-        f"/v1/identity/orgs/{org_id}/members/org-rem-agent",
-        headers={"Authorization": f"Bearer {api_key}"},
+        f"/v1/identity/orgs/{org_id}/members/test-agent",
+        headers={"Authorization": f"Bearer {admin_api_key}"},
     )
     assert resp.status_code == 200
     assert resp.json()["removed"] is True
@@ -240,10 +240,10 @@ async def test_remove_agent_from_org_via_rest(client, api_key):
 
 
 async def test_ingest_metrics_via_rest(client, api_key):
-    await _register_agent(client, api_key, "ingest-agent")
+    await _register_agent(client, api_key, "test-agent")
     resp = await client.post(
         "/v1/identity/metrics/ingest",
-        json={"agent_id": "ingest-agent", "metrics": {"cpu": 0.5}},
+        json={"agent_id": "test-agent", "metrics": {"cpu": 0.5}},
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200

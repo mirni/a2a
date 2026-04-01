@@ -58,7 +58,7 @@ class CorrelationIDMiddleware:
 _SECURITY_HEADERS: list[tuple[bytes, bytes]] = [
     (b"x-content-type-options", b"nosniff"),
     (b"x-frame-options", b"DENY"),
-    (b"strict-transport-security", b"max-age=31536000; includeSubDomains"),
+    (b"strict-transport-security", b"max-age=31536000; includeSubDomains; preload"),
     (b"content-security-policy", b"default-src 'none'"),
 ]
 

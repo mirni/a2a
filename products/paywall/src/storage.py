@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS api_keys (
     allowed_tools     TEXT,
     allowed_agent_ids TEXT,
     scopes            TEXT NOT NULL DEFAULT '["read","write"]',
-    expires_at        REAL
+    expires_at        REAL,
+    revoked_at        REAL
 );
 
 CREATE INDEX IF NOT EXISTS idx_apikeys_agent ON api_keys(agent_id);
@@ -92,6 +93,11 @@ _MIGRATIONS = (
         "convert audit_log cost from REAL to INTEGER (atomic units, SCALE=1e8)",
         "UPDATE audit_log SET cost = CAST(ROUND(cost * 100000000) AS INTEGER) "
         "WHERE typeof(cost) = 'real' OR (cost > 0 AND cost < 100000000);",
+    ),
+    Migration(
+        3,
+        "add revoked_at column to api_keys",
+        "ALTER TABLE api_keys ADD COLUMN revoked_at REAL;",
     ),
 )
 
@@ -199,7 +205,7 @@ class PaywallStorage:
         """Look up an API key by its hash. Returns None if not found."""
         cursor = await self.db.execute(
             "SELECT key_hash, agent_id, tier, connector, org_id, created_at, revoked, "
-            "allowed_tools, allowed_agent_ids, scopes, expires_at "
+            "allowed_tools, allowed_agent_ids, scopes, expires_at, revoked_at "
             "FROM api_keys WHERE key_hash = ?",
             (key_hash,),
         )
@@ -207,10 +213,12 @@ class PaywallStorage:
         return self._deserialize_key_row(row) if row else None
 
     async def revoke_key(self, key_hash: str) -> bool:
-        """Revoke an API key. Returns True if found and revoked."""
+        """Revoke an API key and record revocation timestamp. Returns True if found and revoked."""
+        import time as _time
+
         cursor = await self.db.execute(
-            "UPDATE api_keys SET revoked = 1 WHERE key_hash = ? AND revoked = 0",
-            (key_hash,),
+            "UPDATE api_keys SET revoked = 1, revoked_at = ? WHERE key_hash = ? AND revoked = 0",
+            (_time.time(), key_hash),
         )
         await self.db.commit()
         return cursor.rowcount > 0
@@ -219,7 +227,7 @@ class PaywallStorage:
         """Get all API keys for an agent."""
         cursor = await self.db.execute(
             "SELECT key_hash, agent_id, tier, connector, org_id, created_at, revoked, "
-            "allowed_tools, allowed_agent_ids, scopes, expires_at "
+            "allowed_tools, allowed_agent_ids, scopes, expires_at, revoked_at "
             "FROM api_keys WHERE agent_id = ? ORDER BY created_at DESC",
             (agent_id,),
         )

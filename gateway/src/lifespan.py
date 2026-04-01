@@ -263,6 +263,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             merchant_address=config.x402_merchant_address,
             facilitator_url=config.x402_facilitator_url,
             supported_networks=networks,
+            nonce_db=tracker.storage.db,
         )
         logger.info("x402 payment protocol enabled (merchant=%s)", config.x402_merchant_address)
 

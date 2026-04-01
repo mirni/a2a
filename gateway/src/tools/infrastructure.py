@@ -191,14 +191,25 @@ async def _test_webhook(ctx: AppContext, params: dict[str, Any]) -> dict[str, An
 
 
 async def _rotate_key(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
-    """Revoke current key and create a new one with the same tier."""
+    """Revoke current key and create a new one with the same tier.
+
+    Uses BEGIN IMMEDIATE so revoke + create is atomic — no window where
+    the old key is revoked but the new one doesn't exist yet.
+    """
     current_key = params["current_key"]
     key_info = await ctx.key_manager.validate_key(current_key)
     agent_id = key_info["agent_id"]
     tier = key_info["tier"]
 
-    revoked = await ctx.key_manager.revoke_key(current_key)
-    new_key_info = await ctx.key_manager.create_key(agent_id, tier=tier)
+    db = ctx.key_manager.storage.db
+    await db.execute("BEGIN IMMEDIATE")
+    try:
+        revoked = await ctx.key_manager.revoke_key(current_key)
+        new_key_info = await ctx.key_manager.create_key(agent_id, tier=tier)
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
 
     return {
         "new_key": new_key_info["key"],
@@ -386,7 +397,7 @@ async def _restore_database(ctx: AppContext, params: dict[str, Any]) -> dict[str
             "Invalid backup_path: path traversal detected. Backup files must reside in the backups directory."
         )
 
-    if not os.path.exists(backup_path):
+    if not os.path.isfile(real_backup):
         raise FileNotFoundError(f"Backup not found: {backup_path}")
 
     source = backup_path

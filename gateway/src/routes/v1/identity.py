@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict
 
-from gateway.src.deps.tool_context import ToolContext, finalize_response, require_tool
+from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
 from gateway.src.errors import handle_product_exception
 from gateway.src.tools.identity import (
     _add_agent_to_org,
@@ -98,6 +98,7 @@ async def register_agent(
     tc: ToolContext = Depends(require_tool("register_agent")),
 ):
     params = _inject_caller(tc, {"agent_id": body.agent_id, "public_key": body.public_key})
+    await check_ownership(tc, params)
     try:
         result = await _register_agent(tc.ctx, params)
     except Exception as exc:
@@ -123,6 +124,7 @@ async def search_agents_by_metrics(
             "limit": limit,
         },
     )
+    await check_ownership(tc, params)
     result = await _search_agents_by_metrics(tc.ctx, params)
     return await finalize_response(tc, result)
 
@@ -133,6 +135,7 @@ async def get_agent_identity(
     tc: ToolContext = Depends(require_tool("get_agent_identity")),
 ):
     params = _inject_caller(tc, {"agent_id": agent_id})
+    await check_ownership(tc, params)
     try:
         result = await _get_agent_identity(tc.ctx, params)
     except Exception as exc:
@@ -154,6 +157,7 @@ async def verify_agent(
             "signature": body.signature,
         },
     )
+    await check_ownership(tc, params)
     try:
         result = await _verify_agent(tc.ctx, params)
     except Exception as exc:
@@ -167,6 +171,7 @@ async def get_agent_reputation(
     tc: ToolContext = Depends(require_tool("get_agent_reputation")),
 ):
     params = _inject_caller(tc, {"agent_id": agent_id})
+    await check_ownership(tc, params)
     try:
         result = await _get_agent_reputation(tc.ctx, params)
     except Exception as exc:
@@ -180,6 +185,7 @@ async def get_verified_claims(
     tc: ToolContext = Depends(require_tool("get_verified_claims")),
 ):
     params = _inject_caller(tc, {"agent_id": agent_id})
+    await check_ownership(tc, params)
     try:
         result = await _get_verified_claims(tc.ctx, params)
     except Exception as exc:
@@ -201,6 +207,7 @@ async def submit_metrics(
             "data_source": body.data_source,
         },
     )
+    await check_ownership(tc, params)
     try:
         result = await _submit_metrics(tc.ctx, params)
     except Exception as exc:
@@ -214,6 +221,7 @@ async def build_claim_chain(
     tc: ToolContext = Depends(require_tool("build_claim_chain")),
 ):
     params = _inject_caller(tc, {"agent_id": agent_id})
+    await check_ownership(tc, params)
     try:
         result = await _build_claim_chain(tc.ctx, params)
     except Exception as exc:
@@ -228,6 +236,7 @@ async def get_claim_chains(
     tc: ToolContext = Depends(require_tool("get_claim_chains")),
 ):
     params = _inject_caller(tc, {"agent_id": agent_id, "limit": limit})
+    await check_ownership(tc, params)
     result = await _get_claim_chains(tc.ctx, params)
     return await finalize_response(tc, result)
 
@@ -243,6 +252,7 @@ async def create_org(
     tc: ToolContext = Depends(require_tool("create_org")),
 ):
     params = _inject_caller(tc, {"org_name": body.org_name, "agent_id": body.agent_id})
+    await check_ownership(tc, params)
     try:
         result = await _create_org(tc.ctx, params)
     except Exception as exc:
@@ -257,6 +267,7 @@ async def get_org(
     tc: ToolContext = Depends(require_tool("get_org")),
 ):
     params = _inject_caller(tc, {"org_id": org_id})
+    await check_ownership(tc, params)
     result = await _get_org(tc.ctx, params)
     return await finalize_response(tc, result)
 
@@ -268,6 +279,7 @@ async def add_agent_to_org(
     tc: ToolContext = Depends(require_tool("add_agent_to_org")),
 ):
     params = _inject_caller(tc, {"org_id": org_id, "agent_id": body.agent_id, "role": body.role})
+    await check_ownership(tc, params)
     try:
         result = await _add_agent_to_org(tc.ctx, params)
     except Exception as exc:
@@ -282,6 +294,7 @@ async def remove_agent_from_org(
     tc: ToolContext = Depends(require_tool("remove_agent_from_org")),
 ):
     params = _inject_caller(tc, {"org_id": org_id, "agent_id": agent_id})
+    await check_ownership(tc, params)
     try:
         result = await _remove_agent_from_org(tc.ctx, params)
     except Exception as exc:
@@ -309,6 +322,7 @@ async def ingest_metrics(
             "nonce": body.nonce,
         },
     )
+    await check_ownership(tc, params)
     try:
         result = await _ingest_metrics(tc.ctx, params)
     except Exception as exc:
@@ -333,6 +347,7 @@ async def query_metrics(
             "limit": limit,
         },
     )
+    await check_ownership(tc, params)
     result = await _query_metrics(tc.ctx, params)
     return await finalize_response(tc, result)
 
@@ -344,6 +359,7 @@ async def get_metric_deltas(
     tc: ToolContext = Depends(require_tool("get_metric_deltas")),
 ):
     params = _inject_caller(tc, {"agent_id": agent_id, "metric_name": metric_name})
+    await check_ownership(tc, params)
     result = await _get_metric_deltas(tc.ctx, params)
     return await finalize_response(tc, result)
 
@@ -355,5 +371,6 @@ async def get_metric_averages(
     tc: ToolContext = Depends(require_tool("get_metric_averages")),
 ):
     params = _inject_caller(tc, {"agent_id": agent_id, "period": period})
+    await check_ownership(tc, params)
     result = await _get_metric_averages(tc.ctx, params)
     return await finalize_response(tc, result)

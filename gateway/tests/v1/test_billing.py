@@ -62,11 +62,15 @@ async def test_get_balance_headers(client, api_key):
 # ---------------------------------------------------------------------------
 
 
-async def test_create_wallet_via_rest(client, api_key):
+async def test_create_wallet_via_rest(client, app):
+    """Creating a wallet requires ownership — caller must match agent_id."""
+    ctx = app.state.ctx
+    # Create a key for a new agent (no wallet yet)
+    key_info = await ctx.key_manager.create_key("new-wallet-agent", tier="free")
     resp = await client.post(
         "/v1/billing/wallets",
-        json={"agent_id": "new-agent-rest"},
-        headers={"Authorization": f"Bearer {api_key}"},
+        json={"agent_id": "new-wallet-agent"},
+        headers={"Authorization": f"Bearer {key_info['key']}"},
     )
     assert resp.status_code == 201
 

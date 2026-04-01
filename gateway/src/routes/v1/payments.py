@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict
 
-from gateway.src.deps.tool_context import ToolContext, finalize_response, require_tool
+from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
 from gateway.src.errors import handle_product_exception
 from gateway.src.tools.payments import (
     _cancel_escrow,
@@ -145,6 +145,7 @@ async def create_split_intent(
             "currency": body.currency,
         },
     )
+    await check_ownership(tc, params)
     try:
         result = await _create_split_intent(tc.ctx, params)
     except Exception as exc:
@@ -168,6 +169,7 @@ async def create_intent(
             "metadata": body.metadata,
         },
     )
+    await check_ownership(tc, params)
     try:
         result = await _create_intent(tc.ctx, params)
     except Exception as exc:
@@ -193,6 +195,7 @@ async def list_intents(
             "offset": offset,
         },
     )
+    await check_ownership(tc, params)
     result = await _list_intents(tc.ctx, params)
     return await finalize_response(tc, result)
 
@@ -203,6 +206,7 @@ async def get_intent(
     tc: ToolContext = Depends(require_tool("get_intent")),
 ):
     params = _inject_caller(tc, {"intent_id": intent_id})
+    await check_ownership(tc, params)
     try:
         result = await _get_intent(tc.ctx, params)
     except Exception as exc:
@@ -216,6 +220,7 @@ async def capture_intent(
     tc: ToolContext = Depends(require_tool("capture_intent")),
 ):
     params = _inject_caller(tc, {"intent_id": intent_id})
+    await check_ownership(tc, params)
     try:
         result = await _capture_intent(tc.ctx, params)
     except Exception as exc:
@@ -230,6 +235,7 @@ async def partial_capture(
     tc: ToolContext = Depends(require_tool("partial_capture")),
 ):
     params = _inject_caller(tc, {"intent_id": intent_id, "amount": float(body.amount)})
+    await check_ownership(tc, params)
     try:
         result = await _partial_capture(tc.ctx, params)
     except Exception as exc:
@@ -243,6 +249,7 @@ async def refund_intent(
     tc: ToolContext = Depends(require_tool("refund_intent")),
 ):
     params = _inject_caller(tc, {"intent_id": intent_id})
+    await check_ownership(tc, params)
     try:
         result = await _refund_intent(tc.ctx, params)
     except Exception as exc:
@@ -271,6 +278,7 @@ async def create_performance_escrow(
             "description": body.description,
         },
     )
+    await check_ownership(tc, params)
     try:
         result = await _create_performance_escrow(tc.ctx, params)
     except Exception as exc:
@@ -296,6 +304,7 @@ async def create_escrow(
             "metadata": body.metadata,
         },
     )
+    await check_ownership(tc, params)
     try:
         result = await _create_escrow(tc.ctx, params)
     except Exception as exc:
@@ -321,6 +330,7 @@ async def list_escrows(
             "offset": offset,
         },
     )
+    await check_ownership(tc, params)
     result = await _list_escrows(tc.ctx, params)
     return await finalize_response(tc, result)
 
@@ -331,6 +341,7 @@ async def get_escrow(
     tc: ToolContext = Depends(require_tool("get_escrow")),
 ):
     params = _inject_caller(tc, {"escrow_id": escrow_id})
+    await check_ownership(tc, params)
     try:
         result = await _get_escrow(tc.ctx, params)
     except Exception as exc:
@@ -344,6 +355,7 @@ async def release_escrow(
     tc: ToolContext = Depends(require_tool("release_escrow")),
 ):
     params = _inject_caller(tc, {"escrow_id": escrow_id})
+    await check_ownership(tc, params)
     try:
         result = await _release_escrow(tc.ctx, params)
     except Exception as exc:
@@ -357,6 +369,7 @@ async def cancel_escrow(
     tc: ToolContext = Depends(require_tool("cancel_escrow")),
 ):
     params = _inject_caller(tc, {"escrow_id": escrow_id})
+    await check_ownership(tc, params)
     try:
         result = await _cancel_escrow(tc.ctx, params)
     except Exception as exc:
@@ -370,6 +383,7 @@ async def check_performance_escrow(
     tc: ToolContext = Depends(require_tool("check_performance_escrow")),
 ):
     params = _inject_caller(tc, {"escrow_id": escrow_id})
+    await check_ownership(tc, params)
     try:
         result = await _check_performance_escrow(tc.ctx, params)
     except Exception as exc:
@@ -394,6 +408,7 @@ async def refund_settlement(
             params["amount"] = float(body.amount)
         params["reason"] = body.reason
     params = _inject_caller(tc, params)
+    await check_ownership(tc, params)
     try:
         result = await _refund_settlement(tc.ctx, params)
     except Exception as exc:
@@ -414,6 +429,7 @@ async def get_payment_history(
     tc: ToolContext = Depends(require_tool("get_payment_history")),
 ):
     params = _inject_caller(tc, {"agent_id": agent_id, "limit": limit, "offset": offset})
+    await check_ownership(tc, params)
     result = await _get_payment_history(tc.ctx, params)
     return await finalize_response(tc, result)
 
@@ -428,6 +444,7 @@ async def process_due_subscriptions(
     tc: ToolContext = Depends(require_tool("process_due_subscriptions")),
 ):
     params = _inject_caller(tc, {})
+    await check_ownership(tc, params)
     try:
         result = await _process_due_subscriptions(tc.ctx, params)
     except Exception as exc:
@@ -452,6 +469,7 @@ async def create_subscription(
             "metadata": body.metadata,
         },
     )
+    await check_ownership(tc, params)
     try:
         result = await _create_subscription(tc.ctx, params)
     except Exception as exc:
@@ -477,6 +495,7 @@ async def list_subscriptions(
             "offset": offset,
         },
     )
+    await check_ownership(tc, params)
     result = await _list_subscriptions(tc.ctx, params)
     return await finalize_response(tc, result)
 
@@ -487,6 +506,7 @@ async def get_subscription(
     tc: ToolContext = Depends(require_tool("get_subscription")),
 ):
     params = _inject_caller(tc, {"subscription_id": subscription_id})
+    await check_ownership(tc, params)
     try:
         result = await _get_subscription(tc.ctx, params)
     except Exception as exc:
@@ -500,6 +520,7 @@ async def cancel_subscription(
     tc: ToolContext = Depends(require_tool("cancel_subscription")),
 ):
     params = _inject_caller(tc, {"subscription_id": subscription_id})
+    await check_ownership(tc, params)
     try:
         result = await _cancel_subscription(tc.ctx, params)
     except Exception as exc:
@@ -513,6 +534,7 @@ async def reactivate_subscription(
     tc: ToolContext = Depends(require_tool("reactivate_subscription")),
 ):
     params = _inject_caller(tc, {"subscription_id": subscription_id})
+    await check_ownership(tc, params)
     try:
         result = await _reactivate_subscription(tc.ctx, params)
     except Exception as exc:

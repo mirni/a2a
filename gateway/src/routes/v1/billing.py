@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict
 
-from gateway.src.deps.tool_context import ToolContext, finalize_response, require_tool
+from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
 from gateway.src.tools.billing import (
     _convert_currency,
     _create_wallet,
@@ -84,10 +84,14 @@ async def get_balance(
     currency: str = "CREDITS",
     tc: ToolContext = Depends(require_tool("get_balance")),
 ):
-    result = await _get_balance(
-        tc.ctx,
-        {"agent_id": agent_id, "currency": currency, "_caller_agent_id": tc.agent_id, "_caller_tier": tc.agent_tier},
-    )
+    params = {
+        "agent_id": agent_id,
+        "currency": currency,
+        "_caller_agent_id": tc.agent_id,
+        "_caller_tier": tc.agent_tier,
+    }
+    await check_ownership(tc, params)
+    result = await _get_balance(tc.ctx, params)
     return await finalize_response(tc, result)
 
 
@@ -96,16 +100,15 @@ async def create_wallet(
     body: CreateWalletRequest,
     tc: ToolContext = Depends(require_tool("create_wallet")),
 ):
-    result = await _create_wallet(
-        tc.ctx,
-        {
-            "agent_id": body.agent_id,
-            "initial_balance": float(body.initial_balance),
-            "signup_bonus": body.signup_bonus,
-            "_caller_agent_id": tc.agent_id,
-            "_caller_tier": tc.agent_tier,
-        },
-    )
+    params = {
+        "agent_id": body.agent_id,
+        "initial_balance": float(body.initial_balance),
+        "signup_bonus": body.signup_bonus,
+        "_caller_agent_id": tc.agent_id,
+        "_caller_tier": tc.agent_tier,
+    }
+    await check_ownership(tc, params)
+    result = await _create_wallet(tc.ctx, params)
     return await finalize_response(tc, result, status_code=201)
 
 
@@ -123,6 +126,7 @@ async def deposit(
         "_caller_agent_id": tc.agent_id,
         "_caller_tier": tc.agent_tier,
     }
+    await check_ownership(tc, params)
     idem = tc.request.headers.get("idempotency-key")
     if idem:
         params["idempotency_key"] = idem
@@ -144,6 +148,7 @@ async def withdraw(
         "_caller_agent_id": tc.agent_id,
         "_caller_tier": tc.agent_tier,
     }
+    await check_ownership(tc, params)
     idem = tc.request.headers.get("idempotency-key")
     if idem:
         params["idempotency_key"] = idem
@@ -156,10 +161,9 @@ async def freeze_wallet(
     agent_id: str,
     tc: ToolContext = Depends(require_tool("freeze_wallet")),
 ):
-    result = await _freeze_wallet(
-        tc.ctx,
-        {"agent_id": agent_id, "_caller_agent_id": tc.agent_id, "_caller_tier": tc.agent_tier},
-    )
+    params = {"agent_id": agent_id, "_caller_agent_id": tc.agent_id, "_caller_tier": tc.agent_tier}
+    await check_ownership(tc, params)
+    result = await _freeze_wallet(tc.ctx, params)
     return await finalize_response(tc, result)
 
 
@@ -168,10 +172,9 @@ async def unfreeze_wallet(
     agent_id: str,
     tc: ToolContext = Depends(require_tool("unfreeze_wallet")),
 ):
-    result = await _unfreeze_wallet(
-        tc.ctx,
-        {"agent_id": agent_id, "_caller_agent_id": tc.agent_id, "_caller_tier": tc.agent_tier},
-    )
+    params = {"agent_id": agent_id, "_caller_agent_id": tc.agent_id, "_caller_tier": tc.agent_tier}
+    await check_ownership(tc, params)
+    result = await _unfreeze_wallet(tc.ctx, params)
     return await finalize_response(tc, result)
 
 
@@ -182,16 +185,15 @@ async def get_transactions(
     offset: int = 0,
     tc: ToolContext = Depends(require_tool("get_transactions")),
 ):
-    result = await _get_transactions(
-        tc.ctx,
-        {
-            "agent_id": agent_id,
-            "limit": limit,
-            "offset": offset,
-            "_caller_agent_id": tc.agent_id,
-            "_caller_tier": tc.agent_tier,
-        },
-    )
+    params = {
+        "agent_id": agent_id,
+        "limit": limit,
+        "offset": offset,
+        "_caller_agent_id": tc.agent_id,
+        "_caller_tier": tc.agent_tier,
+    }
+    await check_ownership(tc, params)
+    result = await _get_transactions(tc.ctx, params)
     return await finalize_response(tc, result)
 
 
@@ -201,10 +203,9 @@ async def get_usage_summary(
     since: float | None = None,
     tc: ToolContext = Depends(require_tool("get_usage_summary")),
 ):
-    result = await _get_usage_summary(
-        tc.ctx,
-        {"agent_id": agent_id, "since": since, "_caller_agent_id": tc.agent_id, "_caller_tier": tc.agent_tier},
-    )
+    params = {"agent_id": agent_id, "since": since, "_caller_agent_id": tc.agent_id, "_caller_tier": tc.agent_tier}
+    await check_ownership(tc, params)
+    result = await _get_usage_summary(tc.ctx, params)
     return await finalize_response(tc, result)
 
 
@@ -214,10 +215,9 @@ async def get_service_analytics(
     since: float | None = None,
     tc: ToolContext = Depends(require_tool("get_service_analytics")),
 ):
-    result = await _get_service_analytics(
-        tc.ctx,
-        {"agent_id": agent_id, "since": since, "_caller_agent_id": tc.agent_id, "_caller_tier": tc.agent_tier},
-    )
+    params = {"agent_id": agent_id, "since": since, "_caller_agent_id": tc.agent_id, "_caller_tier": tc.agent_tier}
+    await check_ownership(tc, params)
+    result = await _get_service_analytics(tc.ctx, params)
     return await finalize_response(tc, result)
 
 
@@ -227,10 +227,9 @@ async def get_revenue_report(
     limit: int = 50,
     tc: ToolContext = Depends(require_tool("get_revenue_report")),
 ):
-    result = await _get_revenue_report(
-        tc.ctx,
-        {"agent_id": agent_id, "limit": limit, "_caller_agent_id": tc.agent_id, "_caller_tier": tc.agent_tier},
-    )
+    params = {"agent_id": agent_id, "limit": limit, "_caller_agent_id": tc.agent_id, "_caller_tier": tc.agent_tier}
+    await check_ownership(tc, params)
+    result = await _get_revenue_report(tc.ctx, params)
     return await finalize_response(tc, result)
 
 
@@ -242,17 +241,16 @@ async def get_metrics_timeseries(
     limit: int = 24,
     tc: ToolContext = Depends(require_tool("get_metrics_timeseries")),
 ):
-    result = await _get_metrics_timeseries(
-        tc.ctx,
-        {
-            "agent_id": agent_id,
-            "interval": interval,
-            "since": since,
-            "limit": limit,
-            "_caller_agent_id": tc.agent_id,
-            "_caller_tier": tc.agent_tier,
-        },
-    )
+    params = {
+        "agent_id": agent_id,
+        "interval": interval,
+        "since": since,
+        "limit": limit,
+        "_caller_agent_id": tc.agent_id,
+        "_caller_tier": tc.agent_tier,
+    }
+    await check_ownership(tc, params)
+    result = await _get_metrics_timeseries(tc.ctx, params)
     return await finalize_response(tc, result)
 
 
@@ -262,17 +260,16 @@ async def set_budget_cap(
     body: BudgetCapRequest,
     tc: ToolContext = Depends(require_tool("set_budget_cap")),
 ):
-    result = await _set_budget_cap(
-        tc.ctx,
-        {
-            "agent_id": agent_id,
-            "daily_cap": float(body.daily_cap) if body.daily_cap is not None else None,
-            "monthly_cap": float(body.monthly_cap) if body.monthly_cap is not None else None,
-            "alert_threshold": body.alert_threshold,
-            "_caller_agent_id": tc.agent_id,
-            "_caller_tier": tc.agent_tier,
-        },
-    )
+    params = {
+        "agent_id": agent_id,
+        "daily_cap": float(body.daily_cap) if body.daily_cap is not None else None,
+        "monthly_cap": float(body.monthly_cap) if body.monthly_cap is not None else None,
+        "alert_threshold": body.alert_threshold,
+        "_caller_agent_id": tc.agent_id,
+        "_caller_tier": tc.agent_tier,
+    }
+    await check_ownership(tc, params)
+    result = await _set_budget_cap(tc.ctx, params)
     return await finalize_response(tc, result)
 
 
@@ -281,10 +278,9 @@ async def get_budget_status(
     agent_id: str,
     tc: ToolContext = Depends(require_tool("get_budget_status")),
 ):
-    result = await _get_budget_status(
-        tc.ctx,
-        {"agent_id": agent_id, "_caller_agent_id": tc.agent_id, "_caller_tier": tc.agent_tier},
-    )
+    params = {"agent_id": agent_id, "_caller_agent_id": tc.agent_id, "_caller_tier": tc.agent_tier}
+    await check_ownership(tc, params)
+    result = await _get_budget_status(tc.ctx, params)
     return await finalize_response(tc, result)
 
 

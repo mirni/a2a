@@ -6,6 +6,7 @@ Applied to execute.py responses before sending to clients.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 # Fields that contain monetary values (should be serialized as "123.45" strings)
@@ -65,10 +66,13 @@ _TIMESTAMP_FIELDS: frozenset[str] = frozenset(
 
 
 def serialize_money(value: Any) -> str:
-    """Format a numeric value as a 2-decimal fixed-point string."""
+    """Format a numeric value as a 2-decimal fixed-point string.
+
+    Uses Decimal internally to avoid float precision loss (e.g. 0.1+0.2).
+    """
     if isinstance(value, str):
         return value
-    return f"{float(value):.2f}"
+    return f"{Decimal(str(value)):.2f}"
 
 
 def serialize_timestamp(value: Any) -> str:

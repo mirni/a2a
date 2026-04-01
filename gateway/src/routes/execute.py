@@ -207,7 +207,7 @@ async def _try_x402_payment(
 
     # Local validation
     try:
-        verifier.validate_proof_locally(proof, cost_value)
+        await verifier.validate_proof_locally(proof, cost_value)
     except X402ReplayError as exc:
         return await error_response(402, str(exc), "payment_replay_detected", request=request)
     except X402VerificationError as exc:

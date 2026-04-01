@@ -69,40 +69,47 @@ class TestReplayDetection:
 
 
 class TestValidateProofLocally:
-    def test_valid_proof_passes(self, verifier):
+    @pytest.mark.asyncio
+    async def test_valid_proof_passes(self, verifier):
         proof = _make_proof()
-        verifier.validate_proof_locally(proof, required_value="500")
+        await verifier.validate_proof_locally(proof, required_value="500")
 
-    def test_wrong_recipient(self, verifier):
+    @pytest.mark.asyncio
+    async def test_wrong_recipient(self, verifier):
         proof = _make_proof(to="0xWrongAddress")
         with pytest.raises(X402VerificationError, match="recipient"):
-            verifier.validate_proof_locally(proof, required_value="500")
+            await verifier.validate_proof_locally(proof, required_value="500")
 
-    def test_insufficient_value(self, verifier):
+    @pytest.mark.asyncio
+    async def test_insufficient_value(self, verifier):
         proof = _make_proof(value="100")
         with pytest.raises(X402VerificationError, match="Insufficient"):
-            verifier.validate_proof_locally(proof, required_value="500")
+            await verifier.validate_proof_locally(proof, required_value="500")
 
-    def test_expired_proof(self, verifier):
+    @pytest.mark.asyncio
+    async def test_expired_proof(self, verifier):
         proof = _make_proof(valid_before=int(time.time()) - 10)
         with pytest.raises(X402VerificationError, match="expired"):
-            verifier.validate_proof_locally(proof, required_value="500")
+            await verifier.validate_proof_locally(proof, required_value="500")
 
-    def test_not_yet_valid(self, verifier):
+    @pytest.mark.asyncio
+    async def test_not_yet_valid(self, verifier):
         proof = _make_proof(valid_after=int(time.time()) + 9999)
         with pytest.raises(X402VerificationError, match="not yet valid"):
-            verifier.validate_proof_locally(proof, required_value="500")
+            await verifier.validate_proof_locally(proof, required_value="500")
 
-    def test_unsupported_network(self, verifier):
+    @pytest.mark.asyncio
+    async def test_unsupported_network(self, verifier):
         proof = _make_proof(network="ethereum")
         with pytest.raises(X402VerificationError, match="network"):
-            verifier.validate_proof_locally(proof, required_value="500")
+            await verifier.validate_proof_locally(proof, required_value="500")
 
-    def test_replay_nonce(self, verifier):
+    @pytest.mark.asyncio
+    async def test_replay_nonce(self, verifier):
         proof = _make_proof()
         verifier.mark_nonce_used(proof.payload.authorization.nonce)
         with pytest.raises(X402ReplayError):
-            verifier.validate_proof_locally(proof, required_value="500")
+            await verifier.validate_proof_locally(proof, required_value="500")
 
 
 class TestBuildPaymentRequired:

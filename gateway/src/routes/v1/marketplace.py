@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict
 
-from gateway.src.deps.tool_context import ToolContext, finalize_response, require_tool
+from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
 from gateway.src.errors import handle_product_exception
 from gateway.src.tools.marketplace import (
     _best_match,
@@ -92,6 +92,7 @@ async def register_service(
             "pricing": body.pricing,
         },
     )
+    await check_ownership(tc, params)
     try:
         result = await _register_service(tc.ctx, params)
     except Exception as exc:
@@ -121,6 +122,7 @@ async def search_services(
             "offset": offset,
         },
     )
+    await check_ownership(tc, params)
     result = await _search_services(tc.ctx, params)
     return await finalize_response(tc, result)
 
@@ -131,6 +133,7 @@ async def get_service(
     tc: ToolContext = Depends(require_tool("get_service")),
 ):
     params = _inject_caller(tc, {"service_id": service_id})
+    await check_ownership(tc, params)
     try:
         result = await _get_service(tc.ctx, params)
     except Exception as exc:
@@ -156,6 +159,7 @@ async def update_service(
             "metadata": body.metadata,
         },
     )
+    await check_ownership(tc, params)
     try:
         result = await _update_service(tc.ctx, params)
     except Exception as exc:
@@ -169,6 +173,7 @@ async def deactivate_service(
     tc: ToolContext = Depends(require_tool("deactivate_service")),
 ):
     params = _inject_caller(tc, {"service_id": service_id})
+    await check_ownership(tc, params)
     try:
         result = await _deactivate_service(tc.ctx, params)
     except Exception as exc:
@@ -191,6 +196,7 @@ async def rate_service(
             "review": body.review,
         },
     )
+    await check_ownership(tc, params)
     try:
         result = await _rate_service_tool(tc.ctx, params)
     except Exception as exc:
@@ -205,6 +211,7 @@ async def get_service_ratings(
     tc: ToolContext = Depends(require_tool("get_service_ratings")),
 ):
     params = _inject_caller(tc, {"service_id": service_id, "limit": limit})
+    await check_ownership(tc, params)
     result = await _get_service_ratings_tool(tc.ctx, params)
     return await finalize_response(tc, result)
 
@@ -228,6 +235,7 @@ async def best_match(
             "limit": limit,
         },
     )
+    await check_ownership(tc, params)
     result = await _best_match(tc.ctx, params)
     return await finalize_response(tc, result)
 
@@ -239,6 +247,7 @@ async def search_agents(
     tc: ToolContext = Depends(require_tool("search_agents")),
 ):
     params = _inject_caller(tc, {"query": query, "limit": limit})
+    await check_ownership(tc, params)
     result = await _search_agents(tc.ctx, params)
     return await finalize_response(tc, result)
 
@@ -258,5 +267,6 @@ async def list_strategies(
             "limit": limit,
         },
     )
+    await check_ownership(tc, params)
     result = await _list_strategies(tc.ctx, params)
     return await finalize_response(tc, result)

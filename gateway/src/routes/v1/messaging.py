@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict
 
-from gateway.src.deps.tool_context import ToolContext, finalize_response, require_tool
+from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
 from gateway.src.errors import handle_product_exception
 from gateway.src.tools.messaging import (
     _get_messages,
@@ -77,6 +77,7 @@ async def send_message(
             "thread_id": body.thread_id,
         },
     )
+    await check_ownership(tc, params)
     try:
         result = await _send_message(tc.ctx, params)
     except Exception as exc:
@@ -101,6 +102,7 @@ async def get_messages(
             "offset": offset,
         },
     )
+    await check_ownership(tc, params)
     result = await _get_messages(tc.ctx, params)
     return await finalize_response(tc, result)
 
@@ -120,6 +122,7 @@ async def negotiate_price(
             "expires_hours": body.expires_hours,
         },
     )
+    await check_ownership(tc, params)
     try:
         result = await _negotiate_price(tc.ctx, params)
     except Exception as exc:

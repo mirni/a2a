@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict
 
-from gateway.src.deps.tool_context import ToolContext, finalize_response, require_tool
+from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
 from gateway.src.errors import handle_product_exception
 from gateway.src.tools.trust import (
     _check_sla_compliance,
@@ -70,6 +70,7 @@ async def register_server(
             "server_id": body.server_id,
         },
     )
+    await check_ownership(tc, params)
     try:
         result = await _register_server(tc.ctx, params)
     except Exception as exc:
@@ -95,6 +96,7 @@ async def search_servers(
             "offset": offset,
         },
     )
+    await check_ownership(tc, params)
     result = await _search_servers(tc.ctx, params)
     return await finalize_response(tc, result)
 
@@ -110,6 +112,7 @@ async def get_trust_score(
         tc,
         {"server_id": server_id, "window": window, "recompute": recompute},
     )
+    await check_ownership(tc, params)
     try:
         result = await _get_trust_score(tc.ctx, params)
     except Exception as exc:
@@ -127,6 +130,7 @@ async def update_server(
         tc,
         {"server_id": server_id, "name": body.name, "url": body.url},
     )
+    await check_ownership(tc, params)
     try:
         result = await _update_server(tc.ctx, params)
     except Exception as exc:
@@ -140,6 +144,7 @@ async def delete_server(
     tc: ToolContext = Depends(require_tool("delete_server")),
 ):
     params = _inject_caller(tc, {"server_id": server_id})
+    await check_ownership(tc, params)
     try:
         result = await _delete_server(tc.ctx, params)
     except Exception as exc:
@@ -157,6 +162,7 @@ async def check_sla_compliance(
         tc,
         {"server_id": server_id, "claimed_uptime": claimed_uptime},
     )
+    await check_ownership(tc, params)
     try:
         result = await _check_sla_compliance(tc.ctx, params)
     except Exception as exc:
