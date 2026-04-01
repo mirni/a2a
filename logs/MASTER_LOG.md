@@ -6411,3 +6411,29 @@ Implement the plan for Phase 2: extract shared deps from execute.py, create bill
 - `gateway/tests/v1/test_payments.py` — NEW: 24 tests
 - `gateway/tests/v1/test_identity.py` — NEW: 19 tests
 - `ruff.toml` — MODIFIED: B008 ignore for v1 routes
+
+---
+
+## Session — 2026-04-01 (continued): Security Audit Report
+
+### Prompt
+Process backlog/security-audit.md prompt — internal security audit of A2A gateway REST API.
+
+### Output
+- Performed comprehensive security audit of the A2A gateway REST API covering 6 areas:
+  1. Edge Security & Infrastructure
+  2. Agent Authentication & Identity
+  3. Authorization & Access Control (BOLA/BFLA)
+  4. Business Logic & Financial Integrity
+  5. Data Validation & Injection
+  6. Observability & Auditing
+- **32 findings** identified: 5 CRITICAL, 12 HIGH, 10 MEDIUM, 5 LOW
+- Key critical findings:
+  - BOLA: v1 REST routers missing `check_ownership_authorization()`
+  - Stripe webhook replay: in-memory dedup set lost on restart
+  - Refund double-spend: no `SELECT ... FOR UPDATE` in concurrent refund path
+  - X402 nonces: in-memory only, lost on restart
+  - Identity metrics: write without ownership check
+- Report written to `reports/security-audit-2026-04-01.md`
+- Task moved from `tasks/active/` to `tasks/done/security-audit.md`
+- **PR #24**: `report/security-audit` branch — report-only, CI skipped (paths-ignore)
