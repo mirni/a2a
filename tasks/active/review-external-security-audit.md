@@ -41,8 +41,8 @@ The external auditor tested against `api.greenhelix.net/v1` (server v0.5.3, now 
 
 #### Infrastructure / Config Changes (manual)
 
-- [ ] **P1: nginx timeout hardening** — Set `client_header_timeout 10s`, `client_body_timeout 10s`, `keepalive_timeout 60s` in nginx.conf. Mitigates slowloris (CONN-002), slow POST (CONN-003), idle connections (CONN-001).
-- [ ] **P2: nginx server_tokens off** — Suppress version leak in 413 responses.
+- [ ] **P1: nginx timeout hardening** — Add `ensure_nginx_timeouts()` function in `scripts/common.bash` (pattern: `ensure_nginx_rate_limit()`). Should inject `client_header_timeout 10s`, `client_body_timeout 10s`, `keepalive_timeout 60s` into nginx.conf `http` block if not present. Call from `scripts/deploy_a2a-gateway.sh` alongside `ensure_nginx_rate_limit`. Mitigates slowloris (CONN-002), slow POST (CONN-003), idle connections (CONN-001).
+- [ ] **P2: nginx server_tokens off** — Add `ensure_nginx_server_tokens_off()` function in `scripts/common.bash`. Should inject `server_tokens off;` into nginx.conf `http` block if not present. Call from deploy script. Suppresses version leak in 413 responses.
 - [ ] **P2: Verify PostgreSQL `statement_timeout`** — Ensure `statement_timeout = 3000` (or similar) is set in pg config for the gateway connection.
 - [ ] **P3: Cloudflare rate limiting rules** — Configure Cloudflare-level rate limits as defense-in-depth (app-level limits already work for authenticated traffic).
 - [ ] **P3: Cloudflare connection rate limiting** — `limit_conn` or CF equivalent for rapid reconnect (CONN-005).
