@@ -415,10 +415,11 @@ if [[ "$SKIP_CI" == false ]]; then
     # Give GitHub a moment to register the push
     sleep 5
 
-    # Find the workflow run triggered by our push
+    # Find the Release workflow run triggered by our push
     RUN_ID=""
     for attempt in $(seq 1 10); do
         RUN_ID=$(gh run list \
+            --workflow "Release" \
             --branch "$RELEASE_BRANCH" \
             --limit 1 \
             --json databaseId \
@@ -430,7 +431,7 @@ if [[ "$SKIP_CI" == false ]]; then
     done
 
     if [[ -z "$RUN_ID" || "$RUN_ID" == "null" ]]; then
-        err "Could not find CI run for ${RELEASE_BRANCH}. Check: gh run list --branch ${RELEASE_BRANCH}"
+        err "Could not find Release workflow run for ${RELEASE_BRANCH}. Check: gh run list --workflow Release --branch ${RELEASE_BRANCH}"
     fi
 
     info "CI run ID: ${RUN_ID}"
