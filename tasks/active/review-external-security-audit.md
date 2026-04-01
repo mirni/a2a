@@ -44,8 +44,17 @@ The external auditor tested against `api.greenhelix.net/v1` (server v0.5.3, now 
 - [ ] **P1: nginx timeout hardening** — Add `ensure_nginx_timeouts()` function in `scripts/common.bash` (pattern: `ensure_nginx_rate_limit()`). Should inject `client_header_timeout 10s`, `client_body_timeout 10s`, `keepalive_timeout 60s` into nginx.conf `http` block if not present. Call from `scripts/deploy_a2a-gateway.sh` alongside `ensure_nginx_rate_limit`. Mitigates slowloris (CONN-002), slow POST (CONN-003), idle connections (CONN-001).
 - [ ] **P2: nginx server_tokens off** — Add `ensure_nginx_server_tokens_off()` function in `scripts/common.bash`. Should inject `server_tokens off;` into nginx.conf `http` block if not present. Call from deploy script. Suppresses version leak in 413 responses.
 - [ ] **P2: Verify PostgreSQL `statement_timeout`** — Ensure `statement_timeout = 3000` (or similar) is set in pg config for the gateway connection.
-- [ ] **P3: Cloudflare rate limiting rules** — Configure Cloudflare-level rate limits as defense-in-depth (app-level limits already work for authenticated traffic).
-- [ ] **P3: Cloudflare connection rate limiting** — `limit_conn` or CF equivalent for rapid reconnect (CONN-005).
+- [ ] **P3: Cloudflare rate limiting rules** — Defense-in-depth on top of app-level limits.
+  - Dashboard: **greenhelix.net → Security → WAF → Rate limiting rules → Create rule**
+  - Rule 1 "API global": scope `URI Path starts with /v1/`, threshold `100 requests per 10 seconds` per IP, action **Block** for 60s
+  - Rule 2 "API auth abuse": scope `URI Path starts with /v1/` AND `Response code equals 401`, threshold `10 requests per 1 minute` per IP, action **Block** for 300s
+  - Rule 3 "Financial endpoints": scope `URI Path contains /execute` OR `URI Path contains /batch`, threshold `30 requests per 10 seconds` per IP, action **Managed Challenge** for 120s
+  - Verify under **Security → Events** that rules are logging matches
+- [ ] **P3: Cloudflare connection rate limiting** — Mitigates rapid reconnect (CONN-005).
+  - Dashboard: **greenhelix.net → Security → WAF → Rate limiting rules → Create rule**
+  - Rule: scope `URI Path starts with /`, threshold `200 requests per 10 seconds` per IP, action **Block** for 30s
+  - Also check: **greenhelix.net → Security → Settings → Security Level** — set to **Medium** (default) or **High** if under active attack
+  - Check: **greenhelix.net → Security → DDoS → DDoS L7** — ensure "HTTP DDoS attack protection" ruleset is enabled (should be on by default)
 
 #### Re-Run Requirements
 
