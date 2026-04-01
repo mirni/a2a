@@ -28,10 +28,10 @@ from gateway.src.routes.onboarding import router as onboarding_router
 from gateway.src.routes.pricing import router as pricing_router
 from gateway.src.routes.register import router as register_router
 from gateway.src.routes.sse import router as sse_router
-from gateway.src.routes.websocket import router as ws_router
 from gateway.src.routes.v1.billing import router as billing_router
 from gateway.src.routes.v1.identity import router as identity_router
 from gateway.src.routes.v1.payments import router as payments_router
+from gateway.src.routes.websocket import router as ws_router
 from gateway.src.signing import signing_key_handler
 from gateway.src.stripe_checkout import router as checkout_router
 
