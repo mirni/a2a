@@ -18,7 +18,7 @@ def _check_caller_owns_agent_id(params: dict[str, Any]) -> None:
     if tier == ADMIN_TIER or caller is None or target is None:
         return
     if caller != target:
-        raise ToolForbiddenError("Forbidden: you do not have access to this resource")
+        raise ToolForbiddenError(f"Forbidden: cannot act on agent_id '{target}' — you are '{caller}'")
 
 
 async def _register_agent(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:

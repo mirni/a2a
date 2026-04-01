@@ -205,12 +205,10 @@ class TestStripeTimestampValidation:
         import os
 
         os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
-        payload = json.dumps(
-            {
-                "type": "checkout.session.completed",
-                "data": {"object": {"id": "sess_old", "metadata": {"agent_id": "a", "credits": "100"}}},
-            }
-        ).encode()
+        payload = json.dumps({
+            "type": "checkout.session.completed",
+            "data": {"object": {"id": "sess_old", "metadata": {"agent_id": "a", "credits": "100"}}},
+        }).encode()
         old_ts = str(int(time.time()) - 600)  # 10 min ago
         signed_payload = f"{old_ts}.".encode() + payload
         sig = hmac.new(b"whsec_test", signed_payload, hashlib.sha256).hexdigest()
@@ -362,12 +360,10 @@ class TestStripeMetadataValidation:
         import os
 
         os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
-        payload = json.dumps(
-            {
-                "type": "checkout.session.completed",
-                "data": {"object": {"id": "sess_noagent", "metadata": {"credits": "100"}}},
-            }
-        ).encode()
+        payload = json.dumps({
+            "type": "checkout.session.completed",
+            "data": {"object": {"id": "sess_noagent", "metadata": {"credits": "100"}}},
+        }).encode()
         ts = str(int(time.time()))
         signed_payload = f"{ts}.".encode() + payload
         sig = hmac.new(b"whsec_test", signed_payload, hashlib.sha256).hexdigest()
