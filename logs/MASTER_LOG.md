@@ -6437,3 +6437,24 @@ Process backlog/security-audit.md prompt — internal security audit of A2A gate
 - Report written to `reports/security-audit-2026-04-01.md`
 - Task moved from `tasks/active/` to `tasks/done/security-audit.md`
 - **PR #24**: `report/security-audit` branch — report-only, CI skipped (paths-ignore)
+
+---
+
+## Session: External API Audit Prompt Generation (2026-04-01)
+
+**Prompt:** Generate a comprehensive external testing prompt for an AI agent to audit the live sandbox API.
+
+**Steps completed:**
+1. Explored all ~123 API endpoints across 12 domains (billing, payments, disputes, identity, marketplace, messaging, trust, infra, streaming, etc.)
+2. Generated live API keys for all tiers against `https://api.greenhelix.net`:
+   - Free: `a2a_free_fd6f55e3e27cacf45527d574`
+   - Starter: `a2a_starter_7c305eb003f4e8fad383ac47`
+   - Pro: `a2a_pro_695ed84d4f10b0167dd15570`
+   - Admin: `a2a_pro_307702814d8bdf0471ba5621` (pre-existing)
+3. Verified all keys work (200 on auth endpoints, 403 on BOLA, 401 on no-auth, 403 on tier mismatch)
+4. Created `tasks/external/audit.md` — self-contained prompt with:
+   - 12 test phases, ~150 individual test cases
+   - Security tests: BOLA, auth bypass, tier enforcement, rate limits, input validation, RFC 9457, security headers, CORS, monetary precision, idempotency
+   - Pre-generated keys with regeneration instructions
+   - Structured reporting template
+5. **PR #27**: `feat/external-audit-prompt` — CI skipped (tasks/** in paths-ignore)
