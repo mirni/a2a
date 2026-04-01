@@ -486,11 +486,14 @@ class TestMCPConnectionEdgeCases:
         conn = MCPConnection(process=process)
         await conn.start()
 
-        result = await conn.call_tool("some_tool", {
-            "nested": {"key": "value"},
-            "list": [1, 2, 3],
-            "null": None,
-        })
+        result = await conn.call_tool(
+            "some_tool",
+            {
+                "nested": {"key": "value"},
+                "list": [1, 2, 3],
+                "null": None,
+            },
+        )
         assert result == {"ok": True}
 
         # Verify the arguments were sent correctly

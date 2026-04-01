@@ -184,6 +184,7 @@ async def test_respond_to_non_open_dispute_raises(app):
 
     # Try again — should fail
     from gateway.src.disputes import DisputeStateError
+
     with pytest.raises(DisputeStateError, match="responded"):
         await ctx.dispute_engine.respond_to_dispute(dispute["id"], "seller-rnp", "Again")
 
@@ -203,6 +204,7 @@ async def test_resolve_already_resolved_dispute_raises(app):
 
     # Try again
     from gateway.src.disputes import DisputeStateError
+
     with pytest.raises(DisputeStateError, match="resolved"):
         await ctx.dispute_engine.resolve_dispute(dispute["id"], "release", "admin-resolved2")
 
@@ -210,6 +212,7 @@ async def test_resolve_already_resolved_dispute_raises(app):
 async def test_get_nonexistent_dispute_raises(app):
     """Getting a dispute that doesn't exist -> DisputeNotFoundError."""
     from gateway.src.disputes import DisputeNotFoundError
+
     with pytest.raises(DisputeNotFoundError):
         await app.state.ctx.dispute_engine.get_dispute("nonexistent-id")
 
@@ -224,6 +227,7 @@ async def test_open_dispute_on_non_held_escrow_raises(app):
     await ctx.payment_engine.release_escrow(escrow.id)
 
     from gateway.src.disputes import DisputeStateError
+
     with pytest.raises(DisputeStateError):
         await ctx.dispute_engine.open_dispute(escrow_id=escrow.id, opener="buyer-nhe", reason="Too late")
 

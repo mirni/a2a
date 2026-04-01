@@ -169,11 +169,14 @@ class TestBatchExecution:
             json={
                 "calls": [
                     {"tool": "get_balance", "params": {"agent_id": "test-agent"}},
-                    {"tool": "register_webhook", "params": {
-                        "agent_id": "test-agent",
-                        "url": "https://example.com/hook",
-                        "event_types": ["billing.deposit"],
-                    }},
+                    {
+                        "tool": "register_webhook",
+                        "params": {
+                            "agent_id": "test-agent",
+                            "url": "https://example.com/hook",
+                            "event_types": ["billing.deposit"],
+                        },
+                    },
                 ]
             },
             headers={"Authorization": f"Bearer {api_key}"},

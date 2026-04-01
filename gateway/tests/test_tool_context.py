@@ -23,7 +23,11 @@ async def test_unknown_tool_returns_400(client, api_key):
     )
     assert resp.status_code == 400
     body = resp.json()
-    assert body.get("code") == "unknown_tool" or "unknown" in body.get("detail", "").lower() or "Unknown" in body.get("detail", "")
+    assert (
+        body.get("code") == "unknown_tool"
+        or "unknown" in body.get("detail", "").lower()
+        or "Unknown" in body.get("detail", "")
+    )
 
 
 async def test_missing_api_key_returns_401(client):
@@ -84,10 +88,13 @@ async def test_insufficient_balance_returns_402(app, client):
     # best_match costs 0.1 credits and is free tier
     resp = await client.post(
         "/v1/execute",
-        json={"tool": "best_match", "params": {
-            "agent_id": "broke-agent",
-            "query": "test",
-        }},
+        json={
+            "tool": "best_match",
+            "params": {
+                "agent_id": "broke-agent",
+                "query": "test",
+            },
+        },
         headers={"Authorization": f"Bearer {key}"},
     )
     assert resp.status_code == 402
