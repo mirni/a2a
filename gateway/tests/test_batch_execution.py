@@ -139,3 +139,50 @@ class TestBatchExecution:
         assert len(data["results"]) == 1
         assert data["results"][0]["success"] is False
         assert "error" in data["results"][0]
+
+    async def test_batch_non_dict_call_item(self, client, api_key):
+        """Non-dict call item should produce error entry."""
+        resp = await client.post(
+            "/v1/batch",
+            json={"calls": ["not a dict"]},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["results"][0]["success"] is False
+
+    async def test_batch_missing_tool_field(self, client, api_key):
+        """Call missing 'tool' key should produce error entry."""
+        resp = await client.post(
+            "/v1/batch",
+            json={"calls": [{"params": {"agent_id": "test-agent"}}]},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["results"][0]["success"] is False
+
+    async def test_batch_tier_insufficient_in_batch(self, client, api_key):
+        """Free tier tool hitting pro-only tool in batch -> error for that call."""
+        resp = await client.post(
+            "/v1/batch",
+            json={
+                "calls": [
+                    {"tool": "get_balance", "params": {"agent_id": "test-agent"}},
+                    {
+                        "tool": "register_webhook",
+                        "params": {
+                            "agent_id": "test-agent",
+                            "url": "https://example.com/hook",
+                            "event_types": ["billing.deposit"],
+                        },
+                    },
+                ]
+            },
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["results"]) == 2
+        assert data["results"][0]["success"] is True
+        assert data["results"][1]["success"] is False

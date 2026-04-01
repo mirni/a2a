@@ -4,7 +4,61 @@ from __future__ import annotations
 
 import pytest
 
+from gateway.src.deps.billing import BalanceError, calculate_tool_cost
+
 pytestmark = pytest.mark.asyncio
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for calculate_tool_cost
+# ---------------------------------------------------------------------------
+
+
+class TestCalculateToolCost:
+    def test_flat_pricing_basic(self):
+        pricing = {"per_call": 0.5}
+        assert calculate_tool_cost(pricing, {}) == 0.5
+
+    def test_flat_pricing_zero(self):
+        pricing = {"per_call": 0}
+        assert calculate_tool_cost(pricing, {}) == 0.0
+
+    def test_flat_pricing_negative_clamped(self):
+        pricing = {"per_call": -1}
+        assert calculate_tool_cost(pricing, {}) == 0.0
+
+    def test_flat_pricing_empty(self):
+        assert calculate_tool_cost({}, {}) == 0.0
+
+    def test_percentage_pricing_basic(self):
+        pricing = {"model": "percentage", "percentage": 10, "min_fee": 0, "max_fee": 100}
+        # 10% of 200 = 20
+        assert calculate_tool_cost(pricing, {"amount": 200}) == 20.0
+
+    def test_percentage_pricing_min_fee_clamp(self):
+        pricing = {"model": "percentage", "percentage": 1, "min_fee": 5, "max_fee": 100}
+        # 1% of 100 = 1, clamped to min_fee=5
+        assert calculate_tool_cost(pricing, {"amount": 100}) == 5.0
+
+    def test_percentage_pricing_max_fee_clamp(self):
+        pricing = {"model": "percentage", "percentage": 50, "min_fee": 0, "max_fee": 10}
+        # 50% of 100 = 50, clamped to max_fee=10
+        assert calculate_tool_cost(pricing, {"amount": 100}) == 10.0
+
+    def test_percentage_pricing_zero_amount(self):
+        pricing = {"model": "percentage", "percentage": 10, "min_fee": 0, "max_fee": 100}
+        # 10% of 0 = 0
+        assert calculate_tool_cost(pricing, {"amount": 0}) == 0.0
+
+    def test_percentage_pricing_min_fee_on_zero_amount(self):
+        pricing = {"model": "percentage", "percentage": 10, "min_fee": 1.0, "max_fee": 100}
+        # 10% of 0 = 0, clamped to min_fee=1.0
+        assert calculate_tool_cost(pricing, {"amount": 0}) == 1.0
+
+    def test_balance_error_attributes(self):
+        err = BalanceError("Insufficient balance: 0 < 10")
+        assert err.message == "Insufficient balance: 0 < 10"
+        assert "0 < 10" in str(err)
 
 
 # ---------------------------------------------------------------------------

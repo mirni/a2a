@@ -274,3 +274,36 @@ async def test_get_metric_averages_via_rest(client, api_key):
     )
     assert resp.status_code == 200
     assert "averages" in resp.json()
+
+
+# ---------------------------------------------------------------------------
+# Negative / edge-case tests
+# ---------------------------------------------------------------------------
+
+
+async def test_duplicate_agent_registration(client, api_key):
+    """Registering the same agent_id twice -> 409 or idempotent 200."""
+    await _register_agent(client, api_key, "test-agent")
+    resp = await _register_agent(client, api_key, "test-agent")
+    assert resp.status_code in (200, 201, 409)
+
+
+async def test_get_nonexistent_agent(client, api_key):
+    """GET a non-existent agent -> 404 or empty result."""
+    resp = await client.get(
+        "/v1/identity/agents/nonexistent-agent-xyz",
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    # Some implementations return 404, others return 200 with empty/default
+    assert resp.status_code in (200, 404)
+
+
+async def test_search_agents_with_valid_metric_no_results(client, pro_api_key):
+    """Search with valid metric but high threshold -> empty results."""
+    resp = await client.get(
+        "/v1/identity/agents?metric_name=p99_latency_ms&min_value=999999",
+        headers={"Authorization": f"Bearer {pro_api_key}"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body.get("agents", [])) == 0

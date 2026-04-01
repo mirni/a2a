@@ -368,3 +368,44 @@ async def test_process_due_subscriptions_via_rest(client, pro_api_key):
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Negative / edge-case tests
+# ---------------------------------------------------------------------------
+
+
+async def test_get_nonexistent_intent(client, pro_api_key):
+    """GET a non-existent intent -> 404."""
+    resp = await client.get(
+        "/v1/payments/intents/nonexistent-id-xyz",
+        headers={"Authorization": f"Bearer {pro_api_key}"},
+    )
+    assert resp.status_code == 404
+
+
+async def test_release_non_held_escrow(client, pro_api_key):
+    """Releasing an already-released escrow -> error."""
+    # Create + release
+    resp = await _create_escrow(client, pro_api_key, payee="payee-rlse")
+    escrow_id = resp.json()["id"]
+    await client.post(
+        f"/v1/payments/escrows/{escrow_id}/release",
+        headers={"Authorization": f"Bearer {pro_api_key}"},
+    )
+    # Try to release again — should fail (already settled/released)
+    resp = await client.post(
+        f"/v1/payments/escrows/{escrow_id}/release",
+        headers={"Authorization": f"Bearer {pro_api_key}"},
+    )
+    assert resp.status_code in (400, 404, 409)
+
+
+async def test_list_intents_with_status_filter(client, pro_api_key):
+    """List intents with status filter."""
+    await _create_intent(client, pro_api_key, payee="payee-filter")
+    resp = await client.get(
+        "/v1/payments/intents?agent_id=pro-agent&status=pending",
+        headers={"Authorization": f"Bearer {pro_api_key}"},
+    )
+    assert resp.status_code == 200

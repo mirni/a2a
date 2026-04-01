@@ -4,7 +4,85 @@ from __future__ import annotations
 
 import pytest
 
+from gateway.src.deps.rate_limit import (
+    RateLimitError,
+    ServiceError,
+    TierError,
+    build_rate_limit_headers,
+)
+
 pytestmark = pytest.mark.asyncio
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for build_rate_limit_headers
+# ---------------------------------------------------------------------------
+
+
+def test_build_rate_limit_headers_basic():
+    headers = build_rate_limit_headers(100, 10)
+    assert headers["X-RateLimit-Limit"] == "100"
+    assert int(headers["X-RateLimit-Remaining"]) == 90
+    assert 0 < int(headers["X-RateLimit-Reset"]) <= 3600
+
+
+def test_build_rate_limit_headers_over_limit():
+    headers = build_rate_limit_headers(100, 150)
+    assert headers["X-RateLimit-Remaining"] == "0"
+
+
+def test_build_rate_limit_headers_at_limit():
+    headers = build_rate_limit_headers(100, 100)
+    assert headers["X-RateLimit-Remaining"] == "0"
+
+
+def test_build_rate_limit_headers_zero_rate_count():
+    headers = build_rate_limit_headers(500, 0)
+    assert headers["X-RateLimit-Remaining"] == "500"
+
+
+# ---------------------------------------------------------------------------
+# Exception classes
+# ---------------------------------------------------------------------------
+
+
+def test_tier_error_attributes():
+    err = TierError("free", "register_webhook", "pro")
+    assert err.tier == "free"
+    assert err.tool_name == "register_webhook"
+    assert err.required_tier == "pro"
+    assert "free" in str(err)
+
+
+def test_rate_limit_error_global():
+    err = RateLimitError(500, 500)
+    assert "500/500" in str(err)
+
+
+def test_rate_limit_error_per_tool():
+    err = RateLimitError(10, 10, tool_name="search_services")
+    assert "search_services" in str(err)
+
+
+def test_service_error():
+    err = ServiceError("Rate limit service unavailable")
+    assert "unavailable" in str(err)
+
+
+# ---------------------------------------------------------------------------
+# Admin tier bypass (integration)
+# ---------------------------------------------------------------------------
+
+
+async def test_admin_tier_no_rate_limit_headers(client, admin_api_key):
+    """Admin-tier responses should NOT include rate-limit headers."""
+    resp = await client.get(
+        "/v1/billing/wallets/admin-agent/balance",
+        headers={"Authorization": f"Bearer {admin_api_key}"},
+    )
+    assert resp.status_code == 200
+    # Admin tier should not have rate limit headers
+    assert "x-ratelimit-limit" not in resp.headers
 
 
 async def test_successful_response_has_rate_limit_headers(client, api_key):
