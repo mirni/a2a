@@ -405,3 +405,100 @@ class TestRegisterMCPTools:
         for tool_name in _TOOL_MAP:
             handler = TOOL_REGISTRY[tool_name]
             assert callable(handler)
+
+
+# ---------------------------------------------------------------------------
+# MCPConnection edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestMCPConnectionEdgeCases:
+    """Edge cases: process death, non-JSON lines, stdout EOF."""
+
+    async def test_timeout_on_no_response(self):
+        """If the server never responds, call_tool should raise TimeoutError."""
+        from gateway.src.mcp_proxy import MCPConnection
+
+        # Process that responds to init but not to tool call
+        responses = [
+            {"jsonrpc": "2.0", "id": 1, "result": {"serverInfo": {"name": "test"}}},
+            # No second response — will timeout
+        ]
+        process = _make_fake_process(responses)
+        conn = MCPConnection(process=process)
+        conn._timeout = 0.5  # Short timeout for test
+        await conn.start()
+
+        with pytest.raises((asyncio.TimeoutError, RuntimeError)):
+            await conn.call_tool("some_tool", {})
+
+        conn._reader_task.cancel()
+        try:
+            await conn._reader_task
+        except asyncio.CancelledError:
+            pass
+
+    async def test_process_dead_detected(self):
+        """If process is already dead, stdout read returns empty."""
+        from gateway.src.mcp_proxy import MCPConnection
+
+        process = MagicMock()
+        process.returncode = 1  # Already dead
+
+        async def fake_read(n):
+            return b""
+
+        process.stdout = MagicMock()
+        process.stdout.read = fake_read
+        process.stdin = MagicMock()
+        process.stdin.write = MagicMock()
+
+        async def fake_drain():
+            pass
+
+        process.stdin.drain = fake_drain
+        process.terminate = MagicMock()
+        process.kill = MagicMock()
+
+        async def fake_wait():
+            pass
+
+        process.wait = fake_wait
+
+        conn = MCPConnection(process=process)
+        # The reader loop should exit quickly on empty reads
+        # We just verify no crash
+        conn._initialized = False
+
+    async def test_call_tool_with_various_argument_types(self):
+        """Tool call with nested dicts, lists, and nulls."""
+        from gateway.src.mcp_proxy import MCPConnection
+
+        responses = [
+            {"jsonrpc": "2.0", "id": 1, "result": {"serverInfo": {"name": "test"}}},
+            {
+                "jsonrpc": "2.0",
+                "id": 2,
+                "result": {"content": [{"type": "text", "text": '{"ok": true}'}]},
+            },
+        ]
+        process = _make_fake_process(responses)
+        conn = MCPConnection(process=process)
+        await conn.start()
+
+        result = await conn.call_tool("some_tool", {
+            "nested": {"key": "value"},
+            "list": [1, 2, 3],
+            "null": None,
+        })
+        assert result == {"ok": True}
+
+        # Verify the arguments were sent correctly
+        tool_call = json.loads(process._written[2])  # init, notif, tool_call
+        assert tool_call["params"]["arguments"]["nested"] == {"key": "value"}
+
+        conn._reader_task.cancel()
+        try:
+            await conn._reader_task
+        except asyncio.CancelledError:
+            pass

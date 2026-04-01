@@ -146,3 +146,89 @@ async def test_resolve_dispute_release(client, app):
     # Seller should receive funds
     seller_balance = await ctx.tracker.wallet.get_balance("seller-f")
     assert seller_balance == 60.0
+
+
+# ---------------------------------------------------------------------------
+# DisputeEngine unit tests (direct calls, no HTTP)
+# ---------------------------------------------------------------------------
+
+
+async def test_invalid_resolution_type_raises(app):
+    """Invalid resolution type -> ValueError."""
+    ctx = app.state.ctx
+    await ctx.tracker.wallet.create("buyer-inv", initial_balance=1000.0, signup_bonus=False)
+    await ctx.tracker.wallet.create("seller-inv", initial_balance=0.0, signup_bonus=False)
+
+    escrow = await ctx.payment_engine.create_escrow(payer="buyer-inv", payee="seller-inv", amount=50.0)
+    dispute = await ctx.dispute_engine.open_dispute(escrow_id=escrow.id, opener="buyer-inv", reason="Bad")
+
+    with pytest.raises(ValueError, match="Invalid resolution"):
+        await ctx.dispute_engine.resolve_dispute(
+            dispute_id=dispute["id"],
+            resolution="invalidtype",
+            resolved_by="admin",
+        )
+
+
+async def test_respond_to_non_open_dispute_raises(app):
+    """Responding to already-responded dispute -> DisputeStateError."""
+    ctx = app.state.ctx
+    await ctx.tracker.wallet.create("buyer-rnp", initial_balance=1000.0, signup_bonus=False)
+    await ctx.tracker.wallet.create("seller-rnp", initial_balance=0.0, signup_bonus=False)
+
+    escrow = await ctx.payment_engine.create_escrow(payer="buyer-rnp", payee="seller-rnp", amount=50.0)
+    dispute = await ctx.dispute_engine.open_dispute(escrow_id=escrow.id, opener="buyer-rnp", reason="Test")
+
+    # Respond once
+    await ctx.dispute_engine.respond_to_dispute(dispute["id"], "seller-rnp", "My reply")
+
+    # Try again — should fail
+    from gateway.src.disputes import DisputeStateError
+    with pytest.raises(DisputeStateError, match="responded"):
+        await ctx.dispute_engine.respond_to_dispute(dispute["id"], "seller-rnp", "Again")
+
+
+async def test_resolve_already_resolved_dispute_raises(app):
+    """Resolving an already-resolved dispute -> DisputeStateError."""
+    ctx = app.state.ctx
+    await _create_admin_key(app, "admin-resolved2")
+    await ctx.tracker.wallet.create("buyer-rr", initial_balance=1000.0, signup_bonus=False)
+    await ctx.tracker.wallet.create("seller-rr", initial_balance=0.0, signup_bonus=False)
+
+    escrow = await ctx.payment_engine.create_escrow(payer="buyer-rr", payee="seller-rr", amount=50.0)
+    dispute = await ctx.dispute_engine.open_dispute(escrow_id=escrow.id, opener="buyer-rr", reason="Test")
+
+    # Resolve once
+    await ctx.dispute_engine.resolve_dispute(dispute["id"], "refund", "admin-resolved2")
+
+    # Try again
+    from gateway.src.disputes import DisputeStateError
+    with pytest.raises(DisputeStateError, match="resolved"):
+        await ctx.dispute_engine.resolve_dispute(dispute["id"], "release", "admin-resolved2")
+
+
+async def test_get_nonexistent_dispute_raises(app):
+    """Getting a dispute that doesn't exist -> DisputeNotFoundError."""
+    from gateway.src.disputes import DisputeNotFoundError
+    with pytest.raises(DisputeNotFoundError):
+        await app.state.ctx.dispute_engine.get_dispute("nonexistent-id")
+
+
+async def test_open_dispute_on_non_held_escrow_raises(app):
+    """Opening a dispute on a released escrow -> DisputeStateError."""
+    ctx = app.state.ctx
+    await ctx.tracker.wallet.create("buyer-nhe", initial_balance=1000.0, signup_bonus=False)
+    await ctx.tracker.wallet.create("seller-nhe", initial_balance=0.0, signup_bonus=False)
+
+    escrow = await ctx.payment_engine.create_escrow(payer="buyer-nhe", payee="seller-nhe", amount=50.0)
+    await ctx.payment_engine.release_escrow(escrow.id)
+
+    from gateway.src.disputes import DisputeStateError
+    with pytest.raises(DisputeStateError):
+        await ctx.dispute_engine.open_dispute(escrow_id=escrow.id, opener="buyer-nhe", reason="Too late")
+
+
+async def test_list_disputes_empty(app):
+    """Listing disputes for an agent with none -> empty list."""
+    result = await app.state.ctx.dispute_engine.list_disputes("no-disputes-agent")
+    assert result == []

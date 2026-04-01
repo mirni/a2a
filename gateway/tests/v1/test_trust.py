@@ -156,3 +156,36 @@ async def test_trust_response_headers(client, api_key):
     )
     assert "X-Charged" in resp.headers
     assert "X-Request-ID" in resp.headers
+
+
+# ---------------------------------------------------------------------------
+# Negative / edge-case tests
+# ---------------------------------------------------------------------------
+
+
+async def test_delete_nonexistent_server(client, pro_api_key):
+    """DELETE a non-existent server -> 404."""
+    resp = await client.delete(
+        "/v1/trust/servers/nonexistent-server-id",
+        headers={"Authorization": f"Bearer {pro_api_key}"},
+    )
+    assert resp.status_code == 404
+
+
+async def test_get_score_nonexistent_server(client, api_key):
+    """GET score for non-existent server -> 404."""
+    resp = await client.get(
+        "/v1/trust/servers/nonexistent-server-id/score",
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 404
+
+
+async def test_search_servers_with_name_filter(client, api_key):
+    """Search with name filter."""
+    await _register_server(client, api_key, name="findme-server")
+    resp = await client.get(
+        "/v1/trust/servers?name=findme",
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 200

@@ -8,7 +8,78 @@ from __future__ import annotations
 
 import pytest
 
+from gateway.src.tools._pagination import _paginate, decode_cursor, encode_cursor
+
 pytestmark = pytest.mark.asyncio
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for encode_cursor / decode_cursor
+# ---------------------------------------------------------------------------
+
+
+class TestCursorCodec:
+    def test_roundtrip(self):
+        for offset in (0, 1, 50, 9999):
+            assert decode_cursor(encode_cursor(offset)) == offset
+
+    def test_malformed_base64_returns_0(self):
+        assert decode_cursor("!!!not-base64!!!") == 0
+
+    def test_wrong_prefix_returns_0(self):
+        import base64
+
+        bad = base64.urlsafe_b64encode(b"wrong:42").decode()
+        assert decode_cursor(bad) == 0
+
+    def test_negative_offset_clamped_to_0(self):
+        import base64
+
+        cursor = base64.urlsafe_b64encode(b"off:-5").decode()
+        assert decode_cursor(cursor) == 0
+
+
+class TestPaginate:
+    def test_basic_pagination(self):
+        items = list(range(10))
+        result = _paginate(items, {"limit": 3, "offset": 0})
+        assert result["items"] == [0, 1, 2]
+        assert result["total"] == 10
+        assert result["has_more"] is True
+        assert "next_cursor" in result
+
+    def test_last_page(self):
+        items = list(range(5))
+        result = _paginate(items, {"limit": 10, "offset": 0})
+        assert result["items"] == [0, 1, 2, 3, 4]
+        assert result["has_more"] is False
+        assert "next_cursor" not in result
+
+    def test_zero_limit(self):
+        items = list(range(5))
+        result = _paginate(items, {"limit": 0})
+        assert result["items"] == []
+        assert result["total"] == 5
+
+    def test_offset_beyond_total(self):
+        items = list(range(3))
+        result = _paginate(items, {"limit": 10, "offset": 100})
+        assert result["items"] == []
+        assert result["has_more"] is False
+
+    def test_total_override(self):
+        items = [1, 2, 3]  # pre-sliced by storage
+        result = _paginate(items, {"limit": 3, "offset": 0}, total_override=100)
+        assert result["items"] == [1, 2, 3]
+        assert result["total"] == 100
+        assert result["has_more"] is True
+
+    def test_cursor_overrides_offset(self):
+        items = list(range(20))
+        cursor = encode_cursor(5)
+        result = _paginate(items, {"cursor": cursor, "limit": 3, "offset": 0})
+        assert result["items"] == [5, 6, 7]
+        assert result["offset"] == 5
 
 
 # ---------------------------------------------------------------------------
