@@ -199,8 +199,8 @@ class TestStripeTimestampValidation:
     """Webhook must reject events with timestamps too far from now."""
 
     async def test_old_timestamp_rejected(self, client, app):
-        import hmac
         import hashlib
+        import hmac
         import json
         import os
 
@@ -352,8 +352,8 @@ class TestStripeMetadataValidation:
     """Stripe webhook must reject missing/empty agent_id in metadata."""
 
     async def test_missing_agent_id_rejected(self, client, app):
-        import hmac
         import hashlib
+        import hmac
         import json
         import os
 
@@ -384,6 +384,7 @@ class TestBackupPathTraversal:
 
     def test_restore_uses_isfile_not_exists(self):
         import inspect
+
         from gateway.src.tools.infrastructure import _restore_database
 
         source = inspect.getsource(_restore_database)
