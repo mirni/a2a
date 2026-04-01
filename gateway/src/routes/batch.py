@@ -264,7 +264,12 @@ async def batch(request: Request) -> JSONResponse:
         cost = calculate_tool_cost(tool_pricing, params)
         batch_corr = getattr(request.state, "correlation_id", None) or ""
         batch_idx = len(results) - 1
-        batch_idem = f"{batch_corr}:{batch_idx}:{tool_name}" if batch_corr else None
+        # Prefer Idempotency-Key header (appended with index for uniqueness)
+        header_idem = request.headers.get("idempotency-key")
+        batch_idem = (
+            f"{header_idem}:{batch_idx}" if header_idem
+            else (f"{batch_corr}:{batch_idx}:{tool_name}" if batch_corr else None)
+        )
         try:
             await ctx.tracker.storage.record_usage(
                 agent_id=agent_id,

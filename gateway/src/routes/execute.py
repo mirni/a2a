@@ -437,6 +437,11 @@ async def execute(request: Request) -> JSONResponse:
     params["_caller_agent_id"] = agent_id
     params["_caller_tier"] = agent_tier
 
+    # Inject Idempotency-Key header into params if not already present
+    header_idem = request.headers.get("idempotency-key")
+    if header_idem and "idempotency_key" not in params:
+        params["idempotency_key"] = header_idem
+
     # Record the request in metrics regardless of outcome
     await Metrics.record_request(tool_name)
 
@@ -475,7 +480,12 @@ async def execute(request: Request) -> JSONResponse:
 
     # --- 7. Record usage + charge ---
     correlation_id = getattr(request.state, "correlation_id", None) or ""
-    idem_key = f"{correlation_id}:{tool_name}" if correlation_id else None
+    # Prefer Idempotency-Key header; fall back to body param; then correlation-based
+    idem_key = (
+        request.headers.get("idempotency-key")
+        or params.get("idempotency_key")
+        or (f"{correlation_id}:{tool_name}" if correlation_id else None)
+    )
     try:
         await ctx.tracker.storage.record_usage(
             agent_id=agent_id,

@@ -15,12 +15,15 @@ import pytest
 # ---------------------------------------------------------------------------
 
 
-async def _execute(client, api_key: str, tool: str, params: dict):
+async def _execute(client, api_key: str, tool: str, params: dict, *, idempotency_key: str | None = None):
     """Shorthand for POST /v1/execute."""
+    headers = {"Authorization": f"Bearer {api_key}"}
+    if idempotency_key is not None:
+        headers["Idempotency-Key"] = idempotency_key
     resp = await client.post(
         "/v1/execute",
         json={"tool": tool, "params": params},
-        headers={"Authorization": f"Bearer {api_key}"},
+        headers=headers,
     )
     return resp
 
@@ -255,3 +258,40 @@ async def test_refund_settlement_idempotency(client, pro_api_key, app):
     assert r1.json()["id"] == r2.json()["id"]
     # Amount should match
     assert r1.json()["amount"] == r2.json()["amount"]
+
+
+# ---------------------------------------------------------------------------
+# Idempotency-Key HTTP header (T5)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_idempotency_key_header_prevents_duplicate(client, api_key, app):
+    """Idempotency-Key as HTTP header prevents duplicate deposits."""
+    params = {"agent_id": "test-agent", "amount": 100.0, "description": "header-test"}
+
+    r1 = await _execute(client, api_key, "deposit", params, idempotency_key="hdr-idem-001")
+    assert r1.status_code == 200
+    b1 = r1.json()["new_balance"]
+
+    r2 = await _execute(client, api_key, "deposit", params, idempotency_key="hdr-idem-001")
+    assert r2.status_code == 200
+    b2 = r2.json()["new_balance"]
+
+    assert b1 == b2, "Duplicate request with same Idempotency-Key header should not double-credit"
+
+
+@pytest.mark.asyncio
+async def test_idempotency_key_header_different_keys_create_separate(client, api_key, app):
+    """Different Idempotency-Key headers should each produce a distinct deposit."""
+    params = {"agent_id": "test-agent", "amount": 25.0}
+
+    r1 = await _execute(client, api_key, "deposit", params, idempotency_key="hdr-A")
+    assert r1.status_code == 200
+    b1 = r1.json()["new_balance"]
+
+    r2 = await _execute(client, api_key, "deposit", params, idempotency_key="hdr-B")
+    assert r2.status_code == 200
+    b2 = r2.json()["new_balance"]
+
+    assert b2 == b1 + 25.0
