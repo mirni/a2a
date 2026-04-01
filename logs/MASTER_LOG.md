@@ -6537,3 +6537,63 @@ Ran all 6 audit phases with real data collection:
 - Backlog: `tasks/backlog/fix-register-500.md`
 - Backlog: `tasks/backlog/security-sprint-items.md`
 - Task completed: `tasks/done/internal-audit.md`
+
+---
+
+## Session: 2026-04-01 — Audit Remediation + SDK REST Migration + Backup Package
+
+**Branch:** `fix/audit-remediation`
+**PR:** https://github.com/mirni/a2a/pull/28
+**CI:** All green (package, quality, test, staging)
+
+### Prompt
+Implement the audit remediation plan from PR #27 findings: security fixes, SDK migration from /v1/execute to REST, E2E test updates, Prometheus fix, and backup package.
+
+### Work Done
+
+1. **Security — Admin-only tools (TDD)**
+   - Added `backup_database`, `restore_database`, `check_db_integrity`, `list_backups` to `ADMIN_ONLY_TOOLS` in `gateway/src/authorization.py`
+   - Added 7 tests to `gateway/tests/test_authorization.py` (TestAdminOnlyTools class)
+   - All 1071 gateway tests pass
+
+2. **Register endpoint hardening (TDD)**
+   - Added Pydantic `RegisterRequestBody` validation with `extra="forbid"` in `gateway/src/routes/register.py`
+   - Wrapped `create_key()` and balance retrieval in try/except with RFC 9457 error responses
+   - Added 2 tests to `gateway/tests/test_register.py`
+
+3. **Python SDK REST migration**
+   - Added `_rest()` helper method to `A2AClient` in `sdk/src/a2a_client/client.py`
+   - Migrated all 30+ convenience methods from `self.execute()` → `self._rest()` with direct REST endpoints
+   - Updated `sdk/src/a2a_client/errors.py` to handle both legacy and RFC 9457 error formats
+   - Changed response models from `extra="forbid"` to `extra="ignore"` in `sdk/src/a2a_client/models.py`
+   - Updated `sdk/tests/test_sdk_methods.py` (55 tests) to mock `_rest()` instead of `execute()`
+   - All 66 SDK tests pass
+
+4. **TypeScript SDK REST migration**
+   - Added `rest()` helper to `sdk-ts/src/client.ts`
+   - Migrated all convenience methods to direct REST endpoints
+   - Updated `sdk-ts/src/errors.ts` for RFC 9457 format
+
+5. **E2E tests migration**
+   - Added `_rest_get`, `_rest_post`, `_rest_delete` helpers to `e2e_tests.py`
+   - Migrated all tool tests from `_execute()` to REST endpoints
+
+6. **Prometheus fix**
+   - Changed targets from `api.greenhelix.net:443` to `localhost:8000` in `monitoring/prometheus/prometheus.yml`
+   - Removed `scheme: "https"` — fixes false DOWN in Grafana dashboard
+
+7. **Database backup package**
+   - Created `package/a2a-db-backup/` with DEBIAN/control, postinst, prerm
+   - Created systemd service + timer (hourly, persistent)
+   - Created `scripts/backup_databases.sh` (SQLite backup with integrity check, 30-day retention)
+   - Updated `scripts/create_package.sh` to include new package
+
+### Files Changed (21 files, +1094/-757)
+- gateway/src/authorization.py, gateway/src/routes/register.py
+- gateway/tests/test_authorization.py, gateway/tests/test_register.py
+- sdk/src/a2a_client/client.py, sdk/src/a2a_client/errors.py, sdk/src/a2a_client/models.py
+- sdk/tests/test_client.py, sdk/tests/test_sdk_methods.py
+- sdk-ts/src/client.ts, sdk-ts/src/errors.ts
+- e2e_tests.py, monitoring/prometheus/prometheus.yml
+- scripts/create_package.sh, scripts/backup_databases.sh
+- package/a2a-db-backup/* (6 new files)
