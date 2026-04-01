@@ -1,0 +1,11 @@
+[Unit]
+Description=A2A Database Backup
+After=a2a-gateway.service
+
+[Service]
+Type=oneshot
+User=a2a
+Group=a2a
+ExecStart=/opt/a2a/scripts/backup_databases.sh
+StandardOutput=journal
+StandardError=journal

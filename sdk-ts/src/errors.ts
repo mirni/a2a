@@ -66,11 +66,26 @@ const STATUS_MAP: Record<number, new (m: string, c: string) => A2AError> = {
   429: RateLimitError,
 };
 
-/** Throw the appropriate error for an HTTP error response. */
+/** Throw the appropriate error for an HTTP error response.
+ *
+ * Supports both legacy execute format `{error: {message, code}}`
+ * and RFC 9457 format `{type, title, status, detail}`.
+ */
 export function raiseForStatus(status: number, body: Record<string, any>): never {
-  const error = body.error ?? {};
-  const message: string = error.message ?? "Unknown error";
-  const code: string = error.code ?? "error";
+  let message: string;
+  let code: string;
+
+  if (body.detail !== undefined && body.type !== undefined) {
+    // RFC 9457 format (REST endpoints)
+    message = body.detail ?? "Unknown error";
+    const typeUrl: string = body.type ?? "";
+    code = typeUrl.includes("/") ? typeUrl.split("/").pop()! : "error";
+  } else {
+    // Legacy execute format
+    const error = body.error ?? {};
+    message = error.message ?? body.detail ?? "Unknown error";
+    code = error.code ?? "error";
+  }
 
   const ErrorClass = STATUS_MAP[status] ?? ServerError;
   throw new ErrorClass(message, code);

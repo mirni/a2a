@@ -163,11 +163,69 @@ async def _execute(
     params: dict[str, Any],
     api_key: str,
 ) -> httpx.Response:
-    """POST /v1/execute with the given tool and params."""
+    """POST /v1/execute with the given tool and params.
+
+    Kept for backward-compat / auth / error-handling tests that specifically
+    test the /v1/execute endpoint.
+    """
     return await _post(
         "/v1/execute",
         json_body={"tool": tool, "params": params},
         headers=_auth_headers(api_key),
+    )
+
+
+# ---------------------------------------------------------------------------
+# REST endpoint helpers
+# ---------------------------------------------------------------------------
+
+
+async def _rest_get(
+    path: str,
+    params: dict[str, Any] | None = None,
+    api_key: str = "",
+) -> httpx.Response:
+    """Authenticated GET against a REST endpoint with optional query params."""
+    assert _http is not None
+    headers = _auth_headers(api_key) if api_key else {}
+    return await _http.get(
+        path,
+        params=params or {},
+        headers=headers,
+        follow_redirects=True,
+    )
+
+
+async def _rest_post(
+    path: str,
+    json_body: dict[str, Any] | None = None,
+    api_key: str = "",
+    extra_headers: dict[str, str] | None = None,
+) -> httpx.Response:
+    """Authenticated POST against a REST endpoint."""
+    assert _http is not None
+    headers = _auth_headers(api_key) if api_key else {}
+    if extra_headers:
+        headers.update(extra_headers)
+    return await _http.post(
+        path,
+        json=json_body,
+        headers=headers,
+        follow_redirects=True,
+    )
+
+
+async def _rest_delete(
+    path: str,
+    api_key: str = "",
+) -> httpx.Response:
+    """Authenticated DELETE against a REST endpoint."""
+    assert _http is not None
+    headers = _auth_headers(api_key) if api_key else {}
+    return await _http.delete(
+        path,
+        headers=headers,
+        follow_redirects=True,
     )
 
 
@@ -441,16 +499,16 @@ async def test_auth_invalid_key(suite: TestSuite) -> None:
 
 async def test_auth_valid_key(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
-        resp = await _execute("get_balance", {"agent_id": AGENT_ID}, api_key)
+        resp = await _rest_get(
+            f"/v1/billing/wallets/{AGENT_ID}/balance",
+            api_key=api_key,
+        )
         # 200 means auth passed (even if balance is 0 or wallet not found, auth was OK)
-        # The tool might return 404 for wallet not found, but that is post-auth.
-        # We accept 200 or 404 (wallet_not_found) as evidence that auth succeeded.
+        # The endpoint might return 404 for wallet not found, but that is post-auth.
+        # We accept 200 or 404 as evidence that auth succeeded.
         _assert(resp.status_code in (200, 404), f"Expected 200 or 404 (post-auth), got {resp.status_code}")
-        if resp.status_code == 200:
-            data = resp.json()
-            _assert(data.get("success") is True, "Expected success=true")
 
-    await _run_test(suite, "POST /v1/execute with valid key authenticates", _test)
+    await _run_test(suite, "GET /v1/billing/wallets/.../balance with valid key authenticates", _test)
 
 
 # ---------------------------------------------------------------------------
@@ -460,29 +518,30 @@ async def test_auth_valid_key(suite: TestSuite, api_key: str) -> None:
 
 async def test_billing_get_balance(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
-        resp = await _execute("get_balance", {"agent_id": AGENT_ID}, api_key)
+        resp = await _rest_get(
+            f"/v1/billing/wallets/{AGENT_ID}/balance",
+            api_key=api_key,
+        )
         # Wallet may or may not exist yet; both 200 and 404 are acceptable
         _assert(resp.status_code in (200, 404), f"Expected 200 or 404, got {resp.status_code}")
         if resp.status_code == 200:
             data = resp.json()
-            _assert(data.get("success") is True, "Expected success=true")
-            _assert("balance" in data.get("result", {}), "Expected 'balance' in result")
+            _assert("balance" in data, "Expected 'balance' in response")
 
     await _run_test(suite, "get_balance returns balance or wallet_not_found", _test)
 
 
 async def test_billing_deposit(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
-        resp = await _execute(
-            "deposit",
-            {"agent_id": AGENT_ID, "amount": 100.0, "description": "e2e test deposit"},
-            api_key,
+        resp = await _rest_post(
+            f"/v1/billing/wallets/{AGENT_ID}/deposit",
+            json_body={"amount": 100.0, "description": "e2e test deposit"},
+            api_key=api_key,
         )
         _assert_status(resp, 200)
         data = resp.json()
-        _assert(data.get("success") is True, "Expected success=true")
-        new_balance = data.get("result", {}).get("new_balance")
-        _assert(new_balance is not None, "Expected new_balance in result")
+        new_balance = data.get("new_balance")
+        _assert(new_balance is not None, "Expected new_balance in response")
         _assert(
             isinstance(new_balance, (int, float)) and new_balance >= 100.0,
             f"Expected new_balance >= 100, got {new_balance}",
@@ -493,10 +552,13 @@ async def test_billing_deposit(suite: TestSuite, api_key: str) -> None:
 
 async def test_billing_balance_after_deposit(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
-        resp = await _execute("get_balance", {"agent_id": AGENT_ID}, api_key)
+        resp = await _rest_get(
+            f"/v1/billing/wallets/{AGENT_ID}/balance",
+            api_key=api_key,
+        )
         _assert_status(resp, 200)
         data = resp.json()
-        balance = data.get("result", {}).get("balance", 0)
+        balance = data.get("balance", 0)
         _assert(balance >= 100.0, f"Expected balance >= 100 after deposit, got {balance}")
 
     await _run_test(suite, "get_balance reflects deposited credits", _test)
@@ -504,13 +566,14 @@ async def test_billing_balance_after_deposit(suite: TestSuite, api_key: str) -> 
 
 async def test_billing_usage_summary(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
-        resp = await _execute("get_usage_summary", {"agent_id": AGENT_ID}, api_key)
+        resp = await _rest_get(
+            f"/v1/billing/wallets/{AGENT_ID}/usage",
+            api_key=api_key,
+        )
         _assert_status(resp, 200)
         data = resp.json()
-        _assert(data.get("success") is True, "Expected success=true")
-        result = data.get("result", {})
         # Usage summary should have cost/calls/tokens fields
-        _assert("total_cost" in result or "total_calls" in result, f"Expected usage fields in result: {result}")
+        _assert("total_cost" in data or "total_calls" in data, f"Expected usage fields in response: {data}")
 
     await _run_test(suite, "get_usage_summary returns usage data", _test)
 
@@ -529,29 +592,29 @@ async def test_payments_create_intent(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
         global _created_intent_id
         # First ensure payee has a wallet too
-        await _execute(
-            "deposit",
-            {"agent_id": PAYEE_AGENT, "amount": 10.0, "description": "e2e payee setup"},
-            api_key,
+        await _rest_post(
+            f"/v1/billing/wallets/{PAYEE_AGENT}/deposit",
+            json_body={"amount": 10.0, "description": "e2e payee setup"},
+            api_key=api_key,
         )
-        resp = await _execute(
-            "create_intent",
-            {
+        idempotency_key = f"e2e-intent-{RUN_ID}"
+        resp = await _rest_post(
+            "/v1/payments/intents",
+            json_body={
                 "payer": AGENT_ID,
                 "payee": PAYEE_AGENT,
                 "amount": 5.0,
                 "description": "e2e test payment",
-                "idempotency_key": f"e2e-intent-{RUN_ID}",
+                "currency": "USD",
             },
-            api_key,
+            api_key=api_key,
+            extra_headers={"Idempotency-Key": idempotency_key},
         )
         _assert_status(resp, 200)
         data = resp.json()
-        _assert(data.get("success") is True, "Expected success=true")
-        result = data["result"]
-        _assert_json_key(result, "id")
-        _assert_json_key(result, "status")
-        _created_intent_id = result["id"]
+        _assert_json_key(data, "id")
+        _assert_json_key(data, "status")
+        _created_intent_id = data["id"]
 
     await _run_test(suite, "create_intent creates a payment intent", _test)
 
@@ -560,16 +623,13 @@ async def test_payments_capture_intent(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
         if _created_intent_id is None:
             raise _Skip("No intent created in previous test")
-        resp = await _execute(
-            "capture_intent",
-            {"intent_id": _created_intent_id},
-            api_key,
+        resp = await _rest_post(
+            f"/v1/payments/intents/{_created_intent_id}/capture",
+            api_key=api_key,
         )
         _assert_status(resp, 200)
         data = resp.json()
-        _assert(data.get("success") is True, "Expected success=true")
-        result = data["result"]
-        _assert_json_key(result, "status")
+        _assert_json_key(data, "status")
 
     await _run_test(suite, "capture_intent settles the payment", _test)
 
@@ -579,24 +639,22 @@ async def test_payments_create_escrow(suite: TestSuite, api_key: str) -> None:
 
     async def _test() -> None:
         global _created_escrow_id
-        resp = await _execute(
-            "create_escrow",
-            {
+        resp = await _rest_post(
+            "/v1/payments/escrows",
+            json_body={
                 "payer": AGENT_ID,
                 "payee": PAYEE_AGENT,
                 "amount": 5.0,
                 "description": "e2e test escrow",
                 "timeout_hours": 1,
             },
-            api_key,
+            api_key=api_key,
         )
         _assert_status(resp, 200)
         data = resp.json()
-        _assert(data.get("success") is True, "Expected success=true")
-        result = data["result"]
-        _assert_json_key(result, "id")
-        _assert_json_key(result, "status")
-        _created_escrow_id = result["id"]
+        _assert_json_key(data, "id")
+        _assert_json_key(data, "status")
+        _created_escrow_id = data["id"]
 
     await _run_test(suite, "create_escrow holds funds in escrow", _test)
 
@@ -605,28 +663,23 @@ async def test_payments_release_escrow(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
         if _created_escrow_id is None:
             raise _Skip("No escrow created in previous test")
-        resp = await _execute(
-            "release_escrow",
-            {"escrow_id": _created_escrow_id},
-            api_key,
+        resp = await _rest_post(
+            f"/v1/payments/escrows/{_created_escrow_id}/release",
+            api_key=api_key,
         )
         _assert_status(resp, 200)
-        data = resp.json()
-        _assert(data.get("success") is True, "Expected success=true")
 
     await _run_test(suite, "release_escrow releases funds to payee", _test)
 
 
 async def test_payments_history(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
-        resp = await _execute(
-            "get_payment_history",
-            {"agent_id": AGENT_ID, "limit": 10},
-            api_key,
+        resp = await _rest_get(
+            "/v1/payments/history",
+            params={"agent_id": AGENT_ID, "limit": 10},
+            api_key=api_key,
         )
         _assert_status(resp, 200)
-        data = resp.json()
-        _assert(data.get("success") is True, "Expected success=true")
 
     await _run_test(suite, "get_payment_history returns history", _test)
 
@@ -644,9 +697,9 @@ async def test_marketplace_register(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
         global _registered_service_id
         service_name = f"E2E Test Service {RUN_ID}"
-        resp = await _execute(
-            "register_service",
-            {
+        resp = await _rest_post(
+            "/v1/marketplace/services",
+            json_body={
                 "provider_id": AGENT_ID,
                 "name": service_name,
                 "description": "Automated e2e test service — safe to delete",
@@ -656,42 +709,36 @@ async def test_marketplace_register(suite: TestSuite, api_key: str) -> None:
                 "endpoint": "https://example.com/e2e-test",
                 "pricing": {"model": "per_call", "cost": 0.01},
             },
-            api_key,
+            api_key=api_key,
         )
         _assert_status(resp, 200)
         data = resp.json()
-        _assert(data.get("success") is True, "Expected success=true")
-        result = data["result"]
-        _assert_json_key(result, "id")
-        _registered_service_id = result["id"]
+        _assert_json_key(data, "id")
+        _registered_service_id = data["id"]
 
     await _run_test(suite, "register_service registers in marketplace (pro tier)", _test)
 
 
 async def test_marketplace_search(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
-        resp = await _execute(
-            "search_services",
-            {"query": "e2e test", "limit": 10},
-            api_key,
+        resp = await _rest_get(
+            "/v1/marketplace/services",
+            params={"query": "e2e test", "limit": 10},
+            api_key=api_key,
         )
         _assert_status(resp, 200)
-        data = resp.json()
-        _assert(data.get("success") is True, "Expected success=true")
 
     await _run_test(suite, "search_services returns results", _test)
 
 
 async def test_marketplace_best_match(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
-        resp = await _execute(
-            "best_match",
-            {"query": "testing service", "prefer": "cost", "limit": 5},
-            api_key,
+        resp = await _rest_get(
+            "/v1/marketplace/match",
+            params={"query": "testing service", "prefer": "cost", "limit": 5},
+            api_key=api_key,
         )
         _assert_status(resp, 200)
-        data = resp.json()
-        _assert(data.get("success") is True, "Expected success=true")
 
     await _run_test(suite, "best_match finds ranked matches", _test)
 
@@ -703,32 +750,28 @@ async def test_marketplace_best_match(suite: TestSuite, api_key: str) -> None:
 
 async def test_trust_score(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
-        resp = await _execute(
-            "get_trust_score",
-            {"server_id": "e2e-test-server", "window": "24h"},
-            api_key,
+        resp = await _rest_get(
+            "/v1/trust/servers/e2e-test-server/score",
+            params={"window": "24h"},
+            api_key=api_key,
         )
         # Server may not exist, 200 (with default score) or 404 both acceptable
         _assert(resp.status_code in (200, 404), f"Expected 200 or 404, got {resp.status_code}")
         if resp.status_code == 200:
             data = resp.json()
-            _assert(data.get("success") is True, "Expected success=true")
-            result = data["result"]
-            _assert_json_key(result, "composite_score")
+            _assert_json_key(data, "composite_score")
 
     await _run_test(suite, "get_trust_score returns score or not_found", _test)
 
 
 async def test_trust_search_servers(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
-        resp = await _execute(
-            "search_servers",
-            {"limit": 5},
-            api_key,
+        resp = await _rest_get(
+            "/v1/trust/servers",
+            params={"limit": 5},
+            api_key=api_key,
         )
         _assert_status(resp, 200)
-        data = resp.json()
-        _assert(data.get("success") is True, "Expected success=true")
 
     await _run_test(suite, "search_servers returns server list", _test)
 
@@ -745,30 +788,26 @@ async def test_webhook_register(suite: TestSuite, api_key: str) -> None:
 
     async def _test() -> None:
         global _registered_webhook_id
-        resp = await _execute(
-            "register_webhook",
-            {
-                "agent_id": AGENT_ID,
+        resp = await _rest_post(
+            "/v1/infra/webhooks",
+            json_body={
                 "url": "https://example.com/e2e-webhook-sink",
                 "event_types": ["billing.deposit", "payments.captured"],
                 "secret": f"e2e-secret-{RUN_ID}",
             },
-            api_key,
+            api_key=api_key,
         )
         _assert_status(resp, 200)
         data = resp.json()
-        _assert(data.get("success") is True, "Expected success=true")
-        result = data["result"]
-        _assert_json_key(result, "id")
-        _registered_webhook_id = result["id"]
+        _assert_json_key(data, "id")
+        _registered_webhook_id = data["id"]
 
         # Register cleanup to delete this webhook
         async def _cleanup_webhook() -> None:
             if _registered_webhook_id:
-                await _execute(
-                    "delete_webhook",
-                    {"webhook_id": _registered_webhook_id},
-                    api_key,
+                await _rest_delete(
+                    f"/v1/infra/webhooks/{_registered_webhook_id}",
+                    api_key=api_key,
                 )
 
         _register_cleanup(_cleanup_webhook)
@@ -778,17 +817,14 @@ async def test_webhook_register(suite: TestSuite, api_key: str) -> None:
 
 async def test_webhook_list(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
-        resp = await _execute(
-            "list_webhooks",
-            {"agent_id": AGENT_ID},
-            api_key,
+        resp = await _rest_get(
+            "/v1/infra/webhooks",
+            api_key=api_key,
         )
         _assert_status(resp, 200)
         data = resp.json()
-        _assert(data.get("success") is True, "Expected success=true")
-        result = data["result"]
-        _assert_json_key(result, "webhooks")
-        webhooks = result["webhooks"]
+        _assert_json_key(data, "webhooks")
+        webhooks = data["webhooks"]
         _assert(isinstance(webhooks, list), "Expected webhooks to be a list")
         if _registered_webhook_id:
             found = any(w.get("id") == _registered_webhook_id for w in webhooks)
@@ -801,16 +837,13 @@ async def test_webhook_delete(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
         if _registered_webhook_id is None:
             raise _Skip("No webhook registered in previous test")
-        resp = await _execute(
-            "delete_webhook",
-            {"webhook_id": _registered_webhook_id},
-            api_key,
+        resp = await _rest_delete(
+            f"/v1/infra/webhooks/{_registered_webhook_id}",
+            api_key=api_key,
         )
         _assert_status(resp, 200)
         data = resp.json()
-        _assert(data.get("success") is True, "Expected success=true")
-        result = data["result"]
-        _assert(result.get("deleted") is True, "Expected deleted=true")
+        _assert(data.get("deleted") is True, "Expected deleted=true")
 
     await _run_test(suite, "delete_webhook removes webhook", _test)
 
@@ -822,34 +855,32 @@ async def test_webhook_delete(suite: TestSuite, api_key: str) -> None:
 
 async def test_event_publish(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
-        resp = await _execute(
-            "publish_event",
-            {
+        resp = await _rest_post(
+            "/v1/infra/events",
+            json_body={
                 "event_type": "e2e.test_event",
                 "source": "e2e_tests",
                 "payload": {"run_id": RUN_ID, "timestamp": time.time()},
             },
-            api_key,
+            api_key=api_key,
         )
         _assert_status(resp, 200)
         data = resp.json()
-        _assert(data.get("success") is True, "Expected success=true")
-        _assert_json_key(data["result"], "event_id")
+        _assert_json_key(data, "event_id")
 
     await _run_test(suite, "publish_event publishes to event bus", _test)
 
 
 async def test_event_query(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
-        resp = await _execute(
-            "get_events",
-            {"event_type": "e2e.test_event", "limit": 10},
-            api_key,
+        resp = await _rest_get(
+            "/v1/infra/events",
+            params={"event_type": "e2e.test_event", "limit": 10},
+            api_key=api_key,
         )
         _assert_status(resp, 200)
         data = resp.json()
-        _assert(data.get("success") is True, "Expected success=true")
-        _assert_json_key(data["result"], "events")
+        _assert_json_key(data, "events")
 
     await _run_test(suite, "get_events queries event bus", _test)
 
@@ -861,7 +892,10 @@ async def test_event_query(suite: TestSuite, api_key: str) -> None:
 
 async def test_rate_limit_headers(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
-        resp = await _execute("get_balance", {"agent_id": AGENT_ID}, api_key)
+        resp = await _rest_get(
+            f"/v1/billing/wallets/{AGENT_ID}/balance",
+            api_key=api_key,
+        )
         # Rate limit headers are optional; just check if they appear
         has_ratelimit = any(k.lower().startswith("x-ratelimit") for k in resp.headers)
         if not has_ratelimit:
@@ -882,7 +916,10 @@ async def test_rate_limit_headers(suite: TestSuite, api_key: str) -> None:
 
 async def test_response_signing(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
-        resp = await _execute("get_balance", {"agent_id": AGENT_ID}, api_key)
+        resp = await _rest_get(
+            f"/v1/billing/wallets/{AGENT_ID}/balance",
+            api_key=api_key,
+        )
         sig = resp.headers.get("x-a2a-signature-dilithium")
         if sig is None:
             raise _Skip("No X-A2A-Signature-Dilithium header (signing may be disabled)")
@@ -892,7 +929,7 @@ async def test_response_signing(suite: TestSuite, api_key: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Execute Error Handling Tests
+# Execute Error Handling Tests (kept on /v1/execute)
 # ---------------------------------------------------------------------------
 
 
@@ -943,15 +980,15 @@ async def test_execute_invalid_json(suite: TestSuite, api_key: str) -> None:
 
 async def test_free_tier_denied_pro_tool(suite: TestSuite, free_key: str) -> None:
     async def _test() -> None:
-        # create_escrow requires pro tier
-        resp = await _execute(
-            "create_escrow",
-            {"payer": "test", "payee": "test2", "amount": 1.0},
-            free_key,
+        # create_escrow requires pro tier — use REST endpoint
+        resp = await _rest_post(
+            "/v1/payments/escrows",
+            json_body={"payer": "test", "payee": "test2", "amount": 1.0},
+            api_key=free_key,
         )
         _assert_status(resp, 403)
         data = resp.json()
-        error_code = data.get("error", {}).get("code", "")
+        error_code = data.get("error", {}).get("code", "") if "error" in data else data.get("code", "")
         _assert(error_code == "insufficient_tier", f"Expected error code 'insufficient_tier', got '{error_code}'")
 
     await _run_test(suite, "Free tier denied access to pro-tier tool (create_escrow)", _test)
@@ -959,8 +996,11 @@ async def test_free_tier_denied_pro_tool(suite: TestSuite, free_key: str) -> Non
 
 async def test_free_tier_allowed_free_tool(suite: TestSuite, free_key: str) -> None:
     async def _test() -> None:
-        # get_balance is free-tier accessible
-        resp = await _execute("get_balance", {"agent_id": "test"}, free_key)
+        # get_balance is free-tier accessible — use REST endpoint
+        resp = await _rest_get(
+            "/v1/billing/wallets/test/balance",
+            api_key=free_key,
+        )
         _assert(resp.status_code in (200, 404), f"Expected 200 or 404, got {resp.status_code}")
 
     await _run_test(suite, "Free tier can access free-tier tool (get_balance)", _test)
@@ -1041,15 +1081,14 @@ async def test_sdk_execute(suite: TestSuite, api_key: str) -> None:
 
 async def test_audit_log(suite: TestSuite, api_key: str) -> None:
     async def _test() -> None:
-        resp = await _execute(
-            "get_global_audit_log",
-            {"limit": 5},
-            api_key,
+        resp = await _rest_get(
+            "/v1/infra/audit-log",
+            params={"limit": 5},
+            api_key=api_key,
         )
         _assert_status(resp, 200)
         data = resp.json()
-        _assert(data.get("success") is True, "Expected success=true")
-        _assert_json_key(data["result"], "entries")
+        _assert_json_key(data, "entries")
 
     await _run_test(suite, "get_global_audit_log returns entries (pro tier)", _test)
 
@@ -1077,7 +1116,7 @@ ALL_TESTS = [
     # Authentication
     ("Authentication", "POST /v1/execute without auth returns 401"),
     ("Authentication", "POST /v1/execute with invalid key returns 401"),
-    ("Authentication", "POST /v1/execute with valid key authenticates"),
+    ("Authentication", "GET /v1/billing/wallets/.../balance with valid key authenticates"),
     # Billing
     ("Billing", "get_balance returns balance or wallet_not_found"),
     ("Billing", "deposit credits into test agent wallet"),

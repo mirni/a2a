@@ -1,0 +1,11 @@
+#!/bin/bash
+set -e
+
+mkdir -p /var/backups/a2a /var/log/a2a
+chown a2a:a2a /var/backups/a2a /var/log/a2a 2>/dev/null || true
+
+systemctl daemon-reload
+systemctl enable a2a-db-backup.timer
+systemctl start a2a-db-backup.timer
+
+echo "a2a-db-backup: timer enabled and started (hourly backups)"

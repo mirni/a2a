@@ -38,8 +38,14 @@ async def register(request: Request) -> JSONResponse:
     if not isinstance(raw_body, dict):
         return await error_response(400, "Request body must be a JSON object", "bad_request", request=request)
 
-    agent_id = raw_body.get("agent_id")
-    if not agent_id or not isinstance(agent_id, str):
+    # Validate with Pydantic model (extra="forbid" rejects unknown fields)
+    try:
+        body = RegisterRequestBody(**raw_body)
+    except Exception:
+        return await error_response(400, "Invalid request body", "bad_request", request=request)
+
+    agent_id = body.agent_id
+    if not agent_id:
         return await error_response(400, "Missing required field: agent_id", "bad_request", request=request)
 
     ctx = request.app.state.ctx
@@ -51,9 +57,18 @@ async def register(request: Request) -> JSONResponse:
         return await error_response(409, f"Agent '{agent_id}' is already registered", "already_exists", request=request)
 
     # Create free-tier API key
-    key_info = await ctx.key_manager.create_key(agent_id, tier="free")
+    try:
+        key_info = await ctx.key_manager.create_key(agent_id, tier="free")
+    except Exception:
+        logger.exception("Failed to create API key for agent %s", agent_id)
+        return await error_response(
+            500, "Failed to create API key during registration", "internal_error", request=request
+        )
 
-    balance = float(wallet.get("balance", 0)) if isinstance(wallet, dict) else 0.0
+    try:
+        balance = float(wallet.get("balance", 0)) if isinstance(wallet, dict) else 0.0
+    except (TypeError, ValueError):
+        balance = 0.0
 
     logger.info("Agent registered: %s", agent_id)
 

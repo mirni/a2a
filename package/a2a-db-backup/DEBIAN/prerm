@@ -1,0 +1,5 @@
+#!/bin/bash
+set -e
+
+systemctl stop a2a-db-backup.timer 2>/dev/null || true
+systemctl disable a2a-db-backup.timer 2>/dev/null || true

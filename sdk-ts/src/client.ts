@@ -143,6 +143,32 @@ export class A2AClient {
     return lastResponse!;
   }
 
+  /**
+   * Internal helper for REST endpoint calls with auth and error handling.
+   */
+  private async rest(
+    method: string,
+    path: string,
+    options: { body?: unknown; params?: Record<string, any> } = {},
+  ): Promise<any> {
+    let url = path;
+    if (options.params) {
+      const filtered = Object.entries(options.params).filter(
+        ([, v]) => v !== undefined && v !== null,
+      );
+      if (filtered.length > 0) {
+        const qs = new URLSearchParams(
+          filtered.map(([k, v]) => [k, String(v)]),
+        ).toString();
+        url = `${path}?${qs}`;
+      }
+    }
+    const resp = await this.request(method, url, options.body);
+    const data = await resp.json();
+    if (!resp.ok) raiseForStatus(resp.status, data);
+    return data;
+  }
+
   // ── Core endpoints ─────────────────────────────────────────────────
 
   /** GET /v1/health */
@@ -214,18 +240,15 @@ export class A2AClient {
 
   /** Get wallet balance for an agent. */
   async getBalance(agentId: string): Promise<BalanceResponse> {
-    const r = await this.execute("get_balance", { agent_id: agentId });
-    return r.result as BalanceResponse;
+    return this.rest("GET", `/v1/billing/wallets/${agentId}/balance`);
   }
 
   /** Deposit credits into a wallet. Returns new balance. */
   async deposit(agentId: string, amount: number, description = ""): Promise<number> {
-    const r = await this.execute("deposit", {
-      agent_id: agentId,
-      amount,
-      description,
+    const r = await this.rest("POST", `/v1/billing/wallets/${agentId}/deposit`, {
+      body: { amount, description },
     });
-    return r.result.new_balance;
+    return r.new_balance;
   }
 
   /** Get usage summary for an agent. */
@@ -233,10 +256,9 @@ export class A2AClient {
     agentId: string,
     since?: number,
   ): Promise<UsageSummaryResponse> {
-    const params: Record<string, any> = { agent_id: agentId };
+    const params: Record<string, any> = {};
     if (since !== undefined) params.since = since;
-    const r = await this.execute("get_usage_summary", params);
-    return r.result as UsageSummaryResponse;
+    return this.rest("GET", `/v1/billing/wallets/${agentId}/usage`, { params });
   }
 
   /** Create a payment intent. */
@@ -247,16 +269,15 @@ export class A2AClient {
     description = "",
     idempotencyKey?: string,
   ): Promise<PaymentIntent> {
-    const params: Record<string, any> = { payer, payee, amount, description };
-    if (idempotencyKey) params.idempotency_key = idempotencyKey;
-    const r = await this.execute("create_intent", params);
-    return r.result as PaymentIntent;
+    // Note: idempotency key should be a header, but we keep it simple here
+    return this.rest("POST", "/v1/payments/intents", {
+      body: { payer, payee, amount, description },
+    });
   }
 
   /** Capture a pending payment intent. */
   async capturePayment(intentId: string): Promise<PaymentIntent> {
-    const r = await this.execute("capture_intent", { intent_id: intentId });
-    return r.result as PaymentIntent;
+    return this.rest("POST", `/v1/payments/intents/${intentId}/capture`);
   }
 
   /** Create an escrow. */
@@ -267,16 +288,14 @@ export class A2AClient {
     description = "",
     timeoutHours?: number,
   ): Promise<EscrowResponse> {
-    const params: Record<string, any> = { payer, payee, amount, description };
-    if (timeoutHours !== undefined) params.timeout_hours = timeoutHours;
-    const r = await this.execute("create_escrow", params);
-    return r.result as EscrowResponse;
+    const body: Record<string, any> = { payer, payee, amount, description };
+    if (timeoutHours !== undefined) body.timeout_hours = timeoutHours;
+    return this.rest("POST", "/v1/payments/escrows", { body });
   }
 
   /** Release an escrow to the payee. */
   async releaseEscrow(escrowId: string): Promise<EscrowResponse> {
-    const r = await this.execute("release_escrow", { escrow_id: escrowId });
-    return r.result as EscrowResponse;
+    return this.rest("POST", `/v1/payments/escrows/${escrowId}/release`);
   }
 
   /** Search the marketplace. */
@@ -290,10 +309,10 @@ export class A2AClient {
     const params: Record<string, any> = { limit: options.limit ?? 20 };
     if (options.query) params.query = options.query;
     if (options.category) params.category = options.category;
-    if (options.tags) params.tags = options.tags;
+    if (options.tags) params.tags = options.tags.join(",");
     if (options.maxCost !== undefined) params.max_cost = options.maxCost;
-    const r = await this.execute("search_services", params);
-    return r.result.services;
+    const r = await this.rest("GET", "/v1/marketplace/services", { params });
+    return r.services;
   }
 
   /** Find best matching services. */
@@ -314,8 +333,8 @@ export class A2AClient {
     if (options.budget !== undefined) params.budget = options.budget;
     if (options.minTrustScore !== undefined)
       params.min_trust_score = options.minTrustScore;
-    const r = await this.execute("best_match", params);
-    return r.result.matches;
+    const r = await this.rest("GET", "/v1/marketplace/match", { params });
+    return r.matches;
   }
 
   /** Get trust score for a server. */
@@ -324,12 +343,9 @@ export class A2AClient {
     window = "24h",
     recompute = false,
   ): Promise<TrustScore> {
-    const r = await this.execute("get_trust_score", {
-      server_id: serverId,
-      window,
-      recompute,
-    });
-    return r.result as TrustScore;
+    const params: Record<string, any> = { window };
+    if (recompute) params.recompute = "true";
+    return this.rest("GET", `/v1/trust/servers/${serverId}/score`, { params });
   }
 
   /** Get payment history for an agent. */
@@ -338,12 +354,9 @@ export class A2AClient {
     limit = 100,
     offset = 0,
   ): Promise<PaymentHistoryResponse> {
-    const r = await this.execute("get_payment_history", {
-      agent_id: agentId,
-      limit,
-      offset,
+    return this.rest("GET", "/v1/payments/history", {
+      params: { agent_id: agentId, limit, offset },
     });
-    return r.result as PaymentHistoryResponse;
   }
 
   /** Register a new agent identity. */
@@ -352,12 +365,9 @@ export class A2AClient {
     displayName: string,
     capabilities: string[] = [],
   ): Promise<Record<string, any>> {
-    const r = await this.execute("register_agent", {
-      agent_id: agentId,
-      display_name: displayName,
-      capabilities,
+    return this.rest("POST", "/v1/identity/agents", {
+      body: { agent_id: agentId, display_name: displayName, capabilities },
     });
-    return r.result;
   }
 
   /** Send a message between agents. */
@@ -367,21 +377,16 @@ export class A2AClient {
     content: string,
     messageType = "text",
   ): Promise<Record<string, any>> {
-    const r = await this.execute("send_message", {
-      sender,
-      recipient,
-      content,
-      message_type: messageType,
+    return this.rest("POST", "/v1/messaging/messages", {
+      body: { sender, recipient, body: content, message_type: messageType },
     });
-    return r.result;
   }
 
   // ── Payment convenience methods ───────────────────────────────────
 
   /** Cancel a held escrow and refund the payer. */
   async cancelEscrow(escrowId: string): Promise<EscrowResponse> {
-    const r = await this.execute("cancel_escrow", { escrow_id: escrowId });
-    return r.result as EscrowResponse;
+    return this.rest("POST", `/v1/payments/escrows/${escrowId}/cancel`);
   }
 
   /** Refund a settled payment (full or partial). */
@@ -389,17 +394,15 @@ export class A2AClient {
     settlementId: string,
     options: { amount?: number; reason?: string } = {},
   ): Promise<RefundResponse> {
-    const params: Record<string, any> = { settlement_id: settlementId };
-    if (options.amount !== undefined) params.amount = options.amount;
-    if (options.reason !== undefined) params.reason = options.reason;
-    const r = await this.execute("refund_settlement", params);
-    return r.result as RefundResponse;
+    const body: Record<string, any> = {};
+    if (options.amount !== undefined) body.amount = options.amount;
+    if (options.reason !== undefined) body.reason = options.reason;
+    return this.rest("POST", `/v1/payments/settlements/${settlementId}/refund`, { body });
   }
 
   /** Refund a payment intent: voids if pending, reverse-transfers if settled. */
   async refundIntent(intentId: string): Promise<PaymentIntent> {
-    const r = await this.execute("refund_intent", { intent_id: intentId });
-    return r.result as PaymentIntent;
+    return this.rest("POST", `/v1/payments/intents/${intentId}/refund`);
   }
 
   /** Void a pending payment (alias for refundIntent). */
@@ -415,10 +418,9 @@ export class A2AClient {
     interval: string,
     options: { description?: string } = {},
   ): Promise<SubscriptionResponse> {
-    const params: Record<string, any> = { payer, payee, amount, interval };
-    if (options.description !== undefined) params.description = options.description;
-    const r = await this.execute("create_subscription", params);
-    return r.result as SubscriptionResponse;
+    const body: Record<string, any> = { payer, payee, amount, interval };
+    if (options.description !== undefined) body.description = options.description;
+    return this.rest("POST", "/v1/payments/subscriptions", { body });
   }
 
   /** Cancel an active or suspended subscription. */
@@ -426,29 +428,28 @@ export class A2AClient {
     subscriptionId: string,
     options: { cancelledBy?: string } = {},
   ): Promise<{ id: string; status: string }> {
-    const params: Record<string, any> = { subscription_id: subscriptionId };
-    if (options.cancelledBy !== undefined) params.cancelled_by = options.cancelledBy;
-    const r = await this.execute("cancel_subscription", params);
-    return r.result as { id: string; status: string };
+    const body: Record<string, any> = {};
+    if (options.cancelledBy !== undefined) body.cancelled_by = options.cancelledBy;
+    return this.rest("POST", `/v1/payments/subscriptions/${subscriptionId}/cancel`, { body });
   }
 
   /** Get subscription details by ID. */
   async getSubscription(subscriptionId: string): Promise<SubscriptionDetailResponse> {
-    const r = await this.execute("get_subscription", { subscription_id: subscriptionId });
-    return r.result as SubscriptionDetailResponse;
+    return this.rest("GET", `/v1/payments/subscriptions/${subscriptionId}`);
   }
 
   /** List subscriptions for an agent. */
   async listSubscriptions(
     options: { agentId?: string; status?: string; limit?: number; offset?: number } = {},
   ): Promise<SubscriptionListResponse> {
-    const params: Record<string, any> = {};
-    if (options.agentId !== undefined) params.agent_id = options.agentId;
-    if (options.status !== undefined) params.status = options.status;
-    if (options.limit !== undefined) params.limit = options.limit;
-    if (options.offset !== undefined) params.offset = options.offset;
-    const r = await this.execute("list_subscriptions", params);
-    return r.result as SubscriptionListResponse;
+    return this.rest("GET", "/v1/payments/subscriptions", {
+      params: {
+        agent_id: options.agentId,
+        status: options.status,
+        limit: options.limit,
+        offset: options.offset,
+      },
+    });
   }
 
   // ── Marketplace convenience methods ───────────────────────────────
@@ -464,24 +465,22 @@ export class A2AClient {
     endpoint?: string;
     pricing?: Record<string, any>;
   }): Promise<ServiceRegistrationResponse> {
-    const params: Record<string, any> = {
+    const body: Record<string, any> = {
       provider_id: options.providerId,
       name: options.name,
       description: options.description,
       category: options.category,
     };
-    if (options.tools !== undefined) params.tools = options.tools;
-    if (options.tags !== undefined) params.tags = options.tags;
-    if (options.endpoint !== undefined) params.endpoint = options.endpoint;
-    if (options.pricing !== undefined) params.pricing = options.pricing;
-    const r = await this.execute("register_service", params);
-    return r.result as ServiceRegistrationResponse;
+    if (options.tools !== undefined) body.tools = options.tools;
+    if (options.tags !== undefined) body.tags = options.tags;
+    if (options.endpoint !== undefined) body.endpoint = options.endpoint;
+    if (options.pricing !== undefined) body.pricing = options.pricing;
+    return this.rest("POST", "/v1/marketplace/services", { body });
   }
 
   /** Get a marketplace service by ID. */
   async getService(serviceId: string): Promise<ServiceDetailResponse> {
-    const r = await this.execute("get_service", { service_id: serviceId });
-    return r.result as ServiceDetailResponse;
+    return this.rest("GET", `/v1/marketplace/services/${serviceId}`);
   }
 
   /** Rate a marketplace service (1-5). */
@@ -491,10 +490,9 @@ export class A2AClient {
     rating: number,
     options: { review?: string } = {},
   ): Promise<ServiceRatingResponse> {
-    const params: Record<string, any> = { service_id: serviceId, agent_id: agentId, rating };
-    if (options.review !== undefined) params.review = options.review;
-    const r = await this.execute("rate_service", params);
-    return r.result as ServiceRatingResponse;
+    const body: Record<string, any> = { agent_id: agentId, rating };
+    if (options.review !== undefined) body.review = options.review;
+    return this.rest("POST", `/v1/marketplace/services/${serviceId}/ratings`, { body });
   }
 
   // ── Trust convenience methods ─────────────────────────────────────
@@ -503,20 +501,20 @@ export class A2AClient {
   async searchServers(
     options: { nameContains?: string; minScore?: number; limit?: number } = {},
   ): Promise<ServerSearchResponse> {
-    const params: Record<string, any> = {};
-    if (options.nameContains !== undefined) params.name_contains = options.nameContains;
-    if (options.minScore !== undefined) params.min_score = options.minScore;
-    if (options.limit !== undefined) params.limit = options.limit;
-    const r = await this.execute("search_servers", params);
-    return r.result as ServerSearchResponse;
+    return this.rest("GET", "/v1/trust/servers", {
+      params: {
+        name_contains: options.nameContains,
+        min_score: options.minScore,
+        limit: options.limit,
+      },
+    });
   }
 
   // ── Identity convenience methods ──────────────────────────────────
 
   /** Get the cryptographic identity for an agent. */
   async getAgentIdentity(agentId: string): Promise<AgentIdentityResponse> {
-    const r = await this.execute("get_agent_identity", { agent_id: agentId });
-    return r.result as AgentIdentityResponse;
+    return this.rest("GET", `/v1/identity/agents/${agentId}`);
   }
 
   /** Verify that a message was signed by the claimed agent. */
@@ -525,12 +523,9 @@ export class A2AClient {
     message: string,
     signature: string,
   ): Promise<VerifyAgentResponse> {
-    const r = await this.execute("verify_agent", {
-      agent_id: agentId,
-      message,
-      signature,
+    return this.rest("POST", `/v1/identity/agents/${agentId}/verify`, {
+      body: { message, signature },
     });
-    return r.result as VerifyAgentResponse;
   }
 
   /** Submit trading bot metrics for platform attestation. */
@@ -539,16 +534,14 @@ export class A2AClient {
     metrics: Record<string, any>,
     options: { dataSource?: string } = {},
   ): Promise<MetricsSubmissionResponse> {
-    const params: Record<string, any> = { agent_id: agentId, metrics };
-    if (options.dataSource !== undefined) params.data_source = options.dataSource;
-    const r = await this.execute("submit_metrics", params);
-    return r.result as MetricsSubmissionResponse;
+    const body: Record<string, any> = { metrics };
+    if (options.dataSource !== undefined) body.data_source = options.dataSource;
+    return this.rest("POST", `/v1/identity/agents/${agentId}/metrics`, { body });
   }
 
   /** Get all verified metric claims for an agent. */
   async getVerifiedClaims(agentId: string): Promise<VerifiedClaimsResponse> {
-    const r = await this.execute("get_verified_claims", { agent_id: agentId });
-    return r.result as VerifiedClaimsResponse;
+    return this.rest("GET", `/v1/identity/agents/${agentId}/claims`);
   }
 
   // ── Webhook convenience methods ───────────────────────────────────
@@ -561,27 +554,23 @@ export class A2AClient {
     secret?: string;
     filterAgentIds?: string[];
   }): Promise<WebhookResponse> {
-    const params: Record<string, any> = {
-      agent_id: options.agentId,
+    const body: Record<string, any> = {
       url: options.url,
       event_types: options.eventTypes,
     };
-    if (options.secret !== undefined) params.secret = options.secret;
-    if (options.filterAgentIds !== undefined) params.filter_agent_ids = options.filterAgentIds;
-    const r = await this.execute("register_webhook", params);
-    return r.result as WebhookResponse;
+    if (options.secret !== undefined) body.secret = options.secret;
+    if (options.filterAgentIds !== undefined) body.filter_agent_ids = options.filterAgentIds;
+    return this.rest("POST", "/v1/infra/webhooks", { body });
   }
 
   /** List all registered webhooks for an agent. */
   async listWebhooks(agentId: string): Promise<WebhookListResponse> {
-    const r = await this.execute("list_webhooks", { agent_id: agentId });
-    return r.result as WebhookListResponse;
+    return this.rest("GET", "/v1/infra/webhooks");
   }
 
   /** Delete (deactivate) a webhook by ID. */
   async deleteWebhook(webhookId: string): Promise<WebhookDeleteResponse> {
-    const r = await this.execute("delete_webhook", { webhook_id: webhookId });
-    return r.result as WebhookDeleteResponse;
+    return this.rest("DELETE", `/v1/infra/webhooks/${webhookId}`);
   }
 
   // ── API key convenience methods ───────────────────────────────────
@@ -591,16 +580,16 @@ export class A2AClient {
     agentId: string,
     options: { tier?: string } = {},
   ): Promise<ApiKeyResponse> {
-    const params: Record<string, any> = { agent_id: agentId };
-    if (options.tier !== undefined) params.tier = options.tier;
-    const r = await this.execute("create_api_key", params);
-    return r.result as ApiKeyResponse;
+    const body: Record<string, any> = {};
+    if (options.tier !== undefined) body.tier = options.tier;
+    return this.rest("POST", "/v1/infra/keys", { body });
   }
 
   /** Rotate an API key: revoke current and create new with same tier. */
   async rotateKey(currentKey: string): Promise<KeyRotationResponse> {
-    const r = await this.execute("rotate_key", { current_key: currentKey });
-    return r.result as KeyRotationResponse;
+    return this.rest("POST", "/v1/infra/keys/rotate", {
+      body: { current_key: currentKey },
+    });
   }
 
   // ── Event convenience methods ─────────────────────────────────────
@@ -611,44 +600,41 @@ export class A2AClient {
     source: string,
     payload: Record<string, any> = {},
   ): Promise<EventPublishResponse> {
-    const r = await this.execute("publish_event", {
-      event_type: eventType,
-      source,
-      payload,
+    return this.rest("POST", "/v1/infra/events", {
+      body: { event_type: eventType, source, payload },
     });
-    return r.result as EventPublishResponse;
   }
 
   /** Query events from the event bus. */
   async getEvents(
     options: { eventType?: string; sinceId?: number; limit?: number } = {},
   ): Promise<EventListResponse> {
-    const params: Record<string, any> = {};
-    if (options.eventType !== undefined) params.event_type = options.eventType;
-    if (options.sinceId !== undefined) params.since_id = options.sinceId;
-    if (options.limit !== undefined) params.limit = options.limit;
-    const r = await this.execute("get_events", params);
-    return r.result as EventListResponse;
+    return this.rest("GET", "/v1/infra/events", {
+      params: {
+        event_type: options.eventType,
+        since_id: options.sinceId,
+        limit: options.limit,
+      },
+    });
   }
 
   // ── Org convenience methods ───────────────────────────────────────
 
   /** Create a new organization. */
   async createOrg(orgName: string): Promise<OrgResponse> {
-    const r = await this.execute("create_org", { org_name: orgName });
-    return r.result as OrgResponse;
+    return this.rest("POST", "/v1/identity/orgs", { body: { org_name: orgName } });
   }
 
   /** Get organization details and members. */
   async getOrg(orgId: string): Promise<OrgDetailResponse> {
-    const r = await this.execute("get_org", { org_id: orgId });
-    return r.result as OrgDetailResponse;
+    return this.rest("GET", `/v1/identity/orgs/${orgId}`);
   }
 
   /** Add an agent to an organization. */
   async addAgentToOrg(orgId: string, agentId: string): Promise<OrgMemberResponse> {
-    const r = await this.execute("add_agent_to_org", { org_id: orgId, agent_id: agentId });
-    return r.result as OrgMemberResponse;
+    return this.rest("POST", `/v1/identity/orgs/${orgId}/members`, {
+      body: { agent_id: agentId },
+    });
   }
 
   /** Get organization members (convenience alias for getOrg). */
@@ -666,15 +652,14 @@ export class A2AClient {
     serviceId?: string;
     expiresHours?: number;
   }): Promise<NegotiationResponse> {
-    const params: Record<string, any> = {
+    const body: Record<string, any> = {
       initiator: options.initiator,
       responder: options.responder,
       amount: options.amount,
     };
-    if (options.serviceId !== undefined) params.service_id = options.serviceId;
-    if (options.expiresHours !== undefined) params.expires_hours = options.expiresHours;
-    const r = await this.execute("negotiate_price", params);
-    return r.result as NegotiationResponse;
+    if (options.serviceId !== undefined) body.service_id = options.serviceId;
+    if (options.expiresHours !== undefined) body.expires_hours = options.expiresHours;
+    return this.rest("POST", "/v1/messaging/negotiations", { body });
   }
 
   /** Get messages for an agent. */
@@ -682,10 +667,8 @@ export class A2AClient {
     agentId: string,
     options: { threadId?: string; limit?: number } = {},
   ): Promise<MessageListResponse> {
-    const params: Record<string, any> = { agent_id: agentId };
-    if (options.threadId !== undefined) params.thread_id = options.threadId;
-    if (options.limit !== undefined) params.limit = options.limit;
-    const r = await this.execute("get_messages", params);
-    return r.result as MessageListResponse;
+    return this.rest("GET", "/v1/messaging/messages", {
+      params: { agent_id: agentId, thread_id: options.threadId, limit: options.limit },
+    });
   }
 }

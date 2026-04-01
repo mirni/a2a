@@ -1,0 +1,10 @@
+Package: a2a-db-backup
+Version: 0.7.0
+Architecture: all
+Depends: sqlite3
+Maintainer: A2A Team <team@greenhelix.net>
+Section: admin
+Priority: optional
+Description: Automated backup for A2A Commerce Platform databases
+ Provides a systemd timer that runs hourly SQLite backups of all
+ A2A databases with 30-day retention and integrity verification.
