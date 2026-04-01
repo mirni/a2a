@@ -6458,3 +6458,17 @@ Process backlog/security-audit.md prompt — internal security audit of A2A gate
    - Pre-generated keys with regeneration instructions
    - Structured reporting template
 5. **PR #27**: `feat/external-audit-prompt` — CI skipped (tasks/** in paths-ignore)
+
+### Internal Market-Readiness Audit Prompt
+
+**Prompt:** Generate a comprehensive internal audit prompt using multiple agent personas to assess market readiness.
+
+**Output:** `tasks/external/internal-audit.md`
+
+**Structure:**
+- 6 agent personas: Security Engineer, Financial Auditor, QA/Test Engineer, Developer Advocate, SRE Engineer, Product Manager
+- Dependency-ordered execution: QA first (baseline) → Security + Financial (parallel) → SRE → Dev Advocate → Product (synthesis)
+- Grading rubric (A–F) with weighted scoring: Security 25%, Financial 20%, QA 15%, DX 15%, Ops 15%, Product 10%
+- Go/No-Go decision matrix with conditions
+- Consolidates into `reports/market-readiness-audit-YYYY-MM-DD.md`
+- References prior audit findings, PLAN_v2.md status, and live sandbox verification
