@@ -58,7 +58,7 @@ async def test_list_api_keys_paginate_first_page(client, app, api_key):
     assert "has_more" in body, "Paginated response must contain 'has_more'"
 
     assert len(body["items"]) == 2
-    assert body["total"] >= 4
+    assert float(body["total"]) >= 4
     assert body["offset"] == 0
     assert body["limit"] == 2
     assert body["has_more"] is True
@@ -85,7 +85,7 @@ async def test_list_api_keys_paginate_second_page(client, app, api_key):
     assert len(body["items"]) == 2
     assert body["offset"] == 2
     assert body["limit"] == 2
-    assert body["total"] >= 4
+    assert float(body["total"]) >= 4
 
 
 async def test_list_api_keys_without_paginate_returns_flat(client, app, api_key):
@@ -123,7 +123,7 @@ async def test_list_api_keys_paginate_metadata_total(client, app, api_key):
         },
     )
 
-    assert body["total"] == 5
+    assert float(body["total"]) == 5
     assert len(body["items"]) == 5
     assert body["has_more"] is False
 
@@ -167,7 +167,7 @@ async def test_search_services_paginate(client, app, api_key):
     assert "items" in body
     assert "total" in body
     assert len(body["items"]) == 2
-    assert body["total"] >= 5
+    assert float(body["total"]) >= 5
     assert body["offset"] == 0
     assert body["limit"] == 2
     assert body["has_more"] is True
@@ -274,7 +274,7 @@ async def test_search_agents_paginate(client, app, api_key):
     assert "items" in body
     assert "total" in body
     assert len(body["items"]) == 2
-    assert body["total"] >= 4
+    assert float(body["total"]) >= 4
     assert body["has_more"] is True
 
 
@@ -309,7 +309,7 @@ async def test_list_webhooks_paginate(client, app, pro_api_key):
     assert "items" in body
     assert "total" in body
     assert len(body["items"]) == 2
-    assert body["total"] >= 4
+    assert float(body["total"]) >= 4
     assert body["has_more"] is True
 
 
@@ -371,5 +371,5 @@ async def test_paginate_with_zero_limit(client, app, api_key):
         },
     )
     assert body["items"] == []
-    assert body["total"] >= 1
+    assert float(body["total"]) >= 1
     assert body["limit"] == 0

@@ -27,7 +27,7 @@ async def test_partial_capture_basic(client, pro_api_key, app):
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["amount"] == 30.0
+    assert float(body["amount"]) == 30.0
     assert body["status"] == "settled"
     assert "id" in body
 

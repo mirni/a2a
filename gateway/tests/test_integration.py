@@ -57,7 +57,7 @@ class TestPaywallBillingGateway:
 
         # Verify starting balance
         body, _ = await _exec_ok(client, "get_balance", {"agent_id": "paywall-agent-1"}, key)
-        assert body["balance"] == 100.0
+        assert float(body["balance"]) == 100.0
 
         # Make a paid tool call (create_intent: 2% of amount, min $0.01, max $5.00)
         # 2% of $5.0 = $0.10
@@ -73,12 +73,12 @@ class TestPaywallBillingGateway:
 
         # Verify balance was decremented by the percentage-based fee (0.10)
         body, _ = await _exec_ok(client, "get_balance", {"agent_id": "paywall-agent-1"}, key)
-        assert body["balance"] == 99.9
+        assert float(body["balance"]) == 99.9
 
         # Verify usage was recorded
         body, _ = await _exec_ok(client, "get_usage_summary", {"agent_id": "paywall-agent-1"}, key)
         assert body["total_calls"] >= 1
-        assert body["total_cost"] >= 0.1
+        assert float(body["total_cost"]) >= 0.1
 
     @pytest.mark.asyncio
     async def test_free_tier_denied_pro_tool_then_upgrade(self, app, client):
@@ -168,7 +168,7 @@ class TestPaymentsBillingE2E:
         # Capture intent
         body, _ = await _exec_ok(client, "capture_intent", {"intent_id": intent_id}, key)
         assert body["status"] == "settled"
-        assert body["amount"] == transfer_amount
+        assert float(body["amount"]) == transfer_amount
 
         # Two paid calls (create_intent + capture_intent) at 0.5 each = 1.0
         total_gateway_fees = per_call_cost * 2
@@ -226,7 +226,7 @@ class TestPaymentsBillingE2E:
         release_fee = 0.0
         body, resp = await _exec_ok(client, "release_escrow", {"escrow_id": escrow_id}, key)
         assert body["status"] == "settled"
-        assert body["amount"] == escrow_amount
+        assert float(body["amount"]) == escrow_amount
         assert float(resp.headers["x-charged"]) == release_fee
 
         # Verify payee received the escrowed funds
@@ -603,7 +603,7 @@ class TestFullAgentFlow:
             buyer_key,
         )
         assert body["status"] == "settled"
-        assert body["amount"] == payment_amount
+        assert float(body["amount"]) == payment_amount
         capture_fee = float(resp.headers["x-charged"])
         # capture_intent: $0.00 (fee charged at creation)
         assert capture_fee == 0.0
@@ -617,7 +617,7 @@ class TestFullAgentFlow:
         )
         total_buyer_fees = create_intent_fee + capture_fee
         expected_buyer_balance = buyer_initial - payment_amount - total_buyer_fees
-        assert body["balance"] == expected_buyer_balance
+        assert float(body["balance"]) == expected_buyer_balance
 
         # -- Step 6: Check provider's balance --
         body, _ = await _exec_ok(
@@ -631,7 +631,7 @@ class TestFullAgentFlow:
         # Provider gets: initial + payment_amount
         # Provider loses: register_service gateway fees (per_call 0.0)
         expected_provider_balance = provider_initial + payment_amount
-        assert body["balance"] == expected_provider_balance
+        assert float(body["balance"]) == expected_provider_balance
 
         # -- Step 7: Check buyer's usage summary --
         body, _ = await _exec_ok(
@@ -644,7 +644,7 @@ class TestFullAgentFlow:
         # get_usage_summary = 5 calls minimum
         # (some are free, some are paid)
         assert body["total_calls"] >= 4
-        assert body["total_cost"] >= total_buyer_fees
+        assert float(body["total_cost"]) >= total_buyer_fees
 
 
 # ========================================================================
@@ -697,7 +697,7 @@ class TestEdgeCases:
 
         # Verify key works first
         body, _ = await _exec_ok(client, "get_balance", {"agent_id": agent_id}, key)
-        assert body["balance"] == 100.0
+        assert float(body["balance"]) == 100.0
 
         # Revoke the key
         revoked = await ctx.key_manager.revoke_key(key)

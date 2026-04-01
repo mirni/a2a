@@ -50,7 +50,7 @@ async def test_get_transactions_after_deposit(client, api_key, app):
     assert len(txns) == baseline_count + 1
     # Most recent transaction is first (ordered by created_at DESC)
     assert txns[0]["tx_type"] == "deposit"
-    assert txns[0]["amount"] == 50.0
+    assert float(txns[0]["amount"]) == 50.0
     assert txns[0]["description"] == "Test deposit"
     assert "created_at" in txns[0]
 

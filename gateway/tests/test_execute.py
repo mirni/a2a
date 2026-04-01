@@ -56,7 +56,7 @@ async def test_execute_get_balance(client, api_key, app):
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["balance"] == 1000.0
+    assert float(data["balance"]) == 1000.0
     assert float(resp.headers["x-charged"]) == 0.0
 
 
@@ -82,7 +82,7 @@ async def test_execute_deposit(client, api_key):
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["new_balance"] == 1050.0
+    assert float(data["new_balance"]) == 1050.0
 
 
 @pytest.mark.asyncio
@@ -367,4 +367,4 @@ async def test_execute_create_and_capture_intent(client, api_key, app):
     assert resp.status_code == 200
     capture_data = resp.json()
     assert capture_data["status"] == "settled"
-    assert capture_data["amount"] == 25.0
+    assert float(capture_data["amount"]) == 25.0

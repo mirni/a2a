@@ -97,7 +97,7 @@ async def test_rate_service_upsert(client, api_key, app):
     assert resp2.status_code == 200
     result = resp2.json()
     assert result["count"] == 1
-    assert result["average_rating"] == 5.0
+    assert float(result["average_rating"]) == 5.0
 
 
 async def test_get_service_ratings_empty(client, api_key, app):
@@ -114,7 +114,7 @@ async def test_get_service_ratings_empty(client, api_key, app):
     )
     assert resp.status_code == 200
     result = resp.json()
-    assert result["average_rating"] == 0
+    assert float(result["average_rating"]) == 0
     assert result["count"] == 0
     assert result["ratings"] == []
 
@@ -172,7 +172,7 @@ async def test_get_service_ratings_average(client, api_key, app):
     assert resp.status_code == 200
     result = resp.json()
     assert result["count"] == 2
-    assert result["average_rating"] == 3.0  # (4+2)/2
+    assert float(result["average_rating"]) == 3.0  # (4+2)/2
 
 
 async def test_rate_service_invalid_rating(client, api_key, app):

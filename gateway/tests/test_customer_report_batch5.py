@@ -113,7 +113,9 @@ class TestExchangeRateReturnType:
         )
         assert resp.status_code == 200
         rate = resp.json()["rate"]
-        assert isinstance(rate, (int, float)), f"Expected numeric, got {type(rate).__name__}: {rate}"
+        assert isinstance(rate, str), f"Expected string, got {type(rate).__name__}: {rate}"
+        # Verify it's a valid numeric string
+        float(rate)  # should not raise
 
 
 # ============================================================================

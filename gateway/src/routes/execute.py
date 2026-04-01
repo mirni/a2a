@@ -542,8 +542,13 @@ async def execute(request: Request) -> JSONResponse:
         _tc = _get_tier_config(agent_tier)
         headers.update(_rate_limit_headers(_tc.rate_limit_per_hour, rate_count))
 
+    # Serialize monetary values as strings and timestamps as ISO 8601
+    from gateway.src.serialization import serialize_money, serialize_response
+
+    result = serialize_response(result)
+
     # Envelope-free: result is the body; cost goes in X-Charged header
-    headers["X-Charged"] = str(cost)
+    headers["X-Charged"] = serialize_money(cost)
 
     # Determine status code: 201 for create tools, 200 otherwise
     _CREATE_TOOLS: frozenset[str] = frozenset({

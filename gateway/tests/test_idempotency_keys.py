@@ -94,7 +94,7 @@ async def test_deposit_different_idempotency_keys_create_separate(client, api_ke
     assert r2.status_code == 200
     b2 = r2.json()["new_balance"]
 
-    assert b2 == b1 + 25.0
+    assert float(b2) == float(b1) + 25.0
 
 
 # ---------------------------------------------------------------------------
@@ -294,4 +294,4 @@ async def test_idempotency_key_header_different_keys_create_separate(client, api
     assert r2.status_code == 200
     b2 = r2.json()["new_balance"]
 
-    assert b2 == b1 + 25.0
+    assert float(b2) == float(b1) + 25.0

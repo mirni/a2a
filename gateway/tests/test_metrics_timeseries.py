@@ -50,7 +50,7 @@ class TestMetricsTimeseries:
         assert "calls" in bucket
         assert "cost" in bucket
         assert bucket["calls"] >= 2
-        assert bucket["cost"] >= 0.3 - 0.01  # floating point tolerance
+        assert float(bucket["cost"]) >= 0.3 - 0.01  # floating point tolerance
 
     async def test_returns_buckets_for_daily_interval(self, client, api_key, app):
         """Should return bucketed usage data with daily interval."""

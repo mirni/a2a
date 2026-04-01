@@ -70,7 +70,7 @@ async def test_withdraw_via_gateway(client, api_key):
     )
     assert resp.status_code == 200
     result = resp.json()
-    assert result["new_balance"] == 900.0  # started with 1000
+    assert float(result["new_balance"]) == 900.0  # started with 1000
 
 
 async def test_withdraw_insufficient_balance(client, api_key):

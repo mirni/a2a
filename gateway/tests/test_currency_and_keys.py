@@ -61,7 +61,7 @@ class TestMultiCurrencyPaymentTools:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["balance"] == 0.0
+        assert float(data["balance"]) == 0.0
         assert data["currency"] == "USD"
 
     async def test_deposit_with_currency_param(self, client, api_key):
@@ -428,8 +428,8 @@ class TestConvertCurrency:
         )
         data = resp.json()
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {data}"
-        assert data["from_amount"] == 100.0
-        assert data["to_amount"] > 0
+        assert float(data["from_amount"]) == 100.0
+        assert float(data["to_amount"]) > 0
 
     async def test_convert_currency_converts_balance(self, client, app, api_key):
         """convert_currency should withdraw from source and deposit to target."""
@@ -454,10 +454,10 @@ class TestConvertCurrency:
         )
         data = resp.json()
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {data}"
-        assert data["from_amount"] == 100.0
+        assert float(data["from_amount"]) == 100.0
         assert data["from_currency"] == "CREDITS"
         assert data["to_currency"] == "USD"
-        assert data["to_amount"] > 0
+        assert float(data["to_amount"]) > 0
 
     async def test_convert_currency_ownership_enforced(self, client, api_key):
         """convert_currency for a different agent should be forbidden."""

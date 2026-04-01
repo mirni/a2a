@@ -82,7 +82,7 @@ async def test_refund_settled_intent_creates_reverse_transfer(client, api_key, a
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "refunded"
-    assert body["amount"] == 100.0
+    assert float(body["amount"]) == 100.0
 
     # Payee should have been debited and payer credited
     payee_after = await ctx.tracker.get_balance("ri-payee")

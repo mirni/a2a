@@ -28,7 +28,7 @@ class TestRegisterAgent:
         data = resp.json()
         assert data["agent_id"] == "test-agent"
         assert len(data["public_key"]) == 64  # 32 bytes hex
-        assert data["created_at"] > 0
+        assert isinstance(data["created_at"], str) and "T" in data["created_at"]
 
 
 class TestVerifyAgent:

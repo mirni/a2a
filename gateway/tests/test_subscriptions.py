@@ -30,7 +30,7 @@ async def test_create_subscription_via_gateway(client, pro_api_key, app):
     assert resp.status_code in (200, 201)
     data = resp.json()
     assert data["status"] == "active"
-    assert data["amount"] == 10.0
+    assert float(data["amount"]) == 10.0
     assert "id" in data
 
 
@@ -77,7 +77,7 @@ async def test_get_subscription_via_gateway(client, pro_api_key, app):
     assert resp.status_code == 200
     result = resp.json()
     assert result["id"] == sub.id
-    assert result["amount"] == 15.0
+    assert float(result["amount"]) == 15.0
     assert result["interval"] == "weekly"
 
 

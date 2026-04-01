@@ -119,8 +119,8 @@ async def test_volume_discount_discounted_price(client, api_key, app):
     )
     assert resp.status_code == 200
     result = resp.json()
-    expected_discounted = result["unit_price"] * (1 - result["discount_pct"] / 100)
-    assert abs(result["discounted_price"] - expected_discounted) < 0.001
+    expected_discounted = float(result["unit_price"]) * (1 - result["discount_pct"] / 100)
+    assert abs(float(result["discounted_price"]) - expected_discounted) < 0.001
 
 
 async def test_volume_discount_missing_params(client, api_key):
