@@ -98,11 +98,15 @@ class TestRegisterAgent:
     @pytest.mark.asyncio
     async def test_calls_rest_with_correct_args(self, mock_client):
         mock_client._rest.return_value = {
-            "agent_id": "a1", "public_key": "abc123", "created_at": 1234567890.0,
+            "agent_id": "a1",
+            "public_key": "abc123",
+            "created_at": 1234567890.0,
         }
         result = await mock_client.register_agent("a1")
         mock_client._rest.assert_called_once_with(
-            "POST", "/v1/identity/agents", json={"agent_id": "a1"},
+            "POST",
+            "/v1/identity/agents",
+            json={"agent_id": "a1"},
         )
         assert isinstance(result, RegisterAgentResponse)
         assert result.agent_id == "a1"
@@ -110,11 +114,14 @@ class TestRegisterAgent:
     @pytest.mark.asyncio
     async def test_with_public_key(self, mock_client):
         mock_client._rest.return_value = {
-            "agent_id": "a1", "public_key": "mypk", "created_at": 1234567890.0,
+            "agent_id": "a1",
+            "public_key": "mypk",
+            "created_at": 1234567890.0,
         }
         result = await mock_client.register_agent("a1", public_key="mypk")
         mock_client._rest.assert_called_once_with(
-            "POST", "/v1/identity/agents",
+            "POST",
+            "/v1/identity/agents",
             json={"agent_id": "a1", "public_key": "mypk"},
         )
         assert result.public_key == "mypk"
@@ -132,7 +139,10 @@ class TestSendMessage:
     @pytest.mark.asyncio
     async def test_calls_rest(self, mock_client):
         mock_client._rest.return_value = {
-            "id": "m1", "sender": "a", "recipient": "b", "thread_id": "t1",
+            "id": "m1",
+            "sender": "a",
+            "recipient": "b",
+            "thread_id": "t1",
         }
         result = await mock_client.send_message(sender="a", recipient="b", message_type="text", body="hello")
         call = mock_client._rest.call_args
@@ -147,7 +157,10 @@ class TestSendMessage:
     @pytest.mark.asyncio
     async def test_with_optional_params(self, mock_client):
         mock_client._rest.return_value = {
-            "id": "m1", "sender": "a", "recipient": "b", "thread_id": "t1",
+            "id": "m1",
+            "sender": "a",
+            "recipient": "b",
+            "thread_id": "t1",
         }
         await mock_client.send_message(
             sender="a",
@@ -190,11 +203,14 @@ class TestVoidPayment:
     @pytest.mark.asyncio
     async def test_calls_rest(self, mock_client):
         mock_client._rest.return_value = {
-            "id": "i1", "status": "refunded", "amount": Decimal("10.00"),
+            "id": "i1",
+            "status": "refunded",
+            "amount": Decimal("10.00"),
         }
         result = await mock_client.void_payment("i1")
         mock_client._rest.assert_called_once_with(
-            "POST", "/v1/payments/intents/i1/refund",
+            "POST",
+            "/v1/payments/intents/i1/refund",
         )
         assert isinstance(result, VoidPaymentResponse)
 
@@ -229,11 +245,14 @@ class TestCancelEscrow:
     @pytest.mark.asyncio
     async def test_calls_rest(self, mock_client):
         mock_client._rest.return_value = {
-            "id": "e1", "status": "cancelled", "amount": Decimal("10.00"),
+            "id": "e1",
+            "status": "cancelled",
+            "amount": Decimal("10.00"),
         }
         result = await mock_client.cancel_escrow("e1")
         mock_client._rest.assert_called_once_with(
-            "POST", "/v1/payments/escrows/e1/cancel",
+            "POST",
+            "/v1/payments/escrows/e1/cancel",
         )
         assert isinstance(result, CancelEscrowResponse)
 
@@ -242,7 +261,10 @@ class TestRefundSettlement:
     @pytest.mark.asyncio
     async def test_calls_rest(self, mock_client):
         mock_client._rest.return_value = {
-            "id": "r1", "settlement_id": "s1", "amount": Decimal("5.00"), "status": "refunded",
+            "id": "r1",
+            "settlement_id": "s1",
+            "amount": Decimal("5.00"),
+            "status": "refunded",
         }
         result = await mock_client.refund_settlement("s1", amount=5.0, reason="bad")
         call = mock_client._rest.call_args
@@ -257,8 +279,11 @@ class TestCreateSubscription:
     @pytest.mark.asyncio
     async def test_calls_rest(self, mock_client):
         mock_client._rest.return_value = {
-            "id": "sub1", "status": "active", "amount": Decimal("10.00"),
-            "interval": "daily", "next_charge_at": 123.0,
+            "id": "sub1",
+            "status": "active",
+            "amount": Decimal("10.00"),
+            "interval": "daily",
+            "next_charge_at": 123.0,
         }
         result = await mock_client.create_subscription(payer="a", payee="b", amount=10.0, interval="daily")
         call = mock_client._rest.call_args
@@ -297,7 +322,8 @@ class TestGetSubscription:
         }
         result = await mock_client.get_subscription("sub1")
         mock_client._rest.assert_called_once_with(
-            "GET", "/v1/payments/subscriptions/sub1",
+            "GET",
+            "/v1/payments/subscriptions/sub1",
         )
         assert isinstance(result, GetSubscriptionResponse)
 
@@ -332,11 +358,16 @@ class TestGetService:
     @pytest.mark.asyncio
     async def test_calls_rest(self, mock_client):
         mock_client._rest.return_value = {
-            "id": "svc1", "name": "MySvc", "description": "d", "category": "ai", "status": "active",
+            "id": "svc1",
+            "name": "MySvc",
+            "description": "d",
+            "category": "ai",
+            "status": "active",
         }
         result = await mock_client.get_service("svc1")
         mock_client._rest.assert_called_once_with(
-            "GET", "/v1/marketplace/services/svc1",
+            "GET",
+            "/v1/marketplace/services/svc1",
         )
         assert isinstance(result, GetServiceResponse)
 
@@ -371,11 +402,15 @@ class TestGetAgentIdentity:
     @pytest.mark.asyncio
     async def test_calls_rest(self, mock_client):
         mock_client._rest.return_value = {
-            "agent_id": "a1", "public_key": "pk1", "created_at": 100.0, "found": True,
+            "agent_id": "a1",
+            "public_key": "pk1",
+            "created_at": 100.0,
+            "found": True,
         }
         result = await mock_client.get_agent_identity("a1")
         mock_client._rest.assert_called_once_with(
-            "GET", "/v1/identity/agents/a1",
+            "GET",
+            "/v1/identity/agents/a1",
         )
         assert isinstance(result, GetAgentIdentityResponse)
 
@@ -419,7 +454,8 @@ class TestGetVerifiedClaims:
         mock_client._rest.return_value = {"claims": []}
         result = await mock_client.get_verified_claims("a1")
         mock_client._rest.assert_called_once_with(
-            "GET", "/v1/identity/agents/a1/claims",
+            "GET",
+            "/v1/identity/agents/a1/claims",
         )
         assert isinstance(result, GetVerifiedClaimsResponse)
 
@@ -436,7 +472,9 @@ class TestRegisterWebhook:
             "active": True,
         }
         result = await mock_client.register_webhook(
-            agent_id="a1", url="https://hook.test", event_types=["billing.deposit"],
+            agent_id="a1",
+            url="https://hook.test",
+            event_types=["billing.deposit"],
         )
         call = mock_client._rest.call_args
         assert call[0] == ("POST", "/v1/infra/webhooks")
@@ -452,7 +490,8 @@ class TestListWebhooks:
         mock_client._rest.return_value = {"webhooks": []}
         result = await mock_client.list_webhooks("a1")
         mock_client._rest.assert_called_once_with(
-            "GET", "/v1/infra/webhooks",
+            "GET",
+            "/v1/infra/webhooks",
         )
         assert isinstance(result, ListWebhooksResponse)
 
@@ -463,7 +502,8 @@ class TestDeleteWebhook:
         mock_client._rest.return_value = {"deleted": True}
         result = await mock_client.delete_webhook("w1")
         mock_client._rest.assert_called_once_with(
-            "DELETE", "/v1/infra/webhooks/w1",
+            "DELETE",
+            "/v1/infra/webhooks/w1",
         )
         assert isinstance(result, DeleteWebhookResponse)
 
@@ -472,7 +512,10 @@ class TestCreateApiKey:
     @pytest.mark.asyncio
     async def test_calls_rest(self, mock_client):
         mock_client._rest.return_value = {
-            "key": "k1", "agent_id": "a1", "tier": "free", "created_at": 100.0,
+            "key": "k1",
+            "agent_id": "a1",
+            "tier": "free",
+            "created_at": 100.0,
         }
         result = await mock_client.create_api_key("a1", tier="pro")
         call = mock_client._rest.call_args
@@ -486,11 +529,16 @@ class TestRotateKey:
     @pytest.mark.asyncio
     async def test_calls_rest(self, mock_client):
         mock_client._rest.return_value = {
-            "new_key": "nk1", "tier": "free", "agent_id": "a1", "revoked": True,
+            "new_key": "nk1",
+            "tier": "free",
+            "agent_id": "a1",
+            "revoked": True,
         }
         result = await mock_client.rotate_key("old_key")
         mock_client._rest.assert_called_once_with(
-            "POST", "/v1/infra/keys/rotate", json={"current_key": "old_key"},
+            "POST",
+            "/v1/infra/keys/rotate",
+            json={"current_key": "old_key"},
         )
         assert isinstance(result, RotateKeyResponse)
 
@@ -528,7 +576,9 @@ class TestCreateOrg:
         mock_client._rest.return_value = {"org_id": "o1", "name": "Org1", "created_at": 100.0}
         result = await mock_client.create_org("Org1")
         mock_client._rest.assert_called_once_with(
-            "POST", "/v1/identity/orgs", json={"org_name": "Org1"},
+            "POST",
+            "/v1/identity/orgs",
+            json={"org_name": "Org1"},
         )
         assert isinstance(result, CreateOrgResponse)
 
@@ -537,11 +587,15 @@ class TestGetOrg:
     @pytest.mark.asyncio
     async def test_calls_rest(self, mock_client):
         mock_client._rest.return_value = {
-            "org_id": "o1", "name": "Org1", "created_at": 100.0, "members": [],
+            "org_id": "o1",
+            "name": "Org1",
+            "created_at": 100.0,
+            "members": [],
         }
         result = await mock_client.get_org("o1")
         mock_client._rest.assert_called_once_with(
-            "GET", "/v1/identity/orgs/o1",
+            "GET",
+            "/v1/identity/orgs/o1",
         )
         assert isinstance(result, GetOrgResponse)
 
@@ -552,7 +606,9 @@ class TestAddAgentToOrg:
         mock_client._rest.return_value = {"agent_id": "a1", "org_id": "o1"}
         result = await mock_client.add_agent_to_org(org_id="o1", agent_id="a1")
         mock_client._rest.assert_called_once_with(
-            "POST", "/v1/identity/orgs/o1/members", json={"agent_id": "a1"},
+            "POST",
+            "/v1/identity/orgs/o1/members",
+            json={"agent_id": "a1"},
         )
         assert isinstance(result, AddAgentToOrgResponse)
 
@@ -674,7 +730,9 @@ class TestExistingMethodsReturnTypedModels:
     @pytest.mark.asyncio
     async def test_create_payment_intent_returns_model(self, mock_client):
         mock_client._rest.return_value = {
-            "id": "i1", "status": "pending", "amount": Decimal("10.00"),
+            "id": "i1",
+            "status": "pending",
+            "amount": Decimal("10.00"),
         }
         result = await mock_client.create_payment_intent(payer="a", payee="b", amount=10.0)
         assert isinstance(result, PaymentIntentResponse)
@@ -682,7 +740,9 @@ class TestExistingMethodsReturnTypedModels:
     @pytest.mark.asyncio
     async def test_capture_payment_returns_model(self, mock_client):
         mock_client._rest.return_value = {
-            "id": "i1", "status": "settled", "amount": Decimal("10.00"),
+            "id": "i1",
+            "status": "settled",
+            "amount": Decimal("10.00"),
         }
         result = await mock_client.capture_payment("i1")
         assert isinstance(result, PaymentIntentResponse)
@@ -690,7 +750,9 @@ class TestExistingMethodsReturnTypedModels:
     @pytest.mark.asyncio
     async def test_create_escrow_returns_model(self, mock_client):
         mock_client._rest.return_value = {
-            "id": "e1", "status": "held", "amount": Decimal("10.00"),
+            "id": "e1",
+            "status": "held",
+            "amount": Decimal("10.00"),
         }
         result = await mock_client.create_escrow(payer="a", payee="b", amount=10.0)
         assert isinstance(result, EscrowResponse)
@@ -698,7 +760,9 @@ class TestExistingMethodsReturnTypedModels:
     @pytest.mark.asyncio
     async def test_release_escrow_returns_model(self, mock_client):
         mock_client._rest.return_value = {
-            "id": "e1", "status": "released", "amount": Decimal("10.00"),
+            "id": "e1",
+            "status": "released",
+            "amount": Decimal("10.00"),
         }
         result = await mock_client.release_escrow("e1")
         assert isinstance(result, EscrowResponse)

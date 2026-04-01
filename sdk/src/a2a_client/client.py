@@ -242,7 +242,8 @@ class A2AClient:
     async def deposit(self, agent_id: str, amount: float, description: str = "") -> DepositResponse:
         """Deposit credits into a wallet. Returns new balance."""
         data = await self._rest(
-            "POST", f"/v1/billing/wallets/{agent_id}/deposit",
+            "POST",
+            f"/v1/billing/wallets/{agent_id}/deposit",
             json={"amount": amount, "description": description},
         )
         return DepositResponse.from_dict(data)
@@ -302,7 +303,8 @@ class A2AClient:
         if reason is not None:
             body["reason"] = reason
         data = await self._rest(
-            "POST", f"/v1/payments/settlements/{settlement_id}/refund",
+            "POST",
+            f"/v1/payments/settlements/{settlement_id}/refund",
             json=body or None,
         )
         return RefundSettlementResponse.from_dict(data)
@@ -310,7 +312,8 @@ class A2AClient:
     async def get_payment_history(self, agent_id: str, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
         """Get payment history for an agent."""
         data = await self._rest(
-            "GET", "/v1/payments/history",
+            "GET",
+            "/v1/payments/history",
             params={"agent_id": agent_id, "limit": limit, "offset": offset},
         )
         return data["history"]
@@ -383,7 +386,8 @@ class A2AClient:
         if cancelled_by is not None:
             body["cancelled_by"] = cancelled_by
         data = await self._rest(
-            "POST", f"/v1/payments/subscriptions/{subscription_id}/cancel",
+            "POST",
+            f"/v1/payments/subscriptions/{subscription_id}/cancel",
             json=body or None,
         )
         return CancelSubscriptionResponse.from_dict(data)
@@ -402,7 +406,8 @@ class A2AClient:
     ) -> ListSubscriptionsResponse:
         """List subscriptions for an agent."""
         data = await self._rest(
-            "GET", "/v1/payments/subscriptions",
+            "GET",
+            "/v1/payments/subscriptions",
             params={"agent_id": agent_id, "status": status, "limit": limit, "offset": offset},
         )
         return ListSubscriptionsResponse.from_dict(data)
@@ -552,7 +557,8 @@ class A2AClient:
     async def verify_agent(self, agent_id: str, message: str, signature: str) -> VerifyAgentResponse:
         """Verify that a message was signed by the claimed agent."""
         data = await self._rest(
-            "POST", f"/v1/identity/agents/{agent_id}/verify",
+            "POST",
+            f"/v1/identity/agents/{agent_id}/verify",
             json={"message": message, "signature": signature},
         )
         return VerifyAgentResponse.from_dict(data)
@@ -565,7 +571,8 @@ class A2AClient:
     ) -> SubmitMetricsResponse:
         """Submit trading bot metrics for platform attestation."""
         data = await self._rest(
-            "POST", f"/v1/identity/agents/{agent_id}/metrics",
+            "POST",
+            f"/v1/identity/agents/{agent_id}/metrics",
             json={"metrics": metrics, "data_source": data_source},
         )
         return SubmitMetricsResponse.from_dict(data)
