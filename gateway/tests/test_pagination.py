@@ -373,3 +373,152 @@ async def test_paginate_with_zero_limit(client, app, api_key):
     assert body["items"] == []
     assert float(body["total"]) >= 1
     assert body["limit"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Cursor-based pagination (T9)
+# ---------------------------------------------------------------------------
+
+
+async def _exec_with_resp(client, api_key, tool: str, params: dict):
+    """Execute a tool and return (body, response) for header inspection."""
+    resp = await client.post(
+        "/v1/execute",
+        json={"tool": tool, "params": params},
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 200, resp.text
+    return resp.json(), resp
+
+
+async def test_cursor_pagination_returns_next_cursor(client, app, api_key):
+    """When has_more=True, response includes next_cursor."""
+    ctx = app.state.ctx
+    for _ in range(4):
+        await ctx.key_manager.create_key("test-agent", tier="free")
+
+    body, resp = await _exec_with_resp(
+        client,
+        api_key,
+        "list_api_keys",
+        {
+            "agent_id": "test-agent",
+            "offset": 0,
+            "limit": 2,
+            "paginate": True,
+        },
+    )
+
+    assert body["has_more"] is True
+    assert "next_cursor" in body, "Paginated response with has_more must include next_cursor"
+    assert isinstance(body["next_cursor"], str)
+    assert len(body["next_cursor"]) > 0
+
+
+async def test_cursor_pagination_link_header(client, app, api_key):
+    """When has_more=True, Link header with rel=next is present."""
+    ctx = app.state.ctx
+    for _ in range(4):
+        await ctx.key_manager.create_key("test-agent", tier="free")
+
+    body, resp = await _exec_with_resp(
+        client,
+        api_key,
+        "list_api_keys",
+        {
+            "agent_id": "test-agent",
+            "offset": 0,
+            "limit": 2,
+            "paginate": True,
+        },
+    )
+
+    assert body["has_more"] is True
+    link = resp.headers.get("link")
+    assert link is not None, "Link header must be present when has_more=True"
+    assert 'rel="next"' in link
+
+
+async def test_cursor_pagination_using_cursor_param(client, app, api_key):
+    """Using cursor param from page 1 returns page 2 items."""
+    ctx = app.state.ctx
+    for _ in range(4):
+        await ctx.key_manager.create_key("test-agent", tier="free")
+
+    # First page
+    body1 = await _exec(
+        client,
+        api_key,
+        "list_api_keys",
+        {
+            "agent_id": "test-agent",
+            "offset": 0,
+            "limit": 2,
+            "paginate": True,
+        },
+    )
+    assert body1["has_more"] is True
+    cursor = body1["next_cursor"]
+
+    # Second page using cursor
+    body2 = await _exec(
+        client,
+        api_key,
+        "list_api_keys",
+        {
+            "agent_id": "test-agent",
+            "cursor": cursor,
+            "limit": 2,
+            "paginate": True,
+        },
+    )
+    assert "items" in body2
+    assert len(body2["items"]) > 0
+    # Page 2 items should differ from page 1 (compare by key_hash_prefix)
+    prefixes1 = {k["key_hash_prefix"] for k in body1["items"]}
+    prefixes2 = {k["key_hash_prefix"] for k in body2["items"]}
+    assert prefixes1.isdisjoint(prefixes2), "Cursor-based page 2 should not overlap page 1"
+
+
+async def test_no_link_header_when_no_more_pages(client, app, api_key):
+    """When has_more=False, no Link header and no next_cursor."""
+    body, resp = await _exec_with_resp(
+        client,
+        api_key,
+        "list_api_keys",
+        {
+            "agent_id": "test-agent",
+            "offset": 0,
+            "limit": 100,
+            "paginate": True,
+        },
+    )
+
+    assert body["has_more"] is False
+    assert "next_cursor" not in body
+    assert resp.headers.get("link") is None
+
+
+async def test_pricing_cursor_pagination(client, app, api_key):
+    """GET /v1/pricing with cursor param returns correct page."""
+    # First page
+    resp1 = await client.get(
+        "/v1/pricing?limit=2&offset=0",
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp1.status_code == 200
+    body1 = resp1.json()
+    assert len(body1["tools"]) == 2
+
+    # If there are more tools, check Link header
+    if body1.get("has_more") or body1.get("next_cursor"):
+        cursor = body1["next_cursor"]
+        resp2 = await client.get(
+            f"/v1/pricing?cursor={cursor}&limit=2",
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp2.status_code == 200
+        body2 = resp2.json()
+        names1 = {t["name"] for t in body1["tools"]}
+        names2 = {t["name"] for t in body2["tools"]}
+        assert names1.isdisjoint(names2)

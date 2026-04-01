@@ -578,6 +578,13 @@ async def execute(request: Request) -> JSONResponse:
         if resource_id:
             headers["Location"] = tpl.format(id=resource_id, escrow_id=resource_id, org_id=resource_id)
 
+    # Add Link header for cursor-based pagination when has_more is true
+    if isinstance(result, dict) and result.get("has_more") and result.get("next_cursor"):
+        cursor = result["next_cursor"]
+        limit = result.get("limit", 50)
+        link_url = f"/v1/execute?cursor={cursor}&limit={limit}"
+        headers["Link"] = f'<{link_url}>; rel="next"'
+
     # Sign response if signing manager available
     signing_manager = getattr(request.app.state, "signing_manager", None)
     if signing_manager:

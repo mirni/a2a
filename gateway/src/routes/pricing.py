@@ -21,15 +21,23 @@ async def pricing_list(request: Request) -> JSONResponse:
     Query params:
         limit (int, optional): Max number of tools to return. Negative values ignored.
         offset (int, optional): Number of tools to skip. Default 0.
+        cursor (str, optional): Opaque cursor from previous page's next_cursor.
     """
+    from gateway.src.tools._pagination import decode_cursor, encode_cursor
+
     catalog = get_catalog()
     total = len(catalog)
 
-    # Parse pagination params
+    # Parse pagination params — cursor takes precedence over offset
+    cursor_str = request.query_params.get("cursor")
     limit_str = request.query_params.get("limit")
     offset_str = request.query_params.get("offset")
 
-    offset = max(0, int(offset_str)) if offset_str else 0
+    if cursor_str:
+        offset = decode_cursor(cursor_str)
+    else:
+        offset = max(0, int(offset_str)) if offset_str else 0
+
     if limit_str is not None:
         limit_val = int(limit_str)
         if limit_val < 0:
@@ -38,20 +46,28 @@ async def pricing_list(request: Request) -> JSONResponse:
         limit_val = total  # no limit → return all
 
     tools = catalog[offset : offset + limit_val]
+    has_more = (offset + limit_val) < total
 
     # Use actual IP-based remaining count when the public rate limiter is active
     limiter = getattr(request.state, "public_rate_limiter", None)
     client_ip = getattr(request.state, "client_ip", None)
 
-    return JSONResponse(
-        {
-            "tools": tools,
-            "total": total,
-            "limit": limit_val,
-            "offset": offset,
-        },
-        headers=public_rate_limit_headers(limiter=limiter, client_ip=client_ip),
-    )
+    resp_headers = public_rate_limit_headers(limiter=limiter, client_ip=client_ip)
+
+    body: dict = {
+        "tools": tools,
+        "total": total,
+        "limit": limit_val,
+        "offset": offset,
+        "has_more": has_more,
+    }
+
+    if has_more:
+        next_cursor = encode_cursor(offset + limit_val)
+        body["next_cursor"] = next_cursor
+        resp_headers["Link"] = f'</v1/pricing?cursor={next_cursor}&limit={limit_val}>; rel="next"'
+
+    return JSONResponse(body, headers=resp_headers)
 
 
 @router.get("/v1/pricing/summary")
