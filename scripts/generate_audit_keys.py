@@ -14,7 +14,8 @@ import asyncio
 import json
 import os
 import sys
-from datetime import datetime
+import time
+from datetime import datetime, timedelta
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
@@ -41,7 +42,7 @@ AGENTS = [
 ]
 
 
-async def main(data_dir: str, output_path: str) -> None:
+async def main(data_dir: str, output_path: str, expires_hours: int) -> None:
     os.environ["A2A_DATA_DIR"] = data_dir
 
     from billing_src.tracker import UsageTracker
@@ -56,6 +57,9 @@ async def main(data_dir: str, output_path: str) -> None:
 
     tracker = UsageTracker(f"sqlite:///{data_dir}/billing.db")
     await tracker.connect()
+
+    expires_at = time.time() + expires_hours * 3600
+    expires_dt = datetime.now(datetime.UTC) + timedelta(hours=expires_hours)
 
     keys: list[dict] = []
     for agent in AGENTS:
@@ -72,6 +76,7 @@ async def main(data_dir: str, output_path: str) -> None:
             agent["agent_id"],
             tier=agent["tier"],
             scopes=agent["scopes"],
+            expires_at=expires_at,
         )
         keys.append(
             {
@@ -90,6 +95,8 @@ async def main(data_dir: str, output_path: str) -> None:
         "# External Security Audit API Keys",
         f"# Generated: {datetime.now(datetime.UTC).isoformat()}",
         "# Target: api.greenhelix.net/v1  (or sandbox.greenhelix.net/v1)",
+        "#",
+        f"# Expires: {expires_dt.isoformat()} ({expires_hours}h from generation)",
         "#",
         "# WARNING: These keys grant real access. Do not commit to git.",
         "",
@@ -125,10 +132,16 @@ if __name__ == "__main__":
         default="tasks/external/audit-api-keys.env",
         help="Output file path (default: tasks/external/audit-api-keys.env)",
     )
+    parser.add_argument(
+        "--expires",
+        type=int,
+        default=24,
+        help="Key expiry in hours (default: 24)",
+    )
     args = parser.parse_args()
 
     if not args.data_dir:
         print("Error: --data-dir or $A2A_DATA_DIR required", file=sys.stderr)
         sys.exit(1)
 
-    asyncio.run(main(args.data_dir, args.output))
+    asyncio.run(main(args.data_dir, args.output, args.expires))
