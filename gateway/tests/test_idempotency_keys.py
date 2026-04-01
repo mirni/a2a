@@ -281,6 +281,180 @@ async def test_idempotency_key_header_prevents_duplicate(client, api_key, app):
     assert b1 == b2, "Duplicate request with same Idempotency-Key header should not double-credit"
 
 
+# ---------------------------------------------------------------------------
+# capture_intent idempotency
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_capture_intent_idempotency(client, pro_api_key, app):
+    """Same idempotency_key on capture_intent should not double-settle."""
+    ctx = app.state.ctx
+    await ctx.tracker.wallet.create("cap-payer", initial_balance=5000.0, signup_bonus=False)
+    await ctx.tracker.wallet.create("cap-payee", initial_balance=0.0, signup_bonus=False)
+
+    intent = await ctx.payment_engine.create_intent(
+        payer="pro-agent",
+        payee="cap-payee",
+        amount=200.0,
+    )
+
+    r1 = await _execute(
+        client,
+        pro_api_key,
+        "capture_intent",
+        {"intent_id": intent.id},
+        idempotency_key="cap-idem-001",
+    )
+    assert r1.status_code == 200, r1.json()
+    settlement_id_1 = r1.json()["id"]
+
+    r2 = await _execute(
+        client,
+        pro_api_key,
+        "capture_intent",
+        {"intent_id": intent.id},
+        idempotency_key="cap-idem-001",
+    )
+    assert r2.status_code == 200, r2.json()
+    settlement_id_2 = r2.json()["id"]
+
+    # Same settlement returned, no duplicate
+    assert settlement_id_1 == settlement_id_2
+
+    # Payee should have received funds only once
+    payee_balance = await ctx.tracker.wallet.get_balance("cap-payee")
+    assert payee_balance == 200.0
+
+
+# ---------------------------------------------------------------------------
+# release_escrow idempotency
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_release_escrow_idempotency(client, pro_api_key, app):
+    """Same idempotency_key on release_escrow should not double-release."""
+    ctx = app.state.ctx
+    await ctx.tracker.wallet.create("rel-payee", initial_balance=0.0, signup_bonus=False)
+
+    escrow = await ctx.payment_engine.create_escrow(
+        payer="pro-agent",
+        payee="rel-payee",
+        amount=150.0,
+    )
+
+    r1 = await _execute(
+        client,
+        pro_api_key,
+        "release_escrow",
+        {"escrow_id": escrow.id},
+        idempotency_key="rel-idem-001",
+    )
+    assert r1.status_code == 200, r1.json()
+    settlement_id_1 = r1.json()["id"]
+
+    r2 = await _execute(
+        client,
+        pro_api_key,
+        "release_escrow",
+        {"escrow_id": escrow.id},
+        idempotency_key="rel-idem-001",
+    )
+    assert r2.status_code == 200, r2.json()
+    settlement_id_2 = r2.json()["id"]
+
+    assert settlement_id_1 == settlement_id_2
+
+    # Payee should have received funds only once
+    payee_balance = await ctx.tracker.wallet.get_balance("rel-payee")
+    assert payee_balance == 150.0
+
+
+# ---------------------------------------------------------------------------
+# cancel_escrow idempotency
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_cancel_escrow_idempotency(client, pro_api_key, app):
+    """Same idempotency_key on cancel_escrow should not double-refund."""
+    ctx = app.state.ctx
+    await ctx.tracker.wallet.create("cnl-payee", initial_balance=0.0, signup_bonus=False)
+
+    escrow = await ctx.payment_engine.create_escrow(
+        payer="pro-agent",
+        payee="cnl-payee",
+        amount=100.0,
+    )
+    payer_balance_before = await ctx.tracker.wallet.get_balance("pro-agent")
+
+    r1 = await _execute(
+        client,
+        pro_api_key,
+        "cancel_escrow",
+        {"escrow_id": escrow.id},
+        idempotency_key="cnl-idem-001",
+    )
+    assert r1.status_code == 200, r1.json()
+
+    r2 = await _execute(
+        client,
+        pro_api_key,
+        "cancel_escrow",
+        {"escrow_id": escrow.id},
+        idempotency_key="cnl-idem-001",
+    )
+    assert r2.status_code == 200, r2.json()
+
+    # Payer should get refund only once
+    payer_balance_after = await ctx.tracker.wallet.get_balance("pro-agent")
+    assert payer_balance_after == payer_balance_before + 100.0
+
+
+# ---------------------------------------------------------------------------
+# refund_intent (void) idempotency
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_refund_intent_idempotency(client, pro_api_key, app):
+    """Same idempotency_key on refund_intent (void) should not error on retry."""
+    ctx = app.state.ctx
+    await ctx.tracker.wallet.create("void-payee", initial_balance=0.0, signup_bonus=False)
+
+    intent = await ctx.payment_engine.create_intent(
+        payer="pro-agent",
+        payee="void-payee",
+        amount=50.0,
+    )
+
+    r1 = await _execute(
+        client,
+        pro_api_key,
+        "refund_intent",
+        {"intent_id": intent.id},
+        idempotency_key="void-idem-001",
+    )
+    assert r1.status_code == 200, r1.json()
+    assert r1.json()["status"] == "voided"
+
+    r2 = await _execute(
+        client,
+        pro_api_key,
+        "refund_intent",
+        {"intent_id": intent.id},
+        idempotency_key="void-idem-001",
+    )
+    assert r2.status_code == 200, r2.json()
+    assert r2.json()["status"] == "voided"
+
+
+# ---------------------------------------------------------------------------
+# Idempotency-Key HTTP header (T5)
+# ---------------------------------------------------------------------------
+
+
 @pytest.mark.asyncio
 async def test_idempotency_key_header_different_keys_create_separate(client, api_key, app):
     """Different Idempotency-Key headers should each produce a distinct deposit."""

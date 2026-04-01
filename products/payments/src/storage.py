@@ -98,20 +98,22 @@ CREATE INDEX IF NOT EXISTS idx_sub_status ON subscriptions(status);
 CREATE INDEX IF NOT EXISTS idx_sub_next_charge ON subscriptions(next_charge_at);
 
 CREATE TABLE IF NOT EXISTS settlements (
-    id          TEXT PRIMARY KEY,
-    payer       TEXT NOT NULL,
-    payee       TEXT NOT NULL,
-    amount      INTEGER NOT NULL DEFAULT 0,
-    source_type TEXT NOT NULL,
-    source_id   TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    status      TEXT NOT NULL DEFAULT 'settled',
-    created_at  REAL NOT NULL
+    id              TEXT PRIMARY KEY,
+    payer           TEXT NOT NULL,
+    payee           TEXT NOT NULL,
+    amount          INTEGER NOT NULL DEFAULT 0,
+    source_type     TEXT NOT NULL,
+    source_id       TEXT NOT NULL,
+    description     TEXT NOT NULL DEFAULT '',
+    status          TEXT NOT NULL DEFAULT 'settled',
+    idempotency_key TEXT,
+    created_at      REAL NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_settlement_payer ON settlements(payer);
 CREATE INDEX IF NOT EXISTS idx_settlement_payee ON settlements(payee);
 CREATE INDEX IF NOT EXISTS idx_settlement_source ON settlements(source_type, source_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_settlement_idempotency ON settlements(idempotency_key) WHERE idempotency_key IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS refunds (
     id              TEXT PRIMARY KEY,
@@ -164,6 +166,7 @@ class PaymentStorage:
             ("escrows", "idempotency_key", "TEXT"),
             ("subscriptions", "idempotency_key", "TEXT"),
             ("refunds", "idempotency_key", "TEXT"),
+            ("settlements", "idempotency_key", "TEXT"),
         ]
         for table, column, col_type in migrations:
             cursor = await self._db.execute(  # nosemgrep: formatted-sql-query, sqlalchemy-execute-raw-query
@@ -543,8 +546,8 @@ class PaymentStorage:
             amount = credits_to_atomic(Decimal(str(amount)))
         await self.db.execute(
             "INSERT INTO settlements "
-            "(id, payer, payee, amount, source_type, source_id, description, status, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "(id, payer, payee, amount, source_type, source_id, description, status, idempotency_key, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 data["id"],
                 data["payer"],
@@ -554,10 +557,18 @@ class PaymentStorage:
                 data["source_id"],
                 data.get("description", ""),
                 data.get("status", "settled"),
+                data.get("idempotency_key"),
                 data["created_at"],
             ),
         )
         await self.db.commit()
+
+    async def get_settlement_by_idempotency_key(self, key: str) -> dict[str, Any] | None:
+        cursor = await self.db.execute("SELECT * FROM settlements WHERE idempotency_key = ?", (key,))
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        return self._convert_amount(dict(row))
 
     async def get_settlement(self, settlement_id: str) -> dict[str, Any] | None:
         cursor = await self.db.execute("SELECT * FROM settlements WHERE id = ?", (settlement_id,))

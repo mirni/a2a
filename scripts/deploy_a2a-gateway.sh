@@ -174,8 +174,10 @@ log "Configuring nginx for gateway..."
 # Remove default site
 rm -f /etc/nginx/sites-enabled/default
 
-# Add rate limit zone
+# Harden nginx configuration
 ensure_nginx_rate_limit
+ensure_nginx_timeouts
+ensure_nginx_server_tokens_off
 
 if has_ssl_certs; then
     log "Cloudflare Origin certificates found — configuring HTTPS"

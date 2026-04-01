@@ -166,6 +166,7 @@ class Settlement(BaseModel):
     source_id: str
     description: str = ""
     status: SettlementStatus = SettlementStatus.SETTLED
+    idempotency_key: str | None = None
     created_at: float = Field(default_factory=time.time)
 
     @field_serializer("amount")

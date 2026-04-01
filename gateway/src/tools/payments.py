@@ -102,7 +102,10 @@ async def _capture_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, 
     tier = params.get("_caller_tier", "")
     intent = await ctx.payment_engine.get_intent(params["intent_id"])
     _check_intent_ownership(caller, tier, intent)
-    settlement = await ctx.payment_engine.capture(params["intent_id"])
+    settlement = await ctx.payment_engine.capture(
+        params["intent_id"],
+        idempotency_key=params.get("idempotency_key"),
+    )
     return {
         "id": settlement.id,
         "status": "settled",
@@ -122,8 +125,12 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
     _check_intent_ownership(caller, tier, intent)
 
     if intent.status.value == "pending":
-        voided = await ctx.payment_engine.void(intent.id)
+        voided = await ctx.payment_engine.void(intent.id, idempotency_key=params.get("idempotency_key"))
         return {"id": voided.id, "status": "voided", "amount": float(voided.amount)}
+
+    # Idempotency: if already voided and idempotency_key provided, return success
+    if intent.status.value == "voided" and params.get("idempotency_key"):
+        return {"id": intent.id, "status": "voided", "amount": float(intent.amount)}
 
     if intent.status.value == "settled":
         currency = (intent.metadata or {}).get("currency", "CREDITS")
@@ -220,7 +227,10 @@ async def _release_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, 
     tier = params.get("_caller_tier", "")
     escrow = await ctx.payment_engine.get_escrow(params["escrow_id"])
     _check_escrow_ownership(caller, tier, escrow)
-    settlement = await ctx.payment_engine.release_escrow(params["escrow_id"])
+    settlement = await ctx.payment_engine.release_escrow(
+        params["escrow_id"],
+        idempotency_key=params.get("idempotency_key"),
+    )
     return {
         "id": settlement.id,
         "status": "settled",
@@ -233,7 +243,10 @@ async def _cancel_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
     tier = params.get("_caller_tier", "")
     escrow = await ctx.payment_engine.get_escrow(params["escrow_id"])
     _check_escrow_ownership(caller, tier, escrow)
-    escrow = await ctx.payment_engine.refund_escrow(params["escrow_id"])
+    escrow = await ctx.payment_engine.refund_escrow(
+        params["escrow_id"],
+        idempotency_key=params.get("idempotency_key"),
+    )
     return {
         "id": escrow.id,
         "status": escrow.status.value,
