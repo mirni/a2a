@@ -136,7 +136,9 @@ def generate_openapi_spec() -> dict:
                         },
                         "404": {
                             "description": "Tool not found.",
-                            "content": {"application/problem+json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}},
+                            "content": {
+                                "application/problem+json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}
+                            },
                         },
                     },
                 }
@@ -168,19 +170,27 @@ def generate_openapi_spec() -> dict:
                         },
                         "400": {
                             "description": "Invalid request (missing tool, bad params).",
-                            "content": {"application/problem+json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}},
+                            "content": {
+                                "application/problem+json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}
+                            },
                         },
                         "402": {
                             "description": "Insufficient balance.",
-                            "content": {"application/problem+json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}},
+                            "content": {
+                                "application/problem+json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}
+                            },
                         },
                         "404": {
                             "description": "Tool not found.",
-                            "content": {"application/problem+json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}},
+                            "content": {
+                                "application/problem+json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}
+                            },
                         },
                         "500": {
                             "description": "Internal execution error.",
-                            "content": {"application/problem+json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}},
+                            "content": {
+                                "application/problem+json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}
+                            },
                         },
                     },
                 }

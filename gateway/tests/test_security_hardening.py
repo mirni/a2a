@@ -62,9 +62,7 @@ class TestKeyTierEscalation:
         if resp.status_code == 200:
             data = resp.json()
             # If it returns 200, the tier should NOT be "pro"
-            assert data.get("tier") != "pro", (
-                "SECURITY: free-tier user escalated to pro tier"
-            )
+            assert data.get("tier") != "pro", "SECURITY: free-tier user escalated to pro tier"
         else:
             assert resp.status_code == 403
 
@@ -80,9 +78,7 @@ class TestKeyTierEscalation:
         )
         if resp.status_code == 200:
             data = resp.json()
-            assert data.get("tier") != "admin", (
-                "SECURITY: free-tier user escalated to admin tier"
-            )
+            assert data.get("tier") != "admin", "SECURITY: free-tier user escalated to admin tier"
         else:
             assert resp.status_code == 403
 
@@ -98,9 +94,7 @@ class TestKeyTierEscalation:
         )
         if resp.status_code == 200:
             data = resp.json()
-            assert data.get("tier") != "admin", (
-                "SECURITY: pro-tier user escalated to admin tier"
-            )
+            assert data.get("tier") != "admin", "SECURITY: pro-tier user escalated to admin tier"
         else:
             assert resp.status_code == 403
 

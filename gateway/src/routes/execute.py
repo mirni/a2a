@@ -551,12 +551,21 @@ async def execute(request: Request) -> JSONResponse:
     headers["X-Charged"] = serialize_money(cost)
 
     # Determine status code: 201 for create tools, 200 otherwise
-    _CREATE_TOOLS: frozenset[str] = frozenset({
-        "create_intent", "create_escrow", "create_performance_escrow",
-        "create_subscription", "create_split_intent", "open_dispute",
-        "register_webhook", "register_server", "register_agent",
-        "create_org", "create_api_key",
-    })
+    _CREATE_TOOLS: frozenset[str] = frozenset(
+        {
+            "create_intent",
+            "create_escrow",
+            "create_performance_escrow",
+            "create_subscription",
+            "create_split_intent",
+            "open_dispute",
+            "register_webhook",
+            "register_server",
+            "register_agent",
+            "create_org",
+            "create_api_key",
+        }
+    )
     _LOCATION_TEMPLATES: dict[str, str] = {
         "create_intent": "/v1/intents/{id}",
         "create_escrow": "/v1/escrows/{id}",

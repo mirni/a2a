@@ -9,24 +9,59 @@ from datetime import UTC, datetime
 from typing import Any
 
 # Fields that contain monetary values (should be serialized as "123.45" strings)
-_MONETARY_FIELDS: frozenset[str] = frozenset({
-    "balance", "amount", "cost", "fee", "new_balance", "price",
-    "charged", "total", "min_fee", "max_fee", "per_call",
-    "refund_amount", "original_amount", "net_amount",
-    "remaining", "spent", "cap", "used",
-    "from_amount", "to_amount", "rate",
-    "average_rating",
-    "discount_percent", "original_price", "discounted_price",
-})
+_MONETARY_FIELDS: frozenset[str] = frozenset(
+    {
+        "balance",
+        "amount",
+        "cost",
+        "fee",
+        "new_balance",
+        "price",
+        "charged",
+        "total",
+        "min_fee",
+        "max_fee",
+        "per_call",
+        "refund_amount",
+        "original_amount",
+        "net_amount",
+        "remaining",
+        "spent",
+        "cap",
+        "used",
+        "from_amount",
+        "to_amount",
+        "rate",
+        "average_rating",
+        "discount_percent",
+        "original_price",
+        "discounted_price",
+    }
+)
 
 # Fields that contain Unix timestamps (should be serialized as ISO 8601)
-_TIMESTAMP_FIELDS: frozenset[str] = frozenset({
-    "created_at", "updated_at", "captured_at", "settled_at",
-    "expires_at", "expired_at", "cancelled_at", "refunded_at",
-    "released_at", "resolved_at", "suspended_at", "reactivated_at",
-    "registered_at", "verified_at", "last_seen", "timestamp",
-    "revoked_at", "restored_at",
-})
+_TIMESTAMP_FIELDS: frozenset[str] = frozenset(
+    {
+        "created_at",
+        "updated_at",
+        "captured_at",
+        "settled_at",
+        "expires_at",
+        "expired_at",
+        "cancelled_at",
+        "refunded_at",
+        "released_at",
+        "resolved_at",
+        "suspended_at",
+        "reactivated_at",
+        "registered_at",
+        "verified_at",
+        "last_seen",
+        "timestamp",
+        "revoked_at",
+        "restored_at",
+    }
+)
 
 
 def serialize_money(value: Any) -> str:

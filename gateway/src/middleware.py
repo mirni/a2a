@@ -168,7 +168,9 @@ class PublicRateLimitMiddleware:
             from gateway.src.errors import problem_json_bytes
 
             body = problem_json_bytes(
-                429, "rate_limit_exceeded", "Too many requests. Please retry later.",
+                429,
+                "rate_limit_exceeded",
+                "Too many requests. Please retry later.",
                 instance=path,
             )
 
@@ -382,7 +384,9 @@ class BodySizeLimitMiddleware:
         from gateway.src.errors import problem_json_bytes
 
         body = problem_json_bytes(
-            413, "payload_too_large", "Request body exceeds maximum size of 1MB",
+            413,
+            "payload_too_large",
+            "Request body exceeds maximum size of 1MB",
         )
         headers: list[tuple[bytes, bytes]] = [
             (b"content-type", b"application/problem+json"),

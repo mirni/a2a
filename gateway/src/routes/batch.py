@@ -267,7 +267,8 @@ async def batch(request: Request) -> JSONResponse:
         # Prefer Idempotency-Key header (appended with index for uniqueness)
         header_idem = request.headers.get("idempotency-key")
         batch_idem = (
-            f"{header_idem}:{batch_idx}" if header_idem
+            f"{header_idem}:{batch_idx}"
+            if header_idem
             else (f"{batch_corr}:{batch_idx}:{tool_name}" if batch_corr else None)
         )
         try:
