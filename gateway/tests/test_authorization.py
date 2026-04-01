@@ -465,3 +465,54 @@ class TestAuthorizationGuard:
         assert "bob" in message
         assert "alice" in message
         assert code == "forbidden"
+
+
+# ---------------------------------------------------------------------------
+# 7. Admin-only tools — non-admin gets 403
+# ---------------------------------------------------------------------------
+
+
+class TestAdminOnlyTools:
+    """Database admin tools must require admin tier."""
+
+    ADMIN_ONLY_DB_TOOLS = [
+        "backup_database",
+        "restore_database",
+        "check_db_integrity",
+        "list_backups",
+    ]
+
+    def test_admin_only_tools_in_frozenset(self):
+        """All DB admin tools must be in ADMIN_ONLY_TOOLS."""
+        from gateway.src.authorization import ADMIN_ONLY_TOOLS
+
+        for tool in self.ADMIN_ONLY_DB_TOOLS:
+            assert tool in ADMIN_ONLY_TOOLS, f"{tool} missing from ADMIN_ONLY_TOOLS"
+
+    def test_admin_only_tools_count(self):
+        """ADMIN_ONLY_TOOLS should have at least 8 entries."""
+        from gateway.src.authorization import ADMIN_ONLY_TOOLS
+
+        assert len(ADMIN_ONLY_TOOLS) >= 8
+
+    @pytest.mark.parametrize("tool", ADMIN_ONLY_DB_TOOLS)
+    async def test_non_admin_gets_403_on_admin_tool(self, client, app, tool):
+        """Non-admin (pro tier) calling an admin-only tool gets 403."""
+        key = await _create_agent(app, f"pro-{tool}", tier="pro", balance=5000.0)
+        resp = await client.post(
+            "/v1/execute",
+            json={"tool": tool, "params": {}},
+            headers={"Authorization": f"Bearer {key}"},
+        )
+        assert resp.status_code == 403, f"Expected 403 for {tool}, got {resp.status_code}"
+
+    async def test_admin_allowed_on_existing_admin_tool(self, client, app):
+        """Admin tier can call admin-only tools like resolve_dispute (not 403)."""
+        admin_key = await _create_admin_agent(app, "admin-existing-tool")
+        resp = await client.post(
+            "/v1/execute",
+            json={"tool": "resolve_dispute", "params": {"dispute_id": "fake"}},
+            headers={"Authorization": f"Bearer {admin_key}"},
+        )
+        # May fail for missing dispute, but must NOT be 403
+        assert resp.status_code != 403, "Admin should not get 403 for resolve_dispute"

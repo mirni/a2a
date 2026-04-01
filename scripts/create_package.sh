@@ -23,7 +23,7 @@ DIST_DIR="$REPO_ROOT/dist"
 PACKAGE_DIR="$REPO_ROOT/package"
 
 # All deb packages available
-DEB_PACKAGES=(a2a-common a2a-gateway a2a-gateway-test a2a-gateway-sandbox a2a-website)
+DEB_PACKAGES=(a2a-common a2a-gateway a2a-gateway-test a2a-gateway-sandbox a2a-website a2a-db-backup)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -42,6 +42,7 @@ usage() {
     echo "  a2a-gateway-test  Staging/test gateway deb"
     echo "  a2a-gateway-sandbox Sandbox gateway deb"
     echo "  a2a-website       Static website deb"
+    echo "  a2a-db-backup     Database backup timer deb"
     echo "  a2a-sdk           Python SDK wheel"
     echo "  ALL               Build all packages"
     exit 1
@@ -177,7 +178,7 @@ case "$TARGET" in
     a2a-sdk)
         build_sdk
         ;;
-    a2a-common|a2a-gateway|a2a-gateway-test|a2a-gateway-sandbox|a2a-website)
+    a2a-common|a2a-gateway|a2a-gateway-test|a2a-gateway-sandbox|a2a-website|a2a-db-backup)
         build_deb "$TARGET"
         ;;
     *)

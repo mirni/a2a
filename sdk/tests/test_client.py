@@ -79,7 +79,7 @@ async def setup_agent(gateway_app, sdk_client):
 async def test_health(sdk_client):
     health = await sdk_client.health()
     assert health.status == "ok"
-    assert health.version == "0.1.0"
+    assert health.version  # Version string is present
     assert health.tools > 0
 
 

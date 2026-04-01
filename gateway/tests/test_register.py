@@ -75,3 +75,34 @@ async def test_register_no_auth_required(client):
     )
     # Should NOT return 401
     assert resp.status_code != 401
+
+
+async def test_register_key_creation_failure_returns_structured_error(client, app):
+    """If key_manager.create_key() raises, return RFC 9457 error, not raw 500."""
+    original_create_key = app.state.ctx.key_manager.create_key
+
+    async def _broken_create_key(*args, **kwargs):
+        raise RuntimeError("key storage is down")
+
+    app.state.ctx.key_manager.create_key = _broken_create_key
+    try:
+        resp = await client.post(
+            "/v1/register",
+            json={"agent_id": "broken-key-agent"},
+        )
+        assert resp.status_code == 500
+        data = resp.json()
+        # RFC 9457 requires 'type' field
+        assert "type" in data
+        assert "detail" in data
+    finally:
+        app.state.ctx.key_manager.create_key = original_create_key
+
+
+async def test_register_extra_fields_rejected(client):
+    """Extra fields in request body should be rejected (extra=forbid)."""
+    resp = await client.post(
+        "/v1/register",
+        json={"agent_id": "extra-field-agent", "evil": "payload"},
+    )
+    assert resp.status_code == 400

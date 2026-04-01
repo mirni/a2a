@@ -89,9 +89,13 @@ class HealthResponse:
 
 
 class _ToolResponse(BaseModel):
-    """Base class for all typed tool response models."""
+    """Base class for all typed tool response models.
 
-    model_config = ConfigDict(extra="forbid")
+    Uses ``extra="ignore"`` so that REST endpoints returning additional
+    fields (e.g. ``currency``, ``metadata``) don't cause validation errors.
+    """
+
+    model_config = ConfigDict(extra="ignore")
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]):  # noqa: ANN206
@@ -109,7 +113,7 @@ class BalanceResponse(_ToolResponse):
     balance: Decimal
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={"examples": [{"balance": "100.00"}]},
     )
 
@@ -120,7 +124,7 @@ class DepositResponse(_ToolResponse):
     new_balance: Decimal
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={"examples": [{"new_balance": "200.00"}]},
     )
 
@@ -138,7 +142,7 @@ class PaymentIntentResponse(_ToolResponse):
     amount: Decimal
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={"examples": [{"id": "intent_abc123", "status": "pending", "amount": "10.00"}]},
     )
 
@@ -151,7 +155,7 @@ class EscrowResponse(_ToolResponse):
     amount: Decimal
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={"examples": [{"id": "escrow_abc123", "status": "held", "amount": "50.00"}]},
     )
 
@@ -164,7 +168,7 @@ class CancelEscrowResponse(_ToolResponse):
     amount: Decimal
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={"examples": [{"id": "escrow_abc123", "status": "cancelled", "amount": "50.00"}]},
     )
 
@@ -177,7 +181,7 @@ class VoidPaymentResponse(_ToolResponse):
     amount: Decimal
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={"examples": [{"id": "intent_abc123", "status": "refunded", "amount": "10.00"}]},
     )
 
@@ -192,7 +196,7 @@ class RefundSettlementResponse(_ToolResponse):
     reason: str | None = None
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={
             "examples": [
                 {
@@ -222,7 +226,7 @@ class SubscriptionResponse(_ToolResponse):
     next_charge_at: float
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={
             "examples": [
                 {
@@ -244,7 +248,7 @@ class CancelSubscriptionResponse(_ToolResponse):
     status: str
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={"examples": [{"id": "sub_abc123", "status": "cancelled"}]},
     )
 
@@ -263,7 +267,7 @@ class GetSubscriptionResponse(_ToolResponse):
     created_at: float
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={
             "examples": [
                 {
@@ -288,7 +292,7 @@ class ListSubscriptionsResponse(_ToolResponse):
     subscriptions: list[dict[str, Any]]
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={"examples": [{"subscriptions": []}]},
     )
 
@@ -306,7 +310,7 @@ class RegisterServiceResponse(_ToolResponse):
     status: str
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={"examples": [{"id": "svc_abc123", "name": "MyService", "status": "active"}]},
     )
 
@@ -317,7 +321,7 @@ class SearchServicesResponse(_ToolResponse):
     services: list[dict[str, Any]]
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={"examples": [{"services": [{"id": "svc_abc123", "name": "MyService"}]}]},
     )
 
@@ -332,7 +336,7 @@ class GetServiceResponse(_ToolResponse):
     status: str
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={
             "examples": [
                 {
@@ -355,7 +359,7 @@ class RateServiceResponse(_ToolResponse):
     rating: int
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={"examples": [{"service_id": "svc_abc123", "agent_id": "agent-a", "rating": 5}]},
     )
 
@@ -368,7 +372,7 @@ class ServiceMatch(_ToolResponse):
     match_reasons: list[str] = []
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={
             "examples": [{"service": {"id": "svc1"}, "rank_score": 0.95, "match_reasons": ["keyword_match"]}]
         },
@@ -393,7 +397,7 @@ class TrustScoreResponse(_ToolResponse):
     window: str
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={
             "examples": [
                 {
@@ -417,7 +421,7 @@ class SearchServersResponse(_ToolResponse):
     servers: list[dict[str, Any]]
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={"examples": [{"servers": [{"id": "srv1", "name": "Server1"}]}]},
     )
 
@@ -435,7 +439,7 @@ class RegisterAgentResponse(_ToolResponse):
     created_at: float
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={
             "examples": [{"agent_id": "agent-a", "public_key": "ed25519_hex...", "created_at": 1700000000.0}]
         },
@@ -452,7 +456,7 @@ class GetAgentIdentityResponse(_ToolResponse):
     found: bool = True
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={
             "examples": [
                 {
@@ -473,7 +477,7 @@ class VerifyAgentResponse(_ToolResponse):
     valid: bool
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={"examples": [{"valid": True}]},
     )
 
@@ -489,7 +493,7 @@ class SubmitMetricsResponse(_ToolResponse):
     signature: str
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={
             "examples": [
                 {
@@ -511,7 +515,7 @@ class GetVerifiedClaimsResponse(_ToolResponse):
     claims: list[dict[str, Any]]
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={"examples": [{"claims": []}]},
     )
 
@@ -530,7 +534,7 @@ class SendMessageResponse(_ToolResponse):
     thread_id: str
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={
             "examples": [
                 {"id": "msg_abc123", "sender": "agent-a", "recipient": "agent-b", "thread_id": "thread_abc123"}
@@ -545,7 +549,7 @@ class GetMessagesResponse(_ToolResponse):
     messages: list[dict[str, Any]]
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={"examples": [{"messages": []}]},
     )
 
@@ -559,7 +563,7 @@ class NegotiatePriceResponse(_ToolResponse):
     proposed_amount: Decimal
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={
             "examples": [
                 {
@@ -590,7 +594,7 @@ class RegisterWebhookResponse(_ToolResponse):
     active: bool
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={
             "examples": [
                 {
@@ -613,7 +617,7 @@ class ListWebhooksResponse(_ToolResponse):
     webhooks: list[dict[str, Any]]
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={"examples": [{"webhooks": []}]},
     )
 
@@ -624,7 +628,7 @@ class DeleteWebhookResponse(_ToolResponse):
     deleted: bool
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={"examples": [{"deleted": True}]},
     )
 
@@ -643,7 +647,7 @@ class CreateApiKeyResponse(_ToolResponse):
     created_at: float
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={
             "examples": [{"key": "a2a_free_abc123", "agent_id": "agent-a", "tier": "free", "created_at": 1700000000.0}]
         },
@@ -659,7 +663,7 @@ class RotateKeyResponse(_ToolResponse):
     revoked: bool
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={
             "examples": [{"new_key": "a2a_free_new123", "tier": "free", "agent_id": "agent-a", "revoked": True}]
         },
@@ -677,7 +681,7 @@ class PublishEventResponse(_ToolResponse):
     event_id: int
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={"examples": [{"event_id": 42}]},
     )
 
@@ -688,7 +692,7 @@ class GetEventsResponse(_ToolResponse):
     events: list[dict[str, Any]]
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={"examples": [{"events": []}]},
     )
 
@@ -706,7 +710,7 @@ class CreateOrgResponse(_ToolResponse):
     created_at: float
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={"examples": [{"org_id": "org_abc123", "name": "MyOrg", "created_at": 1700000000.0}]},
     )
 
@@ -720,7 +724,7 @@ class GetOrgResponse(_ToolResponse):
     members: list[Any]
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={
             "examples": [{"org_id": "org_abc123", "name": "MyOrg", "created_at": 1700000000.0, "members": []}]
         },
@@ -734,6 +738,6 @@ class AddAgentToOrgResponse(_ToolResponse):
     org_id: str
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="ignore",
         json_schema_extra={"examples": [{"agent_id": "agent-a", "org_id": "org_abc123"}]},
     )

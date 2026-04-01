@@ -22,7 +22,16 @@ ADMIN_TIER: str = "admin"
 
 # Tools that can only be executed by admin-tier agents.
 ADMIN_ONLY_TOOLS: frozenset[str] = frozenset(
-    {"resolve_dispute", "freeze_wallet", "unfreeze_wallet", "get_global_audit_log"}
+    {
+        "resolve_dispute",
+        "freeze_wallet",
+        "unfreeze_wallet",
+        "get_global_audit_log",
+        "backup_database",
+        "restore_database",
+        "check_db_integrity",
+        "list_backups",
+    }
 )
 
 # Tools where `agent_id` refers to a target (not the caller).

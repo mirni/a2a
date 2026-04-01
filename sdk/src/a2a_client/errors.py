@@ -70,10 +70,22 @@ RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
 
 
 def raise_for_status(status: int, body: dict) -> None:
-    """Raise the appropriate exception for an error response."""
-    error = body.get("error", {})
-    message = error.get("message", "Unknown error")
-    code = error.get("code", "error")
+    """Raise the appropriate exception for an error response.
+
+    Supports both legacy execute format ``{"error": {"message", "code"}}``
+    and RFC 9457 format ``{"type", "title", "status", "detail"}``.
+    """
+    # RFC 9457 format (REST endpoints)
+    if "detail" in body and "type" in body:
+        message = body.get("detail", "Unknown error")
+        # Extract error code from type URL: .../errors/<code>
+        type_url = body.get("type", "")
+        code = type_url.rsplit("/", 1)[-1] if "/" in type_url else "error"
+    else:
+        # Legacy execute format
+        error = body.get("error", {})
+        message = error.get("message", body.get("detail", "Unknown error"))
+        code = error.get("code", "error")
 
     exc_class = STATUS_MAP.get(status, ServerError)
     raise exc_class(message=message, code=code, status=status)
