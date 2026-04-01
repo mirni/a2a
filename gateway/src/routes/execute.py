@@ -1,4 +1,8 @@
-"""POST /execute — the core tool-execution endpoint."""
+"""POST /execute — the core tool-execution endpoint (DEPRECATED).
+
+This endpoint is restricted to connector tools only (Stripe, GitHub, Postgres).
+Core business tools have moved to dedicated REST endpoints under /v1/.
+"""
 
 from __future__ import annotations
 
@@ -6,6 +10,7 @@ import base64
 import json
 import logging
 import math
+import os
 import time
 from typing import Any
 
@@ -17,11 +22,20 @@ from gateway.src.auth import extract_api_key
 from gateway.src.authorization import ADMIN_ONLY_TOOLS, ADMIN_TIER, check_ownership_authorization
 from gateway.src.catalog import get_tool
 from gateway.src.errors import error_response, handle_product_exception
+from gateway.src.mcp_proxy import GITHUB_MCP_TOOLS, POSTGRES_MCP_TOOLS, STRIPE_MCP_TOOLS
 from gateway.src.middleware import Metrics
 from gateway.src.tool_errors import X402ReplayError, X402VerificationError
 from gateway.src.tools import TOOL_REGISTRY
 
 logger = logging.getLogger("a2a.execute")
+
+# Connector tools that still require /v1/execute (no REST equivalent yet)
+_CONNECTOR_TOOLS: frozenset[str] = frozenset(STRIPE_MCP_TOOLS + GITHUB_MCP_TOOLS + POSTGRES_MCP_TOOLS)
+
+# Allow tests to bypass the connector-only gate via env var.
+# Production does NOT set this. Will be removed once all tests migrate
+# to the dedicated REST endpoints.
+_LEGACY_EXECUTE_ENABLED = os.environ.get("A2A_LEGACY_EXECUTE", "") == "1"
 
 router = APIRouter()
 
@@ -258,6 +272,17 @@ async def execute(request: Request) -> JSONResponse:
         return await error_response(
             501, f"Tool '{tool_name}' is cataloged but not implemented", "not_implemented", request=request
         )
+
+    # --- 1b. Restrict to connector tools only (core tools → REST routers) ---
+    if tool_name not in _CONNECTOR_TOOLS and not _LEGACY_EXECUTE_ENABLED:
+        resp = await error_response(
+            410,
+            f"Tool '{tool_name}' has moved to a dedicated REST endpoint. See API docs at /docs for the new routes.",
+            "tool_moved",
+            request=request,
+        )
+        resp.headers["Deprecation"] = "true"
+        return resp
 
     # --- 2. Extract + validate API key (with x402 fallback) ---
     # Auth MUST run before param validation to avoid leaking schema info
@@ -531,7 +556,7 @@ async def execute(request: Request) -> JSONResponse:
     await Metrics.record_latency(elapsed_ms)
 
     # --- 9. Return result ---
-    headers: dict[str, str] = {}
+    headers: dict[str, str] = {"Deprecation": "true"}
     if correlation_id:
         headers["X-Request-ID"] = correlation_id
 

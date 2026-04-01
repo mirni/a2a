@@ -11,6 +11,10 @@ import sys
 
 import pytest
 
+# Allow existing tests to use /v1/execute for all tools (legacy mode).
+# New tests in test_execute_deprecation.py explicitly unset this.
+os.environ["A2A_LEGACY_EXECUTE"] = "1"
+
 # Ensure project root is on sys.path
 _project_root = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if _project_root not in sys.path:
