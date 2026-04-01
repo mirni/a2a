@@ -7,6 +7,7 @@ import hashlib
 import hmac
 import json
 import logging
+import os
 import secrets
 import time
 from typing import Any
@@ -15,6 +16,35 @@ import aiosqlite
 import httpx
 
 logger = logging.getLogger("a2a.webhooks")
+
+# Optional Fernet encryption for webhook secrets at rest
+_WEBHOOK_ENCRYPTION_KEY = os.environ.get("WEBHOOK_ENCRYPTION_KEY", "")
+
+
+def _encrypt_secret(plaintext: str) -> str:
+    """Encrypt a webhook secret for storage. Returns plaintext if no key configured."""
+    if not _WEBHOOK_ENCRYPTION_KEY:
+        return plaintext
+    try:
+        from cryptography.fernet import Fernet
+
+        f = Fernet(_WEBHOOK_ENCRYPTION_KEY.encode())
+        return f.encrypt(plaintext.encode()).decode()
+    except Exception:
+        return plaintext
+
+
+def _decrypt_secret(stored: str) -> str:
+    """Decrypt a webhook secret from storage. Returns as-is if not encrypted."""
+    if not _WEBHOOK_ENCRYPTION_KEY:
+        return stored
+    try:
+        from cryptography.fernet import Fernet
+
+        f = Fernet(_WEBHOOK_ENCRYPTION_KEY.encode())
+        return f.decrypt(stored.encode()).decode()
+    except Exception:
+        return stored  # Not encrypted or wrong key — return as-is
 
 
 # ------------------------------------------------------------------
@@ -181,13 +211,14 @@ class WebhookManager:
         event_types_json = json.dumps(event_types)
         filter_json = json.dumps(filter_agent_ids) if filter_agent_ids else None
 
+        encrypted_secret = _encrypt_secret(secret)
         await self._db.execute(
             """
             INSERT INTO webhooks
                 (id, agent_id, url, event_types, secret, created_at, active, filter_agent_ids)
             VALUES (?, ?, ?, ?, ?, ?, 1, ?)
             """,
-            (webhook_id, agent_id, url, event_types_json, secret, created_at, filter_json),
+            (webhook_id, agent_id, url, event_types_json, encrypted_secret, created_at, filter_json),
         )
         await self._db.commit()
 
@@ -539,7 +570,7 @@ class WebhookManager:
             "agent_id": row["agent_id"],
             "url": row["url"],
             "event_types": json.loads(row["event_types"]),
-            "secret": row["secret"],
+            "secret": _decrypt_secret(row["secret"]),
             "created_at": row["created_at"],
             "active": row["active"],
             "filter_agent_ids": filter_agent_ids,

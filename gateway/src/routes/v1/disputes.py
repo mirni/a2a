@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict
 
-from gateway.src.deps.tool_context import ToolContext, finalize_response, require_tool
+from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
 from gateway.src.errors import handle_product_exception
 from gateway.src.tools.payments import (
     _get_dispute,
@@ -74,6 +74,7 @@ async def open_dispute(
             "reason": body.reason,
         },
     )
+    await check_ownership(tc, params)
     try:
         result = await _open_dispute(tc.ctx, params)
     except Exception as exc:
@@ -93,6 +94,7 @@ async def list_disputes(
         tc,
         {"agent_id": agent_id, "limit": limit, "offset": offset},
     )
+    await check_ownership(tc, params)
     result = await _list_disputes(tc.ctx, params)
     return await finalize_response(tc, result)
 
@@ -103,6 +105,7 @@ async def get_dispute(
     tc: ToolContext = Depends(require_tool("get_dispute")),
 ):
     params = _inject_caller(tc, {"dispute_id": dispute_id})
+    await check_ownership(tc, params)
     try:
         result = await _get_dispute(tc.ctx, params)
     except Exception as exc:
@@ -124,6 +127,7 @@ async def respond_to_dispute(
             "response": body.response,
         },
     )
+    await check_ownership(tc, params)
     try:
         result = await _respond_to_dispute(tc.ctx, params)
     except Exception as exc:
@@ -146,6 +150,7 @@ async def resolve_dispute(
             "notes": body.notes,
         },
     )
+    await check_ownership(tc, params)
     try:
         result = await _resolve_dispute(tc.ctx, params)
     except Exception as exc:

@@ -15,6 +15,7 @@ async def harden_connection(db: aiosqlite.Connection) -> None:
 
     Sets WAL journal mode, enables foreign keys, secure delete, and
     incremental auto-vacuum.  Safe to call multiple times (idempotent).
+    Also restricts file permissions to owner-only (0o600).
     """
     await db.execute("PRAGMA journal_mode=WAL")
     await db.execute("PRAGMA synchronous=NORMAL")
@@ -27,6 +28,17 @@ async def harden_connection(db: aiosqlite.Connection) -> None:
     if page_count <= 1:
         await db.execute("PRAGMA auto_vacuum=INCREMENTAL")
         await db.execute("VACUUM")
+
+    # Restrict file permissions to owner-only
+    cur = await db.execute("PRAGMA database_list")
+    rows = await cur.fetchall()
+    for row in rows:
+        db_path = row[2]  # third column is the file path
+        if db_path and os.path.isfile(db_path):
+            try:
+                os.chmod(db_path, 0o600)
+            except OSError:
+                pass  # May fail on some filesystems
 
 
 async def backup_database(source_path: str, dest_path: str) -> dict:

@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict, Field
 
-from gateway.src.deps.tool_context import ToolContext, finalize_response, require_tool
+from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
 from gateway.src.errors import handle_product_exception
 from gateway.src.tools.infrastructure import (
     _backup_database,
@@ -111,6 +111,7 @@ async def create_api_key(
         tc,
         {"agent_id": tc.agent_id, "tier": body.tier},
     )
+    await check_ownership(tc, params)
     try:
         result = await _create_api_key(tc.ctx, params)
     except Exception as exc:
@@ -123,6 +124,7 @@ async def list_api_keys(
     tc: ToolContext = Depends(require_tool("list_api_keys")),
 ):
     params = _inject_caller(tc, {"agent_id": tc.agent_id})
+    await check_ownership(tc, params)
     result = await _list_api_keys(tc.ctx, params)
     return await finalize_response(tc, result)
 
@@ -136,6 +138,7 @@ async def revoke_api_key(
         tc,
         {"agent_id": tc.agent_id, "key_hash_prefix": body.key_hash_prefix},
     )
+    await check_ownership(tc, params)
     result = await _revoke_api_key(tc.ctx, params)
     return await finalize_response(tc, result)
 
@@ -146,6 +149,7 @@ async def rotate_key(
     tc: ToolContext = Depends(require_tool("rotate_key")),
 ):
     params = _inject_caller(tc, {"current_key": body.current_key})
+    await check_ownership(tc, params)
     try:
         result = await _rotate_key(tc.ctx, params)
     except Exception as exc:
@@ -173,6 +177,7 @@ async def register_webhook(
             "filter_agent_ids": body.filter_agent_ids,
         },
     )
+    await check_ownership(tc, params)
     try:
         result = await _register_webhook(tc.ctx, params)
     except Exception as exc:
@@ -186,6 +191,7 @@ async def list_webhooks(
     tc: ToolContext = Depends(require_tool("list_webhooks")),
 ):
     params = _inject_caller(tc, {"agent_id": tc.agent_id})
+    await check_ownership(tc, params)
     result = await _list_webhooks(tc.ctx, params)
     return await finalize_response(tc, result)
 
@@ -196,6 +202,7 @@ async def test_webhook(
     tc: ToolContext = Depends(require_tool("test_webhook")),
 ):
     params = _inject_caller(tc, {"webhook_id": webhook_id})
+    await check_ownership(tc, params)
     try:
         result = await _test_webhook(tc.ctx, params)
     except Exception as exc:
@@ -209,6 +216,7 @@ async def delete_webhook(
     tc: ToolContext = Depends(require_tool("delete_webhook")),
 ):
     params = _inject_caller(tc, {"webhook_id": webhook_id})
+    await check_ownership(tc, params)
     try:
         result = await _delete_webhook(tc.ctx, params)
     except Exception as exc:
@@ -227,6 +235,7 @@ async def get_webhook_deliveries(
         tc,
         {"webhook_id": webhook_id, "limit": limit, "offset": offset},
     )
+    await check_ownership(tc, params)
     try:
         result = await _get_webhook_deliveries(tc.ctx, params)
     except Exception as exc:
@@ -248,6 +257,7 @@ async def register_event_schema(
         tc,
         {"event_type": body.event_type, "schema": body.schema_def},
     )
+    await check_ownership(tc, params)
     try:
         result = await _register_event_schema(tc.ctx, params)
     except Exception as exc:
@@ -268,6 +278,7 @@ async def publish_event(
             "payload": body.payload or {},
         },
     )
+    await check_ownership(tc, params)
     try:
         result = await _publish_event(tc.ctx, params)
     except Exception as exc:
@@ -281,6 +292,7 @@ async def get_event_schema(
     tc: ToolContext = Depends(require_tool("get_event_schema")),
 ):
     params = _inject_caller(tc, {"event_type": event_type})
+    await check_ownership(tc, params)
     result = await _get_event_schema(tc.ctx, params)
     return await finalize_response(tc, result)
 
@@ -296,6 +308,7 @@ async def get_events(
         tc,
         {"event_type": event_type, "since_id": since_id, "limit": limit},
     )
+    await check_ownership(tc, params)
     result = await _get_events(tc.ctx, params)
     return await finalize_response(tc, result)
 
@@ -312,6 +325,7 @@ async def get_global_audit_log(
     tc: ToolContext = Depends(require_tool("get_global_audit_log")),
 ):
     params = _inject_caller(tc, {"since": since, "limit": limit})
+    await check_ownership(tc, params)
     result = await _get_global_audit_log(tc.ctx, params)
     return await finalize_response(tc, result)
 
@@ -326,6 +340,7 @@ async def list_backups(
     tc: ToolContext = Depends(require_tool("list_backups")),
 ):
     params = _inject_caller(tc, {})
+    await check_ownership(tc, params)
     result = await _list_backups(tc.ctx, params)
     return await finalize_response(tc, result)
 
@@ -340,6 +355,7 @@ async def backup_database(
         tc,
         {"database": database, "encrypt": body.encrypt if body else False},
     )
+    await check_ownership(tc, params)
     try:
         result = await _backup_database(tc.ctx, params)
     except Exception as exc:
@@ -362,6 +378,7 @@ async def restore_database(
             "key_id": body.key_id,
         },
     )
+    await check_ownership(tc, params)
     try:
         result = await _restore_database(tc.ctx, params)
     except Exception as exc:
@@ -375,6 +392,7 @@ async def check_db_integrity(
     tc: ToolContext = Depends(require_tool("check_db_integrity")),
 ):
     params = _inject_caller(tc, {"database": database})
+    await check_ownership(tc, params)
     try:
         result = await _check_db_integrity(tc.ctx, params)
     except Exception as exc:

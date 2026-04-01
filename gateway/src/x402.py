@@ -12,6 +12,7 @@ import base64
 import json
 import logging
 import time
+from typing import Any
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
@@ -142,26 +143,50 @@ class X402Verifier:
         merchant_address: str,
         facilitator_url: str,
         supported_networks: dict[str, str],
+        nonce_db: Any | None = None,
     ) -> None:
         self._merchant_address = merchant_address
         self._facilitator_url = facilitator_url
         self._supported_networks = supported_networks
         self._used_nonces: set[str] = set()
+        self._nonce_db = nonce_db  # aiosqlite connection for persistent nonces
         self.pending_settlements: list[X402PaymentProof] = []
 
     def check_replay(self, nonce: str) -> None:
-        """Raise X402ReplayError if nonce was already seen."""
+        """Raise X402ReplayError if nonce was already seen (in-memory fast path)."""
         if nonce in self._used_nonces:
             raise X402ReplayError(f"Nonce already used: {nonce}")
 
-    def mark_nonce_used(self, nonce: str) -> None:
-        """Record nonce as used."""
+    async def check_replay_persistent(self, nonce: str) -> None:
+        """Raise X402ReplayError if nonce exists in memory or DB.
+
+        Atomic: uses INSERT with unique constraint to prevent TOCTOU races.
+        """
+        if nonce in self._used_nonces:
+            raise X402ReplayError(f"Nonce already used: {nonce}")
+
+        if self._nonce_db is not None:
+            try:
+                await self._nonce_db.execute(
+                    "INSERT INTO x402_nonces (nonce, used_at) VALUES (?, ?)",
+                    (nonce, time.time()),
+                )
+                await self._nonce_db.commit()
+            except Exception:
+                # Unique constraint violation means nonce already used
+                raise X402ReplayError(f"Nonce already used: {nonce}") from None
+
         self._used_nonces.add(nonce)
 
-    def validate_proof_locally(self, proof: X402PaymentProof, required_value: str) -> None:
+    def mark_nonce_used(self, nonce: str) -> None:
+        """Record nonce as used (in-memory)."""
+        self._used_nonces.add(nonce)
+
+    async def validate_proof_locally(self, proof: X402PaymentProof, required_value: str) -> None:
         """Local checks (no network call).
 
         Raises X402VerificationError on any failure.
+        Uses persistent nonce storage when available.
         """
         auth = proof.payload.authorization
         now = time.time()
@@ -181,7 +206,7 @@ class X402Verifier:
         if proof.network not in self._supported_networks:
             raise X402VerificationError(f"Unsupported network: {proof.network}")
 
-        self.check_replay(auth.nonce)
+        await self.check_replay_persistent(auth.nonce)
 
     async def verify_with_facilitator(self, proof: X402PaymentProof) -> dict:
         """POST base64-encoded proof to facilitator /verify endpoint."""

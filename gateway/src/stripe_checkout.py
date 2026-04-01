@@ -12,6 +12,7 @@ import hmac
 import json
 import logging
 import os
+import time
 from typing import Any
 
 import httpx
@@ -28,8 +29,11 @@ router = APIRouter()
 # Credit pricing: $1 = 100 credits (configurable via env)
 CREDITS_PER_DOLLAR = int(os.environ.get("A2A_CREDITS_PER_DOLLAR", "100"))
 
-# Deduplication: track processed Stripe session IDs to prevent double-deposit on webhook replay
+# In-memory fallback for dedup (supplemented by DB persistence below)
 _processed_sessions: set[str] = set()
+
+# Maximum age (in seconds) of a webhook timestamp we will accept
+_MAX_WEBHOOK_AGE_SECONDS = 300
 
 # Preset credit packages
 PACKAGES: dict[str, dict[str, int | str]] = {
@@ -189,6 +193,18 @@ async def stripe_webhook(request: Request) -> JSONResponse:
         logger.warning("Invalid Stripe webhook signature")
         return JSONResponse({"error": "Invalid signature"}, status_code=400)
 
+    # #6 — Validate timestamp to prevent replay of old events
+    elements = dict(item.split("=", 1) for item in sig_header.split(",") if "=" in item)
+    ts_str = elements.get("t", "")
+    if ts_str:
+        try:
+            ts_val = float(ts_str)
+            if abs(time.time() - ts_val) > _MAX_WEBHOOK_AGE_SECONDS:
+                logger.warning("Stripe webhook timestamp too old: %s", ts_str)
+                return JSONResponse({"error": "Webhook timestamp expired"}, status_code=400)
+        except (ValueError, TypeError):
+            pass
+
     try:
         event = json.loads(payload)
     except json.JSONDecodeError:
@@ -201,14 +217,34 @@ async def stripe_webhook(request: Request) -> JSONResponse:
         session = event.get("data", {}).get("object", {})
         session_id = session.get("id", "")
 
-        # Deduplicate: skip if this session was already processed
+        # Deduplicate: check in-memory set AND persistent DB table
         if session_id and session_id in _processed_sessions:
-            logger.info("Duplicate webhook for session %s — skipping", session_id)
+            logger.info("Duplicate webhook for session %s — skipping (memory)", session_id)
             return JSONResponse({"received": True})
+
+        # Check persistent dedup table
+        if session_id:
+            ctx_check = request.app.state.ctx
+            try:
+                cursor = await ctx_check.tracker.storage.db.execute(
+                    "SELECT 1 FROM processed_stripe_sessions WHERE session_id = ?",
+                    (session_id,),
+                )
+                if await cursor.fetchone():
+                    _processed_sessions.add(session_id)
+                    logger.info("Duplicate webhook for session %s — skipping (db)", session_id)
+                    return JSONResponse({"received": True})
+            except Exception:
+                pass  # Table may not exist yet on older schemas
 
         metadata = session.get("metadata", {})
         agent_id = metadata.get("agent_id")
         credits = metadata.get("credits")
+
+        # #26: Validate metadata type safety
+        if not agent_id or not isinstance(agent_id, str) or not agent_id.strip():
+            logger.warning("Missing or empty agent_id in Stripe webhook metadata")
+            return JSONResponse({"error": "Missing agent_id in session metadata"}, status_code=400)
 
         _MAX_CREDITS = 1_000_000
         if agent_id and credits:
@@ -237,6 +273,14 @@ async def stripe_webhook(request: Request) -> JSONResponse:
                 )
                 if session_id:
                     _processed_sessions.add(session_id)
+                    try:
+                        await ctx.tracker.storage.db.execute(
+                            "INSERT OR IGNORE INTO processed_stripe_sessions (session_id, processed_at) VALUES (?, ?)",
+                            (session_id, time.time()),
+                        )
+                        await ctx.tracker.storage.db.commit()
+                    except Exception:
+                        pass  # Best-effort persistence
                 logger.info(
                     "Deposited %d credits to %s (session %s)",
                     credits,

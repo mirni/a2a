@@ -161,6 +161,24 @@ CREATE TABLE IF NOT EXISTS admin_audit_log (
 CREATE INDEX IF NOT EXISTS idx_admin_audit_agent ON admin_audit_log(agent_id);
 CREATE INDEX IF NOT EXISTS idx_admin_audit_tool ON admin_audit_log(tool_name);
 CREATE INDEX IF NOT EXISTS idx_admin_audit_ts ON admin_audit_log(timestamp);
+
+CREATE TABLE IF NOT EXISTS processed_stripe_sessions (
+    session_id TEXT PRIMARY KEY,
+    processed_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS api_audit_log (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp       REAL NOT NULL,
+    agent_id        TEXT NOT NULL,
+    tool_name       TEXT NOT NULL,
+    method          TEXT,
+    path            TEXT,
+    status_code     INTEGER,
+    client_ip       TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_api_audit_agent ON api_audit_log(agent_id);
+CREATE INDEX IF NOT EXISTS idx_api_audit_ts ON api_audit_log(timestamp);
 """
 
     _MIGRATIONS: tuple[Migration, ...] = (
@@ -234,6 +252,26 @@ CREATE INDEX IF NOT EXISTS idx_admin_audit_ts ON admin_audit_log(timestamp);
             "CREATE INDEX IF NOT EXISTS idx_admin_audit_agent ON admin_audit_log(agent_id);\n"
             "CREATE INDEX IF NOT EXISTS idx_admin_audit_tool ON admin_audit_log(tool_name);\n"
             "CREATE INDEX IF NOT EXISTS idx_admin_audit_ts ON admin_audit_log(timestamp);",
+        ),
+        Migration(
+            7,
+            "add processed_stripe_sessions and api_audit_log tables",
+            "CREATE TABLE IF NOT EXISTS processed_stripe_sessions (\n"
+            "    session_id TEXT PRIMARY KEY,\n"
+            "    processed_at REAL NOT NULL\n"
+            ");\n"
+            "CREATE TABLE IF NOT EXISTS api_audit_log (\n"
+            "    id              INTEGER PRIMARY KEY AUTOINCREMENT,\n"
+            "    timestamp       REAL NOT NULL,\n"
+            "    agent_id        TEXT NOT NULL,\n"
+            "    tool_name       TEXT NOT NULL,\n"
+            "    method          TEXT,\n"
+            "    path            TEXT,\n"
+            "    status_code     INTEGER,\n"
+            "    client_ip       TEXT\n"
+            ");\n"
+            "CREATE INDEX IF NOT EXISTS idx_api_audit_agent ON api_audit_log(agent_id);\n"
+            "CREATE INDEX IF NOT EXISTS idx_api_audit_ts ON api_audit_log(timestamp);",
         ),
     )
 

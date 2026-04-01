@@ -258,6 +258,9 @@ class PaymentEngine:
     ) -> Refund:
         """Refund a settled payment (full or partial).
 
+        Uses BEGIN IMMEDIATE to serialize concurrent refund attempts and
+        prevent double-spend race conditions.
+
         Args:
             settlement_id: ID of the settlement to refund.
             amount: Amount to refund. If None, refunds the remaining (un-refunded) balance.
@@ -272,64 +275,73 @@ class PaymentEngine:
             InvalidStateError: If the settlement is already fully refunded.
             PaymentError: If amount is zero, negative, or exceeds the remaining refundable balance.
         """
-        # Idempotency check
+        # Idempotency check (outside transaction — read-only)
         if idempotency_key is not None:
             existing = await self.storage.get_refund_by_idempotency_key(idempotency_key)
             if existing is not None:
                 return Refund(**existing)
 
-        settlement_data = await self.storage.get_settlement(settlement_id)
-        if settlement_data is None:
-            raise SettlementNotFoundError(f"Settlement {settlement_id} not found")
+        # Acquire exclusive lock to prevent concurrent refund race conditions
+        db = self.storage.db
+        await db.execute("BEGIN IMMEDIATE")
+        try:
+            settlement_data = await self.storage.get_settlement(settlement_id)
+            if settlement_data is None:
+                raise SettlementNotFoundError(f"Settlement {settlement_id} not found")
 
-        settlement = Settlement(**settlement_data)
+            settlement = Settlement(**settlement_data)
 
-        # Block if already fully refunded
-        if settlement.status == SettlementStatus.REFUNDED:
-            raise InvalidStateError(f"Settlement {settlement_id} is already fully refunded")
+            # Block if already fully refunded
+            if settlement.status == SettlementStatus.REFUNDED:
+                raise InvalidStateError(f"Settlement {settlement_id} is already fully refunded")
 
-        # Calculate remaining refundable amount
-        total_refunded = await self.storage.get_total_refunded(settlement_id)
-        remaining = settlement.amount - total_refunded
+            # Calculate remaining refundable amount
+            total_refunded = await self.storage.get_total_refunded(settlement_id)
+            remaining = settlement.amount - total_refunded
 
-        if amount is not None:
-            # Validate explicit amount
-            if amount <= 0:
-                raise PaymentError("Refund amount must be positive")
-            if amount > remaining:
-                raise PaymentError(f"Refund amount {amount} exceeds remaining refundable balance {remaining}")
-            refund_amount = amount
-        else:
-            # Full refund of remaining
-            refund_amount = remaining
+            if amount is not None:
+                # Validate explicit amount
+                if amount <= 0:
+                    raise PaymentError("Refund amount must be positive")
+                if amount > remaining:
+                    raise PaymentError(f"Refund amount {amount} exceeds remaining refundable balance {remaining}")
+                refund_amount = amount
+            else:
+                # Full refund of remaining
+                refund_amount = remaining
 
-        # Atomic fund transfer: withdraw from payee, deposit to payer
-        await self.wallet.withdraw(
-            settlement.payee,
-            float(refund_amount),
-            description=f"refund:{settlement_id}",
-        )
-        await self.wallet.deposit(
-            settlement.payer,
-            float(refund_amount),
-            description=f"refund:{settlement_id}",
-        )
+            # Atomic fund transfer: withdraw from payee, deposit to payer
+            await self.wallet.withdraw(
+                settlement.payee,
+                float(refund_amount),
+                description=f"refund:{settlement_id}",
+            )
+            await self.wallet.deposit(
+                settlement.payer,
+                float(refund_amount),
+                description=f"refund:{settlement_id}",
+            )
 
-        # Create refund record
-        refund = Refund(
-            settlement_id=settlement_id,
-            amount=refund_amount,
-            reason=reason,
-            idempotency_key=idempotency_key,
-        )
-        await self.storage.insert_refund(refund.model_dump())
+            # Create refund record
+            refund = Refund(
+                settlement_id=settlement_id,
+                amount=refund_amount,
+                reason=reason,
+                idempotency_key=idempotency_key,
+            )
+            await self.storage.insert_refund(refund.model_dump())
 
-        # Update settlement status
-        new_total_refunded = total_refunded + refund_amount
-        if new_total_refunded >= settlement.amount:
-            await self.storage.update_settlement_status(settlement_id, SettlementStatus.REFUNDED.value)
-        else:
-            await self.storage.update_settlement_status(settlement_id, SettlementStatus.PARTIALLY_REFUNDED.value)
+            # Update settlement status
+            new_total_refunded = total_refunded + refund_amount
+            if new_total_refunded >= settlement.amount:
+                await self.storage.update_settlement_status(settlement_id, SettlementStatus.REFUNDED.value)
+            else:
+                await self.storage.update_settlement_status(settlement_id, SettlementStatus.PARTIALLY_REFUNDED.value)
+
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise
 
         return refund
 

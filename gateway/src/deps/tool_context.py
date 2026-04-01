@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from gateway.src.authorization import ADMIN_ONLY_TOOLS, ADMIN_TIER
+from gateway.src.authorization import ADMIN_ONLY_TOOLS, ADMIN_TIER, check_ownership_authorization
 from gateway.src.catalog import get_tool
 from gateway.src.deps.auth import AuthError, authenticate, check_scopes
 from gateway.src.deps.billing import calculate_tool_cost, record_usage_and_charge
@@ -67,6 +67,9 @@ def require_tool(tool_name: str):
         try:
             agent_id, agent_tier, key_info = await authenticate(request)
         except AuthError as exc:
+            from gateway.src.anomaly import detector
+
+            detector.record_auth_failure(getattr(exc, "agent_id", "unknown"))
             resp = await error_response(exc.status, exc.message, exc.code, request=request)
             raise _ResponseError(resp) from exc
 
@@ -94,6 +97,9 @@ def require_tool(tool_name: str):
             resp = await error_response(403, str(exc), "insufficient_tier", request=request)
             raise _ResponseError(resp) from exc
         except RateLimitError as exc:
+            from gateway.src.anomaly import detector
+
+            detector.record_rate_limit_hit(agent_id)
             resp = await error_response(429, str(exc), "rate_limit_exceeded", request=request)
             raise _ResponseError(resp) from exc
         except ServiceError as exc:
@@ -141,6 +147,29 @@ def require_tool(tool_name: str):
     return _dependency
 
 
+async def _log_api_call(tc: ToolContext, status_code: int) -> None:
+    """Best-effort audit log of every authenticated API call."""
+    try:
+        db = tc.ctx.tracker.storage.db
+        client_ip = tc.request.client.host if tc.request.client else None
+        await db.execute(
+            "INSERT INTO api_audit_log (timestamp, agent_id, tool_name, method, path, status_code, client_ip) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                __import__("time").time(),
+                tc.agent_id,
+                tc.tool_name,
+                tc.request.method,
+                str(tc.request.url.path),
+                status_code,
+                client_ip,
+            ),
+        )
+        await db.commit()
+    except Exception:
+        logger.debug("Failed to write API audit log", exc_info=True)
+
+
 async def finalize_response(
     tc: ToolContext,
     result: dict[str, Any],
@@ -157,6 +186,9 @@ async def finalize_response(
         f"{tc.correlation_id}:{tc.tool_name}" if tc.correlation_id else None
     )
     await record_usage_and_charge(tc.ctx, tc.agent_id, tc.tool_name, tc.cost, idem_key, tc.correlation_id)
+
+    # #9: Best-effort API audit trail
+    await _log_api_call(tc, status_code)
 
     # Record metrics
     await Metrics.record_request(tc.tool_name)
@@ -177,6 +209,10 @@ async def finalize_response(
 
         tier_config = get_tier_config(tc.agent_tier)
         headers.update(build_rate_limit_headers(tier_config.rate_limit_per_hour, tc.rate_count))
+
+    # #21: Key age warning header
+    if tc.key_info and tc.key_info.get("_key_age_warning"):
+        headers["X-Key-Age-Warning"] = tc.key_info["_key_age_warning"]
 
     # Location header
     if location:
@@ -200,6 +236,26 @@ async def finalize_response(
         headers.update(sign_response(signing_manager, body_bytes))
 
     return JSONResponse(result, status_code=status_code, headers=headers)
+
+
+async def check_ownership(tc: ToolContext, params: dict[str, Any]) -> None:
+    """Verify ownership fields in *params* match the authenticated caller.
+
+    Must be called by route handlers AFTER ``_inject_caller()`` so that
+    ``params`` contains the user-supplied fields (``agent_id``, ``payer``,
+    ``sender``, etc.).  Raises ``_ResponseError(403)`` on violation.
+    Admin-tier agents bypass the check.
+    """
+    result = check_ownership_authorization(
+        caller_agent_id=tc.agent_id,
+        caller_tier=tc.agent_tier,
+        params=params,
+        tool_name=tc.tool_name,
+    )
+    if result is not None:
+        status, message, code = result
+        resp = await error_response(status, message, code, request=tc.request)
+        raise _ResponseError(resp)
 
 
 class _ResponseError(Exception):

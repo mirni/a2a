@@ -137,10 +137,20 @@ class KeyManager:
         if record.get("expires_at") is not None and record["expires_at"] < time.time():
             raise ExpiredKeyError("API key has expired")
 
+        # #21: Key age warning (90 days)
+        created = record.get("created_at")
+        if created is not None:
+            age_days = (time.time() - created) / 86400
+            if age_days > 90:
+                record["_key_age_warning"] = f"Key is {int(age_days)} days old. Consider rotating."
+
         return record
 
     async def revoke_key(self, raw_key: str) -> bool:
-        """Revoke an API key. Returns True if successfully revoked."""
+        """Revoke an API key. Returns True if successfully revoked.
+
+        Also records the revocation timestamp (revoked_at).
+        """
         key_hash = _hash_key(raw_key)
         return await self.storage.revoke_key(key_hash)
 

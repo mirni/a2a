@@ -36,6 +36,25 @@ AGENT_ID_IS_TARGET: frozenset[str] = frozenset(
         "delete_server",
         "update_server",
         "check_sla_compliance",
+        # Identity read-only lookups — agents can query other agents' identities
+        "get_agent_identity",
+        "get_agent_reputation",
+        "get_verified_claims",
+        "verify_agent",
+        "search_agents_by_metrics",
+        "get_claim_chains",
+        "query_metrics",
+        "get_metric_deltas",
+        "get_metric_averages",
+        # Marketplace read-only lookups — agents can browse the marketplace
+        "search_services",
+        "get_service",
+        "get_service_ratings",
+        "best_match",
+        "search_agents",
+        "list_strategies",
+        # Trust read-only lookups
+        "search_servers",
     }
 )
 
@@ -60,7 +79,7 @@ def check_ownership_authorization(
         if field == "agent_id" and tool_name in AGENT_ID_IS_TARGET:
             continue
         value = params.get(field)
-        if value is not None and value != caller_agent_id:
+        if value and value != caller_agent_id:
             logger.warning(
                 "Ownership denied: caller=%s, %s=%s",
                 caller_agent_id,

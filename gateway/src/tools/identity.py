@@ -5,6 +5,20 @@ from __future__ import annotations
 from typing import Any
 
 from gateway.src.lifespan import AppContext
+from gateway.src.tool_errors import ToolForbiddenError
+
+ADMIN_TIER = "admin"
+
+
+def _check_caller_owns_agent_id(params: dict[str, Any]) -> None:
+    """Raise ToolForbiddenError if caller is not admin and agent_id != caller."""
+    caller = params.get("_caller_agent_id")
+    tier = params.get("_caller_tier")
+    target = params.get("agent_id")
+    if tier == ADMIN_TIER or caller is None or target is None:
+        return
+    if caller != target:
+        raise ToolForbiddenError(f"Forbidden: cannot act on agent_id '{target}' — you are '{caller}'")
 
 
 async def _register_agent(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
@@ -30,6 +44,7 @@ async def _verify_agent(ctx: AppContext, params: dict[str, Any]) -> dict[str, An
 
 
 async def _submit_metrics(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    _check_caller_owns_agent_id(params)
     attestation = await ctx.identity_api.submit_metrics(
         agent_id=params["agent_id"],
         metrics=params["metrics"],
@@ -171,6 +186,7 @@ async def _get_org(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
 
 async def _ingest_metrics(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     """Ingest time-series metric data for an agent."""
+    _check_caller_owns_agent_id(params)
     result = await ctx.identity_api.ingest_timeseries(
         agent_id=params["agent_id"],
         metrics=params["metrics"],

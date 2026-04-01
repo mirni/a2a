@@ -340,7 +340,7 @@ class TestStripeWebhook:
         assert resp.status_code == 200
         assert resp.json()["received"] is True
 
-    async def test_webhook_missing_metadata_no_crash(self, client, monkeypatch):
+    async def test_webhook_missing_metadata_returns_400(self, client, monkeypatch):
         monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", self._WEBHOOK_SECRET)
         event = {
             "type": "checkout.session.completed",
@@ -352,7 +352,8 @@ class TestStripeWebhook:
             content=payload,
             headers=self._signed_headers(payload),
         )
-        assert resp.status_code == 200
+        # #26: Missing agent_id in metadata is now rejected
+        assert resp.status_code == 400
 
     async def test_webhook_rejects_invalid_signature(self, client, monkeypatch):
         monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", "whsec_real_secret")

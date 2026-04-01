@@ -108,6 +108,14 @@ def create_app() -> FastAPI:
     # Standalone endpoints
     @app.get("/v1/metrics", include_in_schema=False)
     async def metrics(request: Request) -> Response:
+        # #28: IP allowlist for metrics endpoint
+        allowed_raw = os.environ.get("METRICS_ALLOWED_IPS", "127.0.0.1,::1")
+        allowed_ips = {ip.strip() for ip in allowed_raw.split(",") if ip.strip()}
+        client_ip = request.client.host if request.client else None
+        if allowed_ips and client_ip not in allowed_ips:
+            from fastapi.responses import JSONResponse
+
+            return JSONResponse({"error": "Forbidden"}, status_code=403)
         return await metrics_handler(request)
 
     @app.get("/v1/signing-key")
@@ -165,8 +173,8 @@ def create_app() -> FastAPI:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=allowed_origins,
-            allow_methods=["*"],
-            allow_headers=["*"],
+            allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+            allow_headers=["Content-Type", "Authorization", "X-API-Key", "X-Payment", "Idempotency-Key"],
         )
 
     app.add_middleware(CorrelationIDMiddleware)

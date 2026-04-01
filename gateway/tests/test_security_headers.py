@@ -31,7 +31,7 @@ async def test_security_headers_x_frame_options(client):
 async def test_security_headers_strict_transport_security(client):
     """Strict-Transport-Security header must be present on every response."""
     resp = await client.get("/v1/health")
-    assert resp.headers["strict-transport-security"] == "max-age=31536000; includeSubDomains"
+    assert resp.headers["strict-transport-security"] == "max-age=31536000; includeSubDomains; preload"
 
 
 @pytest.mark.asyncio
@@ -48,7 +48,7 @@ async def test_security_headers_present_on_error_responses(client):
     assert resp.status_code == 405
     assert resp.headers["x-content-type-options"] == "nosniff"
     assert resp.headers["x-frame-options"] == "DENY"
-    assert resp.headers["strict-transport-security"] == "max-age=31536000; includeSubDomains"
+    assert resp.headers["strict-transport-security"] == "max-age=31536000; includeSubDomains; preload"
     assert resp.headers["content-security-policy"] == "default-src 'none'"
 
 
