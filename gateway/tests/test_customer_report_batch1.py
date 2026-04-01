@@ -336,7 +336,7 @@ class TestWebhookSSRF:
             },
             key,
         )
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 201)
 
 
 # ============================================================================

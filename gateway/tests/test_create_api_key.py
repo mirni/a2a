@@ -33,7 +33,7 @@ class TestCreateApiKey:
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 201)
         result = resp.json()
         assert "key" in result
         assert result["agent_id"] == "test-agent"
@@ -52,7 +52,7 @@ class TestCreateApiKey:
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 201)
         data = resp.json()
         assert data["tier"] == "free"
 
@@ -66,7 +66,7 @@ class TestCreateApiKey:
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 201)
         new_key = resp.json()["key"]
 
         # Use the new key

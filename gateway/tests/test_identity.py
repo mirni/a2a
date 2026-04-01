@@ -24,7 +24,7 @@ class TestRegisterAgent:
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 201)
         data = resp.json()
         assert data["agent_id"] == "test-agent"
         assert len(data["public_key"]) == 64  # 32 bytes hex
@@ -48,7 +48,7 @@ class TestVerifyAgent:
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 201)
 
         # Sign a message
         message = "prove identity"
@@ -87,7 +87,7 @@ class TestSubmitMetrics:
             },
             headers={"Authorization": f"Bearer {pro_api_key}"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 201)
 
         # Submit metrics
         resp = await client.post(
@@ -144,7 +144,7 @@ class TestSubmitMetrics:
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 201)
 
         # Try submit_metrics with free tier key
         resp = await client.post(

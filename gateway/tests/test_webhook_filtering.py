@@ -326,6 +326,6 @@ async def test_register_webhook_api_with_filter(client, pro_api_key, app):
         },
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 201)
     data = resp.json()
     assert data["filter_agent_ids"] == ["alice", "bob"]

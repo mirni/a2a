@@ -43,7 +43,7 @@ class TestCreateIntentCurrency:
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+        assert resp.status_code in (200, 201), f"Expected 200/201, got {resp.status_code}: {resp.text}"
         data = resp.json()
         assert data["currency"] == "CREDITS"
 
@@ -68,7 +68,7 @@ class TestCreateIntentCurrency:
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 201)
         data = resp.json()
         assert data["currency"] == "USD"
 
@@ -92,7 +92,7 @@ class TestCreateIntentCurrency:
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 201)
         intent_id = resp.json()["id"]
 
         # Check USD balance of payer before capture (should still have 500 USD;
@@ -145,7 +145,7 @@ class TestCreateEscrowCurrency:
             },
             headers={"Authorization": f"Bearer {pro_api_key}"},
         )
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+        assert resp.status_code in (200, 201), f"Expected 200/201, got {resp.status_code}: {resp.text}"
         data = resp.json()
         assert data["currency"] == "USD"
 
@@ -170,7 +170,7 @@ class TestCreateEscrowCurrency:
             },
             headers={"Authorization": f"Bearer {pro_api_key}"},
         )
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+        assert resp.status_code in (200, 201), f"Expected 200/201, got {resp.status_code}: {resp.text}"
         data = resp.json()
         assert data["currency"] == "CREDITS"
 
@@ -201,7 +201,7 @@ class TestCreateSubscriptionCurrency:
             },
             headers={"Authorization": f"Bearer {pro_api_key}"},
         )
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+        assert resp.status_code in (200, 201), f"Expected 200/201, got {resp.status_code}: {resp.text}"
         data = resp.json()
         assert data["currency"] == "CREDITS"
 
@@ -225,7 +225,7 @@ class TestCreateSubscriptionCurrency:
             },
             headers={"Authorization": f"Bearer {pro_api_key}"},
         )
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+        assert resp.status_code in (200, 201), f"Expected 200/201, got {resp.status_code}: {resp.text}"
         data = resp.json()
         assert data["currency"] == "USD"
 
@@ -259,7 +259,7 @@ class TestCreateSplitIntentCurrency:
             },
             headers={"Authorization": f"Bearer {pro_api_key}"},
         )
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+        assert resp.status_code in (200, 201), f"Expected 200/201, got {resp.status_code}: {resp.text}"
         data = resp.json()
         assert data["currency"] == "CREDITS"
 
@@ -286,7 +286,7 @@ class TestCreateSplitIntentCurrency:
             },
             headers={"Authorization": f"Bearer {pro_api_key}"},
         )
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+        assert resp.status_code in (200, 201), f"Expected 200/201, got {resp.status_code}: {resp.text}"
         data = resp.json()
         assert data["currency"] == "USD"
 

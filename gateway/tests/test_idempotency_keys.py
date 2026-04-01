@@ -164,12 +164,12 @@ async def test_create_split_intent_idempotency(client, pro_api_key, app):
     }
 
     r1 = await _execute(client, pro_api_key, "create_split_intent", params)
-    assert r1.status_code == 200, r1.json()
+    assert r1.status_code in (200, 201), r1.json()
 
     payer_balance_after_first = await ctx.tracker.wallet.get_balance("pro-agent")
 
     r2 = await _execute(client, pro_api_key, "create_split_intent", params)
-    assert r2.status_code == 200, r2.json()
+    assert r2.status_code in (200, 201), r2.json()
 
     payer_balance_after_second = await ctx.tracker.wallet.get_balance("pro-agent")
 
@@ -204,10 +204,10 @@ async def test_create_performance_escrow_idempotency(client, pro_api_key, app):
     }
 
     r1 = await _execute(client, pro_api_key, "create_performance_escrow", params)
-    assert r1.status_code == 200, r1.json()
+    assert r1.status_code in (200, 201), r1.json()
 
     r2 = await _execute(client, pro_api_key, "create_performance_escrow", params)
-    assert r2.status_code == 200, r2.json()
+    assert r2.status_code in (200, 201), r2.json()
 
     # Same escrow_id must be returned
     assert r1.json()["escrow_id"] == r2.json()["escrow_id"]

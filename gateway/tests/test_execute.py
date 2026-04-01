@@ -138,7 +138,7 @@ async def test_execute_pro_tier_access(client, pro_api_key, app):
         },
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 201)
     data = resp.json()
     assert data["status"] == "held"
     # 1.5% of amount=10 → max(0.01, min(10.0, 0.15)) = 0.15
@@ -350,7 +350,7 @@ async def test_execute_create_and_capture_intent(client, api_key, app):
         },
         headers={"Authorization": f"Bearer {api_key}"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 201)
     intent_data = resp.json()
     assert intent_data["status"] == "pending"
     intent_id = intent_data["id"]

@@ -17,7 +17,7 @@ async def test_create_org(client, api_key):
         },
         headers={"Authorization": f"Bearer {api_key}"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 201)
     result = resp.json()
     assert result["name"] == "Acme Corp"
     assert "org_id" in result

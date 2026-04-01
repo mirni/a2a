@@ -13,7 +13,7 @@ async def test_register_returns_key_and_wallet(client):
         "/v1/register",
         json={"agent_id": "new-agent-register"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 201)
     data = resp.json()
     assert "api_key" in data
     assert data["agent_id"] == "new-agent-register"
@@ -27,7 +27,7 @@ async def test_register_duplicate_agent_returns_409(client):
         "/v1/register",
         json={"agent_id": "dup-agent"},
     )
-    assert resp1.status_code == 200
+    assert resp1.status_code in (200, 201)
 
     resp2 = await client.post(
         "/v1/register",
@@ -52,7 +52,7 @@ async def test_register_key_works_for_tool_call(client):
         "/v1/register",
         json={"agent_id": "working-agent"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 201)
     api_key = resp.json()["api_key"]
 
     # Use the key to call get_balance

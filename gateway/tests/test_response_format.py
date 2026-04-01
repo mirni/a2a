@@ -68,3 +68,43 @@ async def test_register_returns_unwrapped(client, app):
     assert "api_key" in data
     assert "success" not in data
     assert "result" not in data
+
+
+async def test_create_tool_returns_201(client, api_key, app):
+    """Create tools (e.g. create_intent) should return 201 Created."""
+    ctx = app.state.ctx
+    await ctx.tracker.wallet.create("payee-201", initial_balance=0.0, signup_bonus=False)
+    resp = await client.post(
+        "/v1/execute",
+        json={
+            "tool": "create_intent",
+            "params": {
+                "payer": "test-agent",
+                "payee": "payee-201",
+                "amount": 10.0,
+                "description": "test 201",
+            },
+        },
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 201
+    assert "location" in resp.headers
+
+
+async def test_non_create_tool_returns_200(client, api_key):
+    """Non-create tools (e.g. get_balance) should still return 200."""
+    resp = await client.post(
+        "/v1/execute",
+        json={"tool": "get_balance", "params": {"agent_id": "test-agent"}},
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 200
+
+
+async def test_register_returns_201(client, app):
+    """POST /v1/register should return 201 Created."""
+    resp = await client.post(
+        "/v1/register",
+        json={"agent_id": "agent-201-test"},
+    )
+    assert resp.status_code == 201

@@ -34,7 +34,7 @@ async def _create_intent(client, api_key):
         },
         headers={"Authorization": f"Bearer {api_key}"},
     )
-    assert resp.status_code == 200, resp.text
+    assert resp.status_code in (200, 201), resp.text
     return resp.json()["id"]
 
 

@@ -49,7 +49,7 @@ class TestRemoveAgentFromOrg:
             {"org_name": "Test Org 19", "agent_id": "org-owner-19"},
             key,
         )
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 201)
         org_id = resp.json()["org_id"]
 
         # Add a second member
@@ -83,7 +83,7 @@ class TestRemoveAgentFromOrg:
             {"org_name": "Solo Org 19", "agent_id": "sole-owner-19"},
             key,
         )
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 201)
         org_id = resp.json()["org_id"]
 
         # Attempt to remove the sole owner — should be rejected
@@ -182,4 +182,4 @@ class TestWebhookRequireSecret:
             },
             key,
         )
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 201)

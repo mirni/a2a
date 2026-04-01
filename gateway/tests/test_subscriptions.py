@@ -27,7 +27,7 @@ async def test_create_subscription_via_gateway(client, pro_api_key, app):
         },
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 201)
     data = resp.json()
     assert data["status"] == "active"
     assert data["amount"] == 10.0
@@ -165,7 +165,7 @@ async def test_create_subscription_starter_tier_allowed(client, app):
         },
         headers={"Authorization": f"Bearer {starter_key}"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 201)
     data = resp.json()
     assert data["status"] == "active"
 

@@ -106,11 +106,11 @@ class TestEscrowIdempotency:
         }
 
         resp1 = await _exec(client, "create_escrow", params, key)
-        assert resp1.status_code == 200
+        assert resp1.status_code in (200, 201)
         id1 = resp1.json()["id"]
 
         resp2 = await _exec(client, "create_escrow", params, key)
-        assert resp2.status_code == 200
+        assert resp2.status_code in (200, 201)
         id2 = resp2.json()["id"]
 
         assert id1 == id2
@@ -162,11 +162,11 @@ class TestSubscriptionIdempotency:
         }
 
         resp1 = await _exec(client, "create_subscription", params, key)
-        assert resp1.status_code == 200
+        assert resp1.status_code in (200, 201)
         id1 = resp1.json()["id"]
 
         resp2 = await _exec(client, "create_subscription", params, key)
-        assert resp2.status_code == 200
+        assert resp2.status_code in (200, 201)
         id2 = resp2.json()["id"]
 
         assert id1 == id2

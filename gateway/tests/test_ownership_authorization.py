@@ -152,7 +152,7 @@ class TestCaptureIntentOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200
+        assert create_resp.status_code in (200, 201)
         intent_id = create_resp.json()["id"]
 
         # Eve (unrelated) tries to capture it
@@ -183,7 +183,7 @@ class TestCaptureIntentOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200
+        assert create_resp.status_code in (200, 201)
         intent_id = create_resp.json()["id"]
 
         resp = await _execute(
@@ -213,7 +213,7 @@ class TestCaptureIntentOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200
+        assert create_resp.status_code in (200, 201)
         intent_id = create_resp.json()["id"]
 
         resp = await _execute(
@@ -255,7 +255,7 @@ class TestReleaseEscrowOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200, f"create_escrow failed: {create_resp.json()}"
+        assert create_resp.status_code in (200, 201), f"create failed: {create_resp.json()}"
         escrow_id = create_resp.json()["id"]
 
         # Eve tries to release it
@@ -286,7 +286,7 @@ class TestReleaseEscrowOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200, f"create_escrow failed: {create_resp.json()}"
+        assert create_resp.status_code in (200, 201), f"create failed: {create_resp.json()}"
         escrow_id = create_resp.json()["id"]
 
         resp = await _execute(
@@ -327,7 +327,7 @@ class TestCancelEscrowOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200, f"create_escrow failed: {create_resp.json()}"
+        assert create_resp.status_code in (200, 201), f"create failed: {create_resp.json()}"
         escrow_id = create_resp.json()["id"]
 
         # Eve tries to cancel it
@@ -358,7 +358,7 @@ class TestCancelEscrowOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200, f"create_escrow failed: {create_resp.json()}"
+        assert create_resp.status_code in (200, 201), f"create failed: {create_resp.json()}"
         escrow_id = create_resp.json()["id"]
 
         resp = await _execute(
@@ -399,7 +399,7 @@ class TestRefundIntentOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200
+        assert create_resp.status_code in (200, 201)
         intent_id = create_resp.json()["id"]
 
         # Eve tries to refund it
@@ -430,7 +430,7 @@ class TestRefundIntentOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200
+        assert create_resp.status_code in (200, 201)
         intent_id = create_resp.json()["id"]
 
         resp = await _execute(
@@ -470,7 +470,7 @@ class TestAdminBypassResourceOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200
+        assert create_resp.status_code in (200, 201)
         intent_id = create_resp.json()["id"]
 
         resp = await _execute(
@@ -501,7 +501,7 @@ class TestAdminBypassResourceOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200, f"create_escrow failed: {create_resp.json()}"
+        assert create_resp.status_code in (200, 201), f"create failed: {create_resp.json()}"
         escrow_id = create_resp.json()["id"]
 
         resp = await _execute(
@@ -532,7 +532,7 @@ class TestAdminBypassResourceOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200, f"create_escrow failed: {create_resp.json()}"
+        assert create_resp.status_code in (200, 201), f"create failed: {create_resp.json()}"
         escrow_id = create_resp.json()["id"]
 
         resp = await _execute(
@@ -563,7 +563,7 @@ class TestAdminBypassResourceOwnership:
             },
             key_alice,
         )
-        assert create_resp.status_code == 200
+        assert create_resp.status_code in (200, 201)
         intent_id = create_resp.json()["id"]
 
         resp = await _execute(

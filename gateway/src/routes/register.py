@@ -63,5 +63,6 @@ async def register(request: Request) -> JSONResponse:
             "api_key": key_info["key"],
             "tier": "free",
             "balance": balance,
-        }
+        },
+        status_code=201,
     )

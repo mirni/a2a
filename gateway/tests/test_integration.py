@@ -33,7 +33,7 @@ async def _exec(client, tool: str, params: dict, key: str):
 async def _exec_ok(client, tool: str, params: dict, key: str) -> tuple[dict, object]:
     """Execute a tool and assert success. Return (body, resp) tuple."""
     resp = await _exec(client, tool, params, key)
-    assert resp.status_code == 200, f"Expected 200 for {tool}, got {resp.status_code}: {resp.text}"
+    assert resp.status_code in (200, 201), f"Expected 200/201 for {tool}, got {resp.status_code}: {resp.text}"
     return resp.json(), resp
 
 

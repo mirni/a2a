@@ -52,7 +52,7 @@ class TestListIntents:
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 201)
 
         # List intents
         resp = await client.post(

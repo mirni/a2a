@@ -266,7 +266,7 @@ async def test_create_split_intent(client, pro_api_key, app):
         },
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 201)
     result = resp.json()
     assert result["status"] == "settled"
     assert len(result["settlements"]) == 3

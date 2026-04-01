@@ -545,6 +545,34 @@ async def execute(request: Request) -> JSONResponse:
     # Envelope-free: result is the body; cost goes in X-Charged header
     headers["X-Charged"] = str(cost)
 
+    # Determine status code: 201 for create tools, 200 otherwise
+    _CREATE_TOOLS: frozenset[str] = frozenset({
+        "create_intent", "create_escrow", "create_performance_escrow",
+        "create_subscription", "create_split_intent", "open_dispute",
+        "register_webhook", "register_server", "register_agent",
+        "create_org", "create_api_key",
+    })
+    _LOCATION_TEMPLATES: dict[str, str] = {
+        "create_intent": "/v1/intents/{id}",
+        "create_escrow": "/v1/escrows/{id}",
+        "create_performance_escrow": "/v1/escrows/{escrow_id}",
+        "create_subscription": "/v1/subscriptions/{id}",
+        "create_split_intent": "/v1/intents/{id}",
+        "open_dispute": "/v1/disputes/{id}",
+        "register_webhook": "/v1/webhooks/{id}",
+        "create_org": "/v1/orgs/{org_id}",
+    }
+
+    status_code = 201 if tool_name in _CREATE_TOOLS else 200
+
+    # Add Location header for create tools when result has an id
+    if tool_name in _LOCATION_TEMPLATES and isinstance(result, dict):
+        tpl = _LOCATION_TEMPLATES[tool_name]
+        # Try common id field names
+        resource_id = result.get("id") or result.get("escrow_id") or result.get("org_id")
+        if resource_id:
+            headers["Location"] = tpl.format(id=resource_id, escrow_id=resource_id, org_id=resource_id)
+
     # Sign response if signing manager available
     signing_manager = getattr(request.app.state, "signing_manager", None)
     if signing_manager:
@@ -555,4 +583,4 @@ async def execute(request: Request) -> JSONResponse:
         body_bytes = _json.dumps(result).encode()
         headers.update(sign_response(signing_manager, body_bytes))
 
-    return JSONResponse(result, headers=headers)
+    return JSONResponse(result, status_code=status_code, headers=headers)

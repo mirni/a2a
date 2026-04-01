@@ -21,7 +21,7 @@ async def test_register_webhook(client, pro_api_key, app):
         },
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 201)
     data = resp.json()
     assert data["id"].startswith("whk-")
     assert data["agent_id"] == "pro-agent"

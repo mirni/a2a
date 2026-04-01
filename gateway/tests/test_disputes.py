@@ -45,7 +45,7 @@ async def test_open_dispute(client, pro_api_key, app):
         },
         headers={"Authorization": f"Bearer {disputer_key['key']}"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 201)
     result = resp.json()
     assert result["status"] == "open"
     assert "id" in result

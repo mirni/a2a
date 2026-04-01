@@ -133,7 +133,7 @@ class TestDisputeImpersonation:
             },
             headers={"Authorization": f"Bearer {admin_api_key}"},
         )
-        assert resp.status_code == 200, f"create_escrow failed: {resp.json()}"
+        assert resp.status_code in (200, 201), f"create_escrow failed: {resp.json()}"
         escrow_id = resp.json()["id"]
 
         # Open a dispute via API
@@ -149,7 +149,7 @@ class TestDisputeImpersonation:
             },
             headers={"Authorization": f"Bearer {admin_api_key}"},
         )
-        assert resp.status_code == 200, f"open_dispute failed: {resp.json()}"
+        assert resp.status_code in (200, 201), f"open_dispute failed: {resp.json()}"
         dispute_id = resp.json()["id"]
 
         # Try to resolve with a spoofed resolved_by

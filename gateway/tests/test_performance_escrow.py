@@ -32,7 +32,7 @@ async def test_create_performance_escrow(client, pro_api_key, app):
         },
         headers={"Authorization": f"Bearer {buyer_key['key']}"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 201)
     result = resp.json()
     assert result["status"] == "held"
     assert result["metric_name"] == "sharpe_30d"
