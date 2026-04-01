@@ -205,10 +205,12 @@ class TestStripeTimestampValidation:
         import os
 
         os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
-        payload = json.dumps({
-            "type": "checkout.session.completed",
-            "data": {"object": {"id": "sess_old", "metadata": {"agent_id": "a", "credits": "100"}}},
-        }).encode()
+        payload = json.dumps(
+            {
+                "type": "checkout.session.completed",
+                "data": {"object": {"id": "sess_old", "metadata": {"agent_id": "a", "credits": "100"}}},
+            }
+        ).encode()
         old_ts = str(int(time.time()) - 600)  # 10 min ago
         signed_payload = f"{old_ts}.".encode() + payload
         sig = hmac.new(b"whsec_test", signed_payload, hashlib.sha256).hexdigest()
@@ -301,6 +303,7 @@ class TestKeyRevocationTimestamp:
         await ctx.key_manager.revoke_key(raw_key)
 
         import hashlib
+
         key_hash = hashlib.sha3_256(raw_key.encode()).hexdigest()
         record = await ctx.paywall_storage.lookup_key(key_hash)
         assert record is not None
@@ -323,6 +326,7 @@ class TestKeyAgeWarning:
 
         # Backdate the key's created_at to 100 days ago
         import hashlib
+
         key_hash = hashlib.sha3_256(raw_key.encode()).hexdigest()
         old_ts = time.time() - (100 * 86400)
         await ctx.paywall_storage.db.execute(
@@ -358,10 +362,12 @@ class TestStripeMetadataValidation:
         import os
 
         os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
-        payload = json.dumps({
-            "type": "checkout.session.completed",
-            "data": {"object": {"id": "sess_noagent", "metadata": {"credits": "100"}}},
-        }).encode()
+        payload = json.dumps(
+            {
+                "type": "checkout.session.completed",
+                "data": {"object": {"id": "sess_noagent", "metadata": {"credits": "100"}}},
+            }
+        ).encode()
         ts = str(int(time.time()))
         signed_payload = f"{ts}.".encode() + payload
         sig = hmac.new(b"whsec_test", signed_payload, hashlib.sha256).hexdigest()
