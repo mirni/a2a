@@ -1,7 +1,9 @@
 # =============================================================================
 # A2A Commerce Platform — CI Pipeline (Lightweight)
 # =============================================================================
-# Runs on pull requests only. Skips docs-only changes via paths-ignore.
+# Runs when a PR is marked ready for review (or opened as non-draft) and on
+# merge queue events. Does NOT run on every push to a PR branch.
+# Skips docs-only changes via paths-ignore.
 # Three jobs: quality, test, package — then staging for PRs targeting main.
 #
 # For full CI (SAST, docker, multi-Python), see release.yml which runs on
@@ -12,6 +14,7 @@ name: CI
 
 on:
   pull_request:
+    types: [opened, ready_for_review]
     paths-ignore:
       - 'docs/**'
       - 'reports/**'
@@ -21,6 +24,11 @@ on:
       - '*.md'
       - '.gitignore'
       - 'LICENSE'
+  merge_group:
+
+concurrency:
+  group: ci-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -31,6 +39,7 @@ jobs:
   # Quality: linting, formatting, type checking, security scan
   # ---------------------------------------------------------------------------
   quality:
+    if: github.event.pull_request.draft == false || github.event_name == 'merge_group'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
