@@ -1,5 +1,43 @@
 # Changelog
 
+# Release v0.7.0
+
+**Date:** 2026-04-01
+**Commit:** a33d3b19
+**Previous:** v0.6.0
+
+## Changes
+
+### Bug Fixes
+
+- fix: security audit remediation (24 findings) (#26) (`62154d6`)
+
+### Refactoring
+
+- refactor: restrict /v1/execute to connector tools only (#25) (`2fe321d`)
+- refactor: API Phase 3 — remaining resource endpoints (marketplace, trust, messaging, infra, disputes) (#23) (`9ca566f`)
+- refactor: API Phase 2 — resource endpoints (billing, payments, identity) (#22) (`b1b82cd`)
+- refactor: API Foundation Phase 1 (T3–T9) (#21) (`e47d590`)
+
+### Other
+
+- Update MASTER_LOG.md with latest (`a33d3b1`)
+- report: internal security audit of A2A gateway REST API (#24) (`79db577`)
+- Fix the release pipeline -- CD must wait for CI to finish; Add missed 'done' prompt (`9c41086`)
+- Merge release v0.6.0 into main (`bdc5151`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 0.7.0 |
+| a2a-gateway | 0.7.0 |
+| a2a-gateway-sandbox | 0.7.0 |
+| a2a-gateway-test | 0.7.0 |
+| a2a-website | 0.7.0 |
+---
+
+
 # Release v0.6.0
 
 **Date:** 2026-03-31
