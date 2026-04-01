@@ -6437,3 +6437,103 @@ Process backlog/security-audit.md prompt — internal security audit of A2A gate
 - Report written to `reports/security-audit-2026-04-01.md`
 - Task moved from `tasks/active/` to `tasks/done/security-audit.md`
 - **PR #24**: `report/security-audit` branch — report-only, CI skipped (paths-ignore)
+
+---
+
+## Session: External API Audit Prompt Generation (2026-04-01)
+
+**Prompt:** Generate a comprehensive external testing prompt for an AI agent to audit the live sandbox API.
+
+**Steps completed:**
+1. Explored all ~123 API endpoints across 12 domains (billing, payments, disputes, identity, marketplace, messaging, trust, infra, streaming, etc.)
+2. Generated live API keys for all tiers against `https://api.greenhelix.net`:
+   - Free: `a2a_free_fd6f55e3e27cacf45527d574`
+   - Starter: `a2a_starter_7c305eb003f4e8fad383ac47`
+   - Pro: `a2a_pro_695ed84d4f10b0167dd15570`
+   - Admin: `a2a_pro_307702814d8bdf0471ba5621` (pre-existing)
+3. Verified all keys work (200 on auth endpoints, 403 on BOLA, 401 on no-auth, 403 on tier mismatch)
+4. Created `tasks/external/audit.md` — self-contained prompt with:
+   - 12 test phases, ~150 individual test cases
+   - Security tests: BOLA, auth bypass, tier enforcement, rate limits, input validation, RFC 9457, security headers, CORS, monetary precision, idempotency
+   - Pre-generated keys with regeneration instructions
+   - Structured reporting template
+5. **PR #27**: `feat/external-audit-prompt` — CI skipped (tasks/** in paths-ignore)
+
+### Internal Market-Readiness Audit Prompt
+
+**Prompt:** Generate a comprehensive internal audit prompt using multiple agent personas to assess market readiness.
+
+**Output:** `tasks/external/internal-audit.md`
+
+**Structure:**
+- 6 agent personas: Security Engineer, Financial Auditor, QA/Test Engineer, Developer Advocate, SRE Engineer, Product Manager
+- Dependency-ordered execution: QA first (baseline) → Security + Financial (parallel) → SRE → Dev Advocate → Product (synthesis)
+- Grading rubric (A–F) with weighted scoring: Security 25%, Financial 20%, QA 15%, DX 15%, Ops 15%, Product 10%
+- Go/No-Go decision matrix with conditions
+- Consolidates into `reports/market-readiness-audit-YYYY-MM-DD.md`
+- References prior audit findings, PLAN_v2.md status, and live sandbox verification
+
+---
+
+## Session: Internal Market-Readiness Audit Execution (2026-04-01)
+
+**Prompt:** Execute `tasks/backlog/internal-audit.md` — run all 6 agent persona phases and produce consolidated report.
+
+### Execution Summary
+
+Ran all 6 audit phases with real data collection:
+
+**Phase 3 — QA/Test Engineer:**
+- Gateway: 1,062 passed, 93% coverage
+- Products: 1,223 passed (billing 202, payments 206, identity 216, marketplace 137, trust 103, paywall 132, messaging 65, reputation 162)
+- SDK: 58 passed, 8 failed (Phase 3 migration → 410 Gone)
+- E2E: 16 passed, 21 failed (same root cause)
+- Lint: 0 violations, Format: 406 files clean, Mypy: 0 errors
+
+**Phase 1 — Security Engineer:**
+- 6/8 prior findings fully fixed, 2/8 partially fixed
+- Authorization matrix: 99/99 endpoints call check_ownership()
+- Security headers verified on sandbox
+
+**Phase 2 — Financial Auditor:**
+- ALL SOUND: wallet atomicity, payment state machine, escrow lifecycle, currency conversion, decimal precision, subscription scheduler
+
+**Phase 4 — Developer Advocate (DX):**
+- Score: 6.2/10
+- Blockers: SDKs broken (410 Gone), TS SDK not on npm, no SDK READMEs
+
+**Phase 5 — SRE Engineer:**
+- Critical gaps: no backup automation, no runbooks, no incident response
+- Deployment pipeline solid with rollback
+
+**Phase 6 — Product Manager:**
+- Roadmap 100% complete (P0-P3 all done)
+- Pricing gaps: starter tier vestigial, enterprise empty
+
+### Result: CONDITIONAL GO
+
+**Weighted Score: 74.5/100 (C+)**
+
+| Persona | Weight | Grade | Score |
+|---------|--------|-------|-------|
+| Security | 25% | B+ | 87 |
+| Financial | 20% | A | 96 |
+| QA | 15% | B- | 78 |
+| DX | 15% | D+ | 62 |
+| SRE | 15% | C | 70 |
+| Product | 10% | B | 82 |
+
+### 5 Launch Blockers
+1. Python SDK broken (410 Gone from Phase 3 migration)
+2. TypeScript SDK not published on npm + broken
+3. E2E test regression (21 failures)
+4. No automated database backup
+5. `/v1/register` returns 500 on sandbox
+
+### Outputs
+- Report: `reports/market-readiness-audit-2026-04-01.md`
+- Backlog: `tasks/backlog/fix-sdk-phase3-migration.md`
+- Backlog: `tasks/backlog/operational-readiness.md`
+- Backlog: `tasks/backlog/fix-register-500.md`
+- Backlog: `tasks/backlog/security-sprint-items.md`
+- Task completed: `tasks/done/internal-audit.md`
