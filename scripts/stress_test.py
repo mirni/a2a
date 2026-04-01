@@ -50,26 +50,44 @@ DEFAULT_CUSTOMERS = 20
 DEFAULT_DURATION = 60
 DEFAULT_RAMP_UP = 10
 
-# Workloads: (weight, tool_name, params_fn)
-# Higher weight = more frequent
-WORKLOADS = [
-    (30, "get_balance", lambda aid: {"agent_id": aid}),
-    (15, "get_usage_summary", lambda aid: {"agent_id": aid}),
-    (10, "search_services", lambda _: {"query": "code review", "limit": 5}),
-    (10, "get_events", lambda _: {"limit": 10}),
-    (8, "search_servers", lambda _: {"limit": 5}),
-    (7, "list_webhooks", lambda aid: {"agent_id": aid}),
-    (5, "get_agent_leaderboard", lambda _: {"metric": "calls", "limit": 5}),
-    (5, "estimate_cost", lambda _: {"tool_name": "get_balance", "quantity": 100}),
-    (5, "get_metrics_timeseries", lambda aid: {"agent_id": aid, "interval": "hour"}),
-    (3, "get_payment_history", lambda aid: {"agent_id": aid, "limit": 10}),
-    (2, "list_subscriptions", lambda aid: {"agent_id": aid, "limit": 5}),
+# Workloads: (weight, label, method, path_fn, query_fn)
+# path_fn(agent_id) → URL path; query_fn(agent_id) → query params dict
+WORKLOADS: list[tuple[int, str, str, Any, Any]] = [
+    (30, "get_balance", "GET", lambda aid: f"/v1/billing/wallets/{aid}/balance", lambda _: {}),
+    (15, "get_usage_summary", "GET", lambda aid: f"/v1/billing/wallets/{aid}/usage", lambda _: {}),
+    (
+        10,
+        "search_services",
+        "GET",
+        lambda _: "/v1/marketplace/services",
+        lambda _: {"query": "code review", "limit": 5},
+    ),
+    (10, "get_events", "GET", lambda _: "/v1/infra/events", lambda _: {"limit": 10}),
+    (8, "search_servers", "GET", lambda _: "/v1/trust/servers", lambda _: {"limit": 5}),
+    (7, "list_webhooks", "GET", lambda _: "/v1/infra/webhooks", lambda _: {}),
+    (5, "get_agent_leaderboard", "GET", lambda _: "/v1/billing/leaderboard", lambda _: {"metric": "calls", "limit": 5}),
+    (
+        5,
+        "estimate_cost",
+        "GET",
+        lambda _: "/v1/billing/estimate",
+        lambda _: {"tool_name": "get_balance", "quantity": 100},
+    ),
+    (
+        5,
+        "get_metrics_timeseries",
+        "GET",
+        lambda aid: f"/v1/billing/wallets/{aid}/timeseries",
+        lambda _: {"interval": "hour"},
+    ),
+    (3, "get_payment_history", "GET", lambda _: "/v1/payments/history", lambda aid: {"agent_id": aid, "limit": 10}),
+    (2, "list_subscriptions", "GET", lambda _: "/v1/payments/subscriptions", lambda aid: {"agent_id": aid, "limit": 5}),
 ]
 
-# Build weighted selection list
-_WORKLOAD_CHOICES: list[tuple[str, Any]] = []
-for weight, tool, params_fn in WORKLOADS:
-    _WORKLOAD_CHOICES.extend([(tool, params_fn)] * weight)
+# Build weighted selection list: (label, method, path_fn, query_fn)
+_WORKLOAD_CHOICES: list[tuple[str, str, Any, Any]] = []
+for weight, label, method, path_fn, query_fn in WORKLOADS:
+    _WORKLOAD_CHOICES.extend([(label, method, path_fn, query_fn)] * weight)
 
 
 # ---------------------------------------------------------------------------
@@ -189,36 +207,38 @@ class CustomerAgent:
         self._running = False
 
     async def run(self, duration: float) -> None:
-        """Execute random tool calls for the given duration."""
+        """Execute random REST endpoint calls for the given duration."""
         self._running = True
         end_at = time.monotonic() + duration
         headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
 
         while self._running and time.monotonic() < end_at:
-            tool, params_fn = random.choice(_WORKLOAD_CHOICES)
-            params = params_fn(self.agent_id)
+            label, method, path_fn, query_fn = random.choice(_WORKLOAD_CHOICES)
+            path = path_fn(self.agent_id)
+            query = query_fn(self.agent_id)
 
             start = time.monotonic()
             try:
-                resp = await self.client.post(
-                    f"{self.base_url}/v1/execute",
-                    json={"tool": tool, "params": params},
+                resp = await self.client.request(
+                    method,
+                    f"{self.base_url}{path}",
+                    params=query or None,
                     headers=headers,
                     timeout=30.0,
                 )
                 latency_ms = (time.monotonic() - start) * 1000
-                success = resp.status_code == 200
+                success = resp.status_code in (200, 201)
                 error = ""
                 if not success:
                     try:
                         body = resp.json()
-                        error = body.get("error", {}).get("message", resp.text[:200])
+                        error = body.get("detail", resp.text[:200])
                     except Exception:
                         error = resp.text[:200]
 
                 self.metrics.record(
                     RequestResult(
-                        tool=tool,
+                        tool=label,
                         status_code=resp.status_code,
                         latency_ms=latency_ms,
                         success=success,
@@ -229,7 +249,7 @@ class CustomerAgent:
                 latency_ms = (time.monotonic() - start) * 1000
                 self.metrics.record(
                     RequestResult(
-                        tool=tool,
+                        tool=label,
                         status_code=0,
                         latency_ms=latency_ms,
                         success=False,
@@ -240,7 +260,7 @@ class CustomerAgent:
                 latency_ms = (time.monotonic() - start) * 1000
                 self.metrics.record(
                     RequestResult(
-                        tool=tool,
+                        tool=label,
                         status_code=0,
                         latency_ms=latency_ms,
                         success=False,
@@ -251,7 +271,7 @@ class CustomerAgent:
                 latency_ms = (time.monotonic() - start) * 1000
                 self.metrics.record(
                     RequestResult(
-                        tool=tool,
+                        tool=label,
                         status_code=0,
                         latency_ms=latency_ms,
                         success=False,
@@ -369,28 +389,29 @@ async def provision_test_agents(
     for i in range(count):
         agent_id = f"stress-agent-{i:04d}"
 
-        # Create wallet
+        # Create wallet via REST endpoint
         try:
             await client.post(
-                f"{base_url}/v1/execute",
-                json={"tool": "create_wallet", "params": {"agent_id": agent_id, "initial_balance": 100000.0}},
+                f"{base_url}/v1/billing/wallets",
+                json={"agent_id": agent_id, "initial_balance": 100000.0},
                 headers=headers,
                 timeout=10.0,
             )
         except Exception:
             pass
 
-        # Create API key (pro tier so all tools are accessible)
+        # Create API key via REST endpoint (pro tier so all tools are accessible)
         try:
             resp = await client.post(
-                f"{base_url}/v1/execute",
-                json={"tool": "create_api_key", "params": {"agent_id": agent_id, "tier": "pro"}},
+                f"{base_url}/v1/infra/keys",
+                json={"agent_id": agent_id, "tier": "pro"},
                 headers=headers,
                 timeout=10.0,
             )
-            if resp.status_code == 200:
+            if resp.status_code in (200, 201):
                 body = resp.json()
-                key = body.get("result", {}).get("key", "")
+                # REST endpoints return envelope-free responses
+                key = body.get("key", "") or body.get("result", {}).get("key", "")
                 if key:
                     agents.append((agent_id, key))
                     continue
