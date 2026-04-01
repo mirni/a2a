@@ -35,4 +35,5 @@ ignore = [
 "e2e_tests.py" = ["F821"]
 "gateway/src/signing.py" = ["F821"]
 "gateway/src/lifespan.py" = ["I001"]
+"gateway/src/routes/v1/*.py" = ["B008"]  # Depends() in defaults is standard FastAPI
 "scripts/*" = ["S"]

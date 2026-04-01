@@ -6320,3 +6320,94 @@ Root cause: deb postinst scripts still installed `starlette>=0.37` instead of `f
 - Added Step 11 to `release.sh`: merge release branch back to main + cleanup
 
 CI result: all 4 jobs green (quality, test, package, staging).
+
+---
+
+## 2026-04-01 Session: API Refactoring Phase 1 (T3–T9)
+
+**Prompt:** Implement API Refactoring Phase 1 — Foundation (tasks T3–T9)
+
+**Branch:** `refactor/api-foundation`
+**PR:** https://github.com/mirni/a2a/pull/21
+
+### Completed Tasks
+- **T4**: RFC 9457 Problem Details error format (`application/problem+json`)
+- **T3**: Remove response envelope; `X-Charged` and `X-Request-ID` headers
+- **T5**: `Idempotency-Key` HTTP header support
+- **T6**: `201 Created` + `Location` header for create tools
+- **T7+T8**: String-serialized Decimals + ISO 8601 timestamps
+- **T9**: Cursor-based pagination with `Link` header
+
+### Stats
+- 900 tests passing (was ~892 before, added new test files)
+- ~70 test files updated
+- 7 commits (6 refactor + 1 formatting)
+- CI all green (test, package, quality, staging)
+
+### Key Files Changed
+- `gateway/src/errors.py` — RFC 9457 format
+- `gateway/src/middleware.py` — Problem JSON for 429/413/504
+- `gateway/src/routes/execute.py` — Envelope removal, headers, 201, serialization, Link header
+- `gateway/src/routes/register.py` — Envelope removal, 201
+- `gateway/src/routes/pricing.py` — Cursor pagination, Link header
+- `gateway/src/serialization.py` — NEW: monetary/timestamp serialization
+- `gateway/src/tools/_pagination.py` — Cursor encode/decode
+- `gateway/tests/test_problem_details.py` — NEW: 11 RFC 9457 tests
+- `gateway/tests/test_response_format.py` — NEW: 7 envelope/201/Location tests
+- `gateway/tests/test_serialization.py` — NEW: 3 serialization tests
+
+---
+
+## Session — 2026-04-01: API Refactoring Phase 2 — Resource Endpoints (Partial)
+
+### Prompt
+Implement the plan for Phase 2: extract shared deps from execute.py, create billing/payments/identity routers (~57 REST endpoints).
+
+### Output
+
+**Step 1: Extract Shared Dependencies**
+- Created `gateway/src/deps/` module with `auth.py`, `billing.py`, `rate_limit.py`, `tool_context.py`
+- `ToolContext` dataclass + `require_tool()` factory for FastAPI `Depends()`
+- `finalize_response()` for post-call billing, serialization, headers
+- Added `_ResponseError` exception handler in app.py
+- 7 tests in `gateway/tests/test_deps.py`
+
+**Step 2: Billing Router (18 endpoints)**
+- `gateway/src/routes/v1/billing.py` — 18 REST endpoints under `/v1/billing/`
+- Pydantic request models with `extra="forbid"`: CreateWalletRequest, DepositRequest, WithdrawRequest, BudgetCapRequest, ConvertCurrencyRequest
+- 22 tests in `gateway/tests/v1/test_billing.py`
+
+**Step 3: Payments Router (22 endpoints)**
+- `gateway/src/routes/v1/payments.py` — 22 REST endpoints under `/v1/payments/`
+- Pydantic models: CreateIntentRequest, CreateEscrowRequest, CreatePerformanceEscrowRequest, PartialCaptureRequest, CreateSplitIntentRequest, RefundSettlementRequest, CreateSubscriptionRequest
+- Static routes (`/intents/split`, `/escrows/performance`, `/subscriptions/process-due`) before parameterized
+- 201 Created + Location for create endpoints
+- 24 tests in `gateway/tests/v1/test_payments.py`
+
+**Step 4: Identity Router (17 endpoints)**
+- `gateway/src/routes/v1/identity.py` — 17 REST endpoints under `/v1/identity/`
+- Pydantic models: RegisterAgentRequest, VerifyAgentRequest, SubmitMetricsRequest, CreateOrgRequest, AddMemberRequest, IngestMetricsRequest
+- 19 tests in `gateway/tests/v1/test_identity.py`
+
+**Verification**
+- 972 total tests passing (907 existing + 65 new), 0 failures
+- Lint clean (ruff check + ruff format)
+- B008 (Depends in defaults) ignored for `gateway/src/routes/v1/*.py` — standard FastAPI pattern
+
+### Files Changed
+- `gateway/src/deps/__init__.py` — NEW
+- `gateway/src/deps/auth.py` — NEW: auth extraction
+- `gateway/src/deps/billing.py` — NEW: cost + charging
+- `gateway/src/deps/rate_limit.py` — NEW: rate limit checks
+- `gateway/src/deps/tool_context.py` — NEW: ToolContext + require_tool + finalize
+- `gateway/src/routes/v1/__init__.py` — NEW
+- `gateway/src/routes/v1/billing.py` — NEW: 18 endpoints
+- `gateway/src/routes/v1/payments.py` — NEW: 22 endpoints
+- `gateway/src/routes/v1/identity.py` — NEW: 17 endpoints
+- `gateway/src/app.py` — MODIFIED: register 3 new routers + exception handler
+- `gateway/tests/test_deps.py` — NEW: 7 tests
+- `gateway/tests/v1/__init__.py` — NEW
+- `gateway/tests/v1/test_billing.py` — NEW: 22 tests
+- `gateway/tests/v1/test_payments.py` — NEW: 24 tests
+- `gateway/tests/v1/test_identity.py` — NEW: 19 tests
+- `ruff.toml` — MODIFIED: B008 ignore for v1 routes
