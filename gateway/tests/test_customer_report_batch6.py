@@ -50,7 +50,7 @@ class TestRemoveAgentFromOrg:
             key,
         )
         assert resp.status_code == 200
-        org_id = resp.json()["result"]["org_id"]
+        org_id = resp.json()["org_id"]
 
         # Add a second member
         key2 = await _create_agent(app, "org-member-19", tier="free", balance=1000.0)
@@ -84,7 +84,7 @@ class TestRemoveAgentFromOrg:
             key,
         )
         assert resp.status_code == 200
-        org_id = resp.json()["result"]["org_id"]
+        org_id = resp.json()["org_id"]
 
         # Attempt to remove the sole owner — should be rejected
         resp = await _exec(

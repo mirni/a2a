@@ -139,8 +139,6 @@ class TestX402ExecuteNoApiKey:
             )
 
         assert resp.status_code == 200
-        data = resp.json()
-        assert data["success"] is True
 
     @pytest.mark.asyncio
     async def test_no_key_x402_expired_proof_returns_402(self, x402_client):
@@ -228,4 +226,3 @@ class TestX402ExecuteWithApiKey:
             headers={"Authorization": f"Bearer {key_info['key']}"},
         )
         assert resp.status_code == 200
-        assert resp.json()["success"] is True

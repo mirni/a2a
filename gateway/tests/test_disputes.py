@@ -46,7 +46,7 @@ async def test_open_dispute(client, pro_api_key, app):
         headers={"Authorization": f"Bearer {disputer_key['key']}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["status"] == "open"
     assert "id" in result
     assert result["escrow_id"] == escrow.id
@@ -78,7 +78,7 @@ async def test_respond_to_dispute(client, pro_api_key, app):
         headers={"Authorization": f"Bearer {seller_key['key']}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["status"] == "responded"
 
 
@@ -107,7 +107,7 @@ async def test_resolve_dispute_refund(client, app):
         headers={"Authorization": f"Bearer {admin_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["status"] == "resolved"
     assert result["resolution"] == "refund"
 
@@ -140,7 +140,7 @@ async def test_resolve_dispute_release(client, app):
         headers={"Authorization": f"Bearer {admin_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["resolution"] == "release"
 
     # Seller should receive funds

@@ -50,19 +50,18 @@ async def test_list_api_keys_paginate_first_page(client, app, api_key):
             "paginate": True,
         },
     )
-    result = body["result"]
 
-    assert "items" in result, "Paginated response must contain 'items'"
-    assert "total" in result, "Paginated response must contain 'total'"
-    assert "offset" in result, "Paginated response must contain 'offset'"
-    assert "limit" in result, "Paginated response must contain 'limit'"
-    assert "has_more" in result, "Paginated response must contain 'has_more'"
+    assert "items" in body, "Paginated response must contain 'items'"
+    assert "total" in body, "Paginated response must contain 'total'"
+    assert "offset" in body, "Paginated response must contain 'offset'"
+    assert "limit" in body, "Paginated response must contain 'limit'"
+    assert "has_more" in body, "Paginated response must contain 'has_more'"
 
-    assert len(result["items"]) == 2
-    assert result["total"] >= 4
-    assert result["offset"] == 0
-    assert result["limit"] == 2
-    assert result["has_more"] is True
+    assert len(body["items"]) == 2
+    assert body["total"] >= 4
+    assert body["offset"] == 0
+    assert body["limit"] == 2
+    assert body["has_more"] is True
 
 
 async def test_list_api_keys_paginate_second_page(client, app, api_key):
@@ -82,12 +81,11 @@ async def test_list_api_keys_paginate_second_page(client, app, api_key):
             "paginate": True,
         },
     )
-    result = body["result"]
 
-    assert len(result["items"]) == 2
-    assert result["offset"] == 2
-    assert result["limit"] == 2
-    assert result["total"] >= 4
+    assert len(body["items"]) == 2
+    assert body["offset"] == 2
+    assert body["limit"] == 2
+    assert body["total"] >= 4
 
 
 async def test_list_api_keys_without_paginate_returns_flat(client, app, api_key):
@@ -100,11 +98,10 @@ async def test_list_api_keys_without_paginate_returns_flat(client, app, api_key)
             "agent_id": "test-agent",
         },
     )
-    result = body["result"]
 
     # Legacy format: {"keys": [...]}
-    assert "keys" in result
-    assert "items" not in result
+    assert "keys" in body
+    assert "items" not in body
 
 
 async def test_list_api_keys_paginate_metadata_total(client, app, api_key):
@@ -125,11 +122,10 @@ async def test_list_api_keys_paginate_metadata_total(client, app, api_key):
             "paginate": True,
         },
     )
-    result = body["result"]
 
-    assert result["total"] == 5
-    assert len(result["items"]) == 5
-    assert result["has_more"] is False
+    assert body["total"] == 5
+    assert len(body["items"]) == 5
+    assert body["has_more"] is False
 
 
 # ---------------------------------------------------------------------------
@@ -167,15 +163,14 @@ async def test_search_services_paginate(client, app, api_key):
             "paginate": True,
         },
     )
-    result = body["result"]
 
-    assert "items" in result
-    assert "total" in result
-    assert len(result["items"]) == 2
-    assert result["total"] >= 5
-    assert result["offset"] == 0
-    assert result["limit"] == 2
-    assert result["has_more"] is True
+    assert "items" in body
+    assert "total" in body
+    assert len(body["items"]) == 2
+    assert body["total"] >= 5
+    assert body["offset"] == 0
+    assert body["limit"] == 2
+    assert body["has_more"] is True
 
 
 async def test_search_services_offset_returns_different_subset(client, app, api_key):
@@ -219,8 +214,8 @@ async def test_search_services_offset_returns_different_subset(client, app, api_
         },
     )
 
-    page1_ids = {s["id"] for s in body_page1["result"]["items"]}
-    page2_ids = {s["id"] for s in body_page2["result"]["items"]}
+    page1_ids = {s["id"] for s in body_page1["items"]}
+    page2_ids = {s["id"] for s in body_page2["items"]}
 
     # Pages must not overlap
     assert page1_ids.isdisjoint(page2_ids), "Paginated pages must return different items"
@@ -236,9 +231,8 @@ async def test_search_services_without_paginate_returns_flat(client, app, api_ke
             "category": "analytics",
         },
     )
-    result = body["result"]
-    assert "services" in result
-    assert "items" not in result
+    assert "services" in body
+    assert "items" not in body
 
 
 # ---------------------------------------------------------------------------
@@ -276,13 +270,12 @@ async def test_search_agents_paginate(client, app, api_key):
             "paginate": True,
         },
     )
-    result = body["result"]
 
-    assert "items" in result
-    assert "total" in result
-    assert len(result["items"]) == 2
-    assert result["total"] >= 4
-    assert result["has_more"] is True
+    assert "items" in body
+    assert "total" in body
+    assert len(body["items"]) == 2
+    assert body["total"] >= 4
+    assert body["has_more"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -312,13 +305,12 @@ async def test_list_webhooks_paginate(client, app, pro_api_key):
             "paginate": True,
         },
     )
-    result = body["result"]
 
-    assert "items" in result
-    assert "total" in result
-    assert len(result["items"]) == 2
-    assert result["total"] >= 4
-    assert result["has_more"] is True
+    assert "items" in body
+    assert "total" in body
+    assert len(body["items"]) == 2
+    assert body["total"] >= 4
+    assert body["has_more"] is True
 
 
 async def test_list_webhooks_without_paginate_returns_flat(client, app, pro_api_key):
@@ -339,9 +331,8 @@ async def test_list_webhooks_without_paginate_returns_flat(client, app, pro_api_
             "agent_id": "pro-agent",
         },
     )
-    result = body["result"]
-    assert "webhooks" in result
-    assert "items" not in result
+    assert "webhooks" in body
+    assert "items" not in body
 
 
 # ---------------------------------------------------------------------------
@@ -362,9 +353,8 @@ async def test_paginate_with_negative_offset_returns_error_or_empty(client, app,
             "paginate": True,
         },
     )
-    result = body["result"]
     # Should clamp to 0
-    assert result["offset"] == 0
+    assert body["offset"] == 0
 
 
 async def test_paginate_with_zero_limit(client, app, api_key):
@@ -380,7 +370,6 @@ async def test_paginate_with_zero_limit(client, app, api_key):
             "paginate": True,
         },
     )
-    result = body["result"]
-    assert result["items"] == []
-    assert result["total"] >= 1
-    assert result["limit"] == 0
+    assert body["items"] == []
+    assert body["total"] >= 1
+    assert body["limit"] == 0

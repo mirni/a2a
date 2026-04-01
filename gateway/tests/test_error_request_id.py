@@ -85,12 +85,11 @@ async def test_product_exception_has_request_id_header(client, api_key):
 
 
 async def test_success_response_has_request_id(client, api_key):
-    """Successful responses should also include request_id."""
+    """Successful responses should also include X-Request-ID header."""
     resp = await client.post(
         "/v1/execute",
         json={"tool": "get_balance", "params": {"agent_id": "test-agent"}},
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    body = resp.json()
-    assert "request_id" in body
+    assert "x-request-id" in resp.headers

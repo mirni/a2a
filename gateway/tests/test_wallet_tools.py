@@ -69,7 +69,7 @@ async def test_withdraw_via_gateway(client, api_key):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["new_balance"] == 900.0  # started with 1000
 
 

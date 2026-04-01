@@ -328,5 +328,4 @@ async def test_register_webhook_api_with_filter(client, pro_api_key, app):
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["success"] is True
-    assert data["result"]["filter_agent_ids"] == ["alice", "bob"]
+    assert data["filter_agent_ids"] == ["alice", "bob"]

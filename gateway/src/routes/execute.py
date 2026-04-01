@@ -532,12 +532,8 @@ async def execute(request: Request) -> JSONResponse:
         _tc = _get_tier_config(agent_tier)
         headers.update(_rate_limit_headers(_tc.rate_limit_per_hour, rate_count))
 
-    response_body: dict[str, Any] = {
-        "success": True,
-        "result": result,
-        "charged": cost,
-        "request_id": correlation_id,
-    }
+    # Envelope-free: result is the body; cost goes in X-Charged header
+    headers["X-Charged"] = str(cost)
 
     # Sign response if signing manager available
     signing_manager = getattr(request.app.state, "signing_manager", None)
@@ -546,7 +542,7 @@ async def execute(request: Request) -> JSONResponse:
 
         from gateway.src.signing import sign_response
 
-        body_bytes = _json.dumps({"success": True, "result": result, "charged": cost}).encode()
+        body_bytes = _json.dumps(result).encode()
         headers.update(sign_response(signing_manager, body_bytes))
 
-    return JSONResponse(response_body, headers=headers)
+    return JSONResponse(result, headers=headers)

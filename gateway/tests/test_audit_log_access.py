@@ -48,5 +48,4 @@ class TestGlobalAuditLogAccess:
         )
         assert resp.status_code == 200
         body = resp.json()
-        assert body["success"] is True
-        assert "entries" in body["result"]
+        assert "entries" in body

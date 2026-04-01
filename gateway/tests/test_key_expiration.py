@@ -99,7 +99,6 @@ async def test_future_expiry_key_succeeds(client, future_key):
         headers={"Authorization": f"Bearer {future_key}"},
     )
     assert resp.status_code == 200
-    assert resp.json()["success"] is True
 
 
 @pytest.mark.asyncio
@@ -111,7 +110,6 @@ async def test_no_expiry_key_succeeds(client, no_expiry_key):
         headers={"Authorization": f"Bearer {no_expiry_key}"},
     )
     assert resp.status_code == 200
-    assert resp.json()["success"] is True
 
 
 # ---------------------------------------------------------------------------

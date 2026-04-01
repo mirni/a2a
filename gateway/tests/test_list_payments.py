@@ -35,9 +35,8 @@ class TestListIntents:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["intents"] == []
-        assert data["result"]["count"] == 0
+        assert data["intents"] == []
+        assert data["count"] == 0
 
     async def test_list_intents_after_create(self, client, app, api_key):
         """list_intents returns intents after creating one."""
@@ -66,8 +65,7 @@ class TestListIntents:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["count"] >= 1
+        assert data["count"] >= 1
 
     async def test_list_intents_ownership_enforced(self, client, api_key):
         """list_intents for a different agent should be forbidden."""
@@ -110,9 +108,8 @@ class TestListEscrows:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["escrows"] == []
-        assert data["result"]["count"] == 0
+        assert data["escrows"] == []
+        assert data["count"] == 0
 
     async def test_list_escrows_ownership_enforced(self, client, api_key):
         """list_escrows for a different agent should be forbidden."""

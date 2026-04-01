@@ -86,7 +86,7 @@ class TestTransactionsCurrency:
 
         resp = await _exec(client, "get_transactions", {"agent_id": "txn-curr-agent"}, key)
         assert resp.status_code == 200
-        txns = resp.json()["result"]["transactions"]
+        txns = resp.json()["transactions"]
         assert len(txns) >= 1
         # At least one transaction should have currency
         has_currency = any("currency" in t for t in txns)
@@ -112,7 +112,7 @@ class TestExchangeRateReturnType:
             key,
         )
         assert resp.status_code == 200
-        rate = resp.json()["result"]["rate"]
+        rate = resp.json()["rate"]
         assert isinstance(rate, (int, float)), f"Expected numeric, got {type(rate).__name__}: {rate}"
 
 
@@ -132,7 +132,7 @@ class TestWalletFreeze:
         # Freeze
         resp = await _exec(client, "freeze_wallet", {"agent_id": "freeze-agent"}, admin_key)
         assert resp.status_code == 200
-        assert resp.json()["result"]["frozen"] is True
+        assert resp.json()["frozen"] is True
 
         # Attempt withdraw
         resp = await _exec(
@@ -152,7 +152,7 @@ class TestWalletFreeze:
         await _exec(client, "freeze_wallet", {"agent_id": "unfreeze-agent"}, admin_key)
         resp = await _exec(client, "unfreeze_wallet", {"agent_id": "unfreeze-agent"}, admin_key)
         assert resp.status_code == 200
-        assert resp.json()["result"]["frozen"] is False
+        assert resp.json()["frozen"] is False
 
         # Withdraw should succeed
         resp = await _exec(

@@ -97,8 +97,6 @@ async def test_valid_request_still_works(client, api_key):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    data = resp.json()
-    assert data["success"] is True
 
 
 @pytest.mark.asyncio

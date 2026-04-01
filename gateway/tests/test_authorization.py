@@ -67,7 +67,6 @@ class TestAgentIdOwnership:
             headers={"Authorization": f"Bearer {key}"},
         )
         assert resp.status_code == 200
-        assert resp.json()["success"] is True
 
     async def test_agent_cannot_access_other_agent_resources(self, client, app):
         """403: agent_id in params does NOT match the caller's agent_id."""
@@ -250,7 +249,6 @@ class TestAdminBypass:
             headers={"Authorization": f"Bearer {admin_key}"},
         )
         assert resp.status_code == 200
-        assert resp.json()["success"] is True
 
     async def test_admin_can_create_intent_for_any_payer(self, client, app):
         """200: admin key can create_intent with any payer."""

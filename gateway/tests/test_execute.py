@@ -56,10 +56,8 @@ async def test_execute_get_balance(client, api_key, app):
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["success"] is True
-    assert "result" in data
-    assert data["result"]["balance"] == 1000.0
-    assert data["charged"] == 0.0
+    assert data["balance"] == 1000.0
+    assert float(resp.headers["x-charged"]) == 0.0
 
 
 @pytest.mark.asyncio
@@ -71,9 +69,8 @@ async def test_execute_get_usage_summary(client, api_key):
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["success"] is True
-    assert "total_cost" in data["result"]
-    assert "total_calls" in data["result"]
+    assert "total_cost" in data
+    assert "total_calls" in data
 
 
 @pytest.mark.asyncio
@@ -85,8 +82,7 @@ async def test_execute_deposit(client, api_key):
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["success"] is True
-    assert data["result"]["new_balance"] == 1050.0
+    assert data["new_balance"] == 1050.0
 
 
 @pytest.mark.asyncio
@@ -98,7 +94,6 @@ async def test_execute_x_api_key_header(client, api_key):
         headers={"X-API-Key": api_key},
     )
     assert resp.status_code == 200
-    assert resp.json()["success"] is True
 
 
 @pytest.mark.asyncio
@@ -145,10 +140,9 @@ async def test_execute_pro_tier_access(client, pro_api_key, app):
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["success"] is True
-    assert data["result"]["status"] == "held"
+    assert data["status"] == "held"
     # 1.5% of amount=10 → max(0.01, min(10.0, 0.15)) = 0.15
-    assert data["charged"] == 0.15
+    assert float(resp.headers["x-charged"]) == 0.15
 
 
 @pytest.mark.asyncio
@@ -183,8 +177,7 @@ async def test_execute_search_services(client, api_key):
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["success"] is True
-    assert "services" in data["result"]
+    assert "services" in data
 
 
 @pytest.mark.asyncio
@@ -220,8 +213,7 @@ async def test_execute_delete_server(client, pro_api_key, app):
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["success"] is True
-    assert data["result"]["deleted"] is True
+    assert data["deleted"] is True
 
     # Verify it's gone
     server = await ctx.trust_api.storage.get_server("del-001")
@@ -274,9 +266,8 @@ async def test_execute_update_server(client, pro_api_key, app):
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["success"] is True
-    assert data["result"]["name"] == "New Name"
-    assert data["result"]["url"] == "https://new.com"
+    assert data["name"] == "New Name"
+    assert data["url"] == "https://new.com"
 
 
 @pytest.mark.asyncio
@@ -317,8 +308,7 @@ async def test_execute_global_audit_log(client, admin_api_key, app):
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["success"] is True
-    entries = data["result"]["entries"]
+    entries = data["entries"]
     # Should have at least the 2 entries we just created (plus any from gateway usage)
     assert len(entries) >= 2
     agents = {e["agent_id"] for e in entries}
@@ -361,7 +351,7 @@ async def test_execute_create_and_capture_intent(client, api_key, app):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    intent_data = resp.json()["result"]
+    intent_data = resp.json()
     assert intent_data["status"] == "pending"
     intent_id = intent_data["id"]
 
@@ -375,6 +365,6 @@ async def test_execute_create_and_capture_intent(client, api_key, app):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    capture_data = resp.json()["result"]
+    capture_data = resp.json()
     assert capture_data["status"] == "settled"
     assert capture_data["amount"] == 25.0

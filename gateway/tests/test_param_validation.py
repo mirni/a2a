@@ -41,8 +41,6 @@ async def test_valid_params_pass_validation(client, api_key):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    body = resp.json()
-    assert body["success"] is True
 
 
 async def test_tool_with_no_required_params(client, admin_api_key):

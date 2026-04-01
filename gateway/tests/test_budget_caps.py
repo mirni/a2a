@@ -23,7 +23,7 @@ async def test_set_budget_cap(client, api_key):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["agent_id"] == "test-agent"
     assert result["daily_cap"] == 100.0
     assert result["monthly_cap"] == 2000.0
@@ -43,7 +43,7 @@ async def test_set_budget_cap_defaults(client, api_key):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["agent_id"] == "test-agent"
     assert result["alert_threshold"] == 0.8  # default
 
@@ -59,7 +59,7 @@ async def test_get_budget_status_no_cap(client, api_key):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["agent_id"] == "test-agent"
     assert result["alert_triggered"] is False
     assert result["cap_exceeded"] is False
@@ -97,7 +97,7 @@ async def test_get_budget_status_with_spending(client, api_key, app):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["agent_id"] == "test-agent"
     assert result["daily_spend"] >= 6.0
     assert result["daily_cap"] == 10.0
@@ -137,7 +137,7 @@ async def test_budget_cap_exceeded(client, api_key, app):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["cap_exceeded"] is True
     assert result["alert_triggered"] is True
 

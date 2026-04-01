@@ -37,16 +37,14 @@ class TestAgentLeaderboard:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        result = data["result"]
-        assert "leaderboard" in result
-        assert isinstance(result["leaderboard"], list)
+        assert "leaderboard" in data
+        assert isinstance(data["leaderboard"], list)
         # agent-b spent 20, agent-a spent 15 — b should be first
-        if len(result["leaderboard"]) >= 2:
-            assert result["leaderboard"][0]["agent_id"] == "agent-b"
-            assert result["leaderboard"][0]["rank"] == 1
-            assert result["leaderboard"][1]["agent_id"] == "agent-a"
-            assert result["leaderboard"][1]["rank"] == 2
+        if len(data["leaderboard"]) >= 2:
+            assert data["leaderboard"][0]["agent_id"] == "agent-b"
+            assert data["leaderboard"][0]["rank"] == 1
+            assert data["leaderboard"][1]["agent_id"] == "agent-a"
+            assert data["leaderboard"][1]["rank"] == 2
 
     async def test_leaderboard_by_calls(self, client, api_key, app):
         """Should rank agents by total calls."""
@@ -65,7 +63,7 @@ class TestAgentLeaderboard:
         )
         assert resp.status_code == 200
         data = resp.json()
-        lb = data["result"]["leaderboard"]
+        lb = data["leaderboard"]
         # caller-a has 3 calls, caller-b has 1
         caller_a = [e for e in lb if e["agent_id"] == "caller-a"]
         caller_b = [e for e in lb if e["agent_id"] == "caller-b"]
@@ -81,8 +79,7 @@ class TestAgentLeaderboard:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert "leaderboard" in data["result"]
+        assert "leaderboard" in data
 
     async def test_limit_parameter(self, client, api_key, app):
         """Should respect the limit parameter."""
@@ -102,7 +99,7 @@ class TestAgentLeaderboard:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data["result"]["leaderboard"]) <= 3
+        assert len(data["leaderboard"]) <= 3
 
     async def test_default_limit_is_10(self, client, api_key):
         """Default limit should be 10."""
@@ -113,7 +110,7 @@ class TestAgentLeaderboard:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data["result"]["leaderboard"]) <= 10
+        assert len(data["leaderboard"]) <= 10
 
     async def test_leaderboard_entries_have_rank(self, client, api_key, app):
         """Each entry should have rank, agent_id, and value fields."""
@@ -128,7 +125,7 @@ class TestAgentLeaderboard:
         )
         assert resp.status_code == 200
         data = resp.json()
-        for entry in data["result"]["leaderboard"]:
+        for entry in data["leaderboard"]:
             assert "rank" in entry
             assert "agent_id" in entry
             assert "value" in entry
@@ -163,7 +160,7 @@ class TestAgentLeaderboard:
         )
         assert resp.status_code == 200
         data = resp.json()
-        lb = data["result"]["leaderboard"]
+        lb = data["leaderboard"]
         # rev-seller-b has 500, rev-seller-a has 300
         seller_a = [e for e in lb if e["agent_id"] == "rev-seller-a"]
         seller_b = [e for e in lb if e["agent_id"] == "rev-seller-b"]
@@ -210,7 +207,7 @@ class TestAgentLeaderboard:
         )
         assert resp.status_code == 200
         data = resp.json()
-        lb = data["result"]["leaderboard"]
+        lb = data["leaderboard"]
         rated_a = [e for e in lb if e["agent_id"] == "rated-a"]
         rated_b = [e for e in lb if e["agent_id"] == "rated-b"]
         assert rated_b and rated_a

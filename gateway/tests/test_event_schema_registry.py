@@ -40,8 +40,6 @@ class TestRegisterEventSchema:
             headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 200
-        data = resp.json()
-        assert data["success"] is True
 
         # Retrieve
         resp2 = await client.post(
@@ -54,9 +52,8 @@ class TestRegisterEventSchema:
         )
         assert resp2.status_code == 200
         data2 = resp2.json()
-        assert data2["success"] is True
-        assert data2["result"]["schema"] == schema
-        assert data2["result"]["event_type"] == "payment.completed"
+        assert data2["schema"] == schema
+        assert data2["event_type"] == "payment.completed"
 
     async def test_overwrite_existing_schema(self, client, api_key):
         """Registering a schema for an existing event type should overwrite."""
@@ -89,7 +86,7 @@ class TestRegisterEventSchema:
             headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 200
-        assert resp.json()["result"]["schema"] == schema_v2
+        assert resp.json()["schema"] == schema_v2
 
     async def test_get_nonexistent_schema(self, client, api_key):
         """Retrieving a schema that doesn't exist should return not found."""
@@ -103,8 +100,7 @@ class TestRegisterEventSchema:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"].get("found") is False
+        assert data.get("found") is False
 
     async def test_register_missing_params(self, client, api_key):
         """Should fail when required params are missing."""

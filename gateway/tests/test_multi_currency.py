@@ -45,8 +45,7 @@ class TestCreateIntentCurrency:
         )
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["currency"] == "CREDITS"
+        assert data["currency"] == "CREDITS"
 
     async def test_create_intent_explicit_usd(self, client, app, api_key):
         """create_intent with currency=USD should return USD and use the USD wallet."""
@@ -71,8 +70,7 @@ class TestCreateIntentCurrency:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["currency"] == "USD"
+        assert data["currency"] == "USD"
 
     async def test_create_intent_capture_uses_currency(self, client, app, api_key):
         """Capturing a USD intent should move USD, not CREDITS."""
@@ -95,7 +93,7 @@ class TestCreateIntentCurrency:
             headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 200
-        intent_id = resp.json()["result"]["id"]
+        intent_id = resp.json()["id"]
 
         # Check USD balance of payer before capture (should still have 500 USD;
         # intent creation does NOT withdraw yet)
@@ -149,8 +147,7 @@ class TestCreateEscrowCurrency:
         )
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["currency"] == "USD"
+        assert data["currency"] == "USD"
 
         # Verify payer USD balance decreased (escrow withdraws immediately)
         payer_usd = await ctx.tracker.wallet.get_balance("pro-agent", currency="USD")
@@ -175,8 +172,7 @@ class TestCreateEscrowCurrency:
         )
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["currency"] == "CREDITS"
+        assert data["currency"] == "CREDITS"
 
 
 # ---------------------------------------------------------------------------
@@ -207,8 +203,7 @@ class TestCreateSubscriptionCurrency:
         )
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["currency"] == "CREDITS"
+        assert data["currency"] == "CREDITS"
 
     async def test_create_subscription_explicit_usd(self, client, app, pro_api_key):
         """create_subscription with currency=USD should return USD in response."""
@@ -232,8 +227,7 @@ class TestCreateSubscriptionCurrency:
         )
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["currency"] == "USD"
+        assert data["currency"] == "USD"
 
 
 # ---------------------------------------------------------------------------
@@ -267,8 +261,7 @@ class TestCreateSplitIntentCurrency:
         )
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["currency"] == "CREDITS"
+        assert data["currency"] == "CREDITS"
 
     async def test_create_split_intent_explicit_usd(self, client, app, pro_api_key):
         """create_split_intent with currency=USD should move USD funds."""
@@ -295,8 +288,7 @@ class TestCreateSplitIntentCurrency:
         )
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["currency"] == "USD"
+        assert data["currency"] == "USD"
 
         # Verify USD balances
         a_usd = await ctx.tracker.wallet.get_balance("split-usd-a", currency="USD")

@@ -15,12 +15,10 @@ async def test_register_returns_key_and_wallet(client):
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["success"] is True
-    result = data["result"]
-    assert "api_key" in result
-    assert result["agent_id"] == "new-agent-register"
-    assert result["tier"] == "free"
-    assert result["balance"] >= 0
+    assert "api_key" in data
+    assert data["agent_id"] == "new-agent-register"
+    assert data["tier"] == "free"
+    assert data["balance"] >= 0
 
 
 async def test_register_duplicate_agent_returns_409(client):
@@ -55,7 +53,7 @@ async def test_register_key_works_for_tool_call(client):
         json={"agent_id": "working-agent"},
     )
     assert resp.status_code == 200
-    api_key = resp.json()["result"]["api_key"]
+    api_key = resp.json()["api_key"]
 
     # Use the key to call get_balance
     resp2 = await client.post(
@@ -67,7 +65,6 @@ async def test_register_key_works_for_tool_call(client):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp2.status_code == 200
-    assert resp2.json()["success"] is True
 
 
 async def test_register_no_auth_required(client):

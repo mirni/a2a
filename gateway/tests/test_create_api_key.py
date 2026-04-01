@@ -34,9 +34,7 @@ class TestCreateApiKey:
             headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 200
-        data = resp.json()
-        assert data["success"] is True
-        result = data["result"]
+        result = resp.json()
         assert "key" in result
         assert result["agent_id"] == "test-agent"
         assert "tier" in result
@@ -56,8 +54,7 @@ class TestCreateApiKey:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["tier"] == "free"
+        assert data["tier"] == "free"
 
     async def test_created_key_is_valid(self, client, api_key, app):
         """A newly created key should be usable for API calls."""
@@ -70,7 +67,7 @@ class TestCreateApiKey:
             headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 200
-        new_key = resp.json()["result"]["key"]
+        new_key = resp.json()["key"]
 
         # Use the new key
         resp2 = await client.post(
@@ -79,7 +76,6 @@ class TestCreateApiKey:
             headers={"Authorization": f"Bearer {new_key}"},
         )
         assert resp2.status_code == 200
-        assert resp2.json()["success"] is True
 
     async def test_cannot_create_key_for_different_agent(self, client, api_key):
         """Should reject creating a key for a different agent (non-admin)."""

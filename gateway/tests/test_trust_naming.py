@@ -77,8 +77,7 @@ class TestTrustNamingAgentIdAlias:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["server_id"] == "srv-score-alias"
+        assert data["server_id"] == "srv-score-alias"
 
     @pytest.mark.asyncio
     async def test_delete_server_with_agent_id(self, app, client, pro_api_key):
@@ -95,8 +94,7 @@ class TestTrustNamingAgentIdAlias:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["deleted"] is True
+        assert data["deleted"] is True
 
     @pytest.mark.asyncio
     async def test_update_server_with_agent_id(self, app, client, pro_api_key):
@@ -113,8 +111,7 @@ class TestTrustNamingAgentIdAlias:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["name"] == "Renamed"
+        assert data["name"] == "Renamed"
 
     @pytest.mark.asyncio
     async def test_check_sla_compliance_with_agent_id(self, app, client, pro_api_key):
@@ -130,8 +127,6 @@ class TestTrustNamingAgentIdAlias:
             headers={"Authorization": f"Bearer {pro_api_key}"},
         )
         assert resp.status_code == 200
-        data = resp.json()
-        assert data["success"] is True
 
     # -----------------------------------------------------------------------
     # Backward compatibility: server_id still works
@@ -152,8 +147,7 @@ class TestTrustNamingAgentIdAlias:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["server_id"] == "srv-compat"
+        assert data["server_id"] == "srv-compat"
 
     # -----------------------------------------------------------------------
     # Precedence: server_id wins when both are supplied
@@ -177,5 +171,4 @@ class TestTrustNamingAgentIdAlias:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
-        assert data["result"]["server_id"] == "srv-precedence"
+        assert data["server_id"] == "srv-precedence"

@@ -18,7 +18,7 @@ async def test_rotate_key(client, api_key, app):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert "new_key" in result
     assert result["new_key"] != api_key
     assert result["revoked"] is True
@@ -51,5 +51,5 @@ async def test_rotate_key_preserves_tier(client, pro_api_key, app):
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["tier"] == "pro"

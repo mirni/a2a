@@ -69,15 +69,14 @@ async def test_429_error_has_request_id_header(client, api_key, app):
 
 
 async def test_success_response_includes_request_id(client, api_key):
-    """Successful responses should also include request_id for consistency."""
+    """Successful responses should also include X-Request-ID header."""
     resp = await client.post(
         "/v1/execute",
         json={"tool": "get_balance", "params": {"agent_id": "test-agent"}},
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    body = resp.json()
-    assert "request_id" in body
+    assert "x-request-id" in resp.headers
 
 
 async def test_error_envelope_rfc9457_structure(client, api_key):

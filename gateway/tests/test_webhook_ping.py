@@ -39,9 +39,7 @@ class TestWebhookPing:
             headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 200
-        data = resp.json()
-        assert data["success"] is True
-        result = data["result"]
+        result = resp.json()
         assert "delivery_id" in result
         assert "status" in result
         # response_code may be None if the HTTP request failed (test env),
@@ -60,8 +58,7 @@ class TestWebhookPing:
         # Either a 404 error or a success=True with found=False/error field
         assert resp.status_code in (200, 404)
         if resp.status_code == 200:
-            result = data.get("result", {})
-            assert result.get("error") or result.get("found") is False or "not found" in str(result).lower()
+            assert data.get("error") or data.get("found") is False or "not found" in str(data).lower()
 
     async def test_missing_webhook_id_param(self, client, api_key):
         """Should fail when webhook_id param is missing."""
@@ -90,7 +87,7 @@ class TestWebhookPing:
             headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 200
-        resp.json()["result"]
+        resp.json()
 
         # Verify delivery record exists
         deliveries = await ctx.webhook_manager.get_delivery_history(webhook_id)

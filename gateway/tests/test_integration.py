@@ -30,13 +30,11 @@ async def _exec(client, tool: str, params: dict, key: str):
     )
 
 
-async def _exec_ok(client, tool: str, params: dict, key: str) -> dict:
-    """Execute a tool and assert success. Return the result dict."""
+async def _exec_ok(client, tool: str, params: dict, key: str) -> tuple[dict, object]:
+    """Execute a tool and assert success. Return (body, resp) tuple."""
     resp = await _exec(client, tool, params, key)
     assert resp.status_code == 200, f"Expected 200 for {tool}, got {resp.status_code}: {resp.text}"
-    body = resp.json()
-    assert body["success"] is True, f"Tool {tool} failed: {body}"
-    return body
+    return resp.json(), resp
 
 
 # ========================================================================
@@ -58,30 +56,29 @@ class TestPaywallBillingGateway:
         key = key_info["key"]
 
         # Verify starting balance
-        body = await _exec_ok(client, "get_balance", {"agent_id": "paywall-agent-1"}, key)
-        assert body["result"]["balance"] == 100.0
+        body, _ = await _exec_ok(client, "get_balance", {"agent_id": "paywall-agent-1"}, key)
+        assert body["balance"] == 100.0
 
         # Make a paid tool call (create_intent: 2% of amount, min $0.01, max $5.00)
         # 2% of $5.0 = $0.10
         await ctx.tracker.wallet.create("paywall-payee-1", initial_balance=0.0, signup_bonus=False)
-        body = await _exec_ok(
+        body, resp = await _exec_ok(
             client,
             "create_intent",
             {"payer": "paywall-agent-1", "payee": "paywall-payee-1", "amount": 5.0},
             key,
         )
-        assert body["charged"] == 0.1
-        assert body["result"]["status"] == "pending"
+        assert float(resp.headers["x-charged"]) == 0.1
+        assert body["status"] == "pending"
 
         # Verify balance was decremented by the percentage-based fee (0.10)
-        body = await _exec_ok(client, "get_balance", {"agent_id": "paywall-agent-1"}, key)
-        assert body["result"]["balance"] == 99.9
+        body, _ = await _exec_ok(client, "get_balance", {"agent_id": "paywall-agent-1"}, key)
+        assert body["balance"] == 99.9
 
         # Verify usage was recorded
-        body = await _exec_ok(client, "get_usage_summary", {"agent_id": "paywall-agent-1"}, key)
-        result = body["result"]
-        assert result["total_calls"] >= 1
-        assert result["total_cost"] >= 0.1
+        body, _ = await _exec_ok(client, "get_usage_summary", {"agent_id": "paywall-agent-1"}, key)
+        assert body["total_calls"] >= 1
+        assert body["total_cost"] >= 0.1
 
     @pytest.mark.asyncio
     async def test_free_tier_denied_pro_tool_then_upgrade(self, app, client):
@@ -113,7 +110,7 @@ class TestPaywallBillingGateway:
         pro_key = pro_key_info["key"]
 
         # Now the pro-tier tool should succeed
-        body = await _exec_ok(
+        body, _ = await _exec_ok(
             client,
             "register_service",
             {
@@ -124,8 +121,8 @@ class TestPaywallBillingGateway:
             },
             pro_key,
         )
-        assert body["result"]["name"] == "test-svc"
-        assert body["result"]["status"] == "active"
+        assert body["name"] == "test-svc"
+        assert body["status"] == "active"
 
 
 # ========================================================================
@@ -156,22 +153,22 @@ class TestPaymentsBillingE2E:
         key = key_info["key"]
 
         # Create intent
-        body = await _exec_ok(
+        body, _ = await _exec_ok(
             client,
             "create_intent",
             {"payer": payer_id, "payee": payee_id, "amount": transfer_amount},
             key,
         )
-        intent_id = body["result"]["id"]
-        assert body["result"]["status"] == "pending"
+        intent_id = body["id"]
+        assert body["status"] == "pending"
 
         # The gateway charges 0.5 per create_intent call
         per_call_cost = 0.5
 
         # Capture intent
-        body = await _exec_ok(client, "capture_intent", {"intent_id": intent_id}, key)
-        assert body["result"]["status"] == "settled"
-        assert body["result"]["amount"] == transfer_amount
+        body, _ = await _exec_ok(client, "capture_intent", {"intent_id": intent_id}, key)
+        assert body["status"] == "settled"
+        assert body["amount"] == transfer_amount
 
         # Two paid calls (create_intent + capture_intent) at 0.5 each = 1.0
         total_gateway_fees = per_call_cost * 2
@@ -206,7 +203,7 @@ class TestPaymentsBillingE2E:
         # Create escrow (1.5% of amount, min $0.01, max $10.00)
         # 1.5% of $200 = $3.00
         escrow_fee = 3.0
-        body = await _exec_ok(
+        body, resp = await _exec_ok(
             client,
             "create_escrow",
             {
@@ -217,9 +214,9 @@ class TestPaymentsBillingE2E:
             },
             key,
         )
-        escrow_id = body["result"]["id"]
-        assert body["result"]["status"] == "held"
-        assert body["charged"] == escrow_fee
+        escrow_id = body["id"]
+        assert body["status"] == "held"
+        assert float(resp.headers["x-charged"]) == escrow_fee
 
         # After escrow creation: payer had funds withdrawn for escrow + gateway fee
         payer_balance_after_escrow = await ctx.tracker.get_balance(payer_id)
@@ -227,10 +224,10 @@ class TestPaymentsBillingE2E:
 
         # Release escrow (fee charged at creation, release is free)
         release_fee = 0.0
-        body = await _exec_ok(client, "release_escrow", {"escrow_id": escrow_id}, key)
-        assert body["result"]["status"] == "settled"
-        assert body["result"]["amount"] == escrow_amount
-        assert body["charged"] == release_fee
+        body, resp = await _exec_ok(client, "release_escrow", {"escrow_id": escrow_id}, key)
+        assert body["status"] == "settled"
+        assert body["amount"] == escrow_amount
+        assert float(resp.headers["x-charged"]) == release_fee
 
         # Verify payee received the escrowed funds
         payee_balance = await ctx.tracker.get_balance(payee_id)
@@ -260,13 +257,13 @@ class TestPaymentsBillingE2E:
         key = key_info["key"]
 
         # Create intent
-        body = await _exec_ok(
+        body, _ = await _exec_ok(
             client,
             "create_intent",
             {"payer": payer_id, "payee": payee_id, "amount": intent_amount},
             key,
         )
-        intent_id = body["result"]["id"]
+        intent_id = body["id"]
         # create_intent: 2% of $75 = $1.50
         per_call_cost = 1.5
 
@@ -302,7 +299,7 @@ class TestMarketplaceGateway:
         key = key_info["key"]
 
         # Register a service
-        body = await _exec_ok(
+        body, _ = await _exec_ok(
             client,
             "register_service",
             {
@@ -316,9 +313,9 @@ class TestMarketplaceGateway:
             },
             key,
         )
-        service_id = body["result"]["id"]
-        assert body["result"]["name"] == "Sentiment Analysis API"
-        assert body["result"]["status"] == "active"
+        service_id = body["id"]
+        assert body["name"] == "Sentiment Analysis API"
+        assert body["status"] == "active"
 
         # Search for the service (search_services is free-tier)
         # Create a free-tier key for a different agent to search
@@ -326,13 +323,13 @@ class TestMarketplaceGateway:
         search_key_info = await ctx.key_manager.create_key("mkt-searcher-1", tier="free")
         search_key = search_key_info["key"]
 
-        body = await _exec_ok(
+        body, _ = await _exec_ok(
             client,
             "search_services",
             {"query": "Sentiment"},
             search_key,
         )
-        services = body["result"]["services"]
+        services = body["services"]
         assert len(services) >= 1
         found = [s for s in services if s["id"] == service_id]
         assert len(found) == 1
@@ -386,13 +383,13 @@ class TestMarketplaceGateway:
         search_key = search_key_info["key"]
 
         # best_match with cost preference
-        body = await _exec_ok(
+        body, _ = await _exec_ok(
             client,
             "best_match",
             {"query": "translation", "prefer": "cost"},
             search_key,
         )
-        matches = body["result"]["matches"]
+        matches = body["matches"]
         assert len(matches) >= 2
 
         # Verify results are ranked (higher rank_score first)
@@ -550,7 +547,7 @@ class TestFullAgentFlow:
         buyer_key = buyer_key_info["key"]
 
         # -- Step 1: Provider registers a service --
-        body = await _exec_ok(
+        body, _ = await _exec_ok(
             client,
             "register_service",
             {
@@ -564,24 +561,24 @@ class TestFullAgentFlow:
             },
             provider_key,
         )
-        service_name = body["result"]["name"]
+        service_name = body["name"]
         assert service_name == "Code Review Bot"
 
         # -- Step 2: Buyer searches the marketplace --
-        body = await _exec_ok(
+        body, _ = await _exec_ok(
             client,
             "search_services",
             {"query": "Code Review"},
             buyer_key,
         )
-        services = body["result"]["services"]
+        services = body["services"]
         assert len(services) >= 1
         found_service = [s for s in services if s["name"] == "Code Review Bot"]
         assert len(found_service) == 1
 
         # -- Step 3: Buyer creates a payment intent to the provider --
         payment_amount = 10.0
-        body = await _exec_ok(
+        body, resp = await _exec_ok(
             client,
             "create_intent",
             {
@@ -592,27 +589,27 @@ class TestFullAgentFlow:
             },
             buyer_key,
         )
-        intent_id = body["result"]["id"]
-        assert body["result"]["status"] == "pending"
-        create_intent_fee = body["charged"]
+        intent_id = body["id"]
+        assert body["status"] == "pending"
+        create_intent_fee = float(resp.headers["x-charged"])
         # create_intent: 2% of $10 = $0.20
         assert create_intent_fee == 0.2
 
         # -- Step 4: Buyer captures the payment --
-        body = await _exec_ok(
+        body, resp = await _exec_ok(
             client,
             "capture_intent",
             {"intent_id": intent_id},
             buyer_key,
         )
-        assert body["result"]["status"] == "settled"
-        assert body["result"]["amount"] == payment_amount
-        capture_fee = body["charged"]
+        assert body["status"] == "settled"
+        assert body["amount"] == payment_amount
+        capture_fee = float(resp.headers["x-charged"])
         # capture_intent: $0.00 (fee charged at creation)
         assert capture_fee == 0.0
 
         # -- Step 5: Check buyer's balance --
-        body = await _exec_ok(
+        body, _ = await _exec_ok(
             client,
             "get_balance",
             {"agent_id": buyer_id},
@@ -620,10 +617,10 @@ class TestFullAgentFlow:
         )
         total_buyer_fees = create_intent_fee + capture_fee
         expected_buyer_balance = buyer_initial - payment_amount - total_buyer_fees
-        assert body["result"]["balance"] == expected_buyer_balance
+        assert body["balance"] == expected_buyer_balance
 
         # -- Step 6: Check provider's balance --
-        body = await _exec_ok(
+        body, _ = await _exec_ok(
             client,
             "get_balance",
             {"agent_id": provider_id},
@@ -634,21 +631,20 @@ class TestFullAgentFlow:
         # Provider gets: initial + payment_amount
         # Provider loses: register_service gateway fees (per_call 0.0)
         expected_provider_balance = provider_initial + payment_amount
-        assert body["result"]["balance"] == expected_provider_balance
+        assert body["balance"] == expected_provider_balance
 
         # -- Step 7: Check buyer's usage summary --
-        body = await _exec_ok(
+        body, _ = await _exec_ok(
             client,
             "get_usage_summary",
             {"agent_id": buyer_id},
             buyer_key,
         )
-        usage = body["result"]
         # Buyer called: search_services, create_intent, capture_intent, get_balance,
         # get_usage_summary = 5 calls minimum
         # (some are free, some are paid)
-        assert usage["total_calls"] >= 4
-        assert usage["total_cost"] >= total_buyer_fees
+        assert body["total_calls"] >= 4
+        assert body["total_cost"] >= total_buyer_fees
 
 
 # ========================================================================
@@ -672,17 +668,17 @@ class TestEdgeCases:
         key = key_info["key"]
 
         # Create intent
-        body = await _exec_ok(
+        body, _ = await _exec_ok(
             client,
             "create_intent",
             {"payer": payer_id, "payee": payee_id, "amount": 10.0},
             key,
         )
-        intent_id = body["result"]["id"]
+        intent_id = body["id"]
 
         # Capture
-        body = await _exec_ok(client, "capture_intent", {"intent_id": intent_id}, key)
-        assert body["result"]["status"] == "settled"
+        body, _ = await _exec_ok(client, "capture_intent", {"intent_id": intent_id}, key)
+        assert body["status"] == "settled"
 
         # Second capture should fail
         resp = await _exec(client, "capture_intent", {"intent_id": intent_id}, key)
@@ -700,8 +696,8 @@ class TestEdgeCases:
         key = key_info["key"]
 
         # Verify key works first
-        body = await _exec_ok(client, "get_balance", {"agent_id": agent_id}, key)
-        assert body["result"]["balance"] == 100.0
+        body, _ = await _exec_ok(client, "get_balance", {"agent_id": agent_id}, key)
+        assert body["balance"] == 100.0
 
         # Revoke the key
         revoked = await ctx.key_manager.revoke_key(key)
@@ -744,17 +740,17 @@ class TestEdgeCases:
         key = key_info["key"]
 
         # Create and capture an intent
-        body = await _exec_ok(
+        body, _ = await _exec_ok(
             client,
             "create_intent",
             {"payer": payer_id, "payee": payee_id, "amount": 10.0},
             key,
         )
-        intent_id = body["result"]["id"]
+        intent_id = body["id"]
         await _exec_ok(client, "capture_intent", {"intent_id": intent_id}, key)
 
         # Create an escrow
-        body = await _exec_ok(
+        await _exec_ok(
             client,
             "create_escrow",
             {"payer": payer_id, "payee": payee_id, "amount": 20.0},
@@ -762,13 +758,13 @@ class TestEdgeCases:
         )
 
         # Get payment history
-        body = await _exec_ok(
+        body, _ = await _exec_ok(
             client,
             "get_payment_history",
             {"agent_id": payer_id},
             key,
         )
-        history = body["result"]["history"]
+        history = body["history"]
         # Should have at least: intent, settlement from capture, escrow
         types_found = {entry["type"] for entry in history}
         assert "intent" in types_found

@@ -42,11 +42,11 @@ async def test_deposit_idempotency_returns_same_result(client, api_key, app):
 
     r1 = await _execute(client, api_key, "deposit", params)
     assert r1.status_code == 200
-    balance_after_first = r1.json()["result"]["new_balance"]
+    balance_after_first = r1.json()["new_balance"]
 
     r2 = await _execute(client, api_key, "deposit", params)
     assert r2.status_code == 200
-    balance_after_second = r2.json()["result"]["new_balance"]
+    balance_after_second = r2.json()["new_balance"]
 
     # The balance should not have increased on the retry
     assert balance_after_second == balance_after_first
@@ -59,11 +59,11 @@ async def test_deposit_without_idempotency_key_creates_separate(client, api_key,
 
     r1 = await _execute(client, api_key, "deposit", params)
     assert r1.status_code == 200
-    b1 = r1.json()["result"]["new_balance"]
+    b1 = r1.json()["new_balance"]
 
     r2 = await _execute(client, api_key, "deposit", params)
     assert r2.status_code == 200
-    b2 = r2.json()["result"]["new_balance"]
+    b2 = r2.json()["new_balance"]
 
     # Second deposit should increase the balance further
     assert b2 > b1
@@ -85,11 +85,11 @@ async def test_deposit_different_idempotency_keys_create_separate(client, api_ke
 
     r1 = await _execute(client, api_key, "deposit", params_a)
     assert r1.status_code == 200
-    b1 = r1.json()["result"]["new_balance"]
+    b1 = r1.json()["new_balance"]
 
     r2 = await _execute(client, api_key, "deposit", params_b)
     assert r2.status_code == 200
-    b2 = r2.json()["result"]["new_balance"]
+    b2 = r2.json()["new_balance"]
 
     assert b2 == b1 + 25.0
 
@@ -111,11 +111,11 @@ async def test_withdraw_idempotency_returns_same_result(client, api_key, app):
 
     r1 = await _execute(client, api_key, "withdraw", params)
     assert r1.status_code == 200
-    balance_after_first = r1.json()["result"]["new_balance"]
+    balance_after_first = r1.json()["new_balance"]
 
     r2 = await _execute(client, api_key, "withdraw", params)
     assert r2.status_code == 200
-    balance_after_second = r2.json()["result"]["new_balance"]
+    balance_after_second = r2.json()["new_balance"]
 
     assert balance_after_second == balance_after_first
 
@@ -127,11 +127,11 @@ async def test_withdraw_without_idempotency_key_creates_separate(client, api_key
 
     r1 = await _execute(client, api_key, "withdraw", params)
     assert r1.status_code == 200
-    b1 = r1.json()["result"]["new_balance"]
+    b1 = r1.json()["new_balance"]
 
     r2 = await _execute(client, api_key, "withdraw", params)
     assert r2.status_code == 200
-    b2 = r2.json()["result"]["new_balance"]
+    b2 = r2.json()["new_balance"]
 
     assert b2 < b1
 
@@ -175,7 +175,7 @@ async def test_create_split_intent_idempotency(client, pro_api_key, app):
     balance_drop = payer_balance_after_first - payer_balance_after_second
     assert balance_drop < 100.0, f"Balance dropped by {balance_drop}, suggesting the split was executed twice"
     # Results should match
-    assert r1.json()["result"]["status"] == r2.json()["result"]["status"]
+    assert r1.json()["status"] == r2.json()["status"]
 
 
 # ---------------------------------------------------------------------------
@@ -207,7 +207,7 @@ async def test_create_performance_escrow_idempotency(client, pro_api_key, app):
     assert r2.status_code == 200, r2.json()
 
     # Same escrow_id must be returned
-    assert r1.json()["result"]["escrow_id"] == r2.json()["result"]["escrow_id"]
+    assert r1.json()["escrow_id"] == r2.json()["escrow_id"]
 
     # Payer balance should reflect only ONE escrow withdrawal (200 credits)
     # plus any per-call gateway fees, but NOT two 200-credit escrow withdrawals
@@ -252,6 +252,6 @@ async def test_refund_settlement_idempotency(client, pro_api_key, app):
     assert r2.status_code == 200, r2.json()
 
     # Same refund id
-    assert r1.json()["result"]["id"] == r2.json()["result"]["id"]
+    assert r1.json()["id"] == r2.json()["id"]
     # Amount should match
-    assert r1.json()["result"]["amount"] == r2.json()["result"]["amount"]
+    assert r1.json()["amount"] == r2.json()["amount"]

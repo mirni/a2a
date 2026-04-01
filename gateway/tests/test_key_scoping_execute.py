@@ -124,7 +124,6 @@ async def test_read_scope_allows_read_tool(client, scoped_read_key):
         headers={"Authorization": f"Bearer {scoped_read_key}"},
     )
     assert resp.status_code == 200
-    assert resp.json()["success"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +152,6 @@ async def test_allowed_tools_permits_listed_tool(client, scoped_tool_key):
         headers={"Authorization": f"Bearer {scoped_tool_key}"},
     )
     assert resp.status_code == 200
-    assert resp.json()["success"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -186,7 +184,6 @@ async def test_allowed_agent_ids_permits_listed_agent(client, scoped_agent_key):
         headers={"Authorization": f"Bearer {scoped_agent_key}"},
     )
     assert resp.status_code == 200
-    assert resp.json()["success"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +200,6 @@ async def test_admin_scope_allows_write_tool(client, admin_key):
         headers={"Authorization": f"Bearer {admin_key}"},
     )
     assert resp.status_code == 200
-    assert resp.json()["success"] is True
 
 
 @pytest.mark.asyncio
@@ -215,7 +211,6 @@ async def test_admin_scope_allows_read_tool(client, admin_key):
         headers={"Authorization": f"Bearer {admin_key}"},
     )
     assert resp.status_code == 200
-    assert resp.json()["success"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -257,4 +252,3 @@ async def test_backward_compat_unscoped_key(client, api_key):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    assert resp.json()["success"] is True

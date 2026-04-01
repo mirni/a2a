@@ -16,8 +16,7 @@ async def test_get_transactions_returns_list(client, api_key):
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["success"] is True
-    assert isinstance(body["result"]["transactions"], list)
+    assert isinstance(body["transactions"], list)
 
 
 async def test_get_transactions_after_deposit(client, api_key, app):
@@ -30,7 +29,7 @@ async def test_get_transactions_after_deposit(client, api_key, app):
         json={"tool": "get_transactions", "params": {"agent_id": "test-agent"}},
         headers={"Authorization": f"Bearer {api_key}"},
     )
-    baseline_count = len(baseline_resp.json()["result"]["transactions"])
+    baseline_count = len(baseline_resp.json()["transactions"])
 
     # Record a transaction directly
     await ctx.tracker.storage.record_transaction(
@@ -47,7 +46,7 @@ async def test_get_transactions_after_deposit(client, api_key, app):
     )
     assert resp.status_code == 200
     body = resp.json()
-    txns = body["result"]["transactions"]
+    txns = body["transactions"]
     assert len(txns) == baseline_count + 1
     # Most recent transaction is first (ordered by created_at DESC)
     assert txns[0]["tx_type"] == "deposit"
@@ -76,7 +75,7 @@ async def test_get_transactions_respects_limit(client, api_key, app):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    txns = resp.json()["result"]["transactions"]
+    txns = resp.json()["transactions"]
     # Limit should cap at 3 regardless of how many exist
     assert len(txns) == 3
 
@@ -90,7 +89,7 @@ async def test_get_transactions_respects_offset(client, api_key, app):
         json={"tool": "get_transactions", "params": {"agent_id": "test-agent"}},
         headers={"Authorization": f"Bearer {api_key}"},
     )
-    baseline_count = len(baseline_resp.json()["result"]["transactions"])
+    baseline_count = len(baseline_resp.json()["transactions"])
 
     for i in range(5):
         await ctx.tracker.storage.record_transaction(
@@ -111,7 +110,7 @@ async def test_get_transactions_respects_offset(client, api_key, app):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    txns = resp.json()["result"]["transactions"]
+    txns = resp.json()["transactions"]
     assert len(txns) == total - offset
 
 

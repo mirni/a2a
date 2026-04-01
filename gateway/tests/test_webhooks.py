@@ -23,11 +23,10 @@ async def test_register_webhook(client, pro_api_key, app):
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["success"] is True
-    assert data["result"]["id"].startswith("whk-")
-    assert data["result"]["agent_id"] == "pro-agent"
-    assert data["result"]["url"] == "https://example.com/webhook"
-    assert data["result"]["active"] == 1
+    assert data["id"].startswith("whk-")
+    assert data["agent_id"] == "pro-agent"
+    assert data["url"] == "https://example.com/webhook"
+    assert data["active"] == 1
 
 
 @pytest.mark.asyncio
@@ -58,8 +57,7 @@ async def test_list_webhooks(client, pro_api_key, app):
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["success"] is True
-    assert len(data["result"]["webhooks"]) >= 1
+    assert len(data["webhooks"]) >= 1
 
 
 @pytest.mark.asyncio
@@ -79,7 +77,7 @@ async def test_delete_webhook(client, pro_api_key, app):
         },
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
-    webhook_id = resp.json()["result"]["id"]
+    webhook_id = resp.json()["id"]
 
     # Delete
     resp = await client.post(
@@ -91,7 +89,7 @@ async def test_delete_webhook(client, pro_api_key, app):
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 200
-    assert resp.json()["result"]["deleted"] is True
+    assert resp.json()["deleted"] is True
 
     # Verify it's gone from list
     resp = await client.post(
@@ -102,7 +100,7 @@ async def test_delete_webhook(client, pro_api_key, app):
         },
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
-    webhooks = resp.json()["result"]["webhooks"]
+    webhooks = resp.json()["webhooks"]
     ids = [w["id"] for w in webhooks]
     assert webhook_id not in ids
 

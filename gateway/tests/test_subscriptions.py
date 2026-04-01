@@ -29,11 +29,9 @@ async def test_create_subscription_via_gateway(client, pro_api_key, app):
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["success"] is True
-    result = data["result"]
-    assert result["status"] == "active"
-    assert result["amount"] == 10.0
-    assert "id" in result
+    assert data["status"] == "active"
+    assert data["amount"] == 10.0
+    assert "id" in data
 
 
 async def test_cancel_subscription_via_gateway(client, pro_api_key, app):
@@ -56,8 +54,7 @@ async def test_cancel_subscription_via_gateway(client, pro_api_key, app):
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["success"] is True
-    assert data["result"]["status"] == "cancelled"
+    assert data["status"] == "cancelled"
 
 
 async def test_get_subscription_via_gateway(client, pro_api_key, app):
@@ -78,7 +75,7 @@ async def test_get_subscription_via_gateway(client, pro_api_key, app):
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["id"] == sub.id
     assert result["amount"] == 15.0
     assert result["interval"] == "weekly"
@@ -101,7 +98,7 @@ async def test_list_subscriptions_via_gateway(client, pro_api_key, app):
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert len(result["subscriptions"]) == 2
 
 
@@ -125,7 +122,7 @@ async def test_reactivate_subscription_via_gateway(client, pro_api_key, app):
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 200
-    assert resp.json()["result"]["status"] == "active"
+    assert resp.json()["status"] == "active"
 
 
 async def test_create_subscription_requires_starter(client, api_key):
@@ -170,8 +167,7 @@ async def test_create_subscription_starter_tier_allowed(client, app):
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["success"] is True
-    assert data["result"]["status"] == "active"
+    assert data["status"] == "active"
 
 
 async def test_create_subscription_invalid_interval(client, pro_api_key, app):

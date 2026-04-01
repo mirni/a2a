@@ -44,7 +44,7 @@ async def test_rate_service_basic(client, api_key, app):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["service_id"] == service_id
     assert result["agent_id"] == "test-agent"
     assert result["rating"] == 5
@@ -83,7 +83,7 @@ async def test_rate_service_upsert(client, api_key, app):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    assert resp.json()["result"]["rating"] == 5
+    assert resp.json()["rating"] == 5
 
     # Verify only one rating exists
     resp2 = await client.post(
@@ -95,7 +95,7 @@ async def test_rate_service_upsert(client, api_key, app):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp2.status_code == 200
-    result = resp2.json()["result"]
+    result = resp2.json()
     assert result["count"] == 1
     assert result["average_rating"] == 5.0
 
@@ -113,7 +113,7 @@ async def test_get_service_ratings_empty(client, api_key, app):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["average_rating"] == 0
     assert result["count"] == 0
     assert result["ratings"] == []
@@ -170,7 +170,7 @@ async def test_get_service_ratings_average(client, api_key, app):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
-    result = resp.json()["result"]
+    result = resp.json()
     assert result["count"] == 2
     assert result["average_rating"] == 3.0  # (4+2)/2
 
@@ -191,9 +191,5 @@ async def test_rate_service_invalid_rating(client, api_key, app):
         },
         headers={"Authorization": f"Bearer {api_key}"},
     )
-    # The tool should return an error (either 400 from handler or error in result)
-    body = resp.json()
-    if resp.status_code == 200:
-        assert "error" in body.get("result", {})
-    else:
-        assert resp.status_code in (400, 500)
+    # The tool should return an error (400 or 500)
+    assert resp.status_code in (400, 500)

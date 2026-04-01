@@ -169,11 +169,10 @@ class TestCreateCheckout:
 
         assert resp.status_code == 200
         body = resp.json()
-        assert body["success"] is True
-        assert body["result"]["credits"] == 1000
-        assert body["result"]["amount_usd"] == 10.0
-        assert body["result"]["session_id"] == "cs_test_abc123"
-        assert "checkout.stripe.com" in body["result"]["checkout_url"]
+        assert body["credits"] == 1000
+        assert body["amount_usd"] == 10.0
+        assert body["session_id"] == "cs_test_abc123"
+        assert "checkout.stripe.com" in body["checkout_url"]
 
     async def test_checkout_custom_credits(self, client, api_key, monkeypatch):
         monkeypatch.setenv("STRIPE_API_KEY", "sk_test_fake")
@@ -200,8 +199,8 @@ class TestCreateCheckout:
 
         assert resp.status_code == 200
         body = resp.json()
-        assert body["result"]["credits"] == 2500
-        assert body["result"]["amount_usd"] == 25.0
+        assert body["credits"] == 2500
+        assert body["amount_usd"] == 25.0
 
     async def test_checkout_stripe_api_error(self, client, api_key, monkeypatch):
         monkeypatch.setenv("STRIPE_API_KEY", "sk_test_fake")
