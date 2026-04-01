@@ -136,7 +136,7 @@ def generate_openapi_spec() -> dict:
                         },
                         "404": {
                             "description": "Tool not found.",
-                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}},
+                            "content": {"application/problem+json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}},
                         },
                     },
                 }
@@ -168,19 +168,19 @@ def generate_openapi_spec() -> dict:
                         },
                         "400": {
                             "description": "Invalid request (missing tool, bad params).",
-                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}},
+                            "content": {"application/problem+json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}},
                         },
                         "402": {
                             "description": "Insufficient balance.",
-                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}},
+                            "content": {"application/problem+json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}},
                         },
                         "404": {
                             "description": "Tool not found.",
-                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}},
+                            "content": {"application/problem+json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}},
                         },
                         "500": {
                             "description": "Internal execution error.",
-                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}},
+                            "content": {"application/problem+json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}},
                         },
                     },
                 }
@@ -278,36 +278,36 @@ def generate_openapi_spec() -> dict:
                 },
                 "ErrorResponse": {
                     "type": "object",
+                    "description": "RFC 9457 Problem Details error response.",
                     "properties": {
-                        "success": {
-                            "type": "boolean",
-                            "description": "Always false for error responses.",
-                            "example": False,
-                        },
-                        "error": {
-                            "type": "object",
-                            "description": "Error details.",
-                            "properties": {
-                                "code": {
-                                    "type": "string",
-                                    "description": "Machine-readable error code.",
-                                    "example": "tool_not_found",
-                                },
-                                "message": {
-                                    "type": "string",
-                                    "description": "Human-readable error description.",
-                                    "example": "Tool 'nonexistent' is not in the catalog.",
-                                },
-                            },
-                            "required": ["code", "message"],
-                        },
-                        "request_id": {
+                        "type": {
                             "type": "string",
-                            "description": "Correlation ID for the request (present when available).",
-                            "example": "abc-123-def-456",
+                            "format": "uri",
+                            "description": "URI reference identifying the problem type.",
+                            "example": "https://api.greenhelix.net/errors/unknown-tool",
+                        },
+                        "title": {
+                            "type": "string",
+                            "description": "Short human-readable summary of the problem type.",
+                            "example": "Bad Request",
+                        },
+                        "status": {
+                            "type": "integer",
+                            "description": "HTTP status code.",
+                            "example": 400,
+                        },
+                        "detail": {
+                            "type": "string",
+                            "description": "Human-readable explanation specific to this occurrence.",
+                            "example": "Unknown tool: nonexistent",
+                        },
+                        "instance": {
+                            "type": "string",
+                            "description": "URI reference identifying the specific occurrence.",
+                            "example": "/v1/execute",
                         },
                     },
-                    "required": ["success", "error"],
+                    "required": ["type", "title", "status", "detail"],
                 },
                 # Per-tool output schemas for key tools
                 "GetBalanceOutput": {

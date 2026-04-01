@@ -8,6 +8,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from gateway.src.catalog import get_catalog, get_tool
+from gateway.src.errors import error_response
 from gateway.src.rate_limit_headers import public_rate_limit_headers
 
 router = APIRouter()
@@ -89,8 +90,5 @@ async def pricing_detail(request: Request) -> JSONResponse:
     tool_name = request.path_params["tool"]
     tool = get_tool(tool_name)
     if tool is None:
-        return JSONResponse(
-            {"success": False, "error": {"code": "tool_not_found", "message": f"Unknown tool: {tool_name}"}},
-            status_code=404,
-        )
+        return await error_response(404, f"Unknown tool: {tool_name}", "tool_not_found", request=request)
     return JSONResponse({"tool": tool})

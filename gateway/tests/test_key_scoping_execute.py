@@ -95,7 +95,7 @@ async def test_expired_key_returns_401(client, expired_key):
         headers={"Authorization": f"Bearer {expired_key}"},
     )
     assert resp.status_code == 401
-    assert "expired" in resp.json()["error"]["message"].lower()
+    assert "expired" in resp.json()["detail"].lower()
 
 
 # ---------------------------------------------------------------------------
@@ -112,7 +112,7 @@ async def test_read_scope_blocks_write_tool(client, scoped_read_key):
         headers={"Authorization": f"Bearer {scoped_read_key}"},
     )
     assert resp.status_code == 403
-    assert resp.json()["error"]["code"] == "scope_violation"
+    assert resp.json()["type"].endswith("/scope-violation")
 
 
 @pytest.mark.asyncio
@@ -141,7 +141,7 @@ async def test_allowed_tools_blocks_unlisted_tool(client, scoped_tool_key):
         headers={"Authorization": f"Bearer {scoped_tool_key}"},
     )
     assert resp.status_code == 403
-    assert resp.json()["error"]["code"] == "scope_violation"
+    assert resp.json()["type"].endswith("/scope-violation")
 
 
 @pytest.mark.asyncio
@@ -174,7 +174,7 @@ async def test_allowed_agent_ids_blocks_other_agent(client, scoped_agent_key):
         headers={"Authorization": f"Bearer {scoped_agent_key}"},
     )
     assert resp.status_code == 403
-    assert resp.json()["error"]["code"] == "scope_violation"
+    assert resp.json()["type"].endswith("/scope-violation")
 
 
 @pytest.mark.asyncio

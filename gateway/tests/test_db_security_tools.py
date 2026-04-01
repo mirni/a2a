@@ -137,8 +137,8 @@ async def test_backup_unknown_db_error(client, admin_api_key):
     )
     assert resp.status_code == 400
     body = resp.json()
-    assert body["success"] is False
-    assert "error" in body
+    assert "type" in body
+    assert body["status"] == 400
 
 
 async def test_check_all_databases_integrity(client, admin_api_key):

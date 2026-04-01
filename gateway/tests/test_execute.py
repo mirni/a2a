@@ -13,7 +13,7 @@ async def test_execute_missing_tool(client, api_key):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 400
-    assert resp.json()["error"]["code"] == "bad_request"
+    assert resp.json()["type"].endswith("/bad-request")
 
 
 @pytest.mark.asyncio
@@ -24,7 +24,7 @@ async def test_execute_unknown_tool(client, api_key):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 400
-    assert resp.json()["error"]["code"] == "unknown_tool"
+    assert resp.json()["type"].endswith("/unknown-tool")
 
 
 @pytest.mark.asyncio
@@ -34,7 +34,7 @@ async def test_execute_missing_key(client):
         json={"tool": "get_balance", "params": {"agent_id": "test"}},
     )
     assert resp.status_code == 401
-    assert resp.json()["error"]["code"] == "missing_key"
+    assert resp.json()["type"].endswith("/missing-key")
 
 
 @pytest.mark.asyncio
@@ -123,7 +123,7 @@ async def test_execute_insufficient_tier(client, api_key):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 403
-    assert resp.json()["error"]["code"] == "insufficient_tier"
+    assert resp.json()["type"].endswith("/insufficient-tier")
 
 
 @pytest.mark.asyncio
@@ -170,7 +170,7 @@ async def test_execute_insufficient_balance(client, app):
         headers={"Authorization": f"Bearer {key_info['key']}"},
     )
     assert resp.status_code == 402
-    assert resp.json()["error"]["code"] == "insufficient_balance"
+    assert resp.json()["type"].endswith("/insufficient-balance")
 
 
 @pytest.mark.asyncio
@@ -198,7 +198,7 @@ async def test_execute_invalid_json(client, api_key):
         },
     )
     assert resp.status_code == 400
-    assert resp.json()["error"]["code"] == "bad_request"
+    assert resp.json()["type"].endswith("/bad-request")
 
 
 @pytest.mark.asyncio
@@ -249,7 +249,7 @@ async def test_execute_delete_server_requires_pro(client, api_key):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 403
-    assert resp.json()["error"]["code"] == "insufficient_tier"
+    assert resp.json()["type"].endswith("/insufficient-tier")
 
 
 @pytest.mark.asyncio
@@ -335,7 +335,7 @@ async def test_execute_global_audit_log_requires_admin(client, api_key):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 403
-    assert resp.json()["error"]["code"] == "admin_only"
+    assert resp.json()["type"].endswith("/admin-only")
 
 
 @pytest.mark.asyncio

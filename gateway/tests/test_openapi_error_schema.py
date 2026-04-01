@@ -1,7 +1,7 @@
-"""Tests that the OpenAPI ErrorResponse schema matches the live API error format.
+"""Tests that the OpenAPI ErrorResponse schema matches the RFC 9457 Problem Details format.
 
 The live API returns errors like:
-    {"success": false, "error": {"code": "...", "message": "..."}, "request_id": "..."}
+    {"type": "https://api.greenhelix.net/errors/xxx", "title": "Bad Request", "status": 400, "detail": "..."}
 
 The OpenAPI spec must document this exact shape.
 """
@@ -15,46 +15,48 @@ from gateway.src.openapi import generate_openapi_spec
 
 
 @pytest.mark.asyncio
-async def test_error_response_schema_has_correct_structure():
-    """ErrorResponse schema must have success (bool), error (object with code+message), request_id."""
+async def test_error_response_schema_has_rfc9457_structure():
+    """ErrorResponse schema must have type, title, status, detail (RFC 9457)."""
     spec = generate_openapi_spec()
     error_schema = spec["components"]["schemas"]["ErrorResponse"]
 
-    # Top-level must be an object with success, error, request_id
+    # Top-level must be an object with RFC 9457 fields
     assert error_schema["type"] == "object"
     props = error_schema["properties"]
 
-    # success field
-    assert "success" in props, "ErrorResponse must have a 'success' field"
-    assert props["success"]["type"] == "boolean"
+    # type field (URI reference)
+    assert "type" in props, "ErrorResponse must have a 'type' field"
+    assert props["type"]["type"] == "string"
 
-    # error field must be an object with code and message
-    assert "error" in props, "ErrorResponse must have an 'error' field"
-    assert props["error"]["type"] == "object"
-    error_props = props["error"]["properties"]
-    assert "code" in error_props, "error object must have a 'code' field"
-    assert error_props["code"]["type"] == "string"
-    assert "message" in error_props, "error object must have a 'message' field"
-    assert error_props["message"]["type"] == "string"
+    # title field
+    assert "title" in props, "ErrorResponse must have a 'title' field"
+    assert props["title"]["type"] == "string"
 
-    # request_id field
-    assert "request_id" in props, "ErrorResponse must have a 'request_id' field"
-    assert props["request_id"]["type"] == "string"
+    # status field (integer HTTP status code)
+    assert "status" in props, "ErrorResponse must have a 'status' field"
+    assert props["status"]["type"] == "integer"
 
-    # required fields: success and error are always present
-    assert "success" in error_schema["required"]
-    assert "error" in error_schema["required"]
+    # detail field
+    assert "detail" in props, "ErrorResponse must have a 'detail' field"
+    assert props["detail"]["type"] == "string"
+
+    # required fields
+    assert "type" in error_schema["required"]
+    assert "title" in error_schema["required"]
+    assert "status" in error_schema["required"]
 
 
 @pytest.mark.asyncio
 async def test_error_response_schema_must_not_have_legacy_fields():
-    """ErrorResponse must NOT have the old flat 'detail' field."""
+    """ErrorResponse must NOT have the old 'success' or nested 'error' fields."""
     spec = generate_openapi_spec()
     error_schema = spec["components"]["schemas"]["ErrorResponse"]
     props = error_schema["properties"]
 
-    # The old schema had 'detail' as a top-level string -- must be gone
-    assert "detail" not in props, "Legacy 'detail' field must be removed from ErrorResponse"
+    # The old schema had 'success' and 'error' as top-level fields -- must be gone
+    assert "success" not in props, "Legacy 'success' field must be removed from ErrorResponse"
+    assert "error" not in props, "Legacy 'error' field must be removed from ErrorResponse"
+    assert "request_id" not in props, "Legacy 'request_id' field must be removed from ErrorResponse"
 
 
 @pytest.mark.asyncio

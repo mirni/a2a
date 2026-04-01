@@ -106,7 +106,7 @@ class TestPaywallBillingGateway:
             free_key,
         )
         assert resp.status_code == 403
-        assert resp.json()["error"]["code"] == "insufficient_tier"
+        assert resp.json()["type"].endswith("/insufficient-tier")
 
         # Upgrade: create a pro-tier key for the same agent
         pro_key_info = await ctx.key_manager.create_key("free-upgrade-agent", tier="pro")
@@ -511,7 +511,7 @@ class TestRateLimitIntegration:
         resp = await _exec(client, "get_balance", {"agent_id": agent_id}, key)
         assert resp.status_code == 429
         body = resp.json()
-        assert body["error"]["code"] == "rate_limit_exceeded"
+        assert body["type"].endswith("/rate-limit-exceeded")
 
 
 # ========================================================================
@@ -687,7 +687,7 @@ class TestEdgeCases:
         # Second capture should fail
         resp = await _exec(client, "capture_intent", {"intent_id": intent_id}, key)
         assert resp.status_code == 409
-        assert resp.json()["error"]["code"] == "invalid_state"
+        assert resp.json()["type"].endswith("/invalid-state")
 
     @pytest.mark.asyncio
     async def test_revoked_key_rejected(self, app, client):

@@ -36,7 +36,7 @@ async def test_register_duplicate_agent_returns_409(client):
         json={"agent_id": "dup-agent"},
     )
     assert resp2.status_code == 409
-    assert resp2.json()["error"]["code"] == "already_exists"
+    assert resp2.json()["type"].endswith("/already-exists")
 
 
 async def test_register_missing_agent_id_returns_400(client):

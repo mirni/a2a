@@ -98,8 +98,6 @@ async def test_partial_capture_exceeds_amount_fails(client, pro_api_key, app):
         headers={"Authorization": f"Bearer {pro_api_key}"},
     )
     assert resp.status_code == 400
-    body = resp.json()
-    assert body["success"] is False
 
 
 async def test_partial_capture_missing_params(client, pro_api_key):
@@ -111,7 +109,7 @@ async def test_partial_capture_missing_params(client, pro_api_key):
     )
     assert resp.status_code == 400
     body = resp.json()
-    assert body["error"]["code"] == "missing_parameter"
+    assert body["type"].endswith("/missing-parameter")
 
 
 async def test_partial_capture_not_found(client, pro_api_key):

@@ -265,7 +265,7 @@ class TestFacilitatorTimeout:
             )
 
         assert resp.status_code == 402
-        assert "verification_failed" in resp.json()["error"]["code"]
+        assert resp.json()["type"].endswith("/payment-verification-failed")
 
 
 class TestFreeTool:

@@ -127,4 +127,4 @@ async def test_get_webhook_deliveries_missing_webhook_id(client, pro_api_key):
     )
     assert resp.status_code == 400
     body = resp.json()
-    assert body["error"]["code"] == "missing_parameter"
+    assert body["type"].endswith("/missing-parameter")

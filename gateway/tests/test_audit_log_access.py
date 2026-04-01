@@ -25,7 +25,7 @@ class TestGlobalAuditLogAccess:
         )
         assert resp.status_code == 403
         body = resp.json()
-        assert body["error"]["code"] in ("insufficient_tier", "admin_only")
+        assert body["type"].endswith("/insufficient-tier") or body["type"].endswith("/admin-only")
 
     async def test_pro_tier_without_admin_scope_gets_403(self, client, pro_api_key):
         """Pro-tier user without admin scope should be denied (admin_only)."""
@@ -36,8 +36,8 @@ class TestGlobalAuditLogAccess:
         )
         assert resp.status_code == 403
         body = resp.json()
-        assert body["error"]["code"] == "admin_only"
-        assert "admin" in body["error"]["message"].lower()
+        assert body["type"].endswith("/admin-only")
+        assert "admin" in body["detail"].lower()
 
     async def test_admin_scoped_user_can_access(self, client, admin_api_key):
         """Admin-scoped user should be able to access the global audit log."""

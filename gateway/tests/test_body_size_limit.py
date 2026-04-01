@@ -27,13 +27,13 @@ async def test_oversized_body_returns_json_413(client):
     )
 
     assert resp.status_code == 413
-    assert resp.headers["content-type"] == "application/json"
+    assert resp.headers["content-type"] == "application/problem+json"
 
     body = resp.json()
-    assert body["success"] is False
-    assert body["error"]["code"] == "payload_too_large"
-    assert body["error"]["message"] == "Request body exceeds maximum size of 1MB"
-    assert "request_id" in body
+    assert body["type"].endswith("/payload-too-large")
+    assert body["status"] == 413
+    assert body["detail"] == "Request body exceeds maximum size of 1MB"
+    assert "x-request-id" in resp.headers
 
 
 @pytest.mark.asyncio
@@ -51,10 +51,10 @@ async def test_oversized_content_length_header_returns_json_413(client):
 
     assert resp.status_code == 413
     body = resp.json()
-    assert body["success"] is False
-    assert body["error"]["code"] == "payload_too_large"
-    assert body["error"]["message"] == "Request body exceeds maximum size of 1MB"
-    assert "request_id" in body
+    assert body["type"].endswith("/payload-too-large")
+    assert body["status"] == 413
+    assert body["detail"] == "Request body exceeds maximum size of 1MB"
+    assert "x-request-id" in resp.headers
 
 
 @pytest.mark.asyncio

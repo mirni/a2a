@@ -133,4 +133,4 @@ async def test_get_transactions_missing_agent_id(client, api_key):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 400
-    assert resp.json()["error"]["code"] == "missing_parameter"
+    assert resp.json()["type"].endswith("/missing-parameter")

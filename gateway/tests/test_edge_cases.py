@@ -27,7 +27,7 @@ class TestInvalidJsonVariants:
             },
         )
         assert resp.status_code == 400
-        assert resp.json()["error"]["code"] == "bad_request"
+        assert resp.json()["type"].endswith("/bad-request")
 
     async def test_json_array_body(self, client, api_key):
         """JSON array (not object) should return 400 because body.get('tool') fails."""
@@ -161,4 +161,4 @@ class TestRateLimitExceeded:
             headers={"Authorization": f"Bearer {key_info['key']}"},
         )
         assert resp.status_code == 429
-        assert resp.json()["error"]["code"] == "rate_limit_exceeded"
+        assert resp.json()["type"].endswith("/rate-limit-exceeded")

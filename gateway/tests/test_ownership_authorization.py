@@ -80,7 +80,7 @@ class TestWithdrawOwnership:
         )
 
         assert resp.status_code == 403
-        assert resp.json()["error"]["code"] == "forbidden"
+        assert resp.json()["type"].endswith("/forbidden")
 
     async def test_agent_can_withdraw_from_own_wallet(self, client, app):
         """200: agent can withdraw from own wallet."""
@@ -124,7 +124,7 @@ class TestDepositOwnership:
         )
 
         assert resp.status_code == 403
-        assert resp.json()["error"]["code"] == "forbidden"
+        assert resp.json()["type"].endswith("/forbidden")
 
 
 # ---------------------------------------------------------------------------

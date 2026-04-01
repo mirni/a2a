@@ -135,7 +135,7 @@ class TestSubmitMetrics:
             headers={"Authorization": f"Bearer {pro_api_key}"},
         )
         assert resp.status_code == 400
-        assert "invalid_metric" in resp.json()["error"]["code"]
+        assert resp.json()["type"].endswith("/invalid-metric")
 
     @pytest.mark.asyncio
     async def test_submit_metrics_requires_pro_tier(self, app, client, api_key):

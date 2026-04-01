@@ -164,21 +164,16 @@ class PublicRateLimitMiddleware:
         allowed, remaining, retry_after = limiter.record(client_ip)
 
         if not allowed:
-            # Return 429 Too Many Requests
-            import json as _json
+            # Return 429 Too Many Requests (RFC 9457)
+            from gateway.src.errors import problem_json_bytes
 
-            body = _json.dumps(
-                {
-                    "success": False,
-                    "error": {
-                        "code": "rate_limit_exceeded",
-                        "message": "Too many requests. Please retry later.",
-                    },
-                }
-            ).encode("utf-8")
+            body = problem_json_bytes(
+                429, "rate_limit_exceeded", "Too many requests. Please retry later.",
+                instance=path,
+            )
 
             headers = [
-                (b"content-type", b"application/json"),
+                (b"content-type", b"application/problem+json"),
                 (b"retry-after", str(retry_after).encode("latin-1")),
                 (b"x-ratelimit-limit", str(limiter.limit).encode("latin-1")),
                 (b"x-ratelimit-remaining", b"0"),
@@ -383,25 +378,23 @@ class BodySizeLimitMiddleware:
 
     @staticmethod
     async def _send_413(send: Callable, request_id: str = "") -> None:
-        """Send a 413 Payload Too Large response."""
-        body = json.dumps(
-            {
-                "success": False,
-                "error": {
-                    "code": "payload_too_large",
-                    "message": "Request body exceeds maximum size of 1MB",
-                },
-                "request_id": request_id,
-            }
-        ).encode()
+        """Send a 413 Payload Too Large response (RFC 9457)."""
+        from gateway.src.errors import problem_json_bytes
+
+        body = problem_json_bytes(
+            413, "payload_too_large", "Request body exceeds maximum size of 1MB",
+        )
+        headers: list[tuple[bytes, bytes]] = [
+            (b"content-type", b"application/problem+json"),
+            (b"content-length", str(len(body)).encode()),
+        ]
+        if request_id:
+            headers.append((b"x-request-id", request_id.encode("latin-1")))
         await send(
             {
                 "type": "http.response.start",
                 "status": 413,
-                "headers": [
-                    (b"content-type", b"application/json"),
-                    (b"content-length", str(len(body)).encode()),
-                ],
+                "headers": headers,
             }
         )
         await send(
@@ -452,22 +445,16 @@ class RequestTimeoutMiddleware:
 
     @staticmethod
     async def _send_504(send: Callable) -> None:
-        """Send a 504 Gateway Timeout response."""
-        body = json.dumps(
-            {
-                "success": False,
-                "error": {
-                    "code": "request_timeout",
-                    "message": "Request timed out",
-                },
-            }
-        ).encode()
+        """Send a 504 Gateway Timeout response (RFC 9457)."""
+        from gateway.src.errors import problem_json_bytes
+
+        body = problem_json_bytes(504, "request_timeout", "Request timed out")
         await send(
             {
                 "type": "http.response.start",
                 "status": 504,
                 "headers": [
-                    (b"content-type", b"application/json"),
+                    (b"content-type", b"application/problem+json"),
                     (b"content-length", str(len(body)).encode()),
                 ],
             }

@@ -21,12 +21,12 @@ async def test_oversized_tool_name_truncated_in_error(client, api_key):
     # Should still get an error (unknown tool), but the name in the message
     # must be truncated to at most 128 chars.
     body = resp.json()
-    error_message = body["error"]["message"]
-    # The tool name embedded in the error message must not exceed 128 chars.
+    detail = body["detail"]
+    # The tool name embedded in the detail must not exceed 128 chars.
     # The error format is "Unknown tool: <name>" so we check that the full
     # 300-char name does NOT appear.
-    assert long_name not in error_message
-    assert len(error_message) <= 256  # generous upper bound for the full message
+    assert long_name not in detail
+    assert len(detail) <= 256  # generous upper bound for the full message
 
 
 @pytest.mark.asyncio
@@ -38,9 +38,9 @@ async def test_null_bytes_stripped_from_tool_name(client, api_key):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     body = resp.json()
-    error_message = body["error"]["message"]
-    # Null bytes must not appear in the error message
-    assert "\x00" not in error_message
+    detail = body["detail"]
+    # Null bytes must not appear in the detail message
+    assert "\x00" not in detail
 
 
 @pytest.mark.asyncio
@@ -53,7 +53,7 @@ async def test_null_bytes_only_tool_name_treated_as_missing(client, api_key):
     )
     # After stripping null bytes, the tool name is empty → 400 missing tool
     assert resp.status_code == 400
-    assert resp.json()["error"]["code"] == "bad_request"
+    assert resp.json()["type"].endswith("/bad-request")
 
 
 # ---------------------------------------------------------------------------
@@ -112,4 +112,4 @@ async def test_valid_request_without_params_defaults(client, api_key):
     # get_balance requires agent_id, so missing param → 400
     # But the point is it should NOT be 422 — the body structure is valid.
     assert resp.status_code == 400
-    assert resp.json()["error"]["code"] == "missing_parameter"
+    assert resp.json()["type"].endswith("/missing-parameter")

@@ -73,7 +73,7 @@ async def test_estimate_cost_unknown_tool(client, api_key):
     )
     assert resp.status_code == 404
     body = resp.json()
-    assert body["error"]["code"] == "not_found"
+    assert body["type"].endswith("/not-found")
 
 
 async def test_estimate_cost_missing_params(client, api_key):

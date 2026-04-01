@@ -16,9 +16,8 @@ async def test_missing_required_param_returns_400(client, api_key):
     )
     assert resp.status_code == 400
     body = resp.json()
-    assert body["success"] is False
-    assert body["error"]["code"] == "missing_parameter"
-    assert "agent_id" in body["error"]["message"]
+    assert body["type"].endswith("/missing-parameter")
+    assert "agent_id" in body["detail"]
 
 
 async def test_missing_multiple_required_params(client, api_key):
@@ -30,8 +29,8 @@ async def test_missing_multiple_required_params(client, api_key):
     )
     assert resp.status_code == 400
     body = resp.json()
-    assert body["error"]["code"] == "missing_parameter"
-    assert "sender" in body["error"]["message"]
+    assert body["type"].endswith("/missing-parameter")
+    assert "sender" in body["detail"]
 
 
 async def test_valid_params_pass_validation(client, api_key):
@@ -94,8 +93,7 @@ async def test_rejects_string_for_number_field(client, api_key):
     )
     assert resp.status_code == 422
     body = resp.json()
-    assert body["success"] is False
-    assert "amount" in body["error"]["message"].lower()
+    assert "amount" in body["detail"].lower()
 
 
 async def test_rejects_string_for_integer_field(client, api_key):

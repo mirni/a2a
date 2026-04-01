@@ -196,8 +196,8 @@ async def test_create_subscription_invalid_interval(client, pro_api_key, app):
     # 422 if caught by JSON Schema enum validation; 400 if caught by tool logic
     assert resp.status_code in (400, 422)
     data = resp.json()
-    assert data["success"] is False
-    assert "error" in data
+    assert "type" in data
+    assert "detail" in data
 
 
 async def test_cancel_nonexistent_subscription(client, pro_api_key):
@@ -212,7 +212,7 @@ async def test_cancel_nonexistent_subscription(client, pro_api_key):
     )
     assert resp.status_code == 404
     data = resp.json()
-    assert data["success"] is False
+    assert data["status"] == resp.status_code
 
 
 async def test_get_nonexistent_subscription(client, pro_api_key):
@@ -227,7 +227,7 @@ async def test_get_nonexistent_subscription(client, pro_api_key):
     )
     assert resp.status_code == 404
     data = resp.json()
-    assert data["success"] is False
+    assert data["status"] == resp.status_code
 
 
 async def test_reactivate_non_suspended_subscription(client, pro_api_key, app):
@@ -249,4 +249,4 @@ async def test_reactivate_non_suspended_subscription(client, pro_api_key, app):
     )
     assert resp.status_code == 409
     data = resp.json()
-    assert data["success"] is False
+    assert data["status"] == resp.status_code
