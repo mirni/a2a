@@ -28,6 +28,9 @@ from gateway.src.routes.onboarding import router as onboarding_router
 from gateway.src.routes.pricing import router as pricing_router
 from gateway.src.routes.register import router as register_router
 from gateway.src.routes.sse import router as sse_router
+from gateway.src.routes.v1.billing import router as billing_router
+from gateway.src.routes.v1.identity import router as identity_router
+from gateway.src.routes.v1.payments import router as payments_router
 from gateway.src.routes.websocket import router as ws_router
 from gateway.src.signing import signing_key_handler
 from gateway.src.stripe_checkout import router as checkout_router
@@ -80,7 +83,17 @@ def create_app() -> FastAPI:
     app.include_router(onboarding_router)
     app.include_router(register_router)
     app.include_router(checkout_router)
+    app.include_router(billing_router)
+    app.include_router(payments_router)
+    app.include_router(identity_router)
     app.include_router(_redirect_router)
+
+    # Exception handler for deps._ResponseError (auth/rate-limit failures in Depends)
+    from gateway.src.deps.tool_context import _ResponseError
+
+    @app.exception_handler(_ResponseError)
+    async def _response_error_handler(request: Request, exc: _ResponseError) -> Response:
+        return exc.response
 
     # Standalone endpoints
     @app.get("/v1/metrics", include_in_schema=False)
