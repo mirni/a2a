@@ -57,3 +57,4 @@ reports/customer/
 # Build artifacts
 *.deb
 .pip_packages
+scratchpad.md
