@@ -13,6 +13,17 @@
 name: CI
 
 on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - 'reports/**'
+      - 'tasks/**'
+      - 'plans/**'
+      - 'logs/**'
+      - '*.md'
+      - '.gitignore'
+      - 'LICENSE'
   pull_request:
     types: [opened, synchronize, ready_for_review]
     paths-ignore:
@@ -31,7 +42,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
 
 jobs:
@@ -90,31 +101,56 @@ jobs:
         continue-on-error: true
 
       - name: Test gateway
-        run: scripts/run_tests.sh gateway --cov=gateway --cov-fail-under=70
+        run: scripts/run_tests.sh gateway --cov=gateway --cov-report=xml:coverage-gateway.xml --cov-report=term-missing
 
       - name: Test billing
-        run: scripts/run_tests.sh products/billing
+        run: scripts/run_tests.sh products/billing --cov=src --cov-report=xml:coverage-billing.xml --cov-report=term-missing
 
       - name: Test paywall
-        run: scripts/run_tests.sh products/paywall
+        run: scripts/run_tests.sh products/paywall --cov=src --cov-report=xml:coverage-paywall.xml --cov-report=term-missing
 
       - name: Test payments
-        run: scripts/run_tests.sh products/payments
+        run: scripts/run_tests.sh products/payments --cov=src --cov-report=xml:coverage-payments.xml --cov-report=term-missing
 
       - name: Test marketplace
-        run: scripts/run_tests.sh products/marketplace
+        run: scripts/run_tests.sh products/marketplace --cov=src --cov-report=xml:coverage-marketplace.xml --cov-report=term-missing
 
       - name: Test trust
-        run: scripts/run_tests.sh products/trust
+        run: scripts/run_tests.sh products/trust --cov=src --cov-report=xml:coverage-trust.xml --cov-report=term-missing
 
       - name: Test shared
-        run: scripts/run_tests.sh products/shared
+        run: scripts/run_tests.sh products/shared --cov=src --cov-report=xml:coverage-shared.xml --cov-report=term-missing
 
       - name: Test identity
-        run: scripts/run_tests.sh products/identity
+        run: scripts/run_tests.sh products/identity --cov=src --cov-report=xml:coverage-identity.xml --cov-report=term-missing
 
       - name: Test messaging
-        run: scripts/run_tests.sh products/messaging
+        run: scripts/run_tests.sh products/messaging --cov=src --cov-report=xml:coverage-messaging.xml --cov-report=term-missing
+
+      - name: Coverage ratchet check
+        run: python scripts/ci/coverage_ratchet.py check coverage-*.xml | tee /tmp/coverage-report.txt
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          echo '## Coverage Ratchet Report' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat /tmp/coverage-report.txt >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "No report generated" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Update coverage baseline
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          python scripts/ci/coverage_ratchet.py update coverage-*.xml
+          if git diff --quiet .coverage-baseline.json 2>/dev/null; then
+            echo "Baseline unchanged."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .coverage-baseline.json
+            git commit -m "ci: update coverage baseline [skip ci]"
+            git push
+          fi
 
   # ---------------------------------------------------------------------------
   # Package: build debs + SDK wheel

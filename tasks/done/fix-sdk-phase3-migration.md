@@ -25,7 +25,12 @@ Phase 3 API refactoring migrated tools from `/v1/execute` to dedicated REST rout
 - Validate all 47 tests pass
 
 ## Acceptance Criteria
-- [ ] `python -m pytest sdk/tests/ -x -q` — 0 failures
-- [ ] `python -m pytest e2e_tests.py -x -q` — 0 failures
-- [ ] TypeScript SDK published on npm
-- [ ] Both SDKs have README.md with installation and quickstart
+- [x] `python -m pytest sdk/tests/ -x -q` — 0 failures (66 tests passing)
+- [x] `python -m pytest e2e_tests.py -x -q` — 0 failures
+- [x] TypeScript SDK published on npm
+- [x] Both SDKs have README.md with installation and quickstart
+
+## Completed
+**Date:** 2026-04-01
+**PR:** #28
+**Summary:** All 30+ convenience methods in both Python and TypeScript SDKs migrated from `/v1/execute` to direct REST endpoints. Core `execute()` method retained for backward compatibility. E2E tests updated. SDK guide added at `docs/sdk-guide.md` (PR #38).

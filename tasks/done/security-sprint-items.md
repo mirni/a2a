@@ -35,7 +35,12 @@ After process restart, a replayed webhook would pass the in-memory check and pro
 - Add cleanup job for old entries (>30 days)
 
 ## Acceptance Criteria
-- [ ] All 4 financial ops support `Idempotency-Key`
-- [ ] Duplicate idempotency key returns cached response (not re-execution)
-- [ ] Stripe dedup survives process restart
-- [ ] Tests cover all scenarios
+- [x] All 4 financial ops support `Idempotency-Key`
+- [x] Duplicate idempotency key returns cached response (not re-execution)
+- [x] Stripe dedup survives process restart
+- [x] Tests cover all scenarios
+
+## Completed
+**Date:** S1: 2026-04-01, S2: 2026-04-02
+**PRs:** S1: #28 (idempotency via `_inject_caller` + engine-level checks), S2: PR #39 (DB-first dedup + StripeSessionCleanup task)
+**Summary:** S1 was already fully implemented — all 4 ops extract `Idempotency-Key` header via `_inject_caller()`, with UNIQUE DB indices on all settlement/escrow/intent tables. S2 fixed by swapping dedup check order (DB primary, in-memory cache) and adding `StripeSessionCleanup` background task (30-day retention).

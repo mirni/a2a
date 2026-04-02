@@ -217,13 +217,10 @@ async def stripe_webhook(request: Request) -> JSONResponse:
         session = event.get("data", {}).get("object", {})
         session_id = session.get("id", "")
 
-        # Deduplicate: check in-memory set AND persistent DB table
-        if session_id and session_id in _processed_sessions:
-            logger.info("Duplicate webhook for session %s — skipping (memory)", session_id)
-            return JSONResponse({"received": True})
-
-        # Check persistent dedup table
+        # Deduplicate: DB is the primary source of truth; in-memory set
+        # is a performance cache only.
         if session_id:
+            # 1. DB check (primary — survives process restarts)
             ctx_check = request.app.state.ctx
             try:
                 cursor = await ctx_check.tracker.storage.db.execute(
@@ -231,11 +228,16 @@ async def stripe_webhook(request: Request) -> JSONResponse:
                     (session_id,),
                 )
                 if await cursor.fetchone():
-                    _processed_sessions.add(session_id)
+                    _processed_sessions.add(session_id)  # warm cache
                     logger.info("Duplicate webhook for session %s — skipping (db)", session_id)
                     return JSONResponse({"received": True})
             except Exception:
                 pass  # Table may not exist yet on older schemas
+
+            # 2. In-memory cache (fast path for same-process replays)
+            if session_id in _processed_sessions:
+                logger.info("Duplicate webhook for session %s — skipping (memory)", session_id)
+                return JSONResponse({"received": True})
 
         metadata = session.get("metadata", {})
         agent_id = metadata.get("agent_id")

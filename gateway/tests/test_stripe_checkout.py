@@ -442,3 +442,30 @@ class TestStripeWebhook:
         # Balance must be 500, NOT 1000
         balance = await ctx.tracker.wallet.get_balance("replay-agent")
         assert balance == 500.0
+
+    async def test_webhook_dedup_survives_memory_clear(self, client, app, monkeypatch):
+        """After clearing the in-memory set (simulating restart), DB dedup must still work."""
+        monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", self._WEBHOOK_SECRET)
+        ctx = app.state.ctx
+        await ctx.tracker.wallet.create("restart-agent", initial_balance=0.0, signup_bonus=False)
+
+        event = self._checkout_completed_event("restart-agent", 300, session_id="cs_restart_dedup")
+        payload = json.dumps(event).encode()
+        headers = self._signed_headers(payload)
+
+        # First delivery
+        resp1 = await client.post("/v1/stripe-webhook", content=payload, headers=headers)
+        assert resp1.status_code == 200
+
+        # Simulate process restart: clear in-memory set
+        from gateway.src.stripe_checkout import _processed_sessions
+
+        _processed_sessions.discard("cs_restart_dedup")
+
+        # Replay after "restart" — DB should catch it
+        resp2 = await client.post("/v1/stripe-webhook", content=payload, headers=headers)
+        assert resp2.status_code == 200
+
+        # Balance must be 300, NOT 600
+        balance = await ctx.tracker.wallet.get_balance("restart-agent")
+        assert balance == 300.0
