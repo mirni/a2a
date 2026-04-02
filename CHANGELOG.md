@@ -1,5 +1,35 @@
 # Changelog
 
+# Release v0.8.3
+
+**Date:** 2026-04-02
+**Commit:** 2e5bcd61
+**Previous:** v0.8.2
+
+## Changes
+
+### Bug Fixes
+
+- fix: use /opt/a2a as default install dir for generate_audit_keys (#34) (`2e5bcd6`)
+- fix: import bootstrap before product modules in generate_audit_keys (#33) (`41304a1`)
+
+### Other
+
+- Merge release v0.8.2 into main (`7875258`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 0.8.3 |
+| a2a-db-backup | 0.8.3 |
+| a2a-gateway | 0.8.3 |
+| a2a-gateway-sandbox | 0.8.3 |
+| a2a-gateway-test | 0.8.3 |
+| a2a-website | 0.8.3 |
+---
+
+
 # Release v0.8.2
 
 **Date:** 2026-04-02
