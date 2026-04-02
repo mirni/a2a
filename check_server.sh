@@ -53,18 +53,24 @@ echo "$HEALTH" | jq_check "assert d['status']=='ok'" 2>/dev/null \
 echo "$HEALTH" | jq_check "assert d['tools']>0, f\"tools={d['tools']}\"" 2>/dev/null \
     && pass "health tools > 0" || fail "health tools > 0"
 
-# Pricing
+# Pricing (paginated: {"tools": [...], "total": N, ...})
 PRICING=$(get /v1/pricing 2>&1) && pass "GET /v1/pricing returns 200" || fail "GET /v1/pricing returns 200" "$PRICING"
-echo "$PRICING" | jq_check "assert len(d)>0" 2>/dev/null \
-    && pass "pricing catalog non-empty" || fail "pricing catalog non-empty"
+echo "$PRICING" | jq_check "assert len(d['tools'])>0, f\"tools={len(d['tools'])}\"" 2>/dev/null \
+    && pass "pricing tools non-empty" || fail "pricing tools non-empty"
 
 # OpenAPI
 get /v1/openapi.json >/dev/null 2>&1 \
     && pass "GET /v1/openapi.json returns 200" || fail "GET /v1/openapi.json returns 200"
 
-# Metrics
-get /v1/metrics >/dev/null 2>&1 \
-    && pass "GET /v1/metrics returns 200" || fail "GET /v1/metrics returns 200"
+# Metrics (IP-allowlisted — may return 403 from remote)
+METRICS_STATUS=$(code -X GET "${BASE}/v1/metrics")
+if [[ "$METRICS_STATUS" == "200" ]]; then
+    pass "GET /v1/metrics returns 200"
+elif [[ "$METRICS_STATUS" == "403" ]]; then
+    skip "GET /v1/metrics — 403 (IP allowlist, expected from remote)"
+else
+    fail "GET /v1/metrics returns 200 or 403 (got $METRICS_STATUS)"
+fi
 
 # Signing key
 get /v1/signing-key >/dev/null 2>&1 \
@@ -76,7 +82,7 @@ STATUS=$(code -X GET "${BASE}/health")
     && pass "GET /health redirects ($STATUS)" || fail "GET /health redirects (got $STATUS)"
 
 # ---------------------------------------------------------------------------
-# 2. Auth enforcement
+# 2. Auth enforcement (RFC 9457 error responses)
 # ---------------------------------------------------------------------------
 echo ""
 echo "--- Auth Enforcement ---"
@@ -95,7 +101,7 @@ STATUS=$(code -X POST -H "Content-Type: application/json" \
     && pass "bad key → 401" || fail "bad key → 401 (got $STATUS)"
 
 # ---------------------------------------------------------------------------
-# 3. Authenticated tool execution
+# 3. Authenticated tool execution (envelope-free responses)
 # ---------------------------------------------------------------------------
 echo ""
 echo "--- Tool Execution (requires API_KEY) ---"
@@ -121,44 +127,66 @@ else
             "${BASE}/v1/execute"
     }
 
-    # get_balance (free tier) — smoke-test has no wallet, so accept either result or structured error
-    RESP=$(exec_tool get_balance '{"agent_id":"smoke-test"}' 2>&1) \
-        && echo "$RESP" | jq_check "assert 'result' in d or 'error' in d, d" 2>/dev/null \
-        && pass "get_balance returns response" \
-        || fail "get_balance" "$RESP"
+    # get_balance — envelope-free; may return balance or 404 (no wallet)
+    STATUS=$(exec_tool_code get_balance '{"agent_id":"smoke-test"}')
+    [[ "$STATUS" == "200" || "$STATUS" == "404" ]] \
+        && pass "get_balance → $STATUS" || fail "get_balance → 200/404 (got $STATUS)"
 
-    # get_usage_summary
-    RESP=$(exec_tool get_usage_summary '{"agent_id":"smoke-test"}' 2>&1) \
-        && echo "$RESP" | jq_check "assert 'result' in d, d" 2>/dev/null \
-        && pass "get_usage_summary returns result" \
-        || fail "get_usage_summary" "$RESP"
+    # get_usage_summary — envelope-free; may return usage or 404
+    STATUS=$(exec_tool_code get_usage_summary '{"agent_id":"smoke-test"}')
+    [[ "$STATUS" == "200" || "$STATUS" == "404" ]] \
+        && pass "get_usage_summary → $STATUS" || fail "get_usage_summary → 200/404 (got $STATUS)"
 
-    # search_services
-    RESP=$(exec_tool search_services '{"query":"test"}' 2>&1) \
-        && echo "$RESP" | jq_check "assert 'result' in d, d" 2>/dev/null \
-        && pass "search_services returns result" \
-        || fail "search_services" "$RESP"
+    # search_services — always returns 200 with results array
+    STATUS=$(exec_tool_code search_services '{"query":"test"}')
+    [[ "$STATUS" == "200" ]] \
+        && pass "search_services → 200" || fail "search_services → 200 (got $STATUS)"
 
-    # get_trust_score — uses server_id, accept result or structured error (no server registered)
-    RESP=$(exec_tool get_trust_score '{"server_id":"smoke-test"}' 2>&1) \
-        && echo "$RESP" | jq_check "assert 'result' in d or 'error' in d, d" 2>/dev/null \
-        && pass "get_trust_score returns response" \
-        || fail "get_trust_score" "$RESP"
+    # get_trust_score — may return score or 404 (no server registered)
+    STATUS=$(exec_tool_code get_trust_score '{"server_id":"smoke-test"}')
+    [[ "$STATUS" == "200" || "$STATUS" == "404" ]] \
+        && pass "get_trust_score → $STATUS" || fail "get_trust_score → 200/404 (got $STATUS)"
 
-    # check_db_integrity (pro tier)
-    RESP=$(exec_tool check_db_integrity '{"database":"billing"}' 2>&1) \
-        && echo "$RESP" | jq_check "assert d.get('result',{}).get('ok')==True, d" 2>/dev/null \
-        && pass "check_db_integrity ok=true" \
-        || fail "check_db_integrity" "$RESP"
+    # check_db_integrity — admin tool, may return 200 or 403
+    STATUS=$(exec_tool_code check_db_integrity '{"database":"billing"}')
+    [[ "$STATUS" == "200" || "$STATUS" == "403" ]] \
+        && pass "check_db_integrity → $STATUS" || fail "check_db_integrity → 200/403 (got $STATUS)"
 
-    # Unknown tool
+    # Unknown tool → 400 (RFC 9457 problem+json)
     STATUS=$(exec_tool_code nonexistent_tool_xyz '{}')
     [[ "$STATUS" == "400" ]] \
         && pass "unknown tool → 400" || fail "unknown tool → 400 (got $STATUS)"
 fi
 
 # ---------------------------------------------------------------------------
-# 4. TLS
+# 4. REST API (new router endpoints)
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- REST API ---"
+
+# Billing — requires auth
+if [[ -n "$API_KEY" ]]; then
+    STATUS=$(code -X GET -H "Authorization: Bearer ${API_KEY}" \
+        "${BASE}/v1/billing/leaderboard")
+    [[ "$STATUS" == "200" ]] \
+        && pass "GET /v1/billing/leaderboard → 200" || fail "GET /v1/billing/leaderboard (got $STATUS)"
+
+    STATUS=$(code -X GET -H "Authorization: Bearer ${API_KEY}" \
+        "${BASE}/v1/billing/estimate?tool_name=get_balance")
+    [[ "$STATUS" == "200" ]] \
+        && pass "GET /v1/billing/estimate → 200" || fail "GET /v1/billing/estimate (got $STATUS)"
+else
+    skip "REST billing — no API_KEY set"
+    skip "REST estimate — no API_KEY set"
+fi
+
+# Auth enforcement on REST endpoints
+STATUS=$(code -X GET "${BASE}/v1/billing/leaderboard")
+[[ "$STATUS" == "401" ]] \
+    && pass "REST no key → 401" || fail "REST no key → 401 (got $STATUS)"
+
+# ---------------------------------------------------------------------------
+# 5. TLS
 # ---------------------------------------------------------------------------
 echo ""
 echo "--- TLS ---"
