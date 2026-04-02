@@ -13,6 +13,17 @@
 name: CI
 
 on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - 'reports/**'
+      - 'tasks/**'
+      - 'plans/**'
+      - 'logs/**'
+      - '*.md'
+      - '.gitignore'
+      - 'LICENSE'
   pull_request:
     types: [opened, synchronize, ready_for_review]
     paths-ignore:
@@ -31,7 +42,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
 
 jobs:
@@ -90,7 +101,7 @@ jobs:
         continue-on-error: true
 
       - name: Test gateway
-        run: scripts/run_tests.sh gateway --cov=gateway --cov-report=xml:coverage-gateway.xml --cov-report=term-missing --cov-fail-under=70
+        run: scripts/run_tests.sh gateway --cov=gateway --cov-report=xml:coverage-gateway.xml --cov-report=term-missing
 
       - name: Test billing
         run: scripts/run_tests.sh products/billing --cov=src --cov-report=xml:coverage-billing.xml --cov-report=term-missing
@@ -116,24 +127,30 @@ jobs:
       - name: Test messaging
         run: scripts/run_tests.sh products/messaging --cov=src --cov-report=xml:coverage-messaging.xml --cov-report=term-missing
 
+      - name: Coverage ratchet check
+        run: python scripts/ci/coverage_ratchet.py check coverage-*.xml | tee /tmp/coverage-report.txt
+
       - name: Coverage summary
         if: always()
         run: |
-          echo "## Test Coverage Report" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Module | Coverage |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|--------|----------|" >> "$GITHUB_STEP_SUMMARY"
-          for xml in coverage-*.xml; do
-            [ -f "$xml" ] || continue
-            module=$(echo "$xml" | sed 's/coverage-//;s/\.xml//')
-            pct=$(python -c "
-          import xml.etree.ElementTree as ET
-          tree = ET.parse('$xml')
-          rate = tree.getroot().get('line-rate', '0')
-          print(f'{float(rate)*100:.1f}%')
-          " 2>/dev/null || echo "N/A")
-            echo "| $module | $pct |" >> "$GITHUB_STEP_SUMMARY"
-          done
+          echo '## Coverage Ratchet Report' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat /tmp/coverage-report.txt >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "No report generated" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Update coverage baseline
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          python scripts/ci/coverage_ratchet.py update coverage-*.xml
+          if git diff --quiet .coverage-baseline.json 2>/dev/null; then
+            echo "Baseline unchanged."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .coverage-baseline.json
+            git commit -m "ci: update coverage baseline [skip ci]"
+            git push
+          fi
 
   # ---------------------------------------------------------------------------
   # Package: build debs + SDK wheel
