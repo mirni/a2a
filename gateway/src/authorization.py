@@ -99,7 +99,7 @@ def check_ownership_authorization(
             )
             return (
                 403,
-                f"Forbidden: '{field}' value '{value}' does not match your agent_id '{caller_agent_id}'",
+                "Forbidden: you do not have access to this resource",
                 "forbidden",
             )
 

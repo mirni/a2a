@@ -22,7 +22,7 @@ router = APIRouter()
 class RegisterRequestBody(BaseModel):
     """Request body for POST /v1/register."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"agent_id": "my-agent-001"}})
 
     agent_id: str
 

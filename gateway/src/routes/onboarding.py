@@ -35,10 +35,10 @@ def _build_onboarding_extension() -> dict:
         "quickstart": [
             {
                 "step": 1,
-                "title": "Get an API key",
-                "description": "Create an API key by calling the create_api_key tool or contacting an admin.",
-                "example": 'curl -X POST /v1/execute -H "Content-Type: application/json" '
-                '-d \'{"tool": "create_api_key", "params": {"agent_id": "my-agent"}}\'',
+                "title": "Register and get an API key",
+                "description": "Self-register to create a wallet and free-tier API key in one step.",
+                "example": 'curl -X POST /v1/register -H "Content-Type: application/json" '
+                '-d \'{"agent_id": "my-agent"}\'',
             },
             {
                 "step": 2,

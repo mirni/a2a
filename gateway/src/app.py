@@ -10,6 +10,7 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.responses import RedirectResponse, Response
 
 from gateway.src._version import __version__
+from gateway.src.errors import error_response
 from gateway.src.lifespan import lifespan
 from gateway.src.middleware import (
     BodySizeLimitMiddleware,
@@ -104,6 +105,21 @@ def create_app() -> FastAPI:
     @app.exception_handler(_ResponseError)
     async def _response_error_handler(request: Request, exc: _ResponseError) -> Response:
         return exc.response
+
+    # Wrap FastAPI's default 422 validation errors in RFC 9457 format
+    from fastapi.exceptions import RequestValidationError
+
+    @app.exception_handler(RequestValidationError)
+    async def _validation_error_handler(request: Request, exc: RequestValidationError) -> Response:
+        detail = "; ".join(f"{'.'.join(str(p) for p in e['loc'])}: {e['msg']}" for e in exc.errors())
+        return await error_response(422, detail, "validation_error", request=request)
+
+    # Wrap 405 Method Not Allowed in RFC 9457 format
+    from starlette.exceptions import HTTPException as StarletteHTTPException
+
+    @app.exception_handler(StarletteHTTPException)
+    async def _http_exception_handler(request: Request, exc: StarletteHTTPException) -> Response:
+        return await error_response(exc.status_code, exc.detail, "http_error", request=request)
 
     # Standalone endpoints
     @app.get("/v1/metrics", include_in_schema=False)
