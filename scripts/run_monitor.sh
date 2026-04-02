@@ -145,21 +145,46 @@ case "$CMD" in
         echo "4. Prometheus scrape targets:"
         TARGETS_JSON=$(curl -sf -m 3 "http://localhost:${PROMETHEUS_PORT}/api/v1/targets" 2>/dev/null)
         if [ -n "$TARGETS_JSON" ]; then
-            echo "$TARGETS_JSON" | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-for t in data.get('data', {}).get('activeTargets', []):
-    job = t.get('labels', {}).get('job', '?')
-    health = t.get('health', '?')
-    url = t.get('scrapeUrl', '?')
-    err = t.get('lastError', '')
-    status = 'OK' if health == 'up' else 'FAIL'
-    print(f'   [{status}] {job}: {url} — {health}')
+            python3 << 'PYEOF' "$TARGETS_JSON"
+import json, sys
+
+data = json.loads(sys.argv[1])
+targets = data.get("data", {}).get("activeTargets", [])
+
+if not targets:
+    print("   (no active targets found)")
+    sys.exit(0)
+
+for t in targets:
+    job = t.get("labels", {}).get("job", "?")
+    health = t.get("health", "?")
+    url = t.get("scrapeUrl", "?")
+    err = t.get("lastError", "")
+    last_scrape = t.get("lastScrape", "")
+    scrape_duration = t.get("lastScrapeDuration", 0)
+    status = "OK" if health == "up" else "FAIL"
+
+    print(f"   [{status}] {job}: {url} — {health}")
+    if last_scrape:
+        print(f"         Last scrape: {last_scrape} ({scrape_duration:.3f}s)")
     if err:
-        print(f'         Error: {err}')
-" 2>/dev/null || echo "   (could not parse targets response)"
+        print(f"         Error: {err}")
+
+    # Diagnostics for common failures
+    if health != "up":
+        if "403" in err:
+            print("         Hint: /v1/metrics IP allowlist is blocking Prometheus.")
+            print("               Add Prometheus source IP to METRICS_ALLOWED_IPS in server .env")
+        elif "connection refused" in err.lower():
+            print("         Hint: Gateway is not running or not bound to 0.0.0.0")
+        elif "tls" in err.lower() or "certificate" in err.lower():
+            print("         Hint: TLS cert mismatch. Check insecure_skip_verify in prometheus.yml")
+        elif "INVALID" in err or "parsing" in err.lower():
+            print("         Hint: Endpoint returns non-Prometheus format (e.g. JSON)")
+PYEOF
         else
             echo "   Cannot reach Prometheus at localhost:${PROMETHEUS_PORT}"
+            echo "   Is the monitoring stack running? Try: scripts/run_monitor.sh up"
         fi
         ;;
     *)
