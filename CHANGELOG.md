@@ -1,5 +1,47 @@
 # Changelog
 
+# Release v0.8.1
+
+**Date:** 2026-04-02
+**Commit:** 744b802b
+**Previous:** v0.7.0
+
+## Changes
+
+### Features
+
+- feat: audit remediation — security headers, nginx hardening, idempotency (#31) (`8c5d783`)
+
+### Bug Fixes
+
+- fix: resolve SAST and test failures on release pipeline (#32) (`744b802`)
+- fix: audit remediation — security, SDK REST migration, backup package (#28) (`9379c7b`)
+
+### Tests
+
+- test: improve gateway test coverage (#29) (`91a1cb3`)
+
+### Other
+
+- task: review external security audit findings (#30) (`8fb6952`)
+- Squashed commit of the following: (`2e10b05`)
+- Update master log post-merge (`2f30b3a`)
+- audit: external + internal market-readiness audit (#27) (`41b1888`)
+- Merge release v0.7.0 into main (`90a57a2`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 0.8.1 |
+| a2a-db-backup | 0.8.1 |
+| a2a-gateway | 0.8.1 |
+| a2a-gateway-sandbox | 0.8.1 |
+| a2a-gateway-test | 0.8.1 |
+| a2a-website | 0.8.1 |
+---
+
+
 # Release v0.7.0
 
 **Date:** 2026-04-01
