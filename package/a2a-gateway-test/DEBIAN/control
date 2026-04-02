@@ -1,5 +1,5 @@
 Package: a2a-gateway-test
-Version: 0.7.0
+Version: 0.8.0
 Architecture: all
 Depends: python3 (>= 3.12), sqlite3, curl
 Maintainer: A2A Team <team@greenhelix.net>

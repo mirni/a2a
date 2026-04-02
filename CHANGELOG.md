@@ -1,5 +1,41 @@
 # Changelog
 
+# Release v0.8.0
+
+**Date:** 2026-04-02
+**Commit:** 2e10b05c
+**Previous:** v0.7.0
+
+## Changes
+
+### Bug Fixes
+
+- fix: audit remediation — security, SDK REST migration, backup package (#28) (`9379c7b`)
+
+### Tests
+
+- test: improve gateway test coverage (#29) (`91a1cb3`)
+
+### Other
+
+- Squashed commit of the following: (`2e10b05`)
+- Update master log post-merge (`2f30b3a`)
+- audit: external + internal market-readiness audit (#27) (`41b1888`)
+- Merge release v0.7.0 into main (`90a57a2`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 0.8.0 |
+| a2a-db-backup | 0.8.0 |
+| a2a-gateway | 0.8.0 |
+| a2a-gateway-sandbox | 0.8.0 |
+| a2a-gateway-test | 0.8.0 |
+| a2a-website | 0.8.0 |
+---
+
+
 # Release v0.7.0
 
 **Date:** 2026-04-01
