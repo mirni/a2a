@@ -15,7 +15,7 @@ import json
 import os
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 INSTALL_DIR = os.environ.get("A2A_INSTALL_DIR", "/opt/a2a")
 sys.path.insert(0, INSTALL_DIR)
@@ -61,7 +61,7 @@ async def main(data_dir: str, output_path: str, expires_hours: int) -> None:
     await tracker.connect()
 
     expires_at = time.time() + expires_hours * 3600
-    expires_dt = datetime.now(datetime.UTC) + timedelta(hours=expires_hours)
+    expires_dt = datetime.now(UTC) + timedelta(hours=expires_hours)
 
     keys: list[dict] = []
     for agent in AGENTS:
@@ -95,7 +95,7 @@ async def main(data_dir: str, output_path: str, expires_hours: int) -> None:
     # Write to file
     lines = [
         "# External Security Audit API Keys",
-        f"# Generated: {datetime.now(datetime.UTC).isoformat()}",
+        f"# Generated: {datetime.now(UTC).isoformat()}",
         "# Target: api.greenhelix.net/v1  (or sandbox.greenhelix.net/v1)",
         "#",
         f"# Expires: {expires_dt.isoformat()} ({expires_hours}h from generation)",
