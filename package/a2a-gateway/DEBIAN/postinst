@@ -106,21 +106,25 @@ ENVEOF
                 131.0.72.0/22
             )
 
-            # Delete any existing port 443 rules to avoid duplicates,
-            # then re-add only Cloudflare ranges.
-            # Use numbered delete in reverse to avoid index shifting.
-            EXISTING_443=$(ufw status numbered 2>/dev/null \
-                | grep "443" | sed 's/\[ *\([0-9]*\)\].*/\1/' | sort -rn)
-            for num in $EXISTING_443; do
+            # SAFETY: ensure Tailscale access BEFORE touching any rules.
+            # This is added first so even if the script fails mid-way,
+            # you can still SSH in via Tailscale.
+            ufw allow in on tailscale0 comment "Tailscale VPN" >/dev/null 2>&1 || true
+
+            # Delete existing Cloudflare port-443 rules to avoid duplicates
+            # on upgrade. Match " 443 " with spaces to avoid false matches
+            # on port 4430, IPs containing "443", etc.
+            # Reverse order so index numbers stay valid during deletion.
+            EXISTING_CF=$(ufw status numbered 2>/dev/null \
+                | grep -E " 443[/ ]" | grep -i "cloudflare" \
+                | sed 's/\[ *\([0-9]*\)\].*/\1/' | sort -rn)
+            for num in $EXISTING_CF; do
                 ufw --force delete "$num" >/dev/null 2>&1 || true
             done
 
             for cidr in "${CLOUDFLARE_IPV4[@]}"; do
                 ufw allow from "$cidr" to any port 443 comment "Cloudflare" >/dev/null 2>&1
             done
-
-            # Tailscale — allow all traffic on VPN interface (SSH, staging deploys)
-            ufw allow in on tailscale0 comment "Tailscale VPN" >/dev/null 2>&1 || true
 
             # Deny all other incoming by default (idempotent)
             ufw default deny incoming >/dev/null 2>&1
