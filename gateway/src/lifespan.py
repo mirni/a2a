@@ -58,6 +58,7 @@ from gateway.src.cleanup_tasks import (
     EventBusCleanup,
     NonceCleanup,
     RateEventsCleanup,
+    StripeSessionCleanup,
 )
 
 # Health monitoring
@@ -232,6 +233,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     data_lifecycle_task = asyncio.create_task(data_lifecycle.run())
     logger.info("Data lifecycle started (interval=86400s)")
 
+    # --- Stripe Session Cleanup ---
+    stripe_session_cleanup = StripeSessionCleanup(billing_db=tracker.storage.db, interval=86400)
+    stripe_session_cleanup_task = asyncio.create_task(stripe_session_cleanup.run())
+    logger.info("Stripe session cleanup started (interval=86400s, retention=30d)")
+
     # --- Signing Manager ---
     signing_manager = SigningManager()
 
@@ -347,6 +353,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     data_lifecycle_task.cancel()
     try:
         await data_lifecycle_task
+    except asyncio.CancelledError:
+        pass
+
+    stripe_session_cleanup_task.cancel()
+    try:
+        await stripe_session_cleanup_task
     except asyncio.CancelledError:
         pass
 

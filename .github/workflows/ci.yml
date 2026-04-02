@@ -90,31 +90,50 @@ jobs:
         continue-on-error: true
 
       - name: Test gateway
-        run: scripts/run_tests.sh gateway --cov=gateway --cov-fail-under=70
+        run: scripts/run_tests.sh gateway --cov=gateway --cov-report=xml:coverage-gateway.xml --cov-report=term-missing --cov-fail-under=70
 
       - name: Test billing
-        run: scripts/run_tests.sh products/billing
+        run: scripts/run_tests.sh products/billing --cov=src --cov-report=xml:coverage-billing.xml --cov-report=term-missing
 
       - name: Test paywall
-        run: scripts/run_tests.sh products/paywall
+        run: scripts/run_tests.sh products/paywall --cov=src --cov-report=xml:coverage-paywall.xml --cov-report=term-missing
 
       - name: Test payments
-        run: scripts/run_tests.sh products/payments
+        run: scripts/run_tests.sh products/payments --cov=src --cov-report=xml:coverage-payments.xml --cov-report=term-missing
 
       - name: Test marketplace
-        run: scripts/run_tests.sh products/marketplace
+        run: scripts/run_tests.sh products/marketplace --cov=src --cov-report=xml:coverage-marketplace.xml --cov-report=term-missing
 
       - name: Test trust
-        run: scripts/run_tests.sh products/trust
+        run: scripts/run_tests.sh products/trust --cov=src --cov-report=xml:coverage-trust.xml --cov-report=term-missing
 
       - name: Test shared
-        run: scripts/run_tests.sh products/shared
+        run: scripts/run_tests.sh products/shared --cov=src --cov-report=xml:coverage-shared.xml --cov-report=term-missing
 
       - name: Test identity
-        run: scripts/run_tests.sh products/identity
+        run: scripts/run_tests.sh products/identity --cov=src --cov-report=xml:coverage-identity.xml --cov-report=term-missing
 
       - name: Test messaging
-        run: scripts/run_tests.sh products/messaging
+        run: scripts/run_tests.sh products/messaging --cov=src --cov-report=xml:coverage-messaging.xml --cov-report=term-missing
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          echo "## Test Coverage Report" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Module | Coverage |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|----------|" >> "$GITHUB_STEP_SUMMARY"
+          for xml in coverage-*.xml; do
+            [ -f "$xml" ] || continue
+            module=$(echo "$xml" | sed 's/coverage-//;s/\.xml//')
+            pct=$(python -c "
+          import xml.etree.ElementTree as ET
+          tree = ET.parse('$xml')
+          rate = tree.getroot().get('line-rate', '0')
+          print(f'{float(rate)*100:.1f}%')
+          " 2>/dev/null || echo "N/A")
+            echo "| $module | $pct |" >> "$GITHUB_STEP_SUMMARY"
+          done
 
   # ---------------------------------------------------------------------------
   # Package: build debs + SDK wheel

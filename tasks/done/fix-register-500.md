@@ -21,7 +21,12 @@ curl -X POST https://api.greenhelix.net/v1/register \
 ```
 
 ## Acceptance Criteria
-- [ ] `POST /v1/register` returns 200 with `{api_key, agent_id, credits}` on sandbox
-- [ ] Wallet is created with 500 credit signup bonus
-- [ ] API key is generated and returned
-- [ ] Idempotent: re-registration returns 409 with clear message
+- [x] `POST /v1/register` returns 201 with `{api_key, agent_id, credits}` on sandbox
+- [x] Wallet is created with 500 credit signup bonus
+- [x] API key is generated and returned
+- [x] Idempotent: re-registration returns 409 with clear message
+
+## Completed
+**Date:** 2026-04-01
+**PRs:** #28 (SDK REST migration), #38 (added json_schema_extra example)
+**Summary:** Root cause was `extra="forbid"` rejecting the `name` field in the request body. Register handler has full error handling for wallet creation (409) and key generation (500 with structured error). 7 tests cover all paths.

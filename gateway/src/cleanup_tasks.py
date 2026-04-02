@@ -16,6 +16,7 @@ logger = logging.getLogger("a2a.cleanup")
 # Retention TTLs (in days)
 _USAGE_RECORDS_TTL_DAYS = 90
 _WEBHOOK_DELIVERIES_TTL_DAYS = 30
+_STRIPE_SESSIONS_TTL_DAYS = 30
 _ADMIN_AUDIT_LOG_TTL_DAYS = 365
 _DAY_SECONDS = 86400
 
@@ -246,6 +247,38 @@ class WebhookDeliveriesCleanup:
                 logger.info("WebhookDeliveriesCleanup: removed %d old deliveries", deleted)
             except Exception:
                 logger.exception("WebhookDeliveriesCleanup: unexpected error")
+            await asyncio.sleep(self.interval)
+
+
+class StripeSessionCleanup:
+    """Purges processed_stripe_sessions older than 30 days from the billing database.
+
+    Args:
+        billing_db: An aiosqlite Connection to the billing database.
+        interval: Seconds between cleanup runs.
+    """
+
+    def __init__(self, billing_db, interval: float = 86400) -> None:
+        self.billing_db = billing_db
+        self.interval = interval
+
+    async def cleanup_once(self) -> int:
+        """Delete processed Stripe sessions older than the TTL. Returns number deleted."""
+        cutoff = time.time() - (_STRIPE_SESSIONS_TTL_DAYS * _DAY_SECONDS)
+        cursor = await self.billing_db.execute(
+            "DELETE FROM processed_stripe_sessions WHERE processed_at < ?", (cutoff,)
+        )
+        await self.billing_db.commit()
+        return cursor.rowcount
+
+    async def run(self) -> None:
+        """Polling loop -- runs cleanup every *interval* seconds."""
+        while True:
+            try:
+                deleted = await self.cleanup_once()
+                logger.info("StripeSessionCleanup: removed %d old sessions", deleted)
+            except Exception:
+                logger.exception("StripeSessionCleanup: unexpected error")
             await asyncio.sleep(self.interval)
 
 
