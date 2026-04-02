@@ -31,6 +31,8 @@ ADMIN_ONLY_TOOLS: frozenset[str] = frozenset(
         "restore_database",
         "check_db_integrity",
         "list_backups",
+        "process_due_subscriptions",
+        "revoke_api_key",
     }
 )
 

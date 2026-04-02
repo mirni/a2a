@@ -34,6 +34,9 @@ async def check_rate_limits(
 ) -> int:
     """Check global and per-tool rate limits.
 
+    Records the rate event BEFORE checking counts so that concurrent
+    requests each see an up-to-date count (increment-then-check).
+
     Returns the current rate_count for header generation.
     Raises RateLimitError if limits are exceeded.
     """
@@ -52,6 +55,10 @@ async def check_rate_limits(
     window_key = "gateway"
 
     try:
+        # Record rate event FIRST (increment-then-check) so concurrent
+        # requests each see an up-to-date count.
+        await ctx.paywall_storage.record_rate_event(agent_id, window_key, tool_name)
+
         rate_count = await ctx.paywall_storage.get_sliding_window_count(agent_id, window_key, window_seconds=3600.0)
         if rate_count >= tier_config.rate_limit_per_hour:
             burst_count = await ctx.paywall_storage.get_burst_count(agent_id, window_key, burst_window_seconds=60.0)

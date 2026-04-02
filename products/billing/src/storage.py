@@ -345,6 +345,10 @@ CREATE INDEX IF NOT EXISTS idx_api_audit_ts ON api_audit_log(timestamp);
     async def atomic_debit_strict(self, agent_id: str, amount: float) -> tuple[bool, float]:
         """Atomically debit amount from wallet.
 
+        The UPDATE SET balance = balance - ? WHERE balance >= ? is a single
+        atomic SQL statement that avoids read-check-write races.  The
+        subsequent SELECT reads the updated balance within the same implicit
+        transaction before commit.
         Returns (success, balance) where success=True if debit was applied,
         and balance is the current balance after the operation.
         """
@@ -354,10 +358,10 @@ CREATE INDEX IF NOT EXISTS idx_api_audit_ts ON api_audit_log(timestamp);
             "UPDATE wallets SET balance = balance - ?, updated_at = ? WHERE agent_id = ? AND balance >= ?",
             (amt_atomic, now, agent_id, amt_atomic),
         )
-        await self.db.commit()
         affected = cursor.rowcount
         cur2 = await self.db.execute("SELECT balance FROM wallets WHERE agent_id = ?", (agent_id,))
         row = await cur2.fetchone()
+        await self.db.commit()
         if row is None:
             return (False, 0.0)
         return (affected > 0, self._from_atomic(row[0]))
@@ -365,6 +369,9 @@ CREATE INDEX IF NOT EXISTS idx_api_audit_ts ON api_audit_log(timestamp);
     async def atomic_credit(self, agent_id: str, amount: float) -> tuple[bool, float]:
         """Atomically credit amount to wallet.
 
+        The UPDATE SET balance = balance + ? is a single atomic SQL statement
+        that avoids read-check-write races.  The subsequent SELECT reads the
+        updated balance within the same implicit transaction before commit.
         Returns (success, new_balance) where success=True if agent exists.
         """
         now = time.time()
@@ -373,10 +380,10 @@ CREATE INDEX IF NOT EXISTS idx_api_audit_ts ON api_audit_log(timestamp);
             "UPDATE wallets SET balance = balance + ?, updated_at = ? WHERE agent_id = ?",
             (amt_atomic, now, agent_id),
         )
-        await self.db.commit()
         affected = cursor.rowcount
         cur2 = await self.db.execute("SELECT balance FROM wallets WHERE agent_id = ?", (agent_id,))
         row = await cur2.fetchone()
+        await self.db.commit()
         if row is None:
             return (False, 0.0)
         return (affected > 0, self._from_atomic(row[0]))

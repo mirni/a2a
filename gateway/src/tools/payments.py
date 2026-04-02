@@ -37,6 +37,20 @@ def _check_escrow_ownership(caller: str, tier: str, escrow) -> None:
         )
 
 
+def _check_escrow_payer(caller: str, tier: str, escrow) -> None:
+    """Verify the caller is the escrow payer (not payee).
+
+    Only the payer (or admin) may cancel an escrow.
+    Raises ToolForbiddenError if the caller is not the payer.
+    """
+    if tier == ADMIN_TIER:
+        return
+    if caller != escrow.payer:
+        raise ToolForbiddenError(
+            f"Only the escrow payer may cancel. Caller '{caller}' is not the payer '{escrow.payer}'"
+        )
+
+
 _VALID_CURRENCIES = {"CREDITS", "USD", "EUR", "GBP", "BTC", "ETH"}
 
 
@@ -242,7 +256,7 @@ async def _cancel_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
     caller = params.get("_caller_agent_id", "")
     tier = params.get("_caller_tier", "")
     escrow = await ctx.payment_engine.get_escrow(params["escrow_id"])
-    _check_escrow_ownership(caller, tier, escrow)
+    _check_escrow_payer(caller, tier, escrow)
     escrow = await ctx.payment_engine.refund_escrow(
         params["escrow_id"],
         idempotency_key=params.get("idempotency_key"),

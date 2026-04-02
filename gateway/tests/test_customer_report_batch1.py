@@ -345,34 +345,19 @@ class TestWebhookSSRF:
 
 
 class TestRevokeApiKeyFreeTier:
-    """Free-tier agents should be able to revoke their own API keys."""
+    """revoke_api_key is admin-only (BFLA audit fix). Non-admin must get 403."""
 
-    async def test_free_tier_can_revoke_key(self, client, app):
-        """Free-tier agent creates key, then revokes it — expect 200."""
-        ctx = app.state.ctx
+    async def test_free_tier_cannot_revoke_key(self, client, app):
+        """Free-tier agent trying to revoke a key must get 403 (admin-only)."""
         key = await _create_agent(app, "revoke-free-agent", tier="free", balance=1000.0)
 
-        # List keys to get hash prefix
-        resp = await _exec(client, "list_api_keys", {"agent_id": "revoke-free-agent"}, key)
-        assert resp.status_code == 200
-        keys = resp.json()["keys"]
-        active_keys = [k for k in keys if not k["revoked"]]
-        assert len(active_keys) >= 1
-        hash_prefix = active_keys[0]["key_hash_prefix"]
-
-        # Create a second key so we can revoke the first and still auth
-        key2_info = await ctx.key_manager.create_key("revoke-free-agent", tier="free")
-        key2 = key2_info["key"]
-
-        # Revoke with free tier
         resp = await _exec(
             client,
             "revoke_api_key",
-            {"agent_id": "revoke-free-agent", "key_hash_prefix": hash_prefix},
-            key2,
+            {"agent_id": "revoke-free-agent", "key_hash_prefix": "abcd1234"},
+            key,
         )
-        assert resp.status_code == 200
-        assert resp.json()["revoked"] is True
+        assert resp.status_code == 403
 
 
 # ============================================================================

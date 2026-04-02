@@ -202,3 +202,64 @@ async def test_batch_has_rate_limit_headers(client, api_key):
     assert "x-ratelimit-limit" in resp.headers
     assert "x-ratelimit-remaining" in resp.headers
     assert "x-ratelimit-reset" in resp.headers
+
+
+# ---------------------------------------------------------------------------
+# RL-BURST: Rate limiting must be enforced pre-execution
+# ---------------------------------------------------------------------------
+
+
+async def test_rate_event_recorded_before_execution(client, api_key, app):
+    """Rate events must be recorded in check_rate_limits (pre-execution),
+    so concurrent requests see up-to-date counts."""
+    ctx = app.state.ctx
+    key_info = await ctx.key_manager.validate_key(api_key)
+    agent_id = key_info["agent_id"]
+
+    # Check initial rate count
+    initial_count = await ctx.paywall_storage.get_sliding_window_count(agent_id, "gateway")
+
+    # Make one request
+    resp = await client.post(
+        "/v1/execute",
+        json={"tool": "get_balance", "params": {"agent_id": "test-agent"}},
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 200
+
+    # Rate count should have increased by at least 1
+    new_count = await ctx.paywall_storage.get_sliding_window_count(agent_id, "gateway")
+    assert new_count > initial_count, f"Rate event not recorded: count stayed at {initial_count}"
+
+
+async def test_concurrent_requests_rate_limited(client, api_key, app):
+    """When requests exceed the rate limit, subsequent ones must get 429.
+
+    This verifies that rate events are recorded pre-execution so that
+    sequential requests (which is what async single-threaded achieves)
+    correctly see the up-to-date count.
+    """
+    ctx = app.state.ctx
+    key_info = await ctx.key_manager.validate_key(api_key)
+    agent_id = key_info["agent_id"]
+
+    from paywall_src.tiers import get_tier_config
+
+    tier_config = get_tier_config("free")
+    limit = tier_config.rate_limit_per_hour
+
+    # Pre-fill to exactly at the hourly limit
+    # With pre-execution recording, the NEXT request will tip it over.
+    for _ in range(limit):
+        await ctx.paywall_storage.record_rate_event(agent_id, "gateway", "get_balance")
+
+    # This request should get 429 — pre-execution recording bumps
+    # the count to limit+1, then check sees it's over limit.
+    resp = await client.post(
+        "/v1/execute",
+        json={"tool": "get_balance", "params": {"agent_id": "test-agent"}},
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 429, (
+        f"Expected 429 but got {resp.status_code}. Rate events may not be recorded pre-execution."
+    )
