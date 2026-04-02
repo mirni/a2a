@@ -38,37 +38,63 @@ router = APIRouter(prefix="/v1/identity", tags=["identity"])
 
 
 class RegisterAgentRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"agent_id": "agent-alice", "public_key": "ed25519:abc123..."}})
+    model_config = ConfigDict(
+        extra="forbid", json_schema_extra={"example": {"agent_id": "agent-alice", "public_key": "ed25519:abc123..."}}
+    )
     agent_id: str
     public_key: str | None = None
 
 
 class VerifyAgentRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"message": "challenge-nonce-12345", "signature": "sig_hex_string..."}})
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"example": {"message": "challenge-nonce-12345", "signature": "sig_hex_string..."}},
+    )
     message: str
     signature: str
 
 
 class SubmitMetricsRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"metrics": {"uptime": 0.999, "avg_response_ms": 245, "error_rate": 0.01}, "data_source": "self_reported"}})
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "metrics": {"uptime": 0.999, "avg_response_ms": 245, "error_rate": 0.01},
+                "data_source": "self_reported",
+            }
+        },
+    )
     metrics: dict[str, Any]
     data_source: str = "self_reported"
 
 
 class CreateOrgRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"org_name": "Acme AI Agents", "agent_id": "agent-alice"}})
+    model_config = ConfigDict(
+        extra="forbid", json_schema_extra={"example": {"org_name": "Acme AI Agents", "agent_id": "agent-alice"}}
+    )
     org_name: str
     agent_id: str = ""
 
 
 class AddMemberRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"agent_id": "agent-bob", "role": "member"}})
+    model_config = ConfigDict(
+        extra="forbid", json_schema_extra={"example": {"agent_id": "agent-bob", "role": "member"}}
+    )
     agent_id: str
     role: str = "member"
 
 
 class IngestMetricsRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"agent_id": "agent-alice", "metrics": {"uptime": 0.999, "requests_served": 15420}, "data_source": "self_reported"}})
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "agent_id": "agent-alice",
+                "metrics": {"uptime": 0.999, "requests_served": 15420},
+                "data_source": "self_reported",
+            }
+        },
+    )
     agent_id: str
     metrics: dict[str, Any]
     data_source: str = "self_reported"
