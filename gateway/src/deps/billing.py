@@ -50,7 +50,11 @@ async def record_usage_and_charge(
     idempotency_key: str | None,
     correlation_id: str,
 ) -> None:
-    """Record usage and charge the agent's wallet."""
+    """Record usage and charge the agent's wallet.
+
+    Note: rate events are recorded pre-execution in check_rate_limits()
+    to prevent concurrent requests from bypassing the limit.
+    """
     try:
         await ctx.tracker.storage.record_usage(
             agent_id=agent_id,
@@ -60,7 +64,6 @@ async def record_usage_and_charge(
         )
         if cost > 0:
             await ctx.tracker.wallet.charge(agent_id, cost, description=f"gateway:{tool_name}")
-        await ctx.paywall_storage.record_rate_event(agent_id, "gateway", tool_name)
     except (RuntimeError, OSError):
         logger.warning(
             "Usage recording failed for agent %s, tool %s",

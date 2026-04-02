@@ -247,54 +247,82 @@ class TestRevokeApiKey:
         data = resp.json()
         assert data.get("error", {}).get("code") != "unknown_tool"
 
-    async def test_revoke_api_key_soft_deletes(self, client, app, pro_api_key):
-        """revoke_api_key should soft-delete (revoke) a key by hash prefix."""
+    async def test_revoke_api_key_soft_deletes(self, client, app):
+        """revoke_api_key should soft-delete (revoke) a key by hash prefix.
+
+        revoke_api_key is admin-only; use an admin-tier key.
+        """
+        import hashlib
+        import secrets
+
         ctx = app.state.ctx
-        # Create a second key to revoke
-        new_key_info = await ctx.key_manager.create_key("pro-agent", tier="free")
-        key_hash = new_key_info["key_hash"]
-        key_hash_prefix = key_hash[:8]
+        admin_id = "admin-revoke-test"
+        try:
+            await ctx.tracker.wallet.create(admin_id, initial_balance=10000.0, signup_bonus=False)
+        except Exception:
+            pass
+        raw_admin_key = f"a2a_admin_{secrets.token_hex(12)}"
+        key_hash = hashlib.sha3_256(raw_admin_key.encode()).hexdigest()
+        await ctx.paywall_storage.store_key(key_hash=key_hash, agent_id=admin_id, tier="admin")
+
+        # Create a key to revoke
+        new_key_info = await ctx.key_manager.create_key(admin_id, tier="free")
+        revoke_hash = new_key_info["key_hash"]
+        revoke_prefix = revoke_hash[:8]
 
         resp = await client.post(
             "/v1/execute",
             json={
                 "tool": "revoke_api_key",
-                "params": {"agent_id": "pro-agent", "key_hash_prefix": key_hash_prefix},
+                "params": {"agent_id": admin_id, "key_hash_prefix": revoke_prefix},
             },
-            headers={"Authorization": f"Bearer {pro_api_key}"},
+            headers={"Authorization": f"Bearer {raw_admin_key}"},
         )
         assert resp.status_code == 200
         data = resp.json()
         assert data["revoked"] is True
 
-    async def test_revoke_api_key_nonexistent_prefix(self, client, pro_api_key):
+    async def test_revoke_api_key_nonexistent_prefix(self, client, app):
         """Revoking a key with a nonexistent prefix should report not found."""
+        import hashlib
+        import secrets
+
+        ctx = app.state.ctx
+        admin_id = "admin-revoke-noex"
+        try:
+            await ctx.tracker.wallet.create(admin_id, initial_balance=10000.0, signup_bonus=False)
+        except Exception:
+            pass
+        raw_admin_key = f"a2a_admin_{secrets.token_hex(12)}"
+        key_hash = hashlib.sha3_256(raw_admin_key.encode()).hexdigest()
+        await ctx.paywall_storage.store_key(key_hash=key_hash, agent_id=admin_id, tier="admin")
+
         resp = await client.post(
             "/v1/execute",
             json={
                 "tool": "revoke_api_key",
-                "params": {"agent_id": "pro-agent", "key_hash_prefix": "zzzzzzzz"},
+                "params": {"agent_id": admin_id, "key_hash_prefix": "zzzzzzzz"},
             },
-            headers={"Authorization": f"Bearer {pro_api_key}"},
+            headers={"Authorization": f"Bearer {raw_admin_key}"},
         )
         assert resp.status_code == 200
         data = resp.json()
         assert data["revoked"] is False
 
-    async def test_revoke_api_key_ownership_enforced(self, client, pro_api_key):
-        """revoke_api_key for a different agent should be forbidden."""
+    async def test_revoke_api_key_denied_for_non_admin(self, client, pro_api_key):
+        """revoke_api_key must be denied for non-admin tiers (BFLA fix)."""
         resp = await client.post(
             "/v1/execute",
             json={
                 "tool": "revoke_api_key",
-                "params": {"agent_id": "other-agent", "key_hash_prefix": "abcd1234"},
+                "params": {"agent_id": "pro-agent", "key_hash_prefix": "abcd1234"},
             },
             headers={"Authorization": f"Bearer {pro_api_key}"},
         )
         assert resp.status_code == 403
 
-    async def test_revoke_api_key_allowed_for_free_tier(self, client, api_key):
-        """revoke_api_key should be accessible to free tier (moved from starter)."""
+    async def test_revoke_api_key_denied_for_free_tier(self, client, api_key):
+        """revoke_api_key must be denied for free tier (BFLA fix)."""
         resp = await client.post(
             "/v1/execute",
             json={
@@ -303,8 +331,7 @@ class TestRevokeApiKey:
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
-        # free agents should be able to revoke their own keys
-        assert resp.status_code == 200
+        assert resp.status_code == 403
 
 
 # ---------------------------------------------------------------------------

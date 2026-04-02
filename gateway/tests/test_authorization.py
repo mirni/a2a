@@ -493,7 +493,7 @@ class TestAdminOnlyTools:
         """ADMIN_ONLY_TOOLS should have at least 8 entries."""
         from gateway.src.authorization import ADMIN_ONLY_TOOLS
 
-        assert len(ADMIN_ONLY_TOOLS) >= 8
+        assert len(ADMIN_ONLY_TOOLS) >= 10
 
     @pytest.mark.parametrize("tool", ADMIN_ONLY_DB_TOOLS)
     async def test_non_admin_gets_403_on_admin_tool(self, client, app, tool):
@@ -516,3 +516,47 @@ class TestAdminOnlyTools:
         )
         # May fail for missing dispute, but must NOT be 403
         assert resp.status_code != 403, "Admin should not get 403 for resolve_dispute"
+
+
+class TestBFLAAdminEndpoints:
+    """BFLA audit: process_due_subscriptions and revoke_api_key must be admin-only."""
+
+    def test_process_due_subscriptions_in_admin_only(self):
+        """process_due_subscriptions must be in ADMIN_ONLY_TOOLS."""
+        from gateway.src.authorization import ADMIN_ONLY_TOOLS
+
+        assert "process_due_subscriptions" in ADMIN_ONLY_TOOLS
+
+    def test_revoke_api_key_in_admin_only(self):
+        """revoke_api_key must be in ADMIN_ONLY_TOOLS."""
+        from gateway.src.authorization import ADMIN_ONLY_TOOLS
+
+        assert "revoke_api_key" in ADMIN_ONLY_TOOLS
+
+    async def test_pro_key_cannot_process_due_subscriptions(self, client, app):
+        """Pro-tier key calling process_due_subscriptions must get 403."""
+        key = await _create_agent(app, "pro-bfla-subs", tier="pro", balance=5000.0)
+        resp = await client.post(
+            "/v1/payments/subscriptions/process-due",
+            headers={"Authorization": f"Bearer {key}"},
+        )
+        assert resp.status_code == 403
+
+    async def test_free_key_cannot_revoke_api_key(self, client, app):
+        """Free-tier key calling revoke_api_key must get 403."""
+        key = await _create_agent(app, "free-bfla-revoke", tier="free", balance=1000.0)
+        resp = await client.post(
+            "/v1/execute",
+            json={"tool": "revoke_api_key", "params": {"agent_id": "free-bfla-revoke", "key_hash_prefix": "abcd1234"}},
+            headers={"Authorization": f"Bearer {key}"},
+        )
+        assert resp.status_code == 403
+
+    async def test_admin_can_process_due_subscriptions(self, client, app):
+        """Admin-tier key calling process_due_subscriptions must NOT get 403."""
+        admin_key = await _create_admin_agent(app, "admin-bfla-subs")
+        resp = await client.post(
+            "/v1/payments/subscriptions/process-due",
+            headers={"Authorization": f"Bearer {admin_key}"},
+        )
+        assert resp.status_code != 403

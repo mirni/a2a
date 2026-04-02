@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
 from gateway.src.tools.billing import (
@@ -47,14 +47,14 @@ class CreateWalletRequest(BaseModel):
 
 class DepositRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    amount: Decimal
+    amount: Decimal = Field(gt=0)
     currency: str = "CREDITS"
     description: str = ""
 
 
 class WithdrawRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    amount: Decimal
+    amount: Decimal = Field(gt=0)
     currency: str = "CREDITS"
     description: str = ""
 

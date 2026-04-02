@@ -378,3 +378,106 @@ async def test_get_volume_discount_via_rest(client, api_key):
     assert resp.status_code == 200
     body = resp.json()
     assert "discount_pct" in body
+
+
+# ---------------------------------------------------------------------------
+# AMT-500: Negative/zero amounts must be rejected with 422
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# RACE-DEP: Concurrent deposits must not lose credits
+# ---------------------------------------------------------------------------
+
+
+class TestConcurrentDeposits:
+    """Concurrent deposits must all be accounted for — no lost updates."""
+
+    async def test_concurrent_deposits_via_rest(self, client, api_key, app):
+        """10 concurrent deposits of 1.0 each must increase balance by exactly 10.0."""
+        import asyncio
+
+        # Record initial balance
+        resp = await client.get(
+            "/v1/billing/wallets/test-agent/balance",
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        initial_balance = float(resp.json()["balance"])
+
+        # Fire 10 concurrent deposit requests
+        async def deposit_one(i: int):
+            return await client.post(
+                "/v1/billing/wallets/test-agent/deposit",
+                json={"amount": "1.00"},
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Idempotency-Key": f"race-dep-{i}",
+                },
+            )
+
+        results = await asyncio.gather(*[deposit_one(i) for i in range(10)])
+        # All should succeed
+        for r in results:
+            assert r.status_code == 200, f"Deposit failed: {r.json()}"
+
+        # Check final balance
+        resp = await client.get(
+            "/v1/billing/wallets/test-agent/balance",
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        final_balance = float(resp.json()["balance"])
+        assert final_balance == pytest.approx(
+            initial_balance + 10.0, abs=0.01
+        ), f"Lost deposits: expected {initial_balance + 10.0}, got {final_balance}"
+
+
+class TestAmountValidation:
+    """Deposit and withdraw must reject non-positive amounts at the Pydantic layer."""
+
+    async def test_deposit_negative_amount_rejected(self, client, api_key):
+        resp = await client.post(
+            "/v1/billing/wallets/test-agent/deposit",
+            json={"amount": "-100"},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_deposit_zero_amount_rejected(self, client, api_key):
+        resp = await client.post(
+            "/v1/billing/wallets/test-agent/deposit",
+            json={"amount": "0"},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_deposit_small_negative_rejected(self, client, api_key):
+        resp = await client.post(
+            "/v1/billing/wallets/test-agent/deposit",
+            json={"amount": "-0.01"},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_withdraw_negative_amount_rejected(self, client, api_key):
+        resp = await client.post(
+            "/v1/billing/wallets/test-agent/withdraw",
+            json={"amount": "-100"},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_withdraw_zero_amount_rejected(self, client, api_key):
+        resp = await client.post(
+            "/v1/billing/wallets/test-agent/withdraw",
+            json={"amount": "0"},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_deposit_positive_amount_accepted(self, client, api_key):
+        resp = await client.post(
+            "/v1/billing/wallets/test-agent/deposit",
+            json={"amount": "1.00"},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 200

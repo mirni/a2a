@@ -73,21 +73,42 @@ async def test_list_api_keys_via_rest(client, api_key):
 # ---------------------------------------------------------------------------
 
 
-async def test_revoke_api_key_via_rest(client, api_key):
-    # First list keys to get a hash prefix
-    list_resp = await client.get(
-        "/v1/infra/keys",
-        headers={"Authorization": f"Bearer {api_key}"},
-    )
-    keys = list_resp.json()["keys"]
-    prefix = keys[0]["key_hash_prefix"]
+async def test_revoke_api_key_via_rest(client, app):
+    """revoke_api_key is admin-only; use admin-tier key."""
+    import hashlib
+    import secrets
+
+    ctx = app.state.ctx
+    admin_id = "admin-revoke-infra"
+    try:
+        await ctx.tracker.wallet.create(admin_id, initial_balance=10000.0, signup_bonus=False)
+    except Exception:
+        pass
+    raw_admin_key = f"a2a_admin_{secrets.token_hex(12)}"
+    key_hash = hashlib.sha3_256(raw_admin_key.encode()).hexdigest()
+    await ctx.paywall_storage.store_key(key_hash=key_hash, agent_id=admin_id, tier="admin")
+
+    # Create a key to revoke
+    new_key_info = await ctx.key_manager.create_key(admin_id, tier="free")
+    revoke_prefix = new_key_info["key_hash"][:8]
+
     resp = await client.post(
         "/v1/infra/keys/revoke",
-        json={"key_hash_prefix": prefix},
-        headers={"Authorization": f"Bearer {api_key}"},
+        json={"key_hash_prefix": revoke_prefix},
+        headers={"Authorization": f"Bearer {raw_admin_key}"},
     )
     assert resp.status_code == 200
     assert "revoked" in resp.json()
+
+
+async def test_revoke_api_key_non_admin_denied(client, api_key):
+    """Non-admin calling revoke_api_key via REST must get 403."""
+    resp = await client.post(
+        "/v1/infra/keys/revoke",
+        json={"key_hash_prefix": "abcd1234"},
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 403
 
 
 # ---------------------------------------------------------------------------
