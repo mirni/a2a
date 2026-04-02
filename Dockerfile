@@ -37,7 +37,6 @@ COPY products/trust/pyproject.toml products/trust/pyproject.toml
 COPY products/shared/pyproject.toml products/shared/pyproject.toml
 COPY products/identity/pyproject.toml products/identity/pyproject.toml
 COPY products/messaging/pyproject.toml products/messaging/pyproject.toml
-COPY products/reputation/pyproject.toml products/reputation/pyproject.toml
 
 # Install core runtime deps
 RUN pip install --no-cache-dir \
