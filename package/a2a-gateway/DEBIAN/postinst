@@ -110,6 +110,7 @@ ENVEOF
             # This is added first so even if the script fails mid-way,
             # you can still SSH in via Tailscale.
             ufw allow in on tailscale0 comment "Tailscale VPN" >/dev/null 2>&1 || true
+            ufw allow in on tailscale0 to any port 22 comment "Tailscale SSH" >/dev/null 2>&1 || true
 
             # Delete existing Cloudflare port-443 rules to avoid duplicates
             # on upgrade. Match " 443 " with spaces to avoid false matches
