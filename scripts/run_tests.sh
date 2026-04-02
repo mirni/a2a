@@ -48,7 +48,6 @@ ALL_MODULES=(
     products/trust
     products/identity
     products/messaging
-    products/reputation
 )
 
 run_one() {

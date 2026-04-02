@@ -34,11 +34,6 @@ def get_tool(name: str) -> dict[str, Any] | None:
     return None
 
 
-def get_tools_by_service(service: str) -> list[dict[str, Any]]:
-    """Return all tools belonging to a given service (billing, payments, etc.)."""
-    return [dict(t) for t in _load() if t["service"] == service]
-
-
 def tool_count() -> int:
     """Return the number of tools in the catalog."""
     return len(_load())

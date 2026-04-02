@@ -31,17 +31,6 @@ def calculate_tool_cost(pricing: dict[str, Any], params: dict[str, Any]) -> floa
     return max(0.0, float(pricing.get("per_call", 0.0)))
 
 
-async def check_balance(ctx: Any, agent_id: str, cost: float, tier: str) -> None:
-    """Check that the agent has sufficient balance for the tool call."""
-    from gateway.src.authorization import ADMIN_TIER
-
-    if tier == ADMIN_TIER or cost <= 0:
-        return
-    balance = await ctx.tracker.get_balance(agent_id)
-    if balance < cost:
-        raise BalanceError(f"Insufficient balance: {balance} < {cost} credits required")
-
-
 async def record_usage_and_charge(
     ctx: Any,
     agent_id: str,

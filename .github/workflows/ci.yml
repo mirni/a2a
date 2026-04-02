@@ -116,9 +116,6 @@ jobs:
       - name: Test messaging
         run: scripts/run_tests.sh products/messaging
 
-      - name: Test reputation
-        run: scripts/run_tests.sh products/reputation
-
   # ---------------------------------------------------------------------------
   # Package: build debs + SDK wheel
   # ---------------------------------------------------------------------------
