@@ -6597,3 +6597,66 @@ Implement the audit remediation plan from PR #27 findings: security fixes, SDK m
 - e2e_tests.py, monitoring/prometheus/prometheus.yml
 - scripts/create_package.sh, scripts/backup_databases.sh
 - package/a2a-db-backup/* (6 new files)
+
+---
+
+## 2026-04-01 — Improve Test Coverage + Review External Security Audit
+
+### Human Prompt
+"Implement the plan to improve gateway test coverage (5 batches). Then process the prompt in review-external-security-audit.md."
+
+### Actions Taken
+
+#### Task 1: Improve Gateway Test Coverage (PR #29)
+
+Branch: `feat/improve-coverage`
+
+Created 6 new test files and expanded 12 existing ones, adding ~160 new tests:
+
+**Batch 1 — New test files for core modules:**
+- `test_event_handlers.py` — 11 tests (trust drop, marketplace suspend, billing webhook handlers)
+- `test_signing.py` — 14 tests (HMAC sign/verify, dilithium mock paths, sign_response)
+- `test_sql_validator.py` — 19 tests (empty SQL, comments, semicolons, command types)
+- `test_anomaly.py` — 7 tests (auth failure thresholds, rate limit thresholds, time pruning)
+
+**Batch 2 — Tool context dependency chain:**
+- `test_tool_context.py` — 10 tests (400/401/402/403 error paths, headers, ownership)
+
+**Batch 3 — Expand rate_limit, health, billing:**
+- `test_rate_limit_headers.py` — +10 unit tests
+- `test_health.py` — +6 HealthMonitor unit tests
+- `v1/test_billing.py` — +11 calculate_tool_cost unit tests
+
+**Batch 4 — Expand batch, disputes, webhooks, mcp:**
+- `test_batch_execution.py` — +4 error path tests
+- `test_disputes.py` — +6 state machine edge cases
+- `test_webhooks.py` — +10 HMAC/encryption unit tests
+- `test_mcp_proxy.py` — +3 edge case tests
+
+**Batch 5 — Low-hanging fruit:**
+- `test_serialization.py` — +16 unit tests
+- `test_url_validator.py` — 14 SSRF protection tests (new file)
+- `test_pagination.py` — +10 cursor/paginate tests
+- `v1/test_payments.py` — +3 tests
+- `v1/test_trust.py` — +3 tests
+- `v1/test_identity.py` — +3 tests
+
+**Result:** Gateway tests: 1085 → 1245 (all passing). CI green. PR #29 opened.
+
+#### Task 2: Review External Security Audit (PR #30)
+
+Reviewed `tasks/external/external-audit-results_0401.md` — 24 findings (2 Critical, 7 High, 13 Medium, 2 Low).
+
+**Triage summary:**
+- 6 findings: environment artifacts (auditor key not provisioned, tested v0.5.3)
+- 2 findings: false positives (tier escalation prevention exists, extra fields by design)
+- 2 findings: already fixed in v0.7.0 (error handler, security headers)
+- 5 findings: real infra config items (nginx timeouts, server_tokens, CF rate limits)
+- 2 findings: real code gaps (idempotency on capture/release/refund, missing response headers)
+
+Created `scripts/generate_audit_keys.py` for provisioning audit keys.
+Created actionable todo list in `tasks/active/review-external-security-audit.md`.
+
+### PRs
+- PR #29: `feat/improve-coverage` — Test coverage improvements (CI green)
+- PR #30: `task/review-external-audit` — Audit review + key gen script
