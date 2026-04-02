@@ -1,5 +1,30 @@
 # Changelog
 
+# Release v0.9.0
+
+**Date:** 2026-04-02
+**Commit:** d021c7a3
+**Previous:** v0.8.4
+
+## Changes
+
+### Other
+
+- Merge release v0.8.4 into main (`d021c7a`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 0.9.0 |
+| a2a-db-backup | 0.9.0 |
+| a2a-gateway | 0.9.0 |
+| a2a-gateway-sandbox | 0.9.0 |
+| a2a-gateway-test | 0.9.0 |
+| a2a-website | 0.9.0 |
+---
+
+
 # Release v0.8.4
 
 **Date:** 2026-04-02
