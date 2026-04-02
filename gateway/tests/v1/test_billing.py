@@ -426,9 +426,9 @@ class TestConcurrentDeposits:
             headers={"Authorization": f"Bearer {api_key}"},
         )
         final_balance = float(resp.json()["balance"])
-        assert final_balance == pytest.approx(
-            initial_balance + 10.0, abs=0.01
-        ), f"Lost deposits: expected {initial_balance + 10.0}, got {final_balance}"
+        assert final_balance == pytest.approx(initial_balance + 10.0, abs=0.01), (
+            f"Lost deposits: expected {initial_balance + 10.0}, got {final_balance}"
+        )
 
 
 class TestAmountValidation:

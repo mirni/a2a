@@ -229,9 +229,7 @@ async def test_rate_event_recorded_before_execution(client, api_key, app):
 
     # Rate count should have increased by at least 1
     new_count = await ctx.paywall_storage.get_sliding_window_count(agent_id, "gateway")
-    assert new_count > initial_count, (
-        f"Rate event not recorded: count stayed at {initial_count}"
-    )
+    assert new_count > initial_count, f"Rate event not recorded: count stayed at {initial_count}"
 
 
 async def test_concurrent_requests_rate_limited(client, api_key, app):
@@ -263,6 +261,5 @@ async def test_concurrent_requests_rate_limited(client, api_key, app):
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 429, (
-        f"Expected 429 but got {resp.status_code}. "
-        "Rate events may not be recorded pre-execution."
+        f"Expected 429 but got {resp.status_code}. Rate events may not be recorded pre-execution."
     )

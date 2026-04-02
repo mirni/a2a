@@ -517,9 +517,7 @@ class TestIntentCapture500:
         """Capture when payee has no wallet must NOT return 500."""
         payer_key = await _create_agent_key(app, "cap-payer-nowall")
         # payee "no-wallet-payee" intentionally NOT created
-        resp = await _create_intent(
-            client, payer_key, payer="cap-payer-nowall", payee="no-wallet-payee"
-        )
+        resp = await _create_intent(client, payer_key, payer="cap-payer-nowall", payee="no-wallet-payee")
         assert resp.status_code == 201
         intent_id = resp.json()["id"]
 
