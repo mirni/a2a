@@ -17,8 +17,8 @@ import sys
 import time
 from datetime import datetime, timedelta
 
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, REPO_ROOT)
+INSTALL_DIR = os.environ.get("A2A_INSTALL_DIR", "/opt/a2a")
+sys.path.insert(0, INSTALL_DIR)
 
 AGENTS = [
     {
