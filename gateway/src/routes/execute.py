@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from gateway.src.auth import extract_api_key
 from gateway.src.authorization import ADMIN_ONLY_TOOLS, ADMIN_TIER, check_ownership_authorization
 from gateway.src.catalog import get_tool
+from gateway.src.deps.billing import calculate_tool_cost
 from gateway.src.errors import error_response, handle_product_exception
 from gateway.src.mcp_proxy import GITHUB_MCP_TOOLS, POSTGRES_MCP_TOOLS, STRIPE_MCP_TOOLS
 from gateway.src.middleware import Metrics
@@ -124,30 +125,6 @@ def _rate_limit_headers(limit: int, rate_count: int, window_seconds: float = 360
         "X-RateLimit-Remaining": str(remaining),
         "X-RateLimit-Reset": str(reset),
     }
-
-
-def calculate_tool_cost(pricing: dict[str, Any], params: dict[str, Any]) -> float:
-    """Calculate the cost of a tool call based on the pricing model.
-
-    Supports two pricing models:
-    - "percentage": fee = clamp(amount * percentage / 100, min_fee, max_fee)
-    - flat (default): fee = pricing["per_call"]
-    """
-    from gateway.src.tool_errors import NegativeCostError
-
-    model = pricing.get("model")
-    if model == "percentage":
-        amount = float(params.get("amount", 0))
-        pct = float(pricing.get("percentage", 0))
-        min_fee = float(pricing.get("min_fee", 0))
-        max_fee = float(pricing.get("max_fee", float("inf")))
-        raw_fee = amount * pct / 100.0
-        cost = max(min_fee, min(max_fee, raw_fee))
-        if cost < 0:
-            raise NegativeCostError(f"Negative cost calculated: {cost}")
-        return cost
-    # Flat per-call pricing (default)
-    return max(0.0, float(pricing.get("per_call", 0.0)))
 
 
 async def _try_x402_payment(

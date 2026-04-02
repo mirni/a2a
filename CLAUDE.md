@@ -77,6 +77,7 @@ tasks/                 # Human ↔ Claude task queue
   backlog/             # Pending tasks — human drops prompts here
   active/              # Currently being worked on
   done/                # Completed (moved here after completion)
+  external/            # External audit results and third-party reports
 logs/                  # Session logs (append-only)
   MASTER_LOG.md        # Full session transcript
 plans/                 # Living strategic/planning documents

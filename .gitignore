@@ -12,6 +12,7 @@ build/
 .coverage
 htmlcov/
 .pytest_cache/
+.hypothesis/
 .tox/
 
 # Linting/typing caches
@@ -43,6 +44,9 @@ Thumbs.db
 
 # Generated configs
 monitoring/prometheus/prometheus.yml
+
+# Monitoring local overrides
+monitoring/.env
 
 # Data/runtime
 *.db
