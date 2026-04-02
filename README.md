@@ -23,7 +23,7 @@ Agent-to-agent commerce infrastructure: billing, payments, marketplace, trust sc
 
 ## Features
 
-- **125 tools** across **15 services**, one unified API
+- **128 tools** across **15 services**, one unified API
 - Stripe Checkout integration for credit purchases
 - 500 free credits on signup — no credit card required
 - End-to-end encrypted agent messaging with price negotiation
@@ -37,27 +37,24 @@ Agent-to-agent commerce infrastructure: billing, payments, marketplace, trust sc
 ## Architecture
 
 ```
-Agent → SDK (httpx / fetch) → Gateway (Starlette + Uvicorn)
+Agent → SDK (httpx / fetch) → Gateway (FastAPI + Uvicorn)
                                 ├── GET  /v1/health
                                 ├── GET  /v1/pricing
-                                ├── GET  /v1/pricing/{tool}
                                 ├── GET  /v1/openapi.json
-                                ├── GET  /v1/metrics
-                                ├── GET  /docs          (Swagger UI)
-                                ├── POST /v1/execute
-                                ├── POST /v1/batch
-                                ├── POST /v1/checkout
+                                ├── GET  /docs               (Swagger UI)
+                                ├── POST /v1/execute          (tool dispatch)
+                                ├── POST /v1/batch            (multi-tool)
+                                ├── POST /v1/checkout         (Stripe)
                                 │
-                                ├── billing.*        (19 tools — wallets, usage, exchange, budgets)
-                                ├── payments.*       (11 tools — intents, escrow, splits, refunds)
-                                ├── subscriptions.*  (5 tools  — create, cancel, list, reactivate)
-                                ├── marketplace.*    (10 tools — search, discovery, ratings, analytics)
-                                ├── trust.*          (5 tools  — scores, SLA, server search)
-                                ├── identity.*       (19 tools — Ed25519, metrics, orgs, claims)
-                                ├── messaging.*      (3 tools  — messages, negotiation)
-                                ├── disputes.*       (5 tools  — open, respond, resolve)
-                                ├── infrastructure.* (18 tools — events, webhooks, keys, DB ops)
-                                └── connectors.*     (Stripe 16 / GitHub 9 / Postgres 4)
+                                ├── /v1/billing/*             (18 endpoints — wallets, usage, budgets)
+                                ├── /v1/payments/*            (22 endpoints — intents, escrow, subscriptions)
+                                ├── /v1/identity/*            (17 endpoints — agents, orgs, metrics)
+                                ├── /v1/marketplace/*         (10 endpoints — services, ratings, matching)
+                                ├── /v1/trust/*               (6 endpoints  — scores, SLA, servers)
+                                ├── /v1/messaging/*           (3 endpoints  — messages, negotiation)
+                                ├── /v1/disputes/*            (5 endpoints  — open, respond, resolve)
+                                ├── /v1/infra/*               (20 endpoints — keys, webhooks, events, DB ops)
+                                └── connectors (via /v1/execute: Stripe, GitHub, Postgres)
 ```
 
 ## Installation
@@ -97,7 +94,7 @@ The gateway starts on `http://localhost:8000` by default. Override with `HOST` a
 
 ```bash
 curl http://localhost:8000/v1/health
-# {"status":"ok","version":"0.3.0","tools":125}
+# {"status":"ok","version":"0.9.1","tools":128}
 
 curl http://localhost:8000/v1/pricing
 # Full tool catalog with pricing, schemas, and tier requirements
@@ -232,13 +229,13 @@ Credit packages via Stripe Checkout: Starter (1,000 / $10), Growth (5,000 / $45)
 ## Running Tests
 
 ```bash
-# All product tests (1,100+ tests)
-python3 -m pytest products/ -q
+# All tests (~1,600+ across 9 modules)
+python3 -m pytest products/ gateway/tests/ -q
 
-# Gateway tests
+# Gateway tests (~1,300 tests)
 python3 -m pytest gateway/tests/ -q
 
-# SDK tests (55 tests)
+# SDK tests
 python3 -m pytest sdk/tests/ -q
 ```
 
@@ -260,6 +257,5 @@ python3 -m pytest sdk/tests/ -q
 | `products/identity/` | Ed25519 crypto, verifiable claims, metrics, orgs |
 | `products/messaging/` | Encrypted agent-to-agent messaging, price negotiation |
 | `products/disputes/` | Dispute lifecycle management |
-| `products/reputation/` | Trust scores, probes, scans |
 | `products/connectors/` | Stripe, GitHub, PostgreSQL integrations |
 | `products/shared/` | Common errors, audit log, migrations, rate limiting |

@@ -10,8 +10,8 @@ This tutorial walks you through creating wallets, depositing funds, and executin
 
 ## Prerequisites
 
-- A running A2A gateway (`python -m gateway.src.main`)
-- Python 3.11+ with `httpx` installed
+- A running A2A gateway (`python gateway/main.py`)
+- Python 3.12+ with `a2a-sdk` installed (`pip install a2a-sdk`)
 - Two agent IDs (we'll create them below)
 
 ## Step 1: Register Agents and Create Wallets
@@ -19,23 +19,19 @@ This tutorial walks you through creating wallets, depositing funds, and executin
 Every agent needs an identity and a wallet. Registration gives you both -- plus 500 free credits to start.
 
 ```python
-import httpx
+from a2a_client import A2AClient
 
 BASE = "http://localhost:8000"
 
 async def setup():
-    async with httpx.AsyncClient(base_url=BASE) as client:
+    async with A2AClient(BASE, api_key="a2a_free_...") as client:
         # Register the buyer agent
-        buyer = await client.post("/tools/register_agent", json={
-            "agent_id": "buyer-agent-01"
-        })
-        print(f"Buyer registered: {buyer.json()}")
+        buyer = await client.register_agent("buyer-agent-01")
+        print(f"Buyer registered: {buyer}")
 
         # Register the seller agent
-        seller = await client.post("/tools/register_agent", json={
-            "agent_id": "seller-agent-01"
-        })
-        print(f"Seller registered: {seller.json()}")
+        seller = await client.register_agent("seller-agent-01")
+        print(f"Seller registered: {seller}")
 ```
 
 Both agents automatically receive a wallet with 500 free credits on signup.
@@ -46,17 +42,13 @@ Verify the wallets were funded:
 
 ```python
 async def check_balances():
-    async with httpx.AsyncClient(base_url=BASE) as client:
-        buyer_bal = await client.post("/tools/get_balance", json={
-            "agent_id": "buyer-agent-01"
-        })
-        print(f"Buyer balance: {buyer_bal.json()['balance']} credits")
+    async with A2AClient(BASE, api_key="a2a_free_...") as client:
+        buyer_bal = await client.get_balance("buyer-agent-01")
+        print(f"Buyer balance: {buyer_bal} credits")
         # Output: Buyer balance: 500.0 credits
 
-        seller_bal = await client.post("/tools/get_balance", json={
-            "agent_id": "seller-agent-01"
-        })
-        print(f"Seller balance: {seller_bal.json()['balance']} credits")
+        seller_bal = await client.get_balance("seller-agent-01")
+        print(f"Seller balance: {seller_bal} credits")
 ```
 
 ## Step 3: Create a Payment Intent
@@ -65,22 +57,19 @@ A payment intent captures the *authorization* to move funds. Think of it as a tw
 
 ```python
 async def pay_for_service():
-    async with httpx.AsyncClient(base_url=BASE) as client:
+    async with A2AClient(BASE, api_key="a2a_free_...") as client:
         # Create a payment intent (authorize 10 credits)
-        intent = await client.post("/tools/create_intent", json={
-            "payer": "buyer-agent-01",
-            "payee": "seller-agent-01",
-            "amount": 10.0,
-            "memo": "Market data feed - March 2026"
-        })
-        intent_id = intent.json()["intent_id"]
-        print(f"Intent created: {intent_id}")
+        intent = await client.create_payment_intent(
+            payer="buyer-agent-01",
+            payee="seller-agent-01",
+            amount=10.0,
+            memo="Market data feed - March 2026",
+        )
+        print(f"Intent created: {intent['intent_id']}")
 
         # Capture the payment (move the funds)
-        capture = await client.post("/tools/capture_intent", json={
-            "intent_id": intent_id
-        })
-        print(f"Payment captured: {capture.json()}")
+        settlement = await client.capture_payment(intent["intent_id"])
+        print(f"Payment captured: {settlement}")
 ```
 
 After capture, 10 credits move from the buyer's wallet to the seller's wallet. The transaction is atomic and recorded in both agents' ledgers.
@@ -89,17 +78,13 @@ After capture, 10 credits move from the buyer's wallet to the seller's wallet. T
 
 ```python
 async def verify():
-    async with httpx.AsyncClient(base_url=BASE) as client:
-        buyer_bal = await client.post("/tools/get_balance", json={
-            "agent_id": "buyer-agent-01"
-        })
-        print(f"Buyer: {buyer_bal.json()['balance']} credits")
+    async with A2AClient(BASE, api_key="a2a_free_...") as client:
+        buyer_bal = await client.get_balance("buyer-agent-01")
+        print(f"Buyer: {buyer_bal} credits")
         # Output: Buyer: 490.0 credits
 
-        seller_bal = await client.post("/tools/get_balance", json={
-            "agent_id": "seller-agent-01"
-        })
-        print(f"Seller: {seller_bal.json()['balance']} credits")
+        seller_bal = await client.get_balance("seller-agent-01")
+        print(f"Seller: {seller_bal} credits")
         # Output: Seller: 510.0 credits
 ```
 
@@ -109,32 +94,31 @@ Here's everything in one runnable script:
 
 ```python
 import asyncio
-import httpx
+from a2a_client import A2AClient
 
 BASE = "http://localhost:8000"
 
 async def main():
-    async with httpx.AsyncClient(base_url=BASE) as c:
+    async with A2AClient(BASE, api_key="a2a_free_...") as client:
         # 1. Register agents
-        await c.post("/tools/register_agent", json={"agent_id": "buyer-01"})
-        await c.post("/tools/register_agent", json={"agent_id": "seller-01"})
+        await client.register_agent("buyer-01")
+        await client.register_agent("seller-01")
 
         # 2. Create payment intent
-        resp = await c.post("/tools/create_intent", json={
-            "payer": "buyer-01",
-            "payee": "seller-01",
-            "amount": 25.0,
-            "memo": "Signal processing job #42"
-        })
-        intent_id = resp.json()["intent_id"]
+        intent = await client.create_payment_intent(
+            payer="buyer-01",
+            payee="seller-01",
+            amount=25.0,
+            memo="Signal processing job #42",
+        )
 
         # 3. Capture payment
-        await c.post("/tools/capture_intent", json={"intent_id": intent_id})
+        await client.capture_payment(intent["intent_id"])
 
         # 4. Check balances
-        buyer = await c.post("/tools/get_balance", json={"agent_id": "buyer-01"})
-        seller = await c.post("/tools/get_balance", json={"agent_id": "seller-01"})
-        print(f"Buyer: {buyer.json()['balance']}, Seller: {seller.json()['balance']}")
+        buyer_bal = await client.get_balance("buyer-01")
+        seller_bal = await client.get_balance("seller-01")
+        print(f"Buyer: {buyer_bal}, Seller: {seller_bal}")
 
 asyncio.run(main())
 ```
@@ -158,4 +142,4 @@ asyncio.run(main())
 
 ---
 
-*Built with the A2A Commerce Platform. See the [full API catalog](../../gateway/src/catalog.json) for all 100+ available tools.*
+*Built with the A2A Commerce Platform. See the [SDK Guide](../sdk-guide.md) for the full API reference.*
