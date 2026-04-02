@@ -45,11 +45,13 @@ AGENTS = [
 async def main(data_dir: str, output_path: str, expires_hours: int) -> None:
     os.environ["A2A_DATA_DIR"] = data_dir
 
+    import gateway.src.bootstrap  # noqa: F401 — registers billing_src/paywall_src
+
+    _ = gateway.src.bootstrap  # force ruff to treat as separate import blocks
+
     from billing_src.tracker import UsageTracker
     from paywall_src.keys import KeyManager
     from paywall_src.storage import PaywallStorage
-
-    import gateway.src.bootstrap  # noqa: F401 — triggers side-effects
 
     ps = PaywallStorage(f"sqlite:///{data_dir}/paywall.db")
     await ps.connect()

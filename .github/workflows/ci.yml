@@ -66,6 +66,7 @@ jobs:
   # Test: all modules on Python 3.12 with coverage
   # ---------------------------------------------------------------------------
   test:
+    needs: [quality]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -122,6 +123,7 @@ jobs:
   # Package: build debs + SDK wheel
   # ---------------------------------------------------------------------------
   package:
+    needs: [quality]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
