@@ -64,6 +64,25 @@ ENVEOF
             chmod 600 "$INSTALL_DIR/.env"
         fi
 
+        # --- Cloudflare Authenticated Origin Pulls ---
+        # Download the Cloudflare origin-pull CA certificate so nginx can
+        # verify that incoming TLS connections originate from Cloudflare,
+        # preventing direct-to-origin bypass attacks.
+        CF_CA_PATH="/etc/nginx/cloudflare-origin-pull-ca.pem"
+        CF_CA_URL="https://developers.cloudflare.com/ssl/static/authenticated_origin_pull_ca.pem"
+        if [[ ! -f "$CF_CA_PATH" ]]; then
+            echo "Downloading Cloudflare Authenticated Origin Pull CA..."
+            curl -fsSL "$CF_CA_URL" -o "$CF_CA_PATH" \
+                || echo "WARNING: Failed to download Cloudflare origin-pull CA. Authenticated Origin Pulls not configured."
+            if [[ -f "$CF_CA_PATH" ]]; then
+                chmod 644 "$CF_CA_PATH"
+                echo "Cloudflare origin-pull CA installed at $CF_CA_PATH"
+                echo "To activate, add these lines to your nginx server block and enable in Cloudflare dashboard:"
+                echo "  ssl_client_certificate $CF_CA_PATH;"
+                echo "  ssl_verify_client on;"
+            fi
+        fi
+
         # --- Set ownership ---
         chown -R "$A2A_USER:$A2A_USER" "$INSTALL_DIR"
         chown -R "$A2A_USER:$A2A_USER" "$DATA_DIR"
