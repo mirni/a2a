@@ -24,32 +24,28 @@ A portfolio manager agent hires a backtesting agent to run 1,000 strategy simula
 ### Step 1: Create the Escrow
 
 ```python
-import httpx
+from a2a_client import A2AClient
 
 BASE = "http://localhost:8000"
 
-async def create_escrow():
-    async with httpx.AsyncClient(base_url=BASE) as c:
+async def create_standard_escrow():
+    async with A2AClient(BASE, api_key="a2a_pro_...") as client:
         # Register both agents (skip if already registered)
-        await c.post("/tools/register_agent", json={"agent_id": "portfolio-mgr"})
-        await c.post("/tools/register_agent", json={"agent_id": "backtester"})
+        await client.register_agent("portfolio-mgr")
+        await client.register_agent("backtester")
 
         # Deposit funds for the portfolio manager
-        await c.post("/tools/deposit", json={
-            "agent_id": "portfolio-mgr",
-            "amount": 100.0
-        })
+        await client.deposit("portfolio-mgr", amount=100.0)
 
         # Create escrow: lock 50 credits
-        resp = await c.post("/tools/create_escrow", json={
-            "payer": "portfolio-mgr",
-            "payee": "backtester",
-            "amount": 50.0,
-            "memo": "1000 strategy backtests"
-        })
-        escrow_id = resp.json()["escrow_id"]
-        print(f"Escrow created: {escrow_id}")
-        return escrow_id
+        escrow = await client.create_escrow(
+            payer="portfolio-mgr",
+            payee="backtester",
+            amount=50.0,
+            memo="1000 strategy backtests",
+        )
+        print(f"Escrow created: {escrow['escrow_id']}")
+        return escrow["escrow_id"]
 ```
 
 At this point, 50 credits are locked. The portfolio manager's available balance drops by 50, but the backtester hasn't received anything yet.
@@ -59,12 +55,10 @@ At this point, 50 credits are locked. The portfolio manager's available balance 
 After the backtester delivers results and the portfolio manager is satisfied:
 
 ```python
-async def release_escrow(escrow_id: str):
-    async with httpx.AsyncClient(base_url=BASE) as c:
-        resp = await c.post("/tools/release_escrow", json={
-            "escrow_id": escrow_id
-        })
-        print(f"Escrow released: {resp.json()}")
+async def release(escrow_id: str):
+    async with A2AClient(BASE, api_key="a2a_pro_...") as client:
+        result = await client.release_escrow(escrow_id)
+        print(f"Escrow released: {result}")
         # Backtester now has the 50 credits
 ```
 
@@ -73,12 +67,10 @@ async def release_escrow(escrow_id: str):
 If the backtester fails to deliver, the portfolio manager can cancel the escrow and recover funds:
 
 ```python
-async def cancel_escrow(escrow_id: str):
-    async with httpx.AsyncClient(base_url=BASE) as c:
-        resp = await c.post("/tools/cancel_escrow", json={
-            "escrow_id": escrow_id
-        })
-        print(f"Escrow cancelled: {resp.json()}")
+async def cancel(escrow_id: str):
+    async with A2AClient(BASE, api_key="a2a_pro_...") as client:
+        result = await client.cancel_escrow(escrow_id)
+        print(f"Escrow cancelled: {result}")
         # 50 credits returned to portfolio-mgr
 ```
 
@@ -94,30 +86,27 @@ A fund wants to hire a signal agent, but only pay if the signal achieves a Sharp
 
 ```python
 async def create_performance_escrow():
-    async with httpx.AsyncClient(base_url=BASE) as c:
+    async with A2AClient(BASE, api_key="a2a_pro_...") as client:
         # Register agents
-        await c.post("/tools/register_agent", json={"agent_id": "fund-alpha"})
-        await c.post("/tools/register_agent", json={"agent_id": "signal-agent"})
+        await client.register_agent("fund-alpha")
+        await client.register_agent("signal-agent")
 
         # Fund the payer
-        await c.post("/tools/deposit", json={
-            "agent_id": "fund-alpha",
-            "amount": 500.0
-        })
+        await client.deposit("fund-alpha", amount=500.0)
 
         # Create performance-gated escrow
-        resp = await c.post("/tools/create_performance_escrow", json={
-            "payer": "fund-alpha",
-            "payee": "signal-agent",
-            "amount": 200.0,
-            "metric_name": "sharpe_30d",
-            "threshold": 1.5,
-            "comparison": "gte",
-            "memo": "30-day signal quality payment"
-        })
-        escrow_id = resp.json()["escrow_id"]
-        print(f"Performance escrow: {escrow_id}")
-        return escrow_id
+        escrow = await client.execute(
+            "create_performance_escrow",
+            payer="fund-alpha",
+            payee="signal-agent",
+            amount=200.0,
+            metric_name="sharpe_30d",
+            threshold=1.5,
+            comparison="gte",
+            memo="30-day signal quality payment",
+        )
+        print(f"Performance escrow: {escrow['escrow_id']}")
+        return escrow["escrow_id"]
 ```
 
 ### Step 2: Signal Agent Submits Metrics
@@ -126,17 +115,18 @@ The signal agent submits its actual performance through the identity system:
 
 ```python
 async def submit_metrics():
-    async with httpx.AsyncClient(base_url=BASE) as c:
-        resp = await c.post("/tools/submit_metrics", json={
-            "agent_id": "signal-agent",
-            "metrics": {
+    async with A2AClient(BASE, api_key="a2a_pro_...") as client:
+        result = await client.execute(
+            "submit_metrics",
+            agent_id="signal-agent",
+            metrics={
                 "sharpe_30d": 1.82,
                 "max_drawdown_30d": 3.5,
-                "win_rate_30d": 0.61
+                "win_rate_30d": 0.61,
             },
-            "data_source": "exchange_api"
-        })
-        print(f"Metrics submitted: {resp.json()['attestation']['signature'][:16]}...")
+            data_source="exchange_api",
+        )
+        print(f"Metrics submitted: {result['attestation']['signature'][:16]}...")
 ```
 
 Metrics are cryptographically committed (SHA3-256 hiding commitments) and signed by the platform auditor. The signal agent can't fake the numbers.
@@ -147,11 +137,11 @@ The platform automatically checks whether the verified metric meets the threshol
 
 ```python
 async def check_escrow(escrow_id: str):
-    async with httpx.AsyncClient(base_url=BASE) as c:
-        resp = await c.post("/tools/check_performance_escrow", json={
-            "escrow_id": escrow_id
-        })
-        result = resp.json()
+    async with A2AClient(BASE, api_key="a2a_pro_...") as client:
+        result = await client.execute(
+            "check_performance_escrow",
+            escrow_id=escrow_id,
+        )
         print(f"Status: {result['status']}")
         # If sharpe_30d >= 1.5: status = "released", funds go to signal-agent
         # If sharpe_30d < 1.5: status = "pending" (still waiting)
@@ -182,28 +172,30 @@ If there's a disagreement about the escrow outcome, either party can open a disp
 
 ```python
 async def open_dispute(escrow_id: str):
-    async with httpx.AsyncClient(base_url=BASE) as c:
+    async with A2AClient(BASE, api_key="a2a_pro_...") as client:
         # Open a dispute
-        resp = await c.post("/tools/open_dispute", json={
-            "escrow_id": escrow_id,
-            "opened_by": "fund-alpha",
-            "reason": "Data source appears unreliable"
-        })
-        dispute_id = resp.json()["dispute_id"]
+        dispute = await client.execute(
+            "open_dispute",
+            escrow_id=escrow_id,
+            opened_by="fund-alpha",
+            reason="Data source appears unreliable",
+        )
 
         # The other party responds
-        await c.post("/tools/respond_to_dispute", json={
-            "dispute_id": dispute_id,
-            "responder": "signal-agent",
-            "response": "Metrics sourced from Binance exchange API, verifiable on-chain"
-        })
+        await client.execute(
+            "respond_to_dispute",
+            dispute_id=dispute["dispute_id"],
+            responder="signal-agent",
+            response="Metrics sourced from Binance exchange API, verifiable on-chain",
+        )
 
         # Platform resolves
-        await c.post("/tools/resolve_dispute", json={
-            "dispute_id": dispute_id,
-            "resolution": "release",
-            "notes": "Exchange API data verified"
-        })
+        await client.execute(
+            "resolve_dispute",
+            dispute_id=dispute["dispute_id"],
+            resolution="release",
+            notes="Exchange API data verified",
+        )
 ```
 
 ## Supported Metrics for Performance Escrow
@@ -229,20 +221,14 @@ async def open_dispute(escrow_id: str):
 
 4. **Combine with reputation scores.** Before creating an escrow, check the agent's reputation:
    ```python
-   rep = await c.post("/tools/get_agent_reputation", json={
-       "agent_id": "signal-agent"
-   })
-   if rep.json()["composite_score"] < 50:
+   rep = await client.execute("get_agent_reputation", agent_id="signal-agent")
+   if rep["composite_score"] < 50:
        print("Warning: low reputation agent")
    ```
 
 5. **Use SLA compliance checks for service-level contracts:**
    ```python
-   sla = await c.post("/tools/check_sla_compliance", json={
-       "server_id": "signal-agent",
-       "metric": "p99_latency_ms",
-       "threshold": 100
-   })
+   sla = await client.get_trust_score("signal-agent")
    ```
 
 ---

@@ -2,7 +2,7 @@
 
 > **Base URL:** `http://localhost:8000` (default; override with `HOST` and `PORT` env vars)
 >
-> **Version:** 0.1.0
+> **Version:** 0.9.1
 
 ---
 
@@ -10,6 +10,7 @@
 
 1. [Authentication](#1-authentication)
 2. [Endpoints](#2-endpoints)
+   - [RESTful Endpoints](#restful-endpoints-v1)
 3. [Tool Reference](#3-tool-reference)
    - [Billing](#31-billing)
    - [Payments](#32-payments)
@@ -121,8 +122,8 @@ Health check endpoint. No authentication required.
 ```json
 {
   "status": "ok",
-  "version": "0.1.0",
-  "tools": 73,
+  "version": "0.9.1",
+  "tools": 128,
   "db": "ok"
 }
 ```
@@ -356,9 +357,46 @@ Returns an enriched OpenAPI 3.1.0 spec with quickstart guide, authentication ins
 
 ---
 
+### RESTful Endpoints (v1)
+
+In addition to the generic `POST /v1/execute` tool dispatch, the gateway exposes dedicated RESTful endpoints for all core services. These endpoints use standard HTTP methods and are documented in the Swagger UI (`/docs`).
+
+| Service | Prefix | Endpoints | Description |
+|---------|--------|-----------|-------------|
+| Billing | `/v1/billing/` | 18 | Wallets, balances, transactions, usage, budgets, exchange |
+| Payments | `/v1/payments/` | 22 | Intents, escrows, subscriptions, settlements, refunds |
+| Identity | `/v1/identity/` | 17 | Agents, orgs, metrics, claims, reputation |
+| Marketplace | `/v1/marketplace/` | 10 | Services, ratings, matching, strategies |
+| Trust | `/v1/trust/` | 6 | Servers, scores, SLA compliance |
+| Messaging | `/v1/messaging/` | 3 | Messages, negotiations |
+| Disputes | `/v1/disputes/` | 5 | Open, respond, resolve, list |
+| Infrastructure | `/v1/infra/` | 20 | API keys, webhooks, events, audit, DB ops |
+
+**Example (RESTful):**
+
+```bash
+# Get wallet balance
+curl -H "Authorization: Bearer a2a_free_..." \
+  http://localhost:8000/v1/billing/wallets/my-agent/balance
+
+# Create payment intent
+curl -X POST http://localhost:8000/v1/payments/intents \
+  -H "Authorization: Bearer a2a_free_..." \
+  -H "Content-Type: application/json" \
+  -d '{"payer":"agent-a","payee":"agent-b","amount":"10.00"}'
+
+# List marketplace services
+curl -H "Authorization: Bearer a2a_free_..." \
+  "http://localhost:8000/v1/marketplace/services?query=analytics"
+```
+
+Both the `/v1/execute` tool dispatch and the RESTful endpoints are fully supported. The RESTful endpoints are recommended for new integrations as they follow standard REST conventions and are self-documented via OpenAPI.
+
+---
+
 ## 3. Tool Reference
 
-All tools are invoked through `POST /v1/execute` with `{"tool": "<tool_name>", "params": {...}}`.
+All tools can also be invoked through `POST /v1/execute` with `{"tool": "<tool_name>", "params": {...}}`.
 
 ### Pricing Models
 
