@@ -62,6 +62,16 @@ ENVEOF
             chmod 600 /opt/a2a-sandbox/.env
         fi
 
+        # --- Cloudflare Authenticated Origin Pulls ---
+        CF_CA_PATH="/etc/nginx/cloudflare-origin-pull-ca.pem"
+        CF_CA_URL="https://developers.cloudflare.com/ssl/static/authenticated_origin_pull_ca.pem"
+        if [[ ! -f "$CF_CA_PATH" ]]; then
+            echo "Downloading Cloudflare Authenticated Origin Pull CA..."
+            curl -fsSL "$CF_CA_URL" -o "$CF_CA_PATH" \
+                || echo "WARNING: Failed to download Cloudflare origin-pull CA."
+            [[ -f "$CF_CA_PATH" ]] && chmod 644 "$CF_CA_PATH"
+        fi
+
         # Enable the a2a-sandbox site in nginx
         ln -sf /etc/nginx/sites-available/a2a-sandbox /etc/nginx/sites-enabled/a2a-sandbox
         nginx -t && systemctl reload nginx

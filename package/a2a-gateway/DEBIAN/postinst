@@ -64,6 +64,112 @@ ENVEOF
             chmod 600 "$INSTALL_DIR/.env"
         fi
 
+        # --- Cloudflare Authenticated Origin Pulls ---
+        # Download the Cloudflare origin-pull CA certificate so nginx can
+        # verify that incoming TLS connections originate from Cloudflare,
+        # preventing direct-to-origin bypass attacks.
+        CF_CA_PATH="/etc/nginx/cloudflare-origin-pull-ca.pem"
+        CF_CA_URL="https://developers.cloudflare.com/ssl/static/authenticated_origin_pull_ca.pem"
+        if [[ ! -f "$CF_CA_PATH" ]]; then
+            echo "Downloading Cloudflare Authenticated Origin Pull CA..."
+            curl -fsSL "$CF_CA_URL" -o "$CF_CA_PATH" \
+                || echo "WARNING: Failed to download Cloudflare origin-pull CA. Authenticated Origin Pulls not configured."
+            if [[ -f "$CF_CA_PATH" ]]; then
+                chmod 644 "$CF_CA_PATH"
+                echo "Cloudflare origin-pull CA installed at $CF_CA_PATH"
+                echo "To activate, add these lines to your nginx server block and enable in Cloudflare dashboard:"
+                echo "  ssl_client_certificate $CF_CA_PATH;"
+                echo "  ssl_verify_client on;"
+            fi
+        fi
+
+        # --- UFW: restrict port 443 to Cloudflare IPs only ---
+        # Cloudflare IPv4 ranges: https://www.cloudflare.com/ips-v4/
+        # This ensures only Cloudflare can reach the origin on 443,
+        # preventing direct-to-origin attacks that bypass WAF/DDoS.
+        if command -v ufw >/dev/null 2>&1; then
+            CLOUDFLARE_IPV4=(
+                173.245.48.0/20
+                103.21.244.0/22
+                103.22.200.0/22
+                103.31.4.0/22
+                141.101.64.0/18
+                108.162.192.0/18
+                190.93.240.0/20
+                188.114.96.0/20
+                197.234.240.0/22
+                198.41.128.0/17
+                162.158.0.0/15
+                104.16.0.0/13
+                104.24.0.0/14
+                172.64.0.0/13
+                131.0.72.0/22
+            )
+
+            # SAFETY: ensure Tailscale access BEFORE touching any rules.
+            # This is added first so even if the script fails mid-way,
+            # you can still SSH in via Tailscale.
+            ufw allow in on tailscale0 comment "Tailscale VPN" >/dev/null 2>&1 || true
+            ufw allow in on tailscale0 to any port 22 comment "Tailscale SSH" >/dev/null 2>&1 || true
+
+            # Delete existing Cloudflare port-443 rules to avoid duplicates
+            # on upgrade. Match " 443 " with spaces to avoid false matches
+            # on port 4430, IPs containing "443", etc.
+            # Reverse order so index numbers stay valid during deletion.
+            EXISTING_CF=$(ufw status numbered 2>/dev/null \
+                | grep -E " 443[/ ]" | grep -i "cloudflare" \
+                | sed 's/\[ *\([0-9]*\)\].*/\1/' | sort -rn)
+            for num in $EXISTING_CF; do
+                ufw --force delete "$num" >/dev/null 2>&1 || true
+            done
+
+            for cidr in "${CLOUDFLARE_IPV4[@]}"; do
+                ufw allow from "$cidr" to any port 443 comment "Cloudflare" >/dev/null 2>&1
+            done
+
+            # Deny all other incoming by default (idempotent)
+            ufw default deny incoming >/dev/null 2>&1
+            ufw default allow outgoing >/dev/null 2>&1
+
+            # Enable UFW if not already active
+            ufw --force enable >/dev/null 2>&1
+            echo "UFW configured: port 443 restricted to Cloudflare IPs, Tailscale allowed."
+        fi
+
+        # --- nginx: Cloudflare real IP restoration ---
+        # So the application sees the real client IP instead of Cloudflare's.
+        CF_REALIP_CONF="/etc/nginx/conf.d/cloudflare-real-ip.conf"
+        if [[ -d /etc/nginx/conf.d ]] && [[ ! -f "$CF_REALIP_CONF" ]]; then
+            cat > "$CF_REALIP_CONF" << 'CFEOF'
+# Restore real client IP from Cloudflare — managed by a2a-gateway postinst
+# Source: https://www.cloudflare.com/ips-v4/
+set_real_ip_from 173.245.48.0/20;
+set_real_ip_from 103.21.244.0/22;
+set_real_ip_from 103.22.200.0/22;
+set_real_ip_from 103.31.4.0/22;
+set_real_ip_from 141.101.64.0/18;
+set_real_ip_from 108.162.192.0/18;
+set_real_ip_from 190.93.240.0/20;
+set_real_ip_from 188.114.96.0/20;
+set_real_ip_from 197.234.240.0/22;
+set_real_ip_from 198.41.128.0/17;
+set_real_ip_from 162.158.0.0/15;
+set_real_ip_from 104.16.0.0/13;
+set_real_ip_from 104.24.0.0/14;
+set_real_ip_from 172.64.0.0/13;
+set_real_ip_from 131.0.72.0/22;
+real_ip_header CF-Connecting-IP;
+CFEOF
+            echo "nginx Cloudflare real-IP config installed at $CF_REALIP_CONF"
+        fi
+
+        # --- Deploy robots.txt for nginx ---
+        if [[ -f "$INSTALL_DIR/static/robots.txt" ]]; then
+            echo "NOTE: robots.txt is at $INSTALL_DIR/static/robots.txt"
+            echo "Add to your nginx server block:"
+            echo "  location = /robots.txt { alias $INSTALL_DIR/static/robots.txt; access_log off; }"
+        fi
+
         # --- Set ownership ---
         chown -R "$A2A_USER:$A2A_USER" "$INSTALL_DIR"
         chown -R "$A2A_USER:$A2A_USER" "$DATA_DIR"

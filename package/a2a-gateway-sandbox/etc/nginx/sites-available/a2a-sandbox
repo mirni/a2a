@@ -21,6 +21,10 @@ server {
     ssl_ciphers         HIGH:!aNULL:!MD5;
     ssl_prefer_server_ciphers on;
 
+    # Cloudflare Authenticated Origin Pulls — only accept connections from Cloudflare
+    ssl_client_certificate /etc/nginx/cloudflare-origin-pull-ca.pem;
+    ssl_verify_client on;
+
     # Security headers
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-Frame-Options "DENY" always;
@@ -28,6 +32,11 @@ server {
 
     # HTTP/2 field size limits
     large_client_header_buffers 4 16k;
+
+    location = /robots.txt {
+        alias /opt/a2a-sandbox/static/robots.txt;
+        access_log off;
+    }
 
     location / {
         proxy_pass http://a2a_sandbox_backend;
