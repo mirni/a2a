@@ -31,6 +31,14 @@ if [ ! -f "$MONITOR_DIR/docker-compose.yml" ]; then
     exit 1
 fi
 
+# Load local overrides (not checked in — contains Tailscale IP, etc.)
+if [ -f "$MONITOR_DIR/.env" ]; then
+    set -a
+    # shellcheck source=/dev/null
+    source "$MONITOR_DIR/.env"
+    set +a
+fi
+
 # Check docker compose is available
 if docker compose version >/dev/null 2>&1; then
     COMPOSE="docker compose"
