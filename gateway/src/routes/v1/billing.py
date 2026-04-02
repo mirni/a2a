@@ -39,35 +39,35 @@ router = APIRouter(prefix="/v1/billing", tags=["billing"])
 
 
 class CreateWalletRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"agent_id": "agent-alice", "initial_balance": "100.00", "signup_bonus": True}})
     agent_id: str
     initial_balance: Decimal = Decimal("0")
     signup_bonus: bool = True
 
 
 class DepositRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    amount: Decimal = Field(gt=0)
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"amount": "50.00", "currency": "CREDITS", "description": "Top-up via Stripe"}})
+    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=2)
     currency: str = "CREDITS"
     description: str = ""
 
 
 class WithdrawRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    amount: Decimal = Field(gt=0)
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"amount": "25.00", "currency": "CREDITS", "description": "Payout to external wallet"}})
+    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=2)
     currency: str = "CREDITS"
     description: str = ""
 
 
 class BudgetCapRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"daily_cap": "100.00", "monthly_cap": "2000.00", "alert_threshold": 0.8}})
     daily_cap: Decimal | None = None
     monthly_cap: Decimal | None = None
     alert_threshold: float = 0.8
 
 
 class ConvertCurrencyRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"amount": "100.00", "from_currency": "CREDITS", "to_currency": "USD"}})
     amount: Decimal
     from_currency: str
     to_currency: str

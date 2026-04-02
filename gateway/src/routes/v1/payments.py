@@ -44,7 +44,7 @@ router = APIRouter(prefix="/v1/payments", tags=["payments"])
 
 
 class CreateIntentRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"payer": "agent-alice", "payee": "agent-bob", "amount": "10.00", "description": "Data analysis service", "currency": "CREDITS"}})
     payer: str
     payee: str
     amount: Decimal
@@ -54,7 +54,7 @@ class CreateIntentRequest(BaseModel):
 
 
 class CreateEscrowRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"payer": "agent-alice", "payee": "agent-bob", "amount": "50.00", "description": "Milestone delivery", "timeout_hours": 72}})
     payer: str
     payee: str
     amount: Decimal
@@ -65,7 +65,7 @@ class CreateEscrowRequest(BaseModel):
 
 
 class CreatePerformanceEscrowRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"payer": "agent-alice", "payee": "agent-bob", "amount": "25.00", "metric_name": "accuracy", "threshold": ">=0.95", "description": "ML model delivery"}})
     payer: str
     payee: str
     amount: Decimal
@@ -75,7 +75,7 @@ class CreatePerformanceEscrowRequest(BaseModel):
 
 
 class PartialCaptureRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"amount": "15.00"}})
     amount: Decimal
 
 
@@ -86,7 +86,7 @@ class SplitEntry(BaseModel):
 
 
 class CreateSplitIntentRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"payer": "agent-alice", "amount": "100.00", "splits": [{"payee": "agent-bob", "percentage": 60}, {"payee": "agent-carol", "percentage": 40}], "description": "Revenue split"}})
     payer: str
     amount: Decimal
     splits: list[SplitEntry]
@@ -95,13 +95,13 @@ class CreateSplitIntentRequest(BaseModel):
 
 
 class RefundSettlementRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"amount": "10.00", "reason": "Service not delivered"}})
     amount: Decimal | None = None
     reason: str = ""
 
 
 class CreateSubscriptionRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"payer": "agent-alice", "payee": "agent-bob", "amount": "9.99", "interval": "monthly", "description": "Premium data feed"}})
     payer: str
     payee: str
     amount: Decimal

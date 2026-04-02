@@ -245,3 +245,38 @@ async def test_webhook_with_filter_agent_ids(client, pro_api_key, app):
     assert resp.status_code in (200, 201)
     data = resp.json()
     assert data["id"].startswith("whk-")
+
+
+@pytest.mark.asyncio
+async def test_webhook_send_connection_error_graceful(client, pro_api_key, app):
+    """_send should handle non-httpx exceptions (OSError, etc.) without raising 500."""
+    # Register a webhook with a valid-looking URL
+    resp = await client.post(
+        "/v1/execute",
+        json={
+            "tool": "register_webhook",
+            "params": {
+                "agent_id": "pro-agent",
+                "url": "https://httpbin.org/post",
+                "event_types": ["test.ping"],
+                "secret": "conn-error-test",
+            },
+        },
+        headers={"Authorization": f"Bearer {pro_api_key}"},
+    )
+    assert resp.status_code in (200, 201)
+    webhook_id = resp.json()["id"]
+
+    # Mock httpx.AsyncClient.post to raise OSError (not httpx.HTTPError)
+    with patch("gateway.src.webhooks.httpx.AsyncClient") as mock_client:
+        mock_instance = mock_client.return_value.__aenter__.return_value
+        mock_instance.post.side_effect = OSError("Connection refused")
+
+        resp = await client.post(
+            f"/v1/infra/webhooks/{webhook_id}/test",
+            headers={"Authorization": f"Bearer {pro_api_key}"},
+        )
+    # Should return 200 with failure status, not 500
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] in ("failed", "pending")

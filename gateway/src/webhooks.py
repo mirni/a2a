@@ -331,7 +331,7 @@ class WebhookManager:
             status_code = response.status_code
             body = response.text
             success = 200 <= status_code < 300
-        except httpx.HTTPError as exc:
+        except Exception as exc:
             status_code = None
             body = str(exc)
             success = False

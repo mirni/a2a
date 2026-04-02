@@ -80,7 +80,7 @@ class TestAgentIdOwnership:
         assert resp.status_code == 403
         body = resp.json()
         assert body["type"].endswith("/forbidden")
-        assert "bob" in body["detail"]
+        assert "bob" not in body["detail"]
 
     async def test_ownership_check_on_deposit(self, client, app):
         """403: cannot deposit into another agent's wallet."""
@@ -451,8 +451,8 @@ class TestAuthorizationGuard:
         assert result is not None
         assert result[0] == 403
 
-    def test_error_message_includes_field_and_values(self):
-        """Error message should specify which field failed."""
+    def test_error_message_does_not_leak_values(self):
+        """Error message must NOT echo user-supplied input or caller agent_id."""
         from gateway.src.authorization import check_ownership_authorization
 
         result = check_ownership_authorization(
@@ -462,9 +462,23 @@ class TestAuthorizationGuard:
         )
         assert result is not None
         status, message, code = result
-        assert "bob" in message
-        assert "alice" in message
+        assert "bob" not in message
+        assert "alice" not in message
         assert code == "forbidden"
+
+    def test_error_message_does_not_reflect_injection(self):
+        """Attacker-supplied SQL/XSS payloads must not appear in error."""
+        from gateway.src.authorization import check_ownership_authorization
+
+        result = check_ownership_authorization(
+            caller_agent_id="victim",
+            caller_tier="free",
+            params={"agent_id": "'; DROP TABLE wallets;--"},
+        )
+        assert result is not None
+        status, message, code = result
+        assert "DROP TABLE" not in message
+        assert "victim" not in message
 
 
 # ---------------------------------------------------------------------------

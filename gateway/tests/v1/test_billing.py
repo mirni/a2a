@@ -481,3 +481,52 @@ class TestAmountValidation:
             headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 200
+
+    async def test_deposit_huge_amount_rejected(self, client, api_key):
+        resp = await client.post(
+            "/v1/billing/wallets/test-agent/deposit",
+            json={"amount": "1e18"},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_deposit_over_billion_rejected(self, client, api_key):
+        resp = await client.post(
+            "/v1/billing/wallets/test-agent/deposit",
+            json={"amount": "999999999999.99"},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_withdraw_huge_amount_rejected(self, client, api_key):
+        resp = await client.post(
+            "/v1/billing/wallets/test-agent/withdraw",
+            json={"amount": "1e18"},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_deposit_sub_penny_rejected(self, client, api_key):
+        resp = await client.post(
+            "/v1/billing/wallets/test-agent/deposit",
+            json={"amount": "0.001"},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_deposit_two_decimal_accepted(self, client, api_key):
+        resp = await client.post(
+            "/v1/billing/wallets/test-agent/deposit",
+            json={"amount": "0.01"},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 200
+
+    async def test_deposit_max_amount_accepted(self, client, api_key):
+        """Exactly 1 billion should be accepted."""
+        resp = await client.post(
+            "/v1/billing/wallets/test-agent/deposit",
+            json={"amount": "1000000000"},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 200

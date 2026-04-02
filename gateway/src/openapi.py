@@ -437,6 +437,12 @@ def generate_openapi_spec() -> dict:
                     "scheme": "bearer",
                     "description": "API key passed as Bearer token in the Authorization header.",
                 },
+                "ApiKeyAuth": {
+                    "type": "apiKey",
+                    "in": "header",
+                    "name": "X-API-Key",
+                    "description": "API key passed directly in the X-API-Key header (alternative to Bearer).",
+                },
                 "X402Payment": {
                     "type": "apiKey",
                     "in": "header",
@@ -445,7 +451,7 @@ def generate_openapi_spec() -> dict:
                 },
             },
         },
-        "security": [{"BearerAuth": []}, {"X402Payment": []}],
+        "security": [{"BearerAuth": []}, {"ApiKeyAuth": []}, {"X402Payment": []}],
     }
 
     return spec

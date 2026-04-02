@@ -6,10 +6,13 @@ from collections import defaultdict
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from shared_src.pricing_config import load_pricing_config
 
 from gateway.src.catalog import get_catalog, get_tool
 from gateway.src.errors import error_response
 from gateway.src.rate_limit_headers import public_rate_limit_headers
+
+_pricing = load_pricing_config()
 
 router = APIRouter()
 
@@ -98,6 +101,35 @@ async def pricing_summary(request: Request) -> JSONResponse:
         )
 
     return JSONResponse({"services": services})
+
+
+@router.get("/v1/pricing/tiers")
+async def pricing_tiers(request: Request) -> JSONResponse:
+    """Return a human-readable comparison of all API tiers."""
+    plans_by_tier: dict[str, dict | None] = {}
+    for plan_name, plan in _pricing.subscription_plans.items():
+        plans_by_tier[plan["tier"]] = {
+            "plan": plan_name,
+            "price_cents": plan.get("price_cents") or plan.get("price_cents_min"),
+            "credits_included": plan.get("credits_included"),
+            "billing_period": plan.get("billing_period", "monthly"),
+        }
+
+    tiers = []
+    for name, vals in _pricing.tiers.items():
+        tiers.append(
+            {
+                "name": name,
+                "description": vals.get("description", ""),
+                "rate_limit_per_hour": vals["rate_limit_per_hour"],
+                "burst_allowance": vals.get("burst_allowance", 0),
+                "support_level": vals.get("support_level", "none"),
+                "audit_log_retention_days": vals.get("audit_log_retention_days"),
+                "subscription": plans_by_tier.get(name),
+            }
+        )
+
+    return JSONResponse({"tiers": tiers})
 
 
 @router.get("/v1/pricing/{tool}")

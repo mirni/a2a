@@ -184,3 +184,33 @@ async def test_pricing_404_uses_problem_details(client):
     assert body["status"] == 404
     assert "type" in body
     assert "success" not in body
+
+
+async def test_rest_422_uses_problem_details(client, api_key):
+    """REST route 422 validation errors must use RFC 9457, not FastAPI default."""
+    resp = await client.post(
+        "/v1/billing/wallets/test-agent/deposit",
+        json={"amount": "-1"},
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 422
+    assert resp.headers["content-type"] == "application/problem+json"
+    body = resp.json()
+    assert body["status"] == 422
+    assert "type" in body
+    assert "title" in body
+    # Must NOT have FastAPI's default "detail" array format
+    assert not isinstance(body.get("detail"), list)
+
+
+async def test_405_uses_problem_details(client, api_key):
+    """405 Method Not Allowed must use RFC 9457 format."""
+    resp = await client.put(
+        "/v1/health",
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 405
+    assert resp.headers["content-type"] == "application/problem+json"
+    body = resp.json()
+    assert body["status"] == 405
+    assert "type" in body

@@ -173,3 +173,51 @@ async def test_pricing_summary(client):
     tool = svc["tools"][0]
     assert "name" in tool
     assert "pricing" in tool
+
+
+# ---------------------------------------------------------------------------
+# Tiers endpoint (DX-3)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_pricing_tiers(client):
+    """GET /v1/pricing/tiers should return tier comparison."""
+    resp = await client.get("/v1/pricing/tiers")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "tiers" in data
+    tiers = data["tiers"]
+    assert len(tiers) == 4
+
+    # Verify all tier names present
+    tier_names = [t["name"] for t in tiers]
+    assert tier_names == ["free", "starter", "pro", "enterprise"]
+
+    # Each tier should have required fields
+    for tier in tiers:
+        assert "name" in tier
+        assert "description" in tier
+        assert "rate_limit_per_hour" in tier
+        assert "burst_allowance" in tier
+        assert "support_level" in tier
+        assert "audit_log_retention_days" in tier
+
+
+@pytest.mark.asyncio
+async def test_pricing_tiers_includes_subscription_plans(client):
+    """Tiers endpoint should include subscription plan info where applicable."""
+    resp = await client.get("/v1/pricing/tiers")
+    data = resp.json()
+
+    # Free tier has no subscription plan
+    free_tier = data["tiers"][0]
+    assert free_tier["name"] == "free"
+    assert free_tier["subscription"] is None
+
+    # Starter tier should have a plan
+    starter_tier = data["tiers"][1]
+    assert starter_tier["name"] == "starter"
+    assert starter_tier["subscription"] is not None
+    assert "price_cents" in starter_tier["subscription"]
+    assert "credits_included" in starter_tier["subscription"]
