@@ -1,5 +1,37 @@
 # Changelog
 
+# Release v0.8.4
+
+**Date:** 2026-04-02
+**Commit:** d3d98d9e
+**Previous:** v0.8.3
+
+## Changes
+
+### Bug Fixes
+
+- fix: add missing migration for currency column on transactions table (`d043f6e`)
+- fix: use datetime.UTC import compatible with Python 3.12 (`94f9697`)
+- fix: use /opt/a2a as default install dir for generate_audit_keys (`9453a31`)
+
+### Other
+
+- Merge branch 'fix/audit-keys-install-dir' (`d3d98d9`)
+- Merge release v0.8.3 into main (`648b69a`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 0.8.4 |
+| a2a-db-backup | 0.8.4 |
+| a2a-gateway | 0.8.4 |
+| a2a-gateway-sandbox | 0.8.4 |
+| a2a-gateway-test | 0.8.4 |
+| a2a-website | 0.8.4 |
+---
+
+
 # Release v0.8.3
 
 **Date:** 2026-04-02
