@@ -1,0 +1,5 @@
+# api.greenhelix.net — API server
+# No crawling. Clients use the API with authentication, not crawlers.
+
+User-agent: *
+Disallow: /

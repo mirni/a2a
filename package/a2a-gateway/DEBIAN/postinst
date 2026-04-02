@@ -83,6 +83,13 @@ ENVEOF
             fi
         fi
 
+        # --- Deploy robots.txt for nginx ---
+        if [[ -f "$INSTALL_DIR/static/robots.txt" ]]; then
+            echo "NOTE: robots.txt is at $INSTALL_DIR/static/robots.txt"
+            echo "Add to your nginx server block:"
+            echo "  location = /robots.txt { alias $INSTALL_DIR/static/robots.txt; access_log off; }"
+        fi
+
         # --- Set ownership ---
         chown -R "$A2A_USER:$A2A_USER" "$INSTALL_DIR"
         chown -R "$A2A_USER:$A2A_USER" "$DATA_DIR"

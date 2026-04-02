@@ -1,0 +1,5 @@
+# sandbox.greenhelix.net — developer sandbox
+# No crawling. Ephemeral environment.
+
+User-agent: *
+Disallow: /

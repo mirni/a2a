@@ -33,6 +33,11 @@ server {
     # HTTP/2 field size limits
     large_client_header_buffers 4 16k;
 
+    location = /robots.txt {
+        alias /opt/a2a-sandbox/static/robots.txt;
+        access_log off;
+    }
+
     location / {
         proxy_pass http://a2a_sandbox_backend;
         proxy_http_version 1.1;
