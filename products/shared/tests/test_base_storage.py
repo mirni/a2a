@@ -148,12 +148,16 @@ class TestSchemaVersionCheck:
             await db.commit()
 
         storage = MigStorage(dsn=f"sqlite:///{db_path}")
-        await storage.connect(apply_migrations=True)
+        try:
+            await storage.connect(apply_migrations=True)
 
-        # Version should be 2
-        version = await get_current_version(storage.db)
-        assert version == 2
+            # Version should be 2
+            version = await get_current_version(storage.db)
+            assert version == 2
 
-        # Column from migration v2 should exist
-        await storage.db.execute("INSERT INTO t1 (id, name, tag) VALUES (1, 'ok', 't')")
-        await storage.close()
+            # Column from migration v2 should exist — close cursor explicitly
+            # to prevent RuntimeError on event-loop teardown (aiosqlite thread)
+            cursor = await storage.db.execute("INSERT INTO t1 (id, name, tag) VALUES (1, 'ok', 't')")
+            await cursor.close()
+        finally:
+            await storage.close()

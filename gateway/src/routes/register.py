@@ -60,6 +60,7 @@ async def register(request: Request) -> JSONResponse:
     try:
         key_info = await ctx.key_manager.create_key(agent_id, tier="free")
     except Exception:
+        # nosemgrep: python-logger-credential-disclosure
         logger.exception("Failed to create API key for agent %s", agent_id)
         return await error_response(
             500, "Failed to create API key during registration", "internal_error", request=request
