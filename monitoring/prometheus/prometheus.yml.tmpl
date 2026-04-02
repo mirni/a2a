@@ -18,6 +18,8 @@ scrape_configs:
     scheme: "${A2A_GATEWAY_SCHEME}"
     metrics_path: "/v1/metrics"
     scrape_interval: 10s
+    tls_config:
+      insecure_skip_verify: true
     static_configs:
       - targets: ["${A2A_GATEWAY_HOST}:${A2A_GATEWAY_PORT}"]
         labels:
@@ -30,6 +32,8 @@ scrape_configs:
     scheme: "${A2A_GATEWAY_SCHEME}"
     metrics_path: "/v1/health"
     scrape_interval: 30s
+    tls_config:
+      insecure_skip_verify: true
     static_configs:
       - targets: ["${A2A_GATEWAY_HOST}:${A2A_GATEWAY_PORT}"]
         labels:

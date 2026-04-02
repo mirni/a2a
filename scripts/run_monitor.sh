@@ -87,7 +87,7 @@ case "$CMD" in
         echo ""
         # Quick reachability check (non-blocking)
         echo "Checking gateway reachability..."
-        if curl -sf -o /dev/null -m 3 "https://${A2A_GATEWAY_HOST}:${A2A_GATEWAY_PORT}/v1/health"; then
+        if curl -sf -k -o /dev/null -m 3 "${A2A_GATEWAY_SCHEME}://${A2A_GATEWAY_HOST}:${A2A_GATEWAY_PORT}/v1/health"; then
             echo "  Gateway ${A2A_GATEWAY_HOST}:${A2A_GATEWAY_PORT} is reachable."
         else
             echo "  WARNING: Cannot reach gateway at ${A2A_GATEWAY_HOST}:${A2A_GATEWAY_PORT}"
@@ -124,17 +124,17 @@ case "$CMD" in
         echo ""
 
         echo "2. Gateway reachability (from host):"
-        if curl -sf -o /dev/null -m 3 "https://${A2A_GATEWAY_HOST}:${A2A_GATEWAY_PORT}/v1/health"; then
+        if curl -sf -k -o /dev/null -m 3 "${A2A_GATEWAY_SCHEME}://${A2A_GATEWAY_HOST}:${A2A_GATEWAY_PORT}/v1/health"; then
             echo "   OK — gateway responds at ${A2A_GATEWAY_HOST}:${A2A_GATEWAY_PORT}"
         else
-            echo "   FAIL — cannot reach https://${A2A_GATEWAY_HOST}:${A2A_GATEWAY_PORT}/v1/health"
+            echo "   FAIL — cannot reach ${A2A_GATEWAY_SCHEME}://${A2A_GATEWAY_HOST}:${A2A_GATEWAY_PORT}/v1/health"
             echo "   Is the gateway running? Is it bound to 0.0.0.0?"
         fi
         echo ""
 
         echo "3. Gateway reachability (from Prometheus container):"
-        if docker exec a2a-prometheus wget -q -O /dev/null -T 3 \
-            "https://${A2A_GATEWAY_HOST}:${A2A_GATEWAY_PORT}/v1/health" 2>/dev/null; then
+        if docker exec a2a-prometheus wget -q -O /dev/null -T 3 --no-check-certificate \
+            "${A2A_GATEWAY_SCHEME}://${A2A_GATEWAY_HOST}:${A2A_GATEWAY_PORT}/v1/health" 2>/dev/null; then
             echo "   OK — Prometheus container can reach the gateway"
         else
             echo "   FAIL — Prometheus container cannot reach ${A2A_GATEWAY_HOST}:${A2A_GATEWAY_PORT}"
