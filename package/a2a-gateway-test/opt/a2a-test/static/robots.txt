@@ -1,0 +1,5 @@
+# test.greenhelix.net — staging/test server
+# No crawling. Internal environment only.
+
+User-agent: *
+Disallow: /
