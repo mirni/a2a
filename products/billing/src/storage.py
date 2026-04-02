@@ -273,6 +273,11 @@ CREATE INDEX IF NOT EXISTS idx_api_audit_ts ON api_audit_log(timestamp);
             "CREATE INDEX IF NOT EXISTS idx_api_audit_agent ON api_audit_log(agent_id);\n"
             "CREATE INDEX IF NOT EXISTS idx_api_audit_ts ON api_audit_log(timestamp);",
         ),
+        Migration(
+            8,
+            "add currency column to transactions",
+            "ALTER TABLE transactions ADD COLUMN currency TEXT NOT NULL DEFAULT 'CREDITS';",
+        ),
     )
 
     # -----------------------------------------------------------------------
