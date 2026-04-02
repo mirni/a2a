@@ -83,6 +83,81 @@ ENVEOF
             fi
         fi
 
+        # --- UFW: restrict port 443 to Cloudflare IPs only ---
+        # Cloudflare IPv4 ranges: https://www.cloudflare.com/ips-v4/
+        # This ensures only Cloudflare can reach the origin on 443,
+        # preventing direct-to-origin attacks that bypass WAF/DDoS.
+        if command -v ufw >/dev/null 2>&1; then
+            CLOUDFLARE_IPV4=(
+                173.245.48.0/20
+                103.21.244.0/22
+                103.22.200.0/22
+                103.31.4.0/22
+                141.101.64.0/18
+                108.162.192.0/18
+                190.93.240.0/20
+                188.114.96.0/20
+                197.234.240.0/22
+                198.41.128.0/17
+                162.158.0.0/15
+                104.16.0.0/13
+                104.24.0.0/14
+                172.64.0.0/13
+                131.0.72.0/22
+            )
+
+            # Delete any existing port 443 rules to avoid duplicates,
+            # then re-add only Cloudflare ranges.
+            # Use numbered delete in reverse to avoid index shifting.
+            EXISTING_443=$(ufw status numbered 2>/dev/null \
+                | grep "443" | sed 's/\[ *\([0-9]*\)\].*/\1/' | sort -rn)
+            for num in $EXISTING_443; do
+                ufw --force delete "$num" >/dev/null 2>&1 || true
+            done
+
+            for cidr in "${CLOUDFLARE_IPV4[@]}"; do
+                ufw allow from "$cidr" to any port 443 comment "Cloudflare" >/dev/null 2>&1
+            done
+
+            # Tailscale — allow all traffic on VPN interface (SSH, staging deploys)
+            ufw allow in on tailscale0 comment "Tailscale VPN" >/dev/null 2>&1 || true
+
+            # Deny all other incoming by default (idempotent)
+            ufw default deny incoming >/dev/null 2>&1
+            ufw default allow outgoing >/dev/null 2>&1
+
+            # Enable UFW if not already active
+            ufw --force enable >/dev/null 2>&1
+            echo "UFW configured: port 443 restricted to Cloudflare IPs, Tailscale allowed."
+        fi
+
+        # --- nginx: Cloudflare real IP restoration ---
+        # So the application sees the real client IP instead of Cloudflare's.
+        CF_REALIP_CONF="/etc/nginx/conf.d/cloudflare-real-ip.conf"
+        if [[ -d /etc/nginx/conf.d ]] && [[ ! -f "$CF_REALIP_CONF" ]]; then
+            cat > "$CF_REALIP_CONF" << 'CFEOF'
+# Restore real client IP from Cloudflare — managed by a2a-gateway postinst
+# Source: https://www.cloudflare.com/ips-v4/
+set_real_ip_from 173.245.48.0/20;
+set_real_ip_from 103.21.244.0/22;
+set_real_ip_from 103.22.200.0/22;
+set_real_ip_from 103.31.4.0/22;
+set_real_ip_from 141.101.64.0/18;
+set_real_ip_from 108.162.192.0/18;
+set_real_ip_from 190.93.240.0/20;
+set_real_ip_from 188.114.96.0/20;
+set_real_ip_from 197.234.240.0/22;
+set_real_ip_from 198.41.128.0/17;
+set_real_ip_from 162.158.0.0/15;
+set_real_ip_from 104.16.0.0/13;
+set_real_ip_from 104.24.0.0/14;
+set_real_ip_from 172.64.0.0/13;
+set_real_ip_from 131.0.72.0/22;
+real_ip_header CF-Connecting-IP;
+CFEOF
+            echo "nginx Cloudflare real-IP config installed at $CF_REALIP_CONF"
+        fi
+
         # --- Deploy robots.txt for nginx ---
         if [[ -f "$INSTALL_DIR/static/robots.txt" ]]; then
             echo "NOTE: robots.txt is at $INSTALL_DIR/static/robots.txt"
