@@ -26,18 +26,8 @@ scrape_configs:
           instance: "gateway-primary"
           environment: "production"
 
-  # A2A Gateway — /v1/health endpoint (probe-style)
-  # Uses the blackbox-style approach: scrape and check for 200
-  - job_name: "a2a-health"
-    scheme: "${A2A_GATEWAY_SCHEME}"
-    metrics_path: "/v1/health"
-    scrape_interval: 30s
-    tls_config:
-      insecure_skip_verify: true
-    static_configs:
-      - targets: ["${A2A_GATEWAY_HOST}:${A2A_GATEWAY_PORT}"]
-        labels:
-          instance: "gateway-primary"
+  # Note: /v1/health returns JSON, not Prometheus format.
+  # Gateway liveness is tracked via up{job="a2a-gateway"} instead.
 
   # Node Exporter — system metrics (CPU, RAM, disk, network)
   - job_name: "node-exporter"
