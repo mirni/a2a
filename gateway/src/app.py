@@ -22,6 +22,7 @@ from gateway.src.middleware import (
     metrics_handler,
 )
 from gateway.src.openapi import generate_openapi_spec
+from gateway.src.routes.agent_card import router as agent_card_router
 from gateway.src.routes.batch import router as batch_router
 from gateway.src.routes.execute import router as execute_router
 from gateway.src.routes.health import router as health_router
@@ -80,6 +81,7 @@ def create_app() -> FastAPI:
     )
 
     # Include all routers
+    app.include_router(agent_card_router)
     app.include_router(health_router)
     app.include_router(pricing_router)
     app.include_router(execute_router)

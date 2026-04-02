@@ -192,3 +192,51 @@ async def test_health_monitor_2xx_no_event():
         await monitor.check_services()
 
     event_bus.publish.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# Agent card tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_agent_card_returns_valid_json(client):
+    """/.well-known/agent-card.json must return valid agent card."""
+    resp = await client.get("/.well-known/agent-card.json")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
+    data = resp.json()
+    assert data["name"] == "A2A Commerce Gateway"
+    assert "url" in data
+    assert "version" in data
+    assert "capabilities" in data
+    assert "skills" in data
+    assert isinstance(data["skills"], list)
+    assert len(data["skills"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_agent_card_no_auth_required(client):
+    """Agent card must be accessible without authentication."""
+    resp = await client.get("/.well-known/agent-card.json")
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_agent_card_skills_have_required_fields(client):
+    """Each skill in the agent card must have id, name, and description."""
+    resp = await client.get("/.well-known/agent-card.json")
+    data = resp.json()
+    for skill in data["skills"]:
+        assert "id" in skill, f"Skill missing 'id': {skill}"
+        assert "name" in skill, f"Skill missing 'name': {skill}"
+        assert "description" in skill, f"Skill missing 'description': {skill}"
+
+
+@pytest.mark.asyncio
+async def test_agent_card_includes_auth_info(client):
+    """Agent card must describe authentication requirements."""
+    resp = await client.get("/.well-known/agent-card.json")
+    data = resp.json()
+    assert "authentication" in data
+    assert data["authentication"]["schemes"] is not None
