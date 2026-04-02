@@ -13,7 +13,9 @@
 |------|---------|--------|
 | SSL/TLS mode | Full (strict) | OK |
 | DNSSEC | Not enabled | FIX |
-| Email Security (SPF/DKIM/DMARC) | Not configured | FIX |
+| Email Security — SPF | `~all` (softfail) | TIGHTEN |
+| Email Security — DKIM | Configured (cf2024-1, RSA/SHA-256) | OK |
+| Email Security — DMARC | Not configured | FIX |
 | Managed Transforms (security headers) | All OFF | FIX |
 | Remove X-Powered-By | OFF | FIX |
 | Non-HTTPS traffic | 252 requests (last 24h) | FIX |
@@ -39,19 +41,28 @@ After Cloudflare generates the DS record, add it at your domain registrar. Cloud
 
 **Priority: MEDIUM**
 
-Even if you don't send email, configure these DNS records to prevent domain spoofing:
+**Current state:** SPF and DKIM are already configured via Cloudflare Email Routing. DMARC is missing.
 
-Go to **DNS > Settings > Email Security > Configure** and add:
+**Action 1 — Add DMARC record** (click "Create record" in Email > DMARC):
 
 ```
-; SPF — reject all (we don't send email from this domain)
-TXT  greenhelix.net  "v=spf1 -all"
-
-; DMARC — reject all, report to postmaster
-TXT  _dmarc.greenhelix.net  "v=DMARC1; p=reject; rua=mailto:postmaster@greenhelix.net"
+Type: TXT
+Name: _dmarc
+Content: v=DMARC1; p=quarantine; rua=mailto:postmaster@greenhelix.net
+TTL: Auto
 ```
 
-If you DO send email via a third party (e.g. transactional email), adjust SPF to include their servers instead of `-all`.
+Start with `p=quarantine` to monitor. After a few weeks of clean reports, tighten to `p=reject`.
+
+**Action 2 — Tighten SPF from `~all` to `-all`:**
+
+Current: `"v=spf1 include:_spf.mx.cloudflare.net ~all"` (softfail — unauthorized senders flagged but delivered)
+
+Change to: `"v=spf1 include:_spf.mx.cloudflare.net -all"` (hardfail — unauthorized senders rejected)
+
+Only safe if Cloudflare Email Routing is your sole email sender. If you add another provider later (e.g. SendGrid, SES), add their `include:` before `-all`.
+
+**DKIM — no change needed.** The `cf2024-1` selector with SHA-256/RSA is correctly configured.
 
 ### 1.3 DNS Records
 
