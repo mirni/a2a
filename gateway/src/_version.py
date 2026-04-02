@@ -1,3 +1,3 @@
 """Single source of truth for the gateway version."""
 
-__version__ = "0.7.0"
+__version__ = "0.8.1"
