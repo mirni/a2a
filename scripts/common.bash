@@ -122,6 +122,23 @@ ensure_nginx_rate_limit() {
     fi
 }
 
+# Harden nginx timeouts (mitigates slowloris, slow POST, idle connections)
+ensure_nginx_timeouts() {
+    local conf="/etc/nginx/nginx.conf"
+    if ! grep -q 'client_header_timeout' "$conf" 2>/dev/null; then
+        sed -i '/http {/a\    client_header_timeout 10s;\n    client_body_timeout 10s;\n    keepalive_timeout 60s;' \
+            "$conf"
+    fi
+}
+
+# Suppress nginx version in error pages (e.g. 413 responses)
+ensure_nginx_server_tokens_off() {
+    local conf="/etc/nginx/nginx.conf"
+    if ! grep -q 'server_tokens off' "$conf" 2>/dev/null; then
+        sed -i '/http {/a\    server_tokens off;' "$conf"
+    fi
+}
+
 # ---------------------------------------------------------------------------
 # Component → systemd service mapping
 # ---------------------------------------------------------------------------

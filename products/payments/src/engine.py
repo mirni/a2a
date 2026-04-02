@@ -122,11 +122,17 @@ class PaymentEngine:
         await self.storage.insert_intent(intent.model_dump())
         return intent
 
-    async def capture(self, intent_id: str) -> Settlement:
+    async def capture(self, intent_id: str, idempotency_key: str | None = None) -> Settlement:
         """Capture a pending intent: move funds from payer to payee.
 
         Transitions: pending -> settled (atomically).
         """
+        # Idempotency check
+        if idempotency_key is not None:
+            existing = await self.storage.get_settlement_by_idempotency_key(idempotency_key)
+            if existing is not None:
+                return Settlement(**existing)
+
         intent_data = await self.storage.get_intent(intent_id)
         if intent_data is None:
             raise IntentNotFoundError(f"Intent {intent_id} not found")
@@ -159,6 +165,7 @@ class PaymentEngine:
             source_type="intent",
             source_id=intent.id,
             description=intent.description,
+            idempotency_key=idempotency_key,
         )
         await self.storage.insert_settlement(settlement.model_dump())
 
@@ -167,13 +174,18 @@ class PaymentEngine:
 
         return settlement
 
-    async def void(self, intent_id: str) -> PaymentIntent:
+    async def void(self, intent_id: str, idempotency_key: str | None = None) -> PaymentIntent:
         """Void a pending intent. No funds move."""
         intent_data = await self.storage.get_intent(intent_id)
         if intent_data is None:
             raise IntentNotFoundError(f"Intent {intent_id} not found")
 
         intent = PaymentIntent(**intent_data)
+
+        # Idempotency: if already voided and same key, return as-is
+        if idempotency_key is not None and intent.status == IntentStatus.VOIDED:
+            return intent
+
         if intent.status != IntentStatus.PENDING:
             raise InvalidStateError(f"Cannot void intent in state '{intent.status.value}'; must be 'pending'")
 
@@ -401,8 +413,14 @@ class PaymentEngine:
         await self.storage.insert_escrow(escrow.model_dump())
         return escrow
 
-    async def release_escrow(self, escrow_id: str) -> Settlement:
+    async def release_escrow(self, escrow_id: str, idempotency_key: str | None = None) -> Settlement:
         """Release escrowed funds to the payee."""
+        # Idempotency check
+        if idempotency_key is not None:
+            existing = await self.storage.get_settlement_by_idempotency_key(idempotency_key)
+            if existing is not None:
+                return Settlement(**existing)
+
         escrow_data = await self.storage.get_escrow(escrow_id)
         if escrow_data is None:
             raise EscrowNotFoundError(f"Escrow {escrow_id} not found")
@@ -429,6 +447,7 @@ class PaymentEngine:
             source_type="escrow",
             source_id=escrow.id,
             description=escrow.description,
+            idempotency_key=idempotency_key,
         )
         await self.storage.insert_settlement(settlement.model_dump())
 
@@ -437,13 +456,18 @@ class PaymentEngine:
 
         return settlement
 
-    async def refund_escrow(self, escrow_id: str) -> Escrow:
+    async def refund_escrow(self, escrow_id: str, idempotency_key: str | None = None) -> Escrow:
         """Refund escrowed funds back to the payer."""
         escrow_data = await self.storage.get_escrow(escrow_id)
         if escrow_data is None:
             raise EscrowNotFoundError(f"Escrow {escrow_id} not found")
 
         escrow = Escrow(**escrow_data)
+
+        # Idempotency: if already refunded and same key, return as-is
+        if idempotency_key is not None and escrow.status == EscrowStatus.REFUNDED:
+            return escrow
+
         if escrow.status != EscrowStatus.HELD:
             raise InvalidStateError(f"Cannot refund escrow in state '{escrow.status.value}'; must be 'held'")
 

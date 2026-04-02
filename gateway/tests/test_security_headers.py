@@ -52,6 +52,20 @@ async def test_security_headers_present_on_error_responses(client):
     assert resp.headers["content-security-policy"] == "default-src 'none'"
 
 
+@pytest.mark.asyncio
+async def test_security_headers_referrer_policy(client):
+    """Referrer-Policy: no-referrer must be present on every response."""
+    resp = await client.get("/v1/health")
+    assert resp.headers["referrer-policy"] == "no-referrer"
+
+
+@pytest.mark.asyncio
+async def test_security_headers_permissions_policy(client):
+    """Permissions-Policy must be present on every response."""
+    resp = await client.get("/v1/health")
+    assert resp.headers["permissions-policy"] == "geolocation=(), camera=(), microphone=()"
+
+
 # ---------------------------------------------------------------------------
 # P3-3  CORS Middleware
 # ---------------------------------------------------------------------------
