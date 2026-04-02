@@ -1,5 +1,40 @@
 # Changelog
 
+# Release v0.9.1
+
+**Date:** 2026-04-02
+**Commit:** d15d9477
+**Previous:** v0.9.0
+
+## Changes
+
+### Bug Fixes
+
+- fix: remediate v0.8.4 security audit findings (6 issues) (#35) (`2058d40`)
+
+### Documentation
+
+- docs: Cloudflare hardening guide for AI agent API (#36) (`7504aee`)
+
+### Other
+
+- Merge branch 'main' of https://github.com/mirni/a2a (`d15d947`)
+- Update tasks (`325e8e2`)
+- Merge release v0.9.0 into main (`9422e19`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 0.9.1 |
+| a2a-db-backup | 0.9.1 |
+| a2a-gateway | 0.9.1 |
+| a2a-gateway-sandbox | 0.9.1 |
+| a2a-gateway-test | 0.9.1 |
+| a2a-website | 0.9.1 |
+---
+
+
 # Release v0.9.0
 
 **Date:** 2026-04-02
