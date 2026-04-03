@@ -33,10 +33,7 @@ def _coverage_xmls(tmp_path: Path) -> list[str]:
     files = []
     for name, rate in [("billing", 0.85), ("gateway", 0.94), ("identity", 0.93)]:
         xml = tmp_path / f"coverage-{name}.xml"
-        xml.write_text(
-            f'<?xml version="1.0"?>'
-            f'<coverage line-rate="{rate}"></coverage>'
-        )
+        xml.write_text(f'<?xml version="1.0"?><coverage line-rate="{rate}"></coverage>')
         files.append(str(xml))
     return files
 
@@ -80,9 +77,7 @@ class TestGenerateMarkdown:
 class TestCmdCheckMarkdown:
     """Tests for cmd_check with --markdown output."""
 
-    def test_writes_markdown_file(
-        self, tmp_path: Path, baseline_file: Path, _coverage_xmls: list[str]
-    ) -> None:
+    def test_writes_markdown_file(self, tmp_path: Path, baseline_file: Path, _coverage_xmls: list[str]) -> None:
         md_path = tmp_path / "coverage-comment.md"
         with mock.patch("coverage_ratchet.BASELINE_FILE", baseline_file):
             cmd_check(_coverage_xmls, markdown_path=str(md_path))
@@ -99,9 +94,7 @@ class TestCmdCheckMarkdown:
         # Should still work normally
         assert ret in (0, 1)
 
-    def test_fail_returns_1_with_markdown(
-        self, tmp_path: Path, baseline_file: Path, _coverage_xmls: list[str]
-    ) -> None:
+    def test_fail_returns_1_with_markdown(self, tmp_path: Path, baseline_file: Path, _coverage_xmls: list[str]) -> None:
         """Identity drops from 96 -> 93, should fail."""
         md_path = tmp_path / "coverage-comment.md"
         with mock.patch("coverage_ratchet.BASELINE_FILE", baseline_file):
