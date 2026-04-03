@@ -3,13 +3,13 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "a2a-langchain"
+name = "a2a-crewai"
 version = "0.1.0"
-description = "LangChain tool wrapper for the A2A Commerce Platform SDK"
+description = "CrewAI tool wrapper for the A2A Commerce Platform SDK"
 requires-python = ">=3.12"
 license = "MIT"
 authors = [{ name = "GreenHelix", email = "dev@greenhelix.net" }]
-keywords = ["a2a", "langchain", "agent", "commerce", "tools"]
+keywords = ["a2a", "crewai", "agent", "commerce", "tools"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -20,7 +20,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
 ]
 dependencies = [
-    "langchain-core>=0.2",
+    "crewai>=0.30",
     "a2a-sdk",
     "pydantic>=2.0",
 ]

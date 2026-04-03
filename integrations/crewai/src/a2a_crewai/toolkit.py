@@ -1,26 +1,27 @@
-"""A2A Toolkit for LangChain — loads tools dynamically from the catalog."""
+"""A2A Toolkit for CrewAI — loads tools dynamically from the catalog."""
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 from typing import Any
 
-from langchain_core.tools import BaseTool, BaseToolkit
+from crewai.tools import BaseTool
 
-from a2a_langchain._base import _normalize_tool_def, create_tool
+from a2a_crewai._base import _normalize_tool_def, create_tool
 
 
-class A2AToolkit(BaseToolkit):
-    """LangChain toolkit that dynamically generates tools from the A2A catalog.
+class A2AToolkit:
+    """CrewAI toolkit that dynamically generates tools from the A2A catalog.
 
     Usage::
 
         toolkit = await A2AToolkit.from_client(client)
         tools = toolkit.get_tools()
-        # Pass tools to an agent
+        # Pass tools to a CrewAI Agent
     """
 
-    tools: list[BaseTool] = []
+    def __init__(self, tools: list[BaseTool]) -> None:
+        self.tools = tools
 
     def get_tools(self) -> list[BaseTool]:
         return self.tools

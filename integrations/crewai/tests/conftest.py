@@ -1,4 +1,4 @@
-"""Shared fixtures for a2a-langchain tests."""
+"""Shared fixtures for a2a-crewai tests."""
 
 from __future__ import annotations
 
