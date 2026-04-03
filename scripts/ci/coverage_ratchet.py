@@ -45,7 +45,33 @@ def _save_baseline(data: dict[str, float]) -> None:
     BASELINE_FILE.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
 
 
-def cmd_check(xml_files: list[str]) -> int:
+def _generate_markdown(rows: list[dict], *, passed: bool) -> str:
+    """Generate a Markdown coverage report with a table and summary."""
+    lines = ["<!-- coverage-ratchet -->", "## Coverage Ratchet Report", ""]
+    lines.append("| Module | Baseline | Current | Delta | Status |")
+    lines.append("|--------|----------|---------|-------|--------|")
+
+    for r in rows:
+        base = f"{r['baseline']:.1f}%" if r["baseline"] is not None else "N/A"
+        curr = f"{r['current']:.1f}%" if r["current"] is not None else "N/A"
+        delta = f"{r['delta']:+.1f}%" if r["delta"] is not None else "—"
+        lines.append(f"| {r['module']} | {base} | {curr} | {delta} | {r['status']} |")
+
+    total = [r for r in rows if r["current"] is not None and r["baseline"] is not None]
+    if total:
+        avg = sum(r["current"] for r in total) / len(total)
+        lines.append("")
+        lines.append(f"**{len(total)} modules** | average coverage: **{avg:.1f}%**")
+
+    verdict = "passed" if passed else "FAILED"
+    emoji = "white_check_mark" if passed else "x"
+    lines.append("")
+    lines.append(f":{emoji}: Coverage ratchet **{verdict}**.")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def cmd_check(xml_files: list[str], *, markdown_path: str | None = None) -> int:
     """Compare current coverage against baseline. Returns 0 on pass, 1 on fail."""
     baseline = _load_baseline()
     if not baseline:
@@ -58,6 +84,7 @@ def cmd_check(xml_files: list[str]) -> int:
         current[name] = pct
 
     failed = False
+    rows: list[dict] = []
     print(f"{'Module':<20} {'Baseline':>10} {'Current':>10} {'Delta':>10}  Status")
     print("-" * 65)
 
@@ -67,9 +94,11 @@ def cmd_check(xml_files: list[str]) -> int:
 
         if curr_pct is None:
             print(f"{module:<20} {base_pct:>9.1f}% {'N/A':>10}  {'SKIP':>10}")
+            rows.append({"module": module, "baseline": base_pct, "current": None, "delta": None, "status": "SKIP"})
             continue
         if base_pct is None:
             print(f"{module:<20} {'N/A':>10} {curr_pct:>9.1f}%  {'NEW':>10}")
+            rows.append({"module": module, "baseline": None, "current": curr_pct, "delta": None, "status": "NEW"})
             continue
 
         delta = curr_pct - base_pct
@@ -81,14 +110,19 @@ def cmd_check(xml_files: list[str]) -> int:
             status = f"+{delta:.1f}%"
 
         print(f"{module:<20} {base_pct:>9.1f}% {curr_pct:>9.1f}% {delta:>+9.1f}%  {status}")
+        rows.append({"module": module, "baseline": base_pct, "current": curr_pct, "delta": delta, "status": status})
 
     if failed:
         print("\nCoverage ratchet FAILED: one or more modules dropped below baseline.")
         print("Fix: add tests to restore coverage, or update baseline if decrease is intentional.")
-        return 1
+    else:
+        print("\nCoverage ratchet passed.")
 
-    print("\nCoverage ratchet passed.")
-    return 0
+    if markdown_path is not None:
+        md = _generate_markdown(rows, passed=not failed)
+        Path(markdown_path).write_text(md)
+
+    return 1 if failed else 0
 
 
 def cmd_update(xml_files: list[str]) -> int:
@@ -121,14 +155,21 @@ def main() -> int:
         return 2
 
     cmd = sys.argv[1]
-    xml_files = [f for f in sys.argv[2:] if Path(f).exists()]
+    markdown_path: str | None = None
+    xml_files: list[str] = []
+
+    for arg in sys.argv[2:]:
+        if arg.startswith("--markdown="):
+            markdown_path = arg.split("=", 1)[1]
+        elif Path(arg).exists():
+            xml_files.append(arg)
 
     if not xml_files:
         print("No coverage XML files found.")
         return 0
 
     if cmd == "check":
-        return cmd_check(xml_files)
+        return cmd_check(xml_files, markdown_path=markdown_path)
     return cmd_update(xml_files)
 
 

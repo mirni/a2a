@@ -128,7 +128,7 @@ jobs:
         run: scripts/run_tests.sh products/messaging --cov=src --cov-report=xml:coverage-messaging.xml --cov-report=term-missing
 
       - name: Coverage ratchet check
-        run: python scripts/ci/coverage_ratchet.py check coverage-*.xml | tee /tmp/coverage-report.txt
+        run: python scripts/ci/coverage_ratchet.py check --markdown=/tmp/coverage-comment.md coverage-*.xml | tee /tmp/coverage-report.txt
 
       - name: Coverage summary
         if: always()
@@ -137,6 +137,22 @@ jobs:
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           cat /tmp/coverage-report.txt >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "No report generated" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post coverage comment on PR
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ ! -f /tmp/coverage-comment.md ]; then
+            echo "No coverage comment file found — skipping."
+            exit 0
+          fi
+          # Try to update existing comment, fall back to creating a new one
+          gh pr comment "${{ github.event.pull_request.number }}" \
+            --body-file /tmp/coverage-comment.md \
+            --edit-last 2>/dev/null \
+          || gh pr comment "${{ github.event.pull_request.number }}" \
+            --body-file /tmp/coverage-comment.md
 
       - name: Update coverage baseline
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
