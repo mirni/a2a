@@ -328,7 +328,6 @@ async def provision_agents(
     ts = int(time.time())
     consecutive_503s = 0
     for i in range(count):
-        success = False
         for attempt in range(10):  # More retries
             try:
                 resp = await client.post(
@@ -339,7 +338,6 @@ async def provision_agents(
                 if resp.status_code in (200, 201):
                     body = resp.json()
                     agents.append((body["agent_id"], body["api_key"]))
-                    success = True
                     consecutive_503s = 0
                     break
                 elif resp.status_code == 503:
@@ -489,7 +487,7 @@ def generate_long_report(
         lines.append("|------------|----------|-----|------|----------|----------|----------|")
 
         test_start = snapshots[0].window_start if snapshots else 0
-        for i, snap in enumerate(snapshots):
+        for snap in snapshots:
             minute = (snap.window_start - test_start) / 60
             st = snap.latency_stats()
             lines.append(
@@ -631,8 +629,6 @@ def generate_long_report(
     if snapshots:
         rps_values = [s.rps for s in snapshots if s.total > 0]
         p95_values = [s.latency_stats()["p95"] for s in snapshots if s.total > 0]
-        err_values = [s.error_rate for s in snapshots]
-
         if rps_values:
             rps_cv = (statistics.stdev(rps_values) / max(0.001, statistics.mean(rps_values)) * 100) if len(rps_values) > 1 else 0
             lines.append(f"- **Throughput stability (CV):** {rps_cv:.1f}% — {'Stable (<15%)' if rps_cv < 15 else 'Variable (>15%)'}")
@@ -719,7 +715,7 @@ async def measure_health_baseline(
         label = "health"
 
     # Quick reachability probe
-    for attempt in range(5):
+    for _attempt in range(5):
         try:
             resp = await client.get(url, headers=headers, timeout=10.0)
             if resp.status_code in (200, 201):
