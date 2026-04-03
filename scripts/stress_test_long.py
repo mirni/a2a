@@ -62,15 +62,50 @@ WORKLOADS: list[tuple[int, str, str, Any, Any, Any]] = [
     (6, "get_events", "GET", lambda _: "/v1/infra/events", lambda _: {"limit": 10}, None),
     (5, "list_webhooks", "GET", lambda _: "/v1/infra/webhooks", lambda _: {}, None),
     (4, "get_leaderboard", "GET", lambda _: "/v1/billing/leaderboard", lambda _: {"metric": "calls", "limit": 5}, None),
-    (4, "estimate_cost", "GET", lambda _: "/v1/billing/estimate", lambda _: {"tool_name": "get_balance", "quantity": 10}, None),
-    (3, "get_timeseries", "GET", lambda aid: f"/v1/billing/wallets/{aid}/timeseries", lambda _: {"interval": "hour"}, None),
+    (
+        4,
+        "estimate_cost",
+        "GET",
+        lambda _: "/v1/billing/estimate",
+        lambda _: {"tool_name": "get_balance", "quantity": 10},
+        None,
+    ),
+    (
+        3,
+        "get_timeseries",
+        "GET",
+        lambda aid: f"/v1/billing/wallets/{aid}/timeseries",
+        lambda _: {"interval": "hour"},
+        None,
+    ),
     # Note: /v1/health excluded — it's public-rate-limited (1000/hr per IP)
     # Write operations (15%)
-    (5, "deposit_small", "POST", lambda aid: f"/v1/billing/wallets/{aid}/deposit", lambda _: {}, lambda: {"amount": "0.01"}),
+    (
+        5,
+        "deposit_small",
+        "POST",
+        lambda aid: f"/v1/billing/wallets/{aid}/deposit",
+        lambda _: {},
+        lambda: {"amount": "0.01"},
+    ),
     (3, "create_intent", "POST", lambda _: "/v1/payments/intents", lambda _: {}, None),  # needs special handling
     # Note: /v1/pricing excluded — public-rate-limited
-    (2, "get_payment_history", "GET", lambda _: "/v1/payments/history", lambda aid: {"agent_id": aid, "limit": 5}, None),
-    (2, "list_subscriptions", "GET", lambda _: "/v1/payments/subscriptions", lambda aid: {"agent_id": aid, "limit": 5}, None),
+    (
+        2,
+        "get_payment_history",
+        "GET",
+        lambda _: "/v1/payments/history",
+        lambda aid: {"agent_id": aid, "limit": 5},
+        None,
+    ),
+    (
+        2,
+        "list_subscriptions",
+        "GET",
+        lambda _: "/v1/payments/subscriptions",
+        lambda aid: {"agent_id": aid, "limit": 5},
+        None,
+    ),
     # Marketplace (5%)
     (3, "trust_servers", "GET", lambda _: "/v1/trust/servers", lambda _: {"limit": 3}, None),
     (2, "marketplace_match", "GET", lambda _: "/v1/marketplace/match", lambda _: {"query": "analysis"}, None),
@@ -100,6 +135,7 @@ class RequestSample:
 @dataclass
 class SnapshotMetrics:
     """Metrics for a single time window."""
+
     window_start: float
     window_end: float
     samples: list[RequestSample] = field(default_factory=list)
@@ -163,6 +199,7 @@ class SnapshotMetrics:
 @dataclass
 class LongRunMetrics:
     """Accumulates all samples and snapshots."""
+
     all_samples: list[RequestSample] = field(default_factory=list)
     snapshots: list[SnapshotMetrics] = field(default_factory=list)
     server_metrics_snapshots: list[dict[str, Any]] = field(default_factory=list)
@@ -284,23 +321,40 @@ class StressAgent:
                     except Exception:
                         error = resp.text[:200]
 
-                await self.metrics.record(RequestSample(
-                    tool=label, status_code=resp.status_code,
-                    latency_ms=latency_ms, success=success,
-                    timestamp=ts, error=error,
-                ))
+                await self.metrics.record(
+                    RequestSample(
+                        tool=label,
+                        status_code=resp.status_code,
+                        latency_ms=latency_ms,
+                        success=success,
+                        timestamp=ts,
+                        error=error,
+                    )
+                )
             except httpx.TimeoutException:
                 latency_ms = (time.monotonic() - start) * 1000
-                await self.metrics.record(RequestSample(
-                    tool=label, status_code=0, latency_ms=latency_ms,
-                    success=False, timestamp=ts, error="timeout",
-                ))
+                await self.metrics.record(
+                    RequestSample(
+                        tool=label,
+                        status_code=0,
+                        latency_ms=latency_ms,
+                        success=False,
+                        timestamp=ts,
+                        error="timeout",
+                    )
+                )
             except Exception as e:
                 latency_ms = (time.monotonic() - start) * 1000
-                await self.metrics.record(RequestSample(
-                    tool=label, status_code=0, latency_ms=latency_ms,
-                    success=False, timestamp=ts, error=str(e)[:200],
-                ))
+                await self.metrics.record(
+                    RequestSample(
+                        tool=label,
+                        status_code=0,
+                        latency_ms=latency_ms,
+                        success=False,
+                        timestamp=ts,
+                        error=str(e)[:200],
+                    )
+                )
 
             # Delay between requests per agent — tuned to stay below Cloudflare
             # rate limits from a single IP. With N agents and 1-3s delay each,
@@ -317,7 +371,9 @@ class StressAgent:
 
 
 async def provision_agents(
-    base_url: str, client: httpx.AsyncClient, count: int,
+    base_url: str,
+    client: httpx.AsyncClient,
+    count: int,
 ) -> list[tuple[str, str]]:
     """Register test agents via public endpoint. Returns [(agent_id, api_key)].
 
@@ -343,10 +399,10 @@ async def provision_agents(
                 elif resp.status_code == 503:
                     consecutive_503s += 1
                     # Exponential backoff: 10s, 20s, 40s, 60s...
-                    wait = min(10 * (2 ** attempt), 120)
+                    wait = min(10 * (2**attempt), 120)
                     if consecutive_503s > 5:
                         wait = 120  # Back off hard if persistent
-                    print(f"  Registration {i}: 503, retrying in {wait}s... (attempt {attempt+1})")
+                    print(f"  Registration {i}: 503, retrying in {wait}s... (attempt {attempt + 1})")
                     await asyncio.sleep(wait)
                 elif resp.status_code == 409:
                     # Already exists — that's fine, try to get the key
@@ -386,7 +442,7 @@ def generate_long_report(
     lines.append("")
     lines.append(f"**Date:** {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}")
     lines.append(f"**Target:** {config['base_url']}")
-    lines.append(f"**Duration:** {actual_duration:.0f}s ({actual_duration/3600:.1f} hours)")
+    lines.append(f"**Duration:** {actual_duration:.0f}s ({actual_duration / 3600:.1f} hours)")
     lines.append(f"**Concurrent Agents:** {config['customers']}")
     lines.append(f"**Snapshot Interval:** {config['snapshot_interval']}s")
     lines.append(f"**Total Requests:** {len(all_samples):,}")
@@ -431,7 +487,7 @@ def generate_long_report(
     lines.append(f"| Successful | {total_ok:,} |")
     lines.append(f"| Failed | {total_err:,} |")
     lines.append(f"| Error rate | {err_rate:.2f}% |")
-    lines.append(f"| Duration | {actual_duration:.0f}s ({actual_duration/3600:.1f}h) |")
+    lines.append(f"| Duration | {actual_duration:.0f}s ({actual_duration / 3600:.1f}h) |")
     lines.append(f"| Avg throughput | {overall_rps:.1f} req/s |")
     lines.append(f"| Min latency | {stats['min']:.1f} ms |")
     lines.append(f"| Mean latency | {stats['mean']:.1f} ms |")
@@ -512,7 +568,9 @@ def generate_long_report(
             if abs(drift) < 10:
                 lines.append("- Assessment: **Stable** — throughput consistent over time")
             elif drift < -10:
-                lines.append("- Assessment: **Degrading** — throughput declining over time (possible resource exhaustion)")
+                lines.append(
+                    "- Assessment: **Degrading** — throughput declining over time (possible resource exhaustion)"
+                )
             else:
                 lines.append("- Assessment: **Improving** — throughput increasing (likely cache warming)")
             lines.append("")
@@ -525,7 +583,9 @@ def generate_long_report(
             lines.append("")
             lines.append(f"- First 10 min avg P95: **{statistics.mean(first_p95):.0f} ms**")
             lines.append(f"- Last 10 min avg P95: **{statistics.mean(last_p95):.0f} ms**")
-            p95_drift = ((statistics.mean(last_p95) - statistics.mean(first_p95)) / max(0.001, statistics.mean(first_p95))) * 100
+            p95_drift = (
+                (statistics.mean(last_p95) - statistics.mean(first_p95)) / max(0.001, statistics.mean(first_p95))
+            ) * 100
             lines.append(f"- Drift: **{p95_drift:+.1f}%**")
             if p95_drift > 20:
                 lines.append("- Assessment: **Latency creep detected** — P95 increasing over time")
@@ -573,8 +633,12 @@ def generate_long_report(
             lines.append(f"| Server avg RPS | {srv_rps:.1f} |")
 
             # Duration stats from server
-            dur_count_delta = last_srv.get("a2a_request_duration_ms_count", 0) - first_srv.get("a2a_request_duration_ms_count", 0)
-            dur_sum_delta = last_srv.get("a2a_request_duration_ms_sum", 0) - first_srv.get("a2a_request_duration_ms_sum", 0)
+            dur_count_delta = last_srv.get("a2a_request_duration_ms_count", 0) - first_srv.get(
+                "a2a_request_duration_ms_count", 0
+            )
+            dur_sum_delta = last_srv.get("a2a_request_duration_ms_sum", 0) - first_srv.get(
+                "a2a_request_duration_ms_sum", 0
+            )
             if dur_count_delta > 0:
                 srv_avg_ms = dur_sum_delta / dur_count_delta
                 lines.append(f"| Server avg latency | {srv_avg_ms:.1f} ms |")
@@ -630,11 +694,23 @@ def generate_long_report(
         rps_values = [s.rps for s in snapshots if s.total > 0]
         p95_values = [s.latency_stats()["p95"] for s in snapshots if s.total > 0]
         if rps_values:
-            rps_cv = (statistics.stdev(rps_values) / max(0.001, statistics.mean(rps_values)) * 100) if len(rps_values) > 1 else 0
-            lines.append(f"- **Throughput stability (CV):** {rps_cv:.1f}% — {'Stable (<15%)' if rps_cv < 15 else 'Variable (>15%)'}")
+            rps_cv = (
+                (statistics.stdev(rps_values) / max(0.001, statistics.mean(rps_values)) * 100)
+                if len(rps_values) > 1
+                else 0
+            )
+            lines.append(
+                f"- **Throughput stability (CV):** {rps_cv:.1f}% — {'Stable (<15%)' if rps_cv < 15 else 'Variable (>15%)'}"
+            )
         if p95_values:
-            p95_cv = (statistics.stdev(p95_values) / max(0.001, statistics.mean(p95_values)) * 100) if len(p95_values) > 1 else 0
-            lines.append(f"- **Latency stability (CV):** {p95_cv:.1f}% — {'Stable (<20%)' if p95_cv < 20 else 'Variable (>20%)'}")
+            p95_cv = (
+                (statistics.stdev(p95_values) / max(0.001, statistics.mean(p95_values)) * 100)
+                if len(p95_values) > 1
+                else 0
+            )
+            lines.append(
+                f"- **Latency stability (CV):** {p95_cv:.1f}% — {'Stable (<20%)' if p95_cv < 20 else 'Variable (>20%)'}"
+            )
 
         # Detect outlier windows
         if p95_values and len(p95_values) > 5:
@@ -650,9 +726,9 @@ def generate_long_report(
 
         # Memory leak indicator: monotonically increasing latency
         if len(p95_values) > 20:
-            chunks = [p95_values[i:i+10] for i in range(0, len(p95_values)-9, 10)]
+            chunks = [p95_values[i : i + 10] for i in range(0, len(p95_values) - 9, 10)]
             chunk_avgs = [statistics.mean(c) for c in chunks]
-            increasing = all(chunk_avgs[i] <= chunk_avgs[i+1] * 1.05 for i in range(len(chunk_avgs)-1))
+            increasing = all(chunk_avgs[i] <= chunk_avgs[i + 1] * 1.05 for i in range(len(chunk_avgs) - 1))
             if increasing and len(chunk_avgs) > 2 and chunk_avgs[-1] > chunk_avgs[0] * 1.3:
                 lines.append("- **Possible resource leak:** Latency consistently increasing over test duration")
             else:
@@ -678,7 +754,9 @@ def generate_long_report(
     lines.append(f"| P95 latency | <5000ms | {stats['p95']:.0f}ms | {'PASS' if p95_ok else 'FAIL'} |")
     lines.append(f"| P99 latency | <10000ms | {stats['p99']:.0f}ms | {'PASS' if p99_ok else 'FAIL'} |")
     lines.append(f"| Throughput | >5 req/s | {overall_rps:.1f} req/s | {'PASS' if rps_ok else 'FAIL'} |")
-    lines.append(f"| Late-test stability | err <10% last 10min | {'OK' if stability_ok else 'DEGRADED'} | {'PASS' if stability_ok else 'FAIL'} |")
+    lines.append(
+        f"| Late-test stability | err <10% last 10min | {'OK' if stability_ok else 'DEGRADED'} | {'PASS' if stability_ok else 'FAIL'} |"
+    )
     lines.append("")
 
     overall = err_ok and p95_ok and p99_ok and rps_ok and stability_ok
@@ -694,8 +772,10 @@ def generate_long_report(
 
 
 async def measure_health_baseline(
-    base_url: str, client: httpx.AsyncClient,
-    api_key: str = "", agent_id: str = "",
+    base_url: str,
+    client: httpx.AsyncClient,
+    api_key: str = "",
+    agent_id: str = "",
     samples: int = 20,
 ) -> dict[str, float]:
     """Measure baseline latency using an authenticated endpoint to avoid public rate limits.
@@ -811,7 +891,7 @@ async def main(args: argparse.Namespace) -> int:
                     print(f"  Probe agent: {probe_id}")
                     break
                 elif resp.status_code == 503:
-                    print(f"  Server returning 503 (Cloudflare throttle), waiting 60s... (attempt {wait_attempt+1})")
+                    print(f"  Server returning 503 (Cloudflare throttle), waiting 60s... (attempt {wait_attempt + 1})")
                     await asyncio.sleep(60)
                 elif resp.status_code == 429:
                     reset = int(resp.headers.get("x-ratelimit-reset", "60"))
@@ -898,7 +978,7 @@ async def main(args: argparse.Namespace) -> int:
             total_reqs = len(metrics.all_samples)
             total_rps = total_reqs / max(0.001, now - test_start)
             print(
-                f"  [{elapsed_min:5.0f}m / {hours*60:.0f}m] "
+                f"  [{elapsed_min:5.0f}m / {hours * 60:.0f}m] "
                 f"reqs={total_reqs:,}  rps={total_rps:.1f}  "
                 f"window: {snap.total} reqs, {snap.error_rate:.1f}% err, "
                 f"avg={snap.latency_stats()['mean']:.0f}ms p95={snap.latency_stats()['p95']:.0f}ms"
@@ -933,22 +1013,29 @@ async def main(args: argparse.Namespace) -> int:
     snapshot_data = []
     for snap in metrics.snapshots:
         st = snap.latency_stats()
-        snapshot_data.append({
-            "window_start": snap.window_start,
-            "total": snap.total,
-            "rps": round(snap.rps, 2),
-            "error_rate": round(snap.error_rate, 2),
-            "avg_ms": round(st["mean"], 1),
-            "p95_ms": round(st["p95"], 1),
-            "p99_ms": round(st["p99"], 1),
-        })
+        snapshot_data.append(
+            {
+                "window_start": snap.window_start,
+                "total": snap.total,
+                "rps": round(snap.rps, 2),
+                "error_rate": round(snap.error_rate, 2),
+                "avg_ms": round(st["mean"], 1),
+                "p95_ms": round(st["p95"], 1),
+                "p99_ms": round(st["p99"], 1),
+            }
+        )
     with open(json_path, "w") as f:
-        json.dump({
-            "config": config,
-            "health_baseline": health,
-            "snapshots": snapshot_data,
-            "server_metrics": metrics.server_metrics_snapshots,
-        }, f, indent=2, default=str)
+        json.dump(
+            {
+                "config": config,
+                "health_baseline": health,
+                "snapshots": snapshot_data,
+                "server_metrics": metrics.server_metrics_snapshots,
+            },
+            f,
+            indent=2,
+            default=str,
+        )
     print(f"  Raw data written to {json_path}")
 
     print()
@@ -961,7 +1048,11 @@ def cli() -> int:
     parser.add_argument("--base-url", default=os.environ.get("STRESS_BASE_URL", DEFAULT_BASE_URL))
     parser.add_argument("--customers", type=int, default=int(os.environ.get("STRESS_CUSTOMERS", DEFAULT_CUSTOMERS)))
     parser.add_argument("--duration", type=int, default=int(os.environ.get("STRESS_DURATION", DEFAULT_DURATION)))
-    parser.add_argument("--snapshot-interval", type=int, default=int(os.environ.get("STRESS_SNAPSHOT_INTERVAL", DEFAULT_SNAPSHOT_INTERVAL)))
+    parser.add_argument(
+        "--snapshot-interval",
+        type=int,
+        default=int(os.environ.get("STRESS_SNAPSHOT_INTERVAL", DEFAULT_SNAPSHOT_INTERVAL)),
+    )
     parser.add_argument("--report-path", default=os.environ.get("STRESS_REPORT_PATH", DEFAULT_REPORT_PATH))
     parser.add_argument("--admin-key", default=os.environ.get("STRESS_ADMIN_KEY", ""))
     args = parser.parse_args()
