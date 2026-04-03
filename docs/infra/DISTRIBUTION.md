@@ -1,8 +1,8 @@
 # Distribution & Marketing Plan: A2A Commerce Platform
 
-**Date:** 2026-03-31
+**Date:** 2026-04-02 (updated)
 **Author:** CMO Agent
-**Version:** 0.4.0
+**Version:** 0.5.0
 **Status:** Actionable — prioritized task list for human and agent execution
 
 ---
@@ -44,23 +44,26 @@ This document compares the CMO Marketing Report (2026-03-28) against the current
 
 | Gap | Impact | Priority |
 |-----|--------|----------|
-| **No hosted sandbox** | Developers must run gateway locally to try the platform. Production API requires real signup. | P0 |
-| **Website has no docs/guides** | greenhelix.net is a brochure site with zero developer content. Swagger UI exists at `/docs` but website doesn't link to it. | P0 |
+| ~~**No hosted sandbox**~~ | ~~Developers must run gateway locally to try the platform.~~ **DONE**: sandbox.greenhelix.net live | ~~P0~~ |
+| ~~**Website has no docs/guides**~~ | ~~greenhelix.net is a brochure site.~~ **DONE**: website/docs.html has full developer guide | ~~P0~~ |
 | **SDK not on PyPI or npm** | Cannot `pip install a2a-sdk` or `npm install @a2a/sdk`. Packages exist locally but have no publishing configuration. | P0 |
 | **No MCP registry listing** | Platform is invisible to the MCP ecosystem. Not registered on any MCP directory. | P0 |
 | **No GitHub topics/README optimization** | Repo is not discoverable via GitHub search. No topics, no badges. | P1 |
-| **No `/.well-known/agent-card.json`** | Not registered on any A2A protocol registry. | P1 |
+| **No `/.well-known/agent-card.json`** | Not registered on any A2A protocol registry. A2A protocol now under Linux Foundation with 150+ orgs. | P1 |
+| **No AGENTS.md** | 60,000+ repos adopted AGENTS.md (under Linux Foundation). Coding agents read it automatically. | P0 |
+| **No SKILL.md** | skills.sh supports 41+ agents (Claude Code, Cursor, Codex, Copilot). Top skills have 26K+ installs. | P1 |
 | **5 products lack READMEs** | identity, messaging, paywall, trust, shared have no documentation. | P2 |
 | **No Docker image published** | Cannot `docker run` the gateway. Dockerfile exists but no registry push. | P1 |
 
 ### Missing from CMO Report
 
 The CMO report did not cover:
-1. **MCP server registries** — the primary distribution channel for agent tools in 2026
-2. **Agent Skills ecosystem** (SKILL.md) — new "npm for AI agents" with 96K+ skills indexed
-3. **A2A Protocol registries** — agent-to-agent discovery via `/.well-known/agent-card.json`
-4. **Framework-specific tool registries** — Vercel AI SDK Tools Registry, Google ADK Cloud API Registry
-5. **Concrete submission processes** for each channel
+1. **MCP server registries** — the primary distribution channel for agent tools in 2026 (97M monthly SDK downloads)
+2. **Agent Skills ecosystem** (SKILL.md + skills.sh) — "npm for AI agents" with 41+ agents supported
+3. **A2A Protocol registries** — agent-to-agent discovery, now under Linux Foundation (150+ orgs)
+4. **AGENTS.md** — adopted by 60,000+ repos, read by all major coding agents
+5. **Framework-specific tool registries** — Vercel AI SDK Tools Registry, Google ADK
+6. **AG2/AutoGen deprecation** — merged into Microsoft unified Agent Framework (no longer worth targeting)
 
 ---
 
@@ -135,12 +138,12 @@ The SKILL.md should describe how AI coding assistants can use the A2A SDK to add
 
 | Framework | Integration Path | Notes |
 |-----------|-----------------|-------|
-| **LangChain** | Submit PR to `langchain-community` with A2A tool wrapper | Largest Python agent ecosystem |
-| **CrewAI** | Publish MCP server (CrewAI uses MCP natively) | Submit PR to `crewai-tools` |
-| **OpenAI Agents SDK** | Expose tools via function calling interface | 14.7M monthly PyPI downloads |
-| **Vercel AI SDK** | Submit to ai-sdk-agents.vercel.app Tools Registry | TypeScript-first, 20M+ monthly downloads |
-| **Google ADK** | Register in Cloud API Registry as MCP server | Growing enterprise adoption |
-| **AutoGPT** | Submit agent template to AutoGPT marketplace | Built into platform |
+| **LangChain** | Submit PR to `langchain-community` with A2A tool wrapper | Largest Python agent ecosystem (47M downloads/mo) |
+| **CrewAI** | Publish MCP server (CrewAI uses MCP natively) | Fastest-growing (5.2M downloads/mo, 450M monthly workflows) |
+| **OpenAI Agents SDK** | Expose tools via function calling interface | Standard for OpenAI ecosystem |
+| **Vercel AI SDK** | Submit to ai-sdk-agents.vercel.app Tools Registry | Leading TypeScript option |
+| **Google ADK** | Register as MCP server (ADK 1.0.0 supports MCP natively) | Python, TypeScript, Java — model-agnostic |
+| ~~**AutoGPT**~~ | ~~Submit agent template~~ | Deprioritized — low ROI vs others |
 
 #### 2.7 Developer Content & Launch
 
@@ -239,8 +242,10 @@ Priority search terms:
 | 7 | **Submit to PulseMCP** | Human/Agent | Submit via web form. |
 | 8 | **Submit to Smithery.ai** | Human/Agent | `smithery mcp publish`. |
 | 9 | **Register on Official MCP Registry** | Engineering | Publish to PyPI/npm first. Use `mcp-publisher` CLI. |
-| 10 | **Host sandbox at sandbox.greenhelix.net** | Engineering | Provision staging-like instance with pre-loaded demo data and free API keys. |
-| 11 | **Add developer docs/guides to website** | Engineering | Link to Swagger UI (`/docs`), SDK quickstart, API reference from greenhelix.net. |
+| 10 | ~~**Host sandbox at sandbox.greenhelix.net**~~ | ~~Engineering~~ | **DONE** — live at sandbox.greenhelix.net |
+| 11 | ~~**Add developer docs/guides to website**~~ | ~~Engineering~~ | **DONE** — website/docs.html with full developer guide |
+| 12 | **Create AGENTS.md** in repo root | Engineering | None. Adopted by 60K+ repos. Coding agents read it automatically. |
+| 13 | **Create SKILL.md** in repo root | Engineering | SDK published. Enables skills.sh distribution to 41+ agents. |
 
 ### P1 — Do Next (Developer Adoption)
 

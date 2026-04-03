@@ -1,11 +1,12 @@
 {
-  "name": "@a2a/sdk",
+  "name": "@greenhelix/sdk",
   "version": "0.1.0",
-  "description": "TypeScript SDK for the A2A Commerce Gateway",
+  "description": "TypeScript SDK for the A2A Commerce Gateway — agent-to-agent payments, escrow, marketplace, identity, and trust scoring",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "build": "tsc",
@@ -14,12 +15,26 @@
   },
   "keywords": [
     "a2a",
-    "agent",
+    "ai-agent",
+    "agent-payments",
+    "mcp",
+    "escrow",
+    "trust",
+    "marketplace",
     "commerce",
-    "gateway",
     "sdk"
   ],
+  "author": "Green Helix <dev@greenhelix.net>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mirni/a2a.git",
+    "directory": "sdk-ts"
+  },
+  "homepage": "https://greenhelix.net",
+  "publishConfig": {
+    "access": "public"
+  },
   "devDependencies": {
     "@types/node": "^25.5.0",
     "typescript": "^5.4"

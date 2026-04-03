@@ -1,0 +1,68 @@
+{
+  "namespace": "io.github.mirni",
+  "name": "a2a-gateway",
+  "version": "0.9.1",
+  "description": "A2A Commerce Platform — 128-tool gateway for agent-to-agent payments, escrow, marketplace, identity, messaging, and trust scoring",
+  "repository": "https://github.com/mirni/a2a",
+  "homepage": "https://greenhelix.net",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Green Helix",
+      "email": "dev@greenhelix.net"
+    }
+  ],
+  "categories": [
+    "commerce",
+    "payments",
+    "finance",
+    "marketplace",
+    "identity"
+  ],
+  "tags": [
+    "a2a",
+    "agent-payments",
+    "escrow",
+    "trust-scoring",
+    "marketplace",
+    "billing",
+    "identity",
+    "mcp-server"
+  ],
+  "packages": [
+    {
+      "registry": "pypi",
+      "name": "a2a-sdk"
+    },
+    {
+      "registry": "npm",
+      "name": "@greenhelix/sdk"
+    },
+    {
+      "registry": "docker",
+      "name": "greenhelix/a2a-gateway"
+    }
+  ],
+  "tools": {
+    "count": 128,
+    "services": [
+      "billing (18 tools)",
+      "payments (22 tools)",
+      "identity (17 tools)",
+      "marketplace (10 tools)",
+      "trust (6 tools)",
+      "messaging (3 tools)",
+      "disputes (5 tools)",
+      "infrastructure (20 tools)",
+      "stripe connector (13 tools)",
+      "github connector (9 tools)",
+      "postgres connector (5 tools)"
+    ]
+  },
+  "endpoints": {
+    "production": "https://api.greenhelix.net",
+    "sandbox": "https://sandbox.greenhelix.net",
+    "docs": "https://api.greenhelix.net/docs",
+    "openapi": "https://api.greenhelix.net/v1/openapi.json"
+  }
+}
