@@ -321,14 +321,15 @@ async def provision_agents(
 ) -> list[tuple[str, str]]:
     """Register test agents via public endpoint. Returns [(agent_id, api_key)].
 
-    Retries with backoff on 503 (Cloudflare throttling).
-    Adds delay between registrations to avoid rate limiting.
+    Retries with longer backoff on 503 (Cloudflare throttling).
+    Paces registrations with 5s gaps to stay below Cloudflare's threshold.
     """
     agents = []
     ts = int(time.time())
+    consecutive_503s = 0
     for i in range(count):
         success = False
-        for attempt in range(3):
+        for attempt in range(10):  # More retries
             try:
                 resp = await client.post(
                     f"{base_url}/v1/register",
@@ -339,21 +340,28 @@ async def provision_agents(
                     body = resp.json()
                     agents.append((body["agent_id"], body["api_key"]))
                     success = True
+                    consecutive_503s = 0
                     break
                 elif resp.status_code == 503:
-                    wait = (attempt + 1) * 3
-                    print(f"  Registration {i}: 503, retrying in {wait}s...")
+                    consecutive_503s += 1
+                    # Exponential backoff: 10s, 20s, 40s, 60s...
+                    wait = min(10 * (2 ** attempt), 120)
+                    if consecutive_503s > 5:
+                        wait = 120  # Back off hard if persistent
+                    print(f"  Registration {i}: 503, retrying in {wait}s... (attempt {attempt+1})")
                     await asyncio.sleep(wait)
+                elif resp.status_code == 409:
+                    # Already exists — that's fine, try to get the key
+                    print(f"  Registration {i}: agent already exists (409)")
+                    break
                 else:
                     print(f"  Warning: registration {i} returned {resp.status_code}")
                     break
             except Exception as e:
                 print(f"  Warning: registration {i} failed: {e}")
-                break
-        if not success and i < count:
-            await asyncio.sleep(1)  # Brief pause between agents
-        else:
-            await asyncio.sleep(0.5)  # Normal pacing
+                await asyncio.sleep(10)
+        # Pace between registrations to avoid Cloudflare triggers
+        await asyncio.sleep(5)
     return agents
 
 
