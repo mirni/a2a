@@ -79,3 +79,8 @@ For sandbox testing:
 ```bash
 python scripts/generate_audit_keys.py --data-dir /path/to/sandbox/data --output tasks/external/audit-api-keys-sandbox.env
 ```
+
+## Completed
+
+**Date:** 2026-04-02
+**Summary:** Reviewed external audit (24 findings, 55 tests blocked by invalid key). Triaged all findings — most were environment artifacts or false positives. Created `scripts/generate_audit_keys.py` for future audit runs. Actionable items documented and tracked in `prelaunch-audit-remediation.md`.

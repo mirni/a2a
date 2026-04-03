@@ -124,3 +124,8 @@ Or use the now-working `revoke_api_key` endpoint (after BFLA fix) to revoke old 
 ## Verification
 
 After all code fixes, re-run external audit against sandbox to confirm findings are resolved.
+
+## Completed
+
+**Date:** 2026-04-02
+**Summary:** All 6 P0/P1 code fixes implemented and verified by pre-launch audit (234 tests, ~600 HTTP requests). Race condition, escrow BOLA, rate limiting, BFLA, negative/zero amounts all confirmed fixed. P2 ops items deferred to operational-readiness task.

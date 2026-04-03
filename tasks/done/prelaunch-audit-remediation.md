@@ -140,3 +140,8 @@ These are feature requests from the marketing persona, not bugs:
 | P1 (post-launch) | 3 | ~3 hours | Error format, X-API-Key docs, sub-penny policy |
 | P2 (ops) | 2 | ~1 day | DNS investigation, intent capture verification |
 | DX backlog | 11 | Ongoing | Feature requests from marketing/DX audit |
+
+## Completed
+
+**Date:** 2026-04-02
+**Summary:** Remediation plan created from pre-launch audit (234 tests). All v0.8.4 findings verified fixed. 3 new P0 items identified (max amount validation, BOLA sanitization, webhook error handling) and 3 P1 items documented for post-launch.

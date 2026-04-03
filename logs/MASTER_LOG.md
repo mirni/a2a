@@ -6695,3 +6695,51 @@ Create live payments remote test guide + run 3-hour stress test with Prometheus 
 - Cloudflare is the bottleneck for stress testing from a single IP
 - Future stress tests should use multiple IPs or Cloudflare bypass (Tailscale VPN)
 - No memory leaks or performance degradation detected in 3-hour window
+
+---
+
+## 2026-04-03 — Framework Integrations (LangChain + CrewAI)
+
+### Prompt
+Implement framework integrations plan: complete LangChain integration (fix data-shape bug, add error handling, metadata + README) and build CrewAI integration from scratch.
+
+### Output
+- **Branch:** `feat/framework-integrations`
+- **PR:** https://github.com/mirni/a2a/pull/44
+- **CI:** All green (quality, package, test, staging)
+
+#### LangChain (a2a-langchain)
+- Fixed data-shape bug in `create_tool()` — now accepts both legacy `tool`/`schema` keys and canonical `name`/`input_schema` from `ToolPricing` dataclass
+- Added `A2AError → ToolException` error wrapping in `_arun()`/`_run()` and `create_tool()` closures
+- Updated conftest `SAMPLE_CATALOG` to canonical ToolPricing-shaped keys
+- Added package metadata (license, authors, classifiers, URLs) to pyproject.toml
+- Created README with installation, quickstart, pre-built tools, toolkit, error handling
+- **66 tests passing**
+
+#### CrewAI (a2a-crewai) — NEW PACKAGE
+- `A2ACrewTool` base class extending `crewai.tools.BaseTool`
+- `create_tool()` factory for dynamic tool creation from catalog entries
+- 10 Pydantic input schemas with `extra="forbid"` + `json_schema_extra`
+- 10 pre-built tool classes (billing, payments, escrow, marketplace, trust, identity, messaging)
+- `A2AToolkit` with `from_client()` async factory + service filtering
+- Error handling returns JSON error objects (CrewAI convention)
+- Full package scaffold with pyproject.toml and README
+- **63 tests passing**
+
+**Total: 129 tests across both integrations, all passing, lint clean.**
+
+---
+
+## Session — 2026-04-03: Fix stale @a2a/sdk npm references
+
+### Prompt
+Fix stale `@a2a/sdk` npm references in docs → `@greenhelix/sdk`.
+
+### Changes
+- `README.md`: Updated `npm install` and `import` lines from `@a2a/sdk` to `@greenhelix/sdk`
+- `website/docs.html`: Updated `npm install` and `import` lines from `@a2a/sdk` to `@greenhelix/sdk`
+
+### Result
+- Branch: `fix/npm-package-refs`
+- PR: #45 — CI green, ready for review.
+
