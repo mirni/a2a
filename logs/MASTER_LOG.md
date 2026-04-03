@@ -6660,3 +6660,38 @@ Created actionable todo list in `tasks/active/review-external-security-audit.md`
 ### PRs
 - PR #29: `feat/improve-coverage` — Test coverage improvements (CI green)
 - PR #30: `task/review-external-audit` — Audit review + key gen script
+
+---
+
+## Session: 2026-04-03 (Performance Testing)
+
+### Human Prompt
+Create live payments remote test guide + run 3-hour stress test with Prometheus metrics collection.
+
+### Work Done
+1. **Created `tasks/external/live-payments-remote-test.md`** — Comprehensive remote testing guide for different machine/network/geo. Includes 7 phases, bash E2E script, Python AI agent script, 30+ item checklist. Budget: max $20.
+
+2. **Created `scripts/stress_test_long.py`** — Long-duration stress test with:
+   - Periodic metric snapshots (configurable interval)
+   - Server-side Prometheus scraping
+   - Cloudflare-aware retry logic with exponential backoff
+   - Trend analysis (throughput, latency, error rate drift)
+   - Stability analysis (CV, spike detection, resource leak indicators)
+   - JSON raw data export for further analysis
+
+3. **Ran 3-hour stress test** against `api.greenhelix.net`:
+   - 20,063 total requests, 4 concurrent agents, 1.9 rps sustained
+   - 2,407 successful (12%), 17,656 failed (88%)
+   - Errors: 503 Cloudflare (51%), 429 rate limit (33%), 403 forbidden (4%)
+   - For successful requests: avg 155ms, p95 148ms
+   - Cloudflare DDoS protection triggered full block at minute 124
+   - No latency drift or resource leaks detected
+
+### PRs
+- PR #43: https://github.com/mirni/a2a/pull/43
+
+### Key Findings
+- Application performance is excellent (sub-200ms P95) when requests reach the server
+- Cloudflare is the bottleneck for stress testing from a single IP
+- Future stress tests should use multiple IPs or Cloudflare bypass (Tailscale VPN)
+- No memory leaks or performance degradation detected in 3-hour window
