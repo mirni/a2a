@@ -68,7 +68,7 @@ pip install a2a-sdk
 ### TypeScript SDK
 
 ```bash
-npm install @a2a/sdk
+npm install @greenhelix/sdk
 ```
 
 ### From Source
@@ -176,7 +176,7 @@ async with A2AClient("https://api.greenhelix.net", api_key="a2a_free_...") as cl
 ## TypeScript SDK
 
 ```typescript
-import { A2AClient } from '@a2a/sdk';
+import { A2AClient } from '@greenhelix/sdk';
 
 const client = new A2AClient({
   baseUrl: 'https://api.greenhelix.net',
