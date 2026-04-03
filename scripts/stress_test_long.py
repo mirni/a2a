@@ -64,11 +64,11 @@ WORKLOADS: list[tuple[int, str, str, Any, Any, Any]] = [
     (4, "get_leaderboard", "GET", lambda _: "/v1/billing/leaderboard", lambda _: {"metric": "calls", "limit": 5}, None),
     (4, "estimate_cost", "GET", lambda _: "/v1/billing/estimate", lambda _: {"tool_name": "get_balance", "quantity": 10}, None),
     (3, "get_timeseries", "GET", lambda aid: f"/v1/billing/wallets/{aid}/timeseries", lambda _: {"interval": "hour"}, None),
-    (3, "get_health", "GET", lambda _: "/v1/health", lambda _: {}, None),
+    # Note: /v1/health excluded — it's public-rate-limited (1000/hr per IP)
     # Write operations (15%)
     (5, "deposit_small", "POST", lambda aid: f"/v1/billing/wallets/{aid}/deposit", lambda _: {}, lambda: {"amount": "0.01"}),
     (3, "create_intent", "POST", lambda _: "/v1/payments/intents", lambda _: {}, None),  # needs special handling
-    (3, "get_pricing", "GET", lambda _: "/v1/pricing", lambda _: {}, None),
+    # Note: /v1/pricing excluded — public-rate-limited
     (2, "get_payment_history", "GET", lambda _: "/v1/payments/history", lambda aid: {"agent_id": aid, "limit": 5}, None),
     (2, "list_subscriptions", "GET", lambda _: "/v1/payments/subscriptions", lambda aid: {"agent_id": aid, "limit": 5}, None),
     # Marketplace (5%)
@@ -302,8 +302,10 @@ class StressAgent:
                     success=False, timestamp=ts, error=str(e)[:200],
                 ))
 
-            # Random delay: 50-300ms between requests per agent
-            await asyncio.sleep(random.uniform(0.05, 0.3))
+            # Delay between requests per agent — tuned to stay below Cloudflare
+            # rate limits from a single IP. With N agents and 1-3s delay each,
+            # total RPS ≈ N / avg_delay (e.g. 5 agents / 2s = 2.5 rps).
+            await asyncio.sleep(random.uniform(1.0, 3.0))
 
     def stop(self) -> None:
         self._running = False
@@ -687,34 +689,56 @@ def generate_long_report(
 # ---------------------------------------------------------------------------
 
 
-async def measure_health_baseline(base_url: str, client: httpx.AsyncClient, samples: int = 20) -> dict[str, float]:
-    # First, wait for rate limit to clear if needed
-    for attempt in range(60):  # Up to 60 minutes of waiting
+async def measure_health_baseline(
+    base_url: str, client: httpx.AsyncClient,
+    api_key: str = "", agent_id: str = "",
+    samples: int = 20,
+) -> dict[str, float]:
+    """Measure baseline latency using an authenticated endpoint to avoid public rate limits.
+
+    /v1/health is subject to IP-based public rate limiting (1000/hr).
+    For stress testing we use an authenticated endpoint instead.
+    """
+    # If we have a key, use authenticated balance check (not public-rate-limited)
+    if api_key and agent_id:
+        url = f"{base_url}/v1/billing/wallets/{agent_id}/balance"
+        headers = {"Authorization": f"Bearer {api_key}"}
+        label = f"balance({agent_id})"
+    else:
+        # Fallback: try /v1/health but handle 429
+        url = f"{base_url}/v1/health"
+        headers = {}
+        label = "health"
+
+    # Quick reachability probe
+    for attempt in range(5):
         try:
-            resp = await client.get(f"{base_url}/v1/health", timeout=10.0)
-            if resp.status_code == 200:
+            resp = await client.get(url, headers=headers, timeout=10.0)
+            if resp.status_code in (200, 201):
                 break
-            elif resp.status_code == 429:
+            elif resp.status_code == 429 and not api_key:
                 reset = int(resp.headers.get("x-ratelimit-reset", "60"))
-                wait = min(reset, 120)  # Wait up to 2 min at a time
-                print(f"  Rate limited (429). Reset in {reset}s, waiting {wait}s...")
+                wait = min(reset + 5, 120)
+                print(f"  Rate limited on {label}. Reset in {reset}s, waiting {wait}s...")
                 await asyncio.sleep(wait)
             else:
+                print(f"  Probe returned {resp.status_code} on {label}")
                 break
-        except Exception:
-            await asyncio.sleep(5)
+        except Exception as e:
+            print(f"  Probe failed: {e}")
+            await asyncio.sleep(3)
 
     latencies = []
     for _ in range(samples):
         start = time.monotonic()
         try:
-            resp = await client.get(f"{base_url}/v1/health", timeout=10.0)
+            resp = await client.get(url, headers=headers, timeout=10.0)
             ms = (time.monotonic() - start) * 1000
-            if resp.status_code == 200:
+            if resp.status_code in (200, 201):
                 latencies.append(ms)
         except Exception:
             pass
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.3)
 
     if not latencies:
         return {"status": "unreachable"}
@@ -722,6 +746,7 @@ async def measure_health_baseline(base_url: str, client: httpx.AsyncClient, samp
     latencies.sort()
     return {
         "status": "ok",
+        "endpoint": label,
         "avg_ms": round(statistics.mean(latencies), 1),
         "min_ms": round(min(latencies), 1),
         "max_ms": round(max(latencies), 1),
@@ -763,9 +788,40 @@ async def main(args: argparse.Namespace) -> int:
     limits = httpx.Limits(max_connections=customers + 10, max_keepalive_connections=customers)
 
     async with httpx.AsyncClient(limits=limits, follow_redirects=True) as client:
-        # 1. Health baseline
-        print("[1/5] Measuring health baseline...")
-        health = await measure_health_baseline(base_url, client)
+        # 1. Wait for Cloudflare to be available, then register probe agent
+        print("[1/5] Waiting for server availability + measuring baseline...")
+        probe_key = ""
+        probe_id = ""
+        for wait_attempt in range(120):  # Up to 2 hours of waiting
+            try:
+                probe_ts = int(time.time())
+                resp = await client.post(
+                    f"{base_url}/v1/register",
+                    json={"agent_id": f"perf-probe-{probe_ts}"},
+                    timeout=15.0,
+                )
+                if resp.status_code in (200, 201):
+                    body = resp.json()
+                    probe_key = body["api_key"]
+                    probe_id = body["agent_id"]
+                    print(f"  Probe agent: {probe_id}")
+                    break
+                elif resp.status_code == 503:
+                    print(f"  Server returning 503 (Cloudflare throttle), waiting 60s... (attempt {wait_attempt+1})")
+                    await asyncio.sleep(60)
+                elif resp.status_code == 429:
+                    reset = int(resp.headers.get("x-ratelimit-reset", "60"))
+                    wait = min(reset + 5, 120)
+                    print(f"  Rate limited (429). Reset in {reset}s, waiting {wait}s...")
+                    await asyncio.sleep(wait)
+                else:
+                    print(f"  Registration returned {resp.status_code}, retrying in 30s...")
+                    await asyncio.sleep(30)
+            except Exception as e:
+                print(f"  Connection error: {e}, retrying in 60s...")
+                await asyncio.sleep(60)
+
+        health = await measure_health_baseline(base_url, client, probe_key, probe_id)
         if health.get("status") != "ok":
             print(f"  ERROR: Server unreachable at {base_url}")
             return 1
