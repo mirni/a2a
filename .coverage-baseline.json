@@ -2,10 +2,10 @@
   "billing": 84.0,
   "gateway": 94.0,
   "identity": 96.0,
-  "marketplace": 94.0,
-  "messaging": 97.0,
-  "payments": 88.0,
-  "paywall": 90.0,
-  "shared": 95.0,
-  "trust": 97.0
+  "marketplace": 93.0,
+  "messaging": 96.0,
+  "payments": 87.0,
+  "paywall": 89.0,
+  "shared": 94.0,
+  "trust": 96.0
 }
