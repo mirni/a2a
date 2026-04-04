@@ -56,8 +56,7 @@ async def test_get_agent_identity_not_found(client, api_key):
         "/v1/identity/agents/nonexistent",
         headers={"Authorization": f"Bearer {api_key}"},
     )
-    assert resp.status_code == 200
-    assert resp.json()["found"] is False
+    assert resp.status_code == 404
 
 
 # ---------------------------------------------------------------------------
@@ -88,7 +87,8 @@ async def test_get_agent_reputation_via_rest(client, api_key):
         "/v1/identity/agents/test-agent/reputation",
         headers={"Authorization": f"Bearer {api_key}"},
     )
-    assert resp.status_code == 200
+    # Agent has no reputation record, so 404 is expected
+    assert resp.status_code == 404
 
 
 # ---------------------------------------------------------------------------

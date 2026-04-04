@@ -8,7 +8,9 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict, Field
 
+from gateway.src.config import GatewayConfig
 from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
+from gateway.src.errors import error_response
 from gateway.src.tools.billing import (
     _convert_currency,
     _create_wallet,
@@ -144,6 +146,21 @@ async def deposit(
         "_caller_tier": tc.agent_tier,
     }
     await check_ownership(tc, params)
+
+    # P0 #1: Enforce per-tier deposit limits
+    config = GatewayConfig.from_env()
+    tier_limit = config.deposit_limits.get(tc.agent_tier)
+    if tier_limit is not None and float(body.amount) > tier_limit:
+        from gateway.src.deps.tool_context import _ResponseError
+
+        resp = await error_response(
+            403,
+            f"Deposit amount exceeds {tc.agent_tier}-tier limit of {tier_limit:,} credits",
+            "deposit_limit_exceeded",
+            request=tc.request,
+        )
+        raise _ResponseError(resp)
+
     idem = tc.request.headers.get("idempotency-key")
     if idem:
         params["idempotency_key"] = idem
@@ -321,16 +338,15 @@ async def get_volume_discount(
     quantity: int = 1,
     tc: ToolContext = Depends(require_tool("get_volume_discount")),
 ):
-    result = await _get_volume_discount(
-        tc.ctx,
-        {
-            "agent_id": agent_id,
-            "tool_name": tool_name,
-            "quantity": quantity,
-            "_caller_agent_id": tc.agent_id,
-            "_caller_tier": tc.agent_tier,
-        },
-    )
+    params = {
+        "agent_id": agent_id,
+        "tool_name": tool_name,
+        "quantity": quantity,
+        "_caller_agent_id": tc.agent_id,
+        "_caller_tier": tc.agent_tier,
+    }
+    await check_ownership(tc, params)
+    result = await _get_volume_discount(tc.ctx, params)
     return await finalize_response(tc, result)
 
 
@@ -341,16 +357,16 @@ async def estimate_cost(
     agent_id: str | None = None,
     tc: ToolContext = Depends(require_tool("estimate_cost")),
 ):
-    result = await _estimate_cost(
-        tc.ctx,
-        {
-            "tool_name": tool_name,
-            "quantity": quantity,
-            "agent_id": agent_id,
-            "_caller_agent_id": tc.agent_id,
-            "_caller_tier": tc.agent_tier,
-        },
-    )
+    params = {
+        "tool_name": tool_name,
+        "quantity": quantity,
+        "agent_id": agent_id,
+        "_caller_agent_id": tc.agent_id,
+        "_caller_tier": tc.agent_tier,
+    }
+    if agent_id:
+        await check_ownership(tc, params)
+    result = await _estimate_cost(tc.ctx, params)
     return await finalize_response(tc, result)
 
 
@@ -378,15 +394,14 @@ async def convert_currency(
     body: ConvertCurrencyRequest,
     tc: ToolContext = Depends(require_tool("convert_currency")),
 ):
-    result = await _convert_currency(
-        tc.ctx,
-        {
-            "agent_id": agent_id,
-            "amount": float(body.amount),
-            "from_currency": body.from_currency,
-            "to_currency": body.to_currency,
-            "_caller_agent_id": tc.agent_id,
-            "_caller_tier": tc.agent_tier,
-        },
-    )
+    params = {
+        "agent_id": agent_id,
+        "amount": float(body.amount),
+        "from_currency": body.from_currency,
+        "to_currency": body.to_currency,
+        "_caller_agent_id": tc.agent_id,
+        "_caller_tier": tc.agent_tier,
+    }
+    await check_ownership(tc, params)
+    result = await _convert_currency(tc.ctx, params)
     return await finalize_response(tc, result)

@@ -67,7 +67,7 @@ async def _get_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]
         "status": intent.status.value,
         "payer": intent.payer,
         "payee": intent.payee,
-        "amount": float(intent.amount),
+        "amount": str(intent.amount),
         "description": intent.description,
         "created_at": intent.created_at,
     }
@@ -80,7 +80,7 @@ async def _get_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]
         "status": escrow.status.value,
         "payer": escrow.payer,
         "payee": escrow.payee,
-        "amount": float(escrow.amount),
+        "amount": str(escrow.amount),
         "description": escrow.description,
         "created_at": escrow.created_at,
     }
@@ -100,7 +100,7 @@ async def _create_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
     return {
         "id": intent.id,
         "status": intent.status.value,
-        "amount": float(intent.amount),
+        "amount": str(intent.amount),
         "currency": currency,
     }
 
@@ -117,7 +117,7 @@ async def _capture_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, 
     return {
         "id": settlement.id,
         "status": "settled",
-        "amount": float(settlement.amount),
+        "amount": str(settlement.amount),
     }
 
 
@@ -134,11 +134,11 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
 
     if intent.status.value == "pending":
         voided = await ctx.payment_engine.void(intent.id, idempotency_key=params.get("idempotency_key"))
-        return {"id": voided.id, "status": "voided", "amount": float(voided.amount)}
+        return {"id": voided.id, "status": "voided", "amount": str(voided.amount)}
 
     # Idempotency: if already voided and idempotency_key provided, return success
     if intent.status.value == "voided" and params.get("idempotency_key"):
-        return {"id": intent.id, "status": "voided", "amount": float(intent.amount)}
+        return {"id": intent.id, "status": "voided", "amount": str(intent.amount)}
 
     if intent.status.value == "settled":
         currency = (intent.metadata or {}).get("currency", "CREDITS")
@@ -154,7 +154,7 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
             description=f"refund:{intent.id}",
             currency=currency,
         )
-        return {"id": intent.id, "status": "refunded", "amount": float(intent.amount)}
+        return {"id": intent.id, "status": "refunded", "amount": str(intent.amount)}
 
     from payments_src.engine import InvalidStateError
 
@@ -179,7 +179,7 @@ async def _partial_capture(ctx: AppContext, params: dict[str, Any]) -> dict[str,
     return {
         "id": settlement.id,
         "status": "settled",
-        "amount": float(settlement.amount),
+        "amount": str(settlement.amount),
         "remaining_amount": remaining,
     }
 
@@ -226,7 +226,7 @@ async def _create_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
     return {
         "id": escrow.id,
         "status": escrow.status.value,
-        "amount": float(escrow.amount),
+        "amount": str(escrow.amount),
         "currency": currency,
     }
 
@@ -243,7 +243,7 @@ async def _release_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, 
     return {
         "id": settlement.id,
         "status": "settled",
-        "amount": float(settlement.amount),
+        "amount": str(settlement.amount),
     }
 
 
@@ -259,7 +259,7 @@ async def _cancel_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
     return {
         "id": escrow.id,
         "status": escrow.status.value,
-        "amount": float(escrow.amount),
+        "amount": str(escrow.amount),
     }
 
 
@@ -285,7 +285,7 @@ async def _create_performance_escrow(ctx: AppContext, params: dict[str, Any]) ->
     return {
         "escrow_id": escrow.id,
         "status": escrow.status.value,
-        "amount": float(escrow.amount),
+        "amount": str(escrow.amount),
         "metric_name": params["metric_name"],
         "threshold": params["threshold"],
     }
@@ -338,7 +338,7 @@ async def _create_subscription(ctx: AppContext, params: dict[str, Any]) -> dict[
     return {
         "id": sub.id,
         "status": sub.status.value,
-        "amount": float(sub.amount),
+        "amount": str(sub.amount),
         "interval": sub.interval.value,
         "next_charge_at": sub.next_charge_at,
         "currency": currency,
@@ -359,7 +359,7 @@ async def _get_subscription(ctx: AppContext, params: dict[str, Any]) -> dict[str
         "id": sub.id,
         "payer": sub.payer,
         "payee": sub.payee,
-        "amount": float(sub.amount),
+        "amount": str(sub.amount),
         "interval": sub.interval.value,
         "status": sub.status.value,
         "next_charge_at": sub.next_charge_at,
@@ -547,7 +547,7 @@ async def _refund_settlement(ctx: AppContext, params: dict[str, Any]) -> dict[st
     return {
         "id": refund.id,
         "settlement_id": refund.settlement_id,
-        "amount": float(refund.amount),
+        "amount": str(refund.amount),
         "reason": refund.reason,
         "status": refund.status.value,
     }

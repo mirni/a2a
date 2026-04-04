@@ -2924,7 +2924,8 @@
     "sla": {
       "max_latency_ms": 300
     },
-    "tier_required": "free"
+    "tier_required": "free",
+    "rate_limit_per_hour": 10
   },
   {
     "name": "build_claim_chain",
@@ -4715,7 +4716,8 @@
     "sla": {
       "max_latency_ms": 300
     },
-    "tier_required": "free"
+    "tier_required": "free",
+    "rate_limit_per_hour": 20
   },
   {
     "name": "get_volume_discount",

@@ -501,3 +501,50 @@ def setup_structured_logging() -> None:
     root.handlers.clear()
     root.addHandler(handler)
     root.setLevel(logging.INFO)
+
+
+# ---------------------------------------------------------------------------
+# Agent ID Length Validation Middleware
+# ---------------------------------------------------------------------------
+
+_MAX_AGENT_ID_LENGTH = 128
+
+
+class AgentIdLengthMiddleware:
+    """ASGI middleware that rejects requests with oversized path segments.
+
+    Any path segment longer than 128 characters in a /v1/ route gets a 422.
+    This prevents abuse via oversized agent_id values in path params.
+    """
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: dict, receive: Callable, send: Callable) -> None:
+        if scope["type"] == "http":
+            path: str = scope.get("path", "")
+            if path.startswith("/v1/"):
+                segments = path.split("/")
+                for segment in segments:
+                    if len(segment) > _MAX_AGENT_ID_LENGTH:
+                        body = json.dumps(
+                            {
+                                "type": "about:blank",
+                                "title": "Validation Error",
+                                "status": 422,
+                                "detail": f"Path segment exceeds maximum length of {_MAX_AGENT_ID_LENGTH} characters",
+                            }
+                        ).encode()
+                        await send(
+                            {
+                                "type": "http.response.start",
+                                "status": 422,
+                                "headers": [
+                                    (b"content-type", b"application/problem+json"),
+                                    (b"content-length", str(len(body)).encode()),
+                                ],
+                            }
+                        )
+                        await send({"type": "http.response.body", "body": body})
+                        return
+        await self.app(scope, receive, send)

@@ -13,6 +13,7 @@ from gateway.src._version import __version__
 from gateway.src.errors import error_response
 from gateway.src.lifespan import lifespan
 from gateway.src.middleware import (
+    AgentIdLengthMiddleware,
     BodySizeLimitMiddleware,
     CorrelationIDMiddleware,
     MetricsMiddleware,
@@ -176,6 +177,7 @@ def create_app() -> FastAPI:
     app.openapi = custom_openapi  # type: ignore[assignment]
 
     # Add middleware (FastAPI wraps in reverse order: last add = outermost)
+    app.add_middleware(AgentIdLengthMiddleware)
     app.add_middleware(PublicRateLimitMiddleware)
     app.add_middleware(RequestTimeoutMiddleware)
     app.add_middleware(BodySizeLimitMiddleware)
@@ -191,7 +193,7 @@ def create_app() -> FastAPI:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=allowed_origins,
-            allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+            allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             allow_headers=["Content-Type", "Authorization", "X-API-Key", "X-Payment", "Idempotency-Key"],
         )
 

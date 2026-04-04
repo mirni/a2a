@@ -564,10 +564,10 @@ class TestAmountValidation:
         assert resp.status_code == 200
 
     async def test_deposit_max_amount_accepted(self, client, api_key):
-        """Exactly 1 billion should be accepted."""
+        """Free-tier deposit at the tier limit (1000) should be accepted."""
         resp = await client.post(
             "/v1/billing/wallets/test-agent/deposit",
-            json={"amount": "1000000000"},
+            json={"amount": "1000"},
             headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 200
