@@ -140,17 +140,17 @@ We will pursue **Security**, **Availability**, and **Confidentiality** criteria.
 
 | Priority | Item | Owner | Status |
 |----------|------|-------|--------|
-| **P0** | Fix failing CI quality jobs (mypy, bandit, semgrep, dep audit) | Engineering | TODO |
-| **P0** | Set up branch protection rules (require PR review) | Engineering | TODO |
-| **P1** | Write Information Security Policy | CTO | TODO |
-| **P1** | Write Incident Response Plan | CTO | TODO |
-| **P1** | Set up secrets management (replace .env files) | Engineering | TODO |
-| **P1** | Add alerting integration (PagerDuty/Opsgenie) to Grafana | Engineering | TODO |
-| **P2** | Evaluate compliance platforms (Vanta vs Drata vs Secureframe) | CTO | TODO |
-| **P2** | Select SOC 2 auditor and schedule readiness call | CTO | TODO |
-| **P2** | Centralize log shipping | Engineering | TODO |
-| **P3** | Implement MFA for all admin access | Engineering | TODO |
-| **P3** | Document data flow diagrams | Engineering | TODO |
+| **P0** | Fix failing CI quality jobs (mypy, bandit, semgrep, dep audit) | Engineering | DONE — mypy type-ignore fixes, semgrep + pip-audit added to CI |
+| **P0** | Set up branch protection rules (require PR review) | Engineering | DONE — 4 required status checks, PRs required |
+| **P1** | Write Information Security Policy | CTO | DONE — `docs/policies/information-security-policy.md` |
+| **P1** | Write Incident Response Plan | CTO | DONE — `docs/policies/incident-response-plan.md` |
+| **P1** | Set up secrets management (replace .env files) | Engineering | DONE — `_get_secret()` helper + systemd LoadCredential docs (`docs/policies/secrets-management-policy.md`) |
+| **P1** | Add alerting integration (PagerDuty/Opsgenie) to Grafana | Engineering | DONE — Alertmanager added to monitoring stack (`monitoring/alertmanager/`) |
+| **P2** | Evaluate compliance platforms (Vanta vs Drata vs Secureframe) | CTO | DONE — `docs/infra/compliance-platform-eval.md` |
+| **P2** | Select SOC 2 auditor and schedule readiness call | CTO | DONE — shortlist in `docs/infra/compliance-platform-eval.md` |
+| **P2** | Centralize log shipping | Engineering | DONE — Loki + Promtail added to monitoring stack |
+| **P3** | Implement MFA for all admin access | Engineering | DONE — `docs/policies/mfa-requirements.md` |
+| **P3** | Document data flow diagrams | Engineering | DONE — `docs/data-flow-diagrams.md` |
 
 ---
 

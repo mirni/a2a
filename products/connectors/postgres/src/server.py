@@ -157,7 +157,7 @@ async def create_server():
     async def list_tools():
         from mcp.types import Tool
 
-        return [Tool(**t) for t in TOOL_DEFINITIONS]
+        return [Tool(**t) for t in TOOL_DEFINITIONS]  # type: ignore[arg-type]
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict):

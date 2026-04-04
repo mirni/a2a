@@ -1,0 +1,50 @@
+# =============================================================================
+# Promtail Configuration — A2A Commerce Platform
+# =============================================================================
+# Scrapes systemd journal for a2a-gateway.service logs and ships to Loki.
+# =============================================================================
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Systemd journal — a2a-gateway service logs
+  - job_name: journal
+    journal:
+      json: false
+      max_age: 12h
+      path: /var/log/journal
+      labels:
+        job: systemd-journal
+    relabel_configs:
+      - source_labels: ['__journal__systemd_unit']
+        target_label: unit
+      - source_labels: ['__journal__hostname']
+        target_label: hostname
+    pipeline_stages:
+      # Only keep a2a-gateway logs
+      - match:
+          selector: '{unit="a2a-gateway.service"}'
+          stages:
+            - json:
+                expressions:
+                  level: level
+                  correlation_id: correlation_id
+                  method: method
+                  path: path
+                  status: status_code
+            - labels:
+                level:
+                method:
+                path:
+      # Drop non-gateway journal entries to reduce noise
+      - drop:
+          source: unit
+          expression: '^(?!a2a-gateway\.service$).*$'
