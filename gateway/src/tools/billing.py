@@ -122,6 +122,20 @@ async def _get_metrics_timeseries(ctx: AppContext, params: dict[str, Any]) -> di
 # ---------------------------------------------------------------------------
 
 
+import re
+
+# Prefixes to exclude from public leaderboards (test/perf/audit data)
+_LEADERBOARD_EXCLUDE_PATTERN = re.compile(r"^(test-|perf-|audit-|stress-)")
+
+
+def _filter_leaderboard(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Remove test/perf/audit/stress agents and re-rank."""
+    filtered = [e for e in entries if not _LEADERBOARD_EXCLUDE_PATTERN.match(e["agent_id"])]
+    for i, entry in enumerate(filtered):
+        entry["rank"] = i + 1
+    return filtered
+
+
 async def _get_agent_leaderboard(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     """Rank agents by total spend, calls, or trust score."""
     metric = params["metric"]  # "spend", "calls", "trust_score"
@@ -185,6 +199,7 @@ async def _get_agent_leaderboard(ctx: AppContext, params: dict[str, Any]) -> dic
     else:
         raise ToolValidationError(f"Unknown metric: {metric}")
 
+    leaderboard = _filter_leaderboard(leaderboard)
     return {"leaderboard": leaderboard}
 
 

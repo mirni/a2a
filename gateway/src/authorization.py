@@ -91,11 +91,12 @@ def check_ownership_authorization(
             continue
         value = params.get(field)
         if value and value != caller_agent_id:
+            # Truncate logged values to prevent log injection with oversized input
+            _log_value = value[:64] + "..." if isinstance(value, str) and len(value) > 64 else value
             logger.warning(
-                "Ownership denied: caller=%s, %s=%s",
-                caller_agent_id,
+                "Ownership denied: %s field mismatch (value=%s)",
                 field,
-                value,
+                _log_value,
             )
             return (
                 403,

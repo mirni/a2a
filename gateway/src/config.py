@@ -60,6 +60,16 @@ class GatewayConfig:
     x402_facilitator_url: str = "https://x402.org/facilitator"
     x402_supported_networks: str = "base,polygon"
 
+    # --- Per-tier deposit limits (credits) ---
+    deposit_limits: dict[str, int] = field(
+        default_factory=lambda: {
+            "free": 1_000,
+            "starter": 10_000,
+            "pro": 100_000,
+            "enterprise": 1_000_000_000,
+        }
+    )
+
     # --- Stripe checkout ---
     stripe_timeout: float = 15.0
 

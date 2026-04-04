@@ -209,7 +209,7 @@ class TestGetReputation:
 
     @pytest.mark.asyncio
     async def test_get_reputation_via_gateway(self, app, client, api_key):
-        """get_agent_reputation should return found=False when no reputation exists."""
+        """get_agent_reputation should return 404 when no reputation exists."""
         resp = await client.post(
             "/v1/execute",
             json={
@@ -218,9 +218,7 @@ class TestGetReputation:
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["found"] is False
+        assert resp.status_code == 404
 
     @pytest.mark.asyncio
     async def test_get_reputation_after_compute(self, app, client, pro_api_key):

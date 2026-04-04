@@ -218,9 +218,15 @@ async def stripe_webhook(request: Request) -> JSONResponse:
         session_id = session.get("id", "")
 
         # Deduplicate: DB is the primary source of truth; in-memory set
-        # is a performance cache only.
+        # is a performance cache only.  Fail-closed: if DB is unavailable,
+        # reject the webhook rather than silently falling back to volatile memory.
         if session_id:
-            # 1. DB check (primary — survives process restarts)
+            # 1. In-memory cache (fast path for same-process replays)
+            if session_id in _processed_sessions:
+                logger.info("Duplicate webhook for session %s — skipping (memory)", session_id)
+                return JSONResponse({"received": True})
+
+            # 2. DB check (primary — survives process restarts)
             ctx_check = request.app.state.ctx
             try:
                 cursor = await ctx_check.tracker.storage.db.execute(
@@ -232,12 +238,8 @@ async def stripe_webhook(request: Request) -> JSONResponse:
                     logger.info("Duplicate webhook for session %s — skipping (db)", session_id)
                     return JSONResponse({"received": True})
             except Exception:
-                pass  # Table may not exist yet on older schemas
-
-            # 2. In-memory cache (fast path for same-process replays)
-            if session_id in _processed_sessions:
-                logger.info("Duplicate webhook for session %s — skipping (memory)", session_id)
-                return JSONResponse({"received": True})
+                logger.error("Stripe dedup DB unavailable — rejecting webhook for safety")
+                return JSONResponse({"error": "Dedup database unavailable"}, status_code=503)
 
         metadata = session.get("metadata", {})
         agent_id = metadata.get("agent_id")
@@ -282,7 +284,7 @@ async def stripe_webhook(request: Request) -> JSONResponse:
                         )
                         await ctx.tracker.storage.db.commit()
                     except Exception:
-                        pass  # Best-effort persistence
+                        logger.error("Failed to persist Stripe session dedup for %s", session_id)
                 logger.info(
                     "Deposited %d credits to %s (session %s)",
                     credits,

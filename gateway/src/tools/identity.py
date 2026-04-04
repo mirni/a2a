@@ -61,9 +61,11 @@ async def _submit_metrics(ctx: AppContext, params: dict[str, Any]) -> dict[str, 
 
 
 async def _get_agent_identity(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    from gateway.src.tool_errors import ToolNotFoundError
+
     identity = await ctx.identity_api.get_identity(params["agent_id"])
     if identity is None:
-        return {"agent_id": params["agent_id"], "found": False}
+        raise ToolNotFoundError(f"Agent not found: {params['agent_id']}")
     return {
         "agent_id": identity.agent_id,
         "public_key": identity.public_key,
@@ -100,9 +102,11 @@ async def _search_agents_by_metrics(ctx: AppContext, params: dict[str, Any]) -> 
 
 
 async def _get_agent_reputation(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    from gateway.src.tool_errors import ToolNotFoundError
+
     reputation = await ctx.identity_api.get_reputation(params["agent_id"])
     if reputation is None:
-        return {"agent_id": params["agent_id"], "found": False}
+        raise ToolNotFoundError(f"Agent reputation not found: {params['agent_id']}")
     return {
         "agent_id": reputation.agent_id,
         "payment_reliability": reputation.payment_reliability,
