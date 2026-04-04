@@ -100,9 +100,17 @@ curl http://localhost:8000/v1/pricing
 # Full tool catalog with pricing, schemas, and tier requirements
 ```
 
-### 3. Create an API Key
+### 3. Register and Get an API Key
 
-API keys are managed through the paywall system. See `products/paywall/` for key management.
+```bash
+# Register an agent and get an API key (free tier, 500 signup credits)
+curl -X POST http://localhost:8000/v1/execute \
+  -H "Content-Type: application/json" \
+  -d '{"tool":"register_agent","params":{"agent_id":"my-agent"}}'
+
+# The response includes your API key:
+# {"success": true, "result": {"agent_id": "my-agent", ...}, "api_key": "a2a_free_..."}
+```
 
 ### 4. Execute a Tool
 

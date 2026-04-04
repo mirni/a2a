@@ -18,9 +18,7 @@ def _check_intent_ownership(caller: str, tier: str, intent) -> None:
     if tier == ADMIN_TIER:
         return
     if caller not in (intent.payer, intent.payee):
-        raise ToolForbiddenError(
-            f"Caller '{caller}' is not a party to intent (payer='{intent.payer}', payee='{intent.payee}')"
-        )
+        raise ToolForbiddenError("Forbidden: you do not have access to this resource")
 
 
 def _check_escrow_ownership(caller: str, tier: str, escrow) -> None:
@@ -32,9 +30,7 @@ def _check_escrow_ownership(caller: str, tier: str, escrow) -> None:
     if tier == ADMIN_TIER:
         return
     if caller not in (escrow.payer, escrow.payee):
-        raise ToolForbiddenError(
-            f"Caller '{caller}' is not a party to escrow (payer='{escrow.payer}', payee='{escrow.payee}')"
-        )
+        raise ToolForbiddenError("Forbidden: you do not have access to this resource")
 
 
 def _check_escrow_payer(caller: str, tier: str, escrow) -> None:
@@ -46,9 +42,7 @@ def _check_escrow_payer(caller: str, tier: str, escrow) -> None:
     if tier == ADMIN_TIER:
         return
     if caller != escrow.payer:
-        raise ToolForbiddenError(
-            f"Only the escrow payer may cancel. Caller '{caller}' is not the payer '{escrow.payer}'"
-        )
+        raise ToolForbiddenError("Forbidden: you do not have access to this resource")
 
 
 _VALID_CURRENCIES = {"CREDITS", "USD", "EUR", "GBP", "BTC", "ETH"}
@@ -180,6 +174,7 @@ async def _partial_capture(ctx: AppContext, params: dict[str, Any]) -> dict[str,
     settlement, remaining = await ctx.payment_engine.partial_capture(
         intent_id=params["intent_id"],
         amount=params["amount"],
+        idempotency_key=params.get("idempotency_key"),
     )
     return {
         "id": settlement.id,
@@ -384,7 +379,10 @@ async def _list_subscriptions(ctx: AppContext, params: dict[str, Any]) -> dict[s
 
 
 async def _reactivate_subscription(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
-    sub = await ctx.payment_engine.reactivate_subscription(params["subscription_id"])
+    sub = await ctx.payment_engine.reactivate_subscription(
+        params["subscription_id"],
+        idempotency_key=params.get("idempotency_key"),
+    )
     return {"id": sub.id, "status": sub.status.value}
 
 
@@ -492,9 +490,7 @@ async def _respond_to_dispute(ctx: AppContext, params: dict[str, Any]) -> dict[s
         if dispute["respondent"] != caller:
             from gateway.src.tool_errors import ToolForbiddenError
 
-            raise ToolForbiddenError(
-                f"Only the dispute respondent can respond (expected '{dispute['respondent']}', got '{caller}')"
-            )
+            raise ToolForbiddenError("Forbidden: you do not have access to this resource")
     return await ctx.dispute_engine.respond_to_dispute(
         dispute_id=params["dispute_id"],
         respondent=params["respondent"],

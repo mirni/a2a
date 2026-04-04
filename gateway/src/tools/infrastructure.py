@@ -145,7 +145,7 @@ async def _check_webhook_ownership(ctx: AppContext, params: dict[str, Any], webh
         raise ToolNotFoundError(f"Webhook not found: {webhook_id}")
 
     if webhook["agent_id"] != caller:
-        raise ToolForbiddenError(f"Forbidden: webhook {webhook_id} does not belong to agent {caller}")
+        raise ToolForbiddenError("Forbidden: you do not have access to this resource")
 
 
 async def _delete_webhook(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:

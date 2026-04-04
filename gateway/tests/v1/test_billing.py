@@ -381,6 +381,47 @@ async def test_get_volume_discount_via_rest(client, api_key):
 
 
 # ---------------------------------------------------------------------------
+# B1: ConvertCurrency amount validation
+# ---------------------------------------------------------------------------
+
+
+class TestConvertCurrencyAmountValidation:
+    """ConvertCurrencyRequest must reject amount <= 0, > 1 billion, and > 2 decimal places."""
+
+    async def test_convert_negative_amount_rejected(self, client, api_key):
+        resp = await client.post(
+            "/v1/billing/wallets/test-agent/convert",
+            json={"amount": "-10", "from_currency": "CREDITS", "to_currency": "USD"},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_convert_zero_amount_rejected(self, client, api_key):
+        resp = await client.post(
+            "/v1/billing/wallets/test-agent/convert",
+            json={"amount": "0", "from_currency": "CREDITS", "to_currency": "USD"},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_convert_overflow_amount_rejected(self, client, api_key):
+        resp = await client.post(
+            "/v1/billing/wallets/test-agent/convert",
+            json={"amount": "1000000001", "from_currency": "CREDITS", "to_currency": "USD"},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_convert_sub_penny_rejected(self, client, api_key):
+        resp = await client.post(
+            "/v1/billing/wallets/test-agent/convert",
+            json={"amount": "10.001", "from_currency": "CREDITS", "to_currency": "USD"},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
 # AMT-500: Negative/zero amounts must be rejected with 422
 # ---------------------------------------------------------------------------
 
