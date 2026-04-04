@@ -88,3 +88,8 @@ Save report to `reports/market-readiness-audit-v0.9.1.md`.
 - If something was "fixed" in a prior audit, verify it's still fixed
 - Be honest about NO-GO items — don't paper over launch blockers
 - Keep the report under 500 lines
+
+## Completed
+- **Date:** 2026-04-03
+- **Report:** `reports/market-readiness-audit-v0.9.1.md`
+- **Summary:** CONDITIONAL GO (B / 83). 3 blockers (payment amount validation, BOLA info-disclosure, register live verification), 5 sprint items, 5 backlog. Major improvements since v0.7.0: SDK 410 fixed, agent-card added, backup script exists, +52% test count, overall grade C+ → B.
