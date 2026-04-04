@@ -1,5 +1,68 @@
 # Changelog
 
+# Release v0.9.2
+
+**Date:** 2026-04-04
+**Commit:** f3023263
+**Previous:** v0.9.1
+
+## Changes
+
+### Features
+
+- feat: post coverage ratchet results as PR comments (#46) (`833d3b0`)
+- feat: complete LangChain + CrewAI framework integrations (#44) (`9b96a83`)
+- feat: live payments test guide + 3-hour performance stress test (#43) (`c67f25d`)
+- Merge pull request #41 from mirni/feat/distribution-implementation (`07661e3`)
+- feat: distribution action plan and DISTRIBUTION.md update (`1e07225`)
+- feat: implement distribution infrastructure (AGENTS.md, SKILL.md, SDK metadata, agent card) (`3437667`)
+- feat: load monitoring/.env for persistent config overrides (`4cd4ead`)
+
+### Bug Fixes
+
+- fix: address market-readiness audit findings (B1, B2, S1–S4) (#48) (`bf85b1d`)
+- fix: replace stale @a2a/sdk npm refs with @greenhelix/sdk (#45) (`cdcc032`)
+- fix: remove license classifier superseded by PEP 639 license expression (`7f11e20`)
+- fix: Stripe dedup DB-first + CI coverage integration (#39) (`612daca`)
+- fix: remediate pre-launch audit findings (P0/P1) + DX improvements (#38) (`2a2a1b3`)
+- fix: update check_server.sh for current API format (`6bd5fdc`)
+- fix: improve monitoring check diagnostics with failure hints (`f1b587c`)
+- fix: remove broken health scrape job from Prometheus (`9b1183b`)
+- fix: monitoring stack over Tailscale VPN (`23c306c`)
+
+### Refactoring
+
+- refactor: remove ~4,000 lines of dead code (#37) (`56c4205`)
+
+### Documentation
+
+- docs: add market-readiness audit v0.9.1 (#47) (`528ef36`)
+- docs: add live payments audit guide for external testing (#42) (`4f6f916`)
+- docs: update all public-facing documentation for consistency (#40) (`d4d5dde`)
+
+### Chores
+
+- chore: clean up task queue and add market-readiness audit prompt (`24ad568`)
+
+### Other
+
+- Update the plan with some finished tasks (`f302326`)
+- Changes to prometheus.yml config to bypass cloudflare checks (`b5ffb44`)
+- Merge release v0.9.1 into main (`1113126`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 0.9.2 |
+| a2a-db-backup | 0.9.2 |
+| a2a-gateway | 0.9.2 |
+| a2a-gateway-sandbox | 0.9.2 |
+| a2a-gateway-test | 0.9.2 |
+| a2a-website | 0.9.2 |
+---
+
+
 # Release v0.9.1
 
 **Date:** 2026-04-02
