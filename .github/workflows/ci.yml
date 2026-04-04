@@ -104,31 +104,64 @@ jobs:
         run: scripts/run_tests.sh gateway --cov=gateway --cov-report=xml:coverage-gateway.xml --cov-report=term-missing
 
       - name: Test billing
-        run: scripts/run_tests.sh products/billing --cov=src --cov-report=xml:coverage-billing.xml --cov-report=term-missing
+        run: scripts/run_tests.sh products/billing --cov=products/billing/src --cov-report=xml:coverage-billing.xml --cov-report=term-missing
 
       - name: Test paywall
-        run: scripts/run_tests.sh products/paywall --cov=src --cov-report=xml:coverage-paywall.xml --cov-report=term-missing
+        run: scripts/run_tests.sh products/paywall --cov=products/paywall/src --cov-report=xml:coverage-paywall.xml --cov-report=term-missing
 
       - name: Test payments
-        run: scripts/run_tests.sh products/payments --cov=src --cov-report=xml:coverage-payments.xml --cov-report=term-missing
+        run: scripts/run_tests.sh products/payments --cov=products/payments/src --cov-report=xml:coverage-payments.xml --cov-report=term-missing
 
       - name: Test marketplace
-        run: scripts/run_tests.sh products/marketplace --cov=src --cov-report=xml:coverage-marketplace.xml --cov-report=term-missing
+        run: scripts/run_tests.sh products/marketplace --cov=products/marketplace/src --cov-report=xml:coverage-marketplace.xml --cov-report=term-missing
 
       - name: Test trust
-        run: scripts/run_tests.sh products/trust --cov=src --cov-report=xml:coverage-trust.xml --cov-report=term-missing
+        run: scripts/run_tests.sh products/trust --cov=products/trust/src --cov-report=xml:coverage-trust.xml --cov-report=term-missing
 
       - name: Test shared
-        run: scripts/run_tests.sh products/shared --cov=src --cov-report=xml:coverage-shared.xml --cov-report=term-missing
+        run: scripts/run_tests.sh products/shared --cov=products/shared/src --cov-report=xml:coverage-shared.xml --cov-report=term-missing
 
       - name: Test identity
-        run: scripts/run_tests.sh products/identity --cov=src --cov-report=xml:coverage-identity.xml --cov-report=term-missing
+        run: scripts/run_tests.sh products/identity --cov=products/identity/src --cov-report=xml:coverage-identity.xml --cov-report=term-missing
 
       - name: Test messaging
-        run: scripts/run_tests.sh products/messaging --cov=src --cov-report=xml:coverage-messaging.xml --cov-report=term-missing
+        run: scripts/run_tests.sh products/messaging --cov=products/messaging/src --cov-report=xml:coverage-messaging.xml --cov-report=term-missing
+
+      - name: Upload coverage XML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage-*.xml
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Coverage ratchet: separate job so it's a distinct required check
+  # ---------------------------------------------------------------------------
+  coverage:
+    needs: [test]
+    if: always() && needs.test.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download coverage XML
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-xml
 
       - name: Coverage ratchet check
-        run: python scripts/ci/coverage_ratchet.py check --markdown=/tmp/coverage-comment.md coverage-*.xml | tee /tmp/coverage-report.txt
+        run: |
+          python scripts/ci/coverage_ratchet.py check \
+            --markdown=/tmp/coverage-comment.md \
+            coverage-*.xml \
+            > /tmp/coverage-report.txt 2>&1
+          RATCHET_EXIT=$?
+          cat /tmp/coverage-report.txt
+          exit $RATCHET_EXIT
 
       - name: Coverage summary
         if: always()
@@ -204,7 +237,7 @@ jobs:
   # Staging deploy (PRs targeting main only, after all CI jobs pass)
   # ---------------------------------------------------------------------------
   staging:
-    needs: [quality, test, package]
+    needs: [quality, test, package, coverage]
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
     uses: ./.github/workflows/staging.yml
     secrets: inherit

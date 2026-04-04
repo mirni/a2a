@@ -71,3 +71,45 @@ groups:
         annotations:
           summary: "Low disk space on {{ $labels.instance }}"
           description: "Only {{ $value }}% disk space remaining."
+
+  - name: a2a_application
+    rules:
+      # Webhook delivery failures
+      - alert: WebhookDeliveryFailures
+        expr: rate(a2a_webhook_failures_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Webhook delivery failures detected"
+          description: "Webhook failure rate is {{ $value }}/s over the last 5 minutes."
+
+      # Auth failure spike (potential brute-force or credential stuffing)
+      - alert: AuthFailureSpike
+        expr: rate(a2a_auth_failures_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Authentication failure spike detected"
+          description: "Auth failure rate is {{ $value }}/s — possible brute-force attack."
+
+      # Database errors
+      - alert: DatabaseErrors
+        expr: rate(a2a_db_errors_total[5m]) > 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database errors detected"
+          description: "DB error rate is {{ $value }}/s over the last 5 minutes."
+
+      # Backup staleness (no successful backup in 24h)
+      - alert: BackupFailure
+        expr: a2a_backup_last_success_timestamp < time() - 86400
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backup has not succeeded in over 24 hours"
+          description: "Last successful backup was {{ $value | humanizeTimestamp }}."

@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
 from gateway.src.errors import handle_product_exception
@@ -58,7 +58,7 @@ class CreateIntentRequest(BaseModel):
     )
     payer: str
     payee: str
-    amount: Decimal
+    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=2)
     description: str = ""
     currency: str = "CREDITS"
     metadata: dict[str, Any] | None = None
@@ -79,7 +79,7 @@ class CreateEscrowRequest(BaseModel):
     )
     payer: str
     payee: str
-    amount: Decimal
+    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=2)
     description: str = ""
     currency: str = "CREDITS"
     timeout_hours: int | None = None
@@ -102,7 +102,7 @@ class CreatePerformanceEscrowRequest(BaseModel):
     )
     payer: str
     payee: str
-    amount: Decimal
+    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=2)
     metric_name: str
     threshold: str
     description: str = ""
@@ -110,7 +110,7 @@ class CreatePerformanceEscrowRequest(BaseModel):
 
 class PartialCaptureRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"amount": "15.00"}})
-    amount: Decimal
+    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=2)
 
 
 class SplitEntry(BaseModel):
@@ -132,7 +132,7 @@ class CreateSplitIntentRequest(BaseModel):
         },
     )
     payer: str
-    amount: Decimal
+    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=2)
     splits: list[SplitEntry]
     description: str = ""
     currency: str = "CREDITS"
@@ -142,7 +142,7 @@ class RefundSettlementRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid", json_schema_extra={"example": {"amount": "10.00", "reason": "Service not delivered"}}
     )
-    amount: Decimal | None = None
+    amount: Decimal | None = Field(default=None, gt=0, le=1_000_000_000, decimal_places=2)
     reason: str = ""
 
 
@@ -161,7 +161,7 @@ class CreateSubscriptionRequest(BaseModel):
     )
     payer: str
     payee: str
-    amount: Decimal
+    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=2)
     interval: str
     description: str = ""
     currency: str = "CREDITS"

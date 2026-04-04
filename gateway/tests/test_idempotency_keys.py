@@ -451,6 +451,94 @@ async def test_refund_intent_idempotency(client, pro_api_key, app):
 
 
 # ---------------------------------------------------------------------------
+# partial_capture idempotency
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_partial_capture_idempotency(client, pro_api_key, app):
+    """Same idempotency_key on partial_capture should not double-settle."""
+    ctx = app.state.ctx
+    await ctx.tracker.wallet.create("pc-idem-payee", initial_balance=0.0, signup_bonus=False)
+
+    intent = await ctx.payment_engine.create_intent(
+        payer="pro-agent",
+        payee="pc-idem-payee",
+        amount=500.0,
+    )
+
+    r1 = await _execute(
+        client,
+        pro_api_key,
+        "partial_capture",
+        {"intent_id": intent.id, "amount": 200.0},
+        idempotency_key="pc-idem-001",
+    )
+    assert r1.status_code == 200, r1.json()
+    settlement_id_1 = r1.json()["id"]
+
+    r2 = await _execute(
+        client,
+        pro_api_key,
+        "partial_capture",
+        {"intent_id": intent.id, "amount": 200.0},
+        idempotency_key="pc-idem-001",
+    )
+    assert r2.status_code == 200, r2.json()
+    settlement_id_2 = r2.json()["id"]
+
+    # Same settlement returned, no duplicate
+    assert settlement_id_1 == settlement_id_2
+
+    # Payee should have received funds only once
+    payee_balance = await ctx.tracker.wallet.get_balance("pc-idem-payee")
+    assert payee_balance == 200.0
+
+
+# ---------------------------------------------------------------------------
+# reactivate_subscription idempotency
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_reactivate_subscription_idempotency(client, pro_api_key, app):
+    """Same idempotency_key on reactivate_subscription should not error on retry."""
+    ctx = app.state.ctx
+    await ctx.tracker.wallet.create("react-payee", initial_balance=0.0, signup_bonus=False)
+
+    # Create a subscription, then suspend it (so reactivation is allowed)
+    sub = await ctx.payment_engine.create_subscription(
+        payer="pro-agent",
+        payee="react-payee",
+        amount=10.0,
+        interval="monthly",
+    )
+    # Suspend the subscription so we can reactivate it
+    await ctx.payment_engine.suspend_subscription(sub.id)
+
+    r1 = await _execute(
+        client,
+        pro_api_key,
+        "reactivate_subscription",
+        {"subscription_id": sub.id},
+        idempotency_key="react-idem-001",
+    )
+    assert r1.status_code == 200, r1.json()
+
+    r2 = await _execute(
+        client,
+        pro_api_key,
+        "reactivate_subscription",
+        {"subscription_id": sub.id},
+        idempotency_key="react-idem-001",
+    )
+    assert r2.status_code == 200, r2.json()
+
+    # Both should return the same status
+    assert r1.json()["status"] == r2.json()["status"]
+
+
+# ---------------------------------------------------------------------------
 # Idempotency-Key HTTP header (T5)
 # ---------------------------------------------------------------------------
 

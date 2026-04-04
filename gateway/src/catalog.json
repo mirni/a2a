@@ -399,6 +399,10 @@
         "amount": {
           "type": "number",
           "description": "Amount to capture (must be <= intent amount)"
+        },
+        "idempotency_key": {
+          "type": "string",
+          "description": "Optional idempotency key to prevent duplicate captures"
         }
       },
       "required": [
@@ -2351,6 +2355,10 @@
       "properties": {
         "subscription_id": {
           "type": "string"
+        },
+        "idempotency_key": {
+          "type": "string",
+          "description": "Optional idempotency key to prevent duplicate reactivations"
         }
       },
       "required": [

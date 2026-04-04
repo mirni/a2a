@@ -194,12 +194,27 @@ class PaymentEngine:
         intent.updated_at = time.time()
         return intent
 
-    async def partial_capture(self, intent_id: str, amount: float) -> tuple[Settlement, float]:
+    async def partial_capture(
+        self, intent_id: str, amount: float, idempotency_key: str | None = None
+    ) -> tuple[Settlement, float]:
         """Partially capture a pending intent.
 
         Validates amount <= intent.amount, creates a settlement for the
         partial amount, and updates (or voids) the intent.
         """
+        # Idempotency check
+        if idempotency_key is not None:
+            existing = await self.storage.get_settlement_by_idempotency_key(idempotency_key)
+            if existing is not None:
+                settlement = Settlement(**existing)
+                # Compute remaining from intent
+                intent_data = await self.storage.get_intent(intent_id)
+                if intent_data is not None:
+                    remaining = float(intent_data.get("amount", 0))
+                else:
+                    remaining = 0.0
+                return settlement, remaining
+
         intent_data = await self.storage.get_intent(intent_id)
         if intent_data is None:
             raise IntentNotFoundError(f"Intent {intent_id} not found")
@@ -237,6 +252,7 @@ class PaymentEngine:
             source_type="intent",
             source_id=intent.id,
             description=intent.description,
+            idempotency_key=idempotency_key,
         )
         await self.storage.insert_settlement(settlement.model_dump())
 
@@ -621,13 +637,18 @@ class PaymentEngine:
         sub.updated_at = time.time()
         return sub
 
-    async def reactivate_subscription(self, sub_id: str) -> Subscription:
+    async def reactivate_subscription(self, sub_id: str, idempotency_key: str | None = None) -> Subscription:
         """Reactivate a suspended subscription."""
         sub_data = await self.storage.get_subscription(sub_id)
         if sub_data is None:
             raise SubscriptionNotFoundError(f"Subscription {sub_id} not found")
 
         sub = Subscription(**sub_data)
+
+        # Idempotency: if already active and idempotency_key provided, return success
+        if idempotency_key is not None and sub.status == SubscriptionStatus.ACTIVE:
+            return sub
+
         if sub.status != SubscriptionStatus.SUSPENDED:
             raise InvalidStateError(
                 f"Cannot reactivate subscription in state '{sub.status.value}'; must be 'suspended'"

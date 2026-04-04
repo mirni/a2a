@@ -85,7 +85,7 @@ class ConvertCurrencyRequest(BaseModel):
         extra="forbid",
         json_schema_extra={"example": {"amount": "100.00", "from_currency": "CREDITS", "to_currency": "USD"}},
     )
-    amount: Decimal
+    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=2)
     from_currency: str
     to_currency: str
 

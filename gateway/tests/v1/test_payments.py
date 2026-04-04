@@ -385,6 +385,131 @@ async def test_process_due_subscriptions_via_rest(client, app):
 
 
 # ---------------------------------------------------------------------------
+# B1: Amount validation — negative, zero, overflow must return 422
+# ---------------------------------------------------------------------------
+
+
+class TestPaymentAmountValidation:
+    """All payment request models must reject amount <= 0, > 1 billion, and > 2 decimal places."""
+
+    async def test_create_intent_negative_amount(self, client, pro_api_key):
+        resp = await client.post(
+            "/v1/payments/intents",
+            json={"payer": "pro-agent", "payee": "b", "amount": "-1"},
+            headers={"Authorization": f"Bearer {pro_api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_create_intent_zero_amount(self, client, pro_api_key):
+        resp = await client.post(
+            "/v1/payments/intents",
+            json={"payer": "pro-agent", "payee": "b", "amount": "0"},
+            headers={"Authorization": f"Bearer {pro_api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_create_intent_overflow_amount(self, client, pro_api_key):
+        resp = await client.post(
+            "/v1/payments/intents",
+            json={"payer": "pro-agent", "payee": "b", "amount": "1000000001"},
+            headers={"Authorization": f"Bearer {pro_api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_create_intent_sub_penny_rejected(self, client, pro_api_key):
+        resp = await client.post(
+            "/v1/payments/intents",
+            json={"payer": "pro-agent", "payee": "b", "amount": "10.001"},
+            headers={"Authorization": f"Bearer {pro_api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_create_escrow_negative_amount(self, client, pro_api_key):
+        resp = await client.post(
+            "/v1/payments/escrows",
+            json={"payer": "pro-agent", "payee": "b", "amount": "-5"},
+            headers={"Authorization": f"Bearer {pro_api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_create_escrow_zero_amount(self, client, pro_api_key):
+        resp = await client.post(
+            "/v1/payments/escrows",
+            json={"payer": "pro-agent", "payee": "b", "amount": "0"},
+            headers={"Authorization": f"Bearer {pro_api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_create_escrow_overflow_amount(self, client, pro_api_key):
+        resp = await client.post(
+            "/v1/payments/escrows",
+            json={"payer": "pro-agent", "payee": "b", "amount": "1000000001"},
+            headers={"Authorization": f"Bearer {pro_api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_create_performance_escrow_negative_amount(self, client, pro_api_key):
+        resp = await client.post(
+            "/v1/payments/escrows/performance",
+            json={"payer": "pro-agent", "payee": "b", "amount": "-10", "metric_name": "m", "threshold": "1"},
+            headers={"Authorization": f"Bearer {pro_api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_partial_capture_negative_amount(self, client, pro_api_key):
+        resp = await client.post(
+            "/v1/payments/intents/fake-id/partial-capture",
+            json={"amount": "-1"},
+            headers={"Authorization": f"Bearer {pro_api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_partial_capture_zero_amount(self, client, pro_api_key):
+        resp = await client.post(
+            "/v1/payments/intents/fake-id/partial-capture",
+            json={"amount": "0"},
+            headers={"Authorization": f"Bearer {pro_api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_split_intent_negative_amount(self, client, pro_api_key):
+        resp = await client.post(
+            "/v1/payments/intents/split",
+            json={
+                "payer": "pro-agent",
+                "amount": "-100",
+                "splits": [{"payee": "a", "percentage": 100}],
+            },
+            headers={"Authorization": f"Bearer {pro_api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_create_subscription_negative_amount(self, client, pro_api_key):
+        resp = await client.post(
+            "/v1/payments/subscriptions",
+            json={"payer": "pro-agent", "payee": "b", "amount": "-9.99", "interval": "monthly"},
+            headers={"Authorization": f"Bearer {pro_api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_create_subscription_zero_amount(self, client, pro_api_key):
+        resp = await client.post(
+            "/v1/payments/subscriptions",
+            json={"payer": "pro-agent", "payee": "b", "amount": "0", "interval": "monthly"},
+            headers={"Authorization": f"Bearer {pro_api_key}"},
+        )
+        assert resp.status_code == 422
+
+    async def test_refund_settlement_negative_amount(self, client, pro_api_key):
+        resp = await client.post(
+            "/v1/payments/settlements/fake-id/refund",
+            json={"amount": "-10"},
+            headers={"Authorization": f"Bearer {pro_api_key}"},
+        )
+        assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
 # Negative / edge-case tests
 # ---------------------------------------------------------------------------
 
@@ -543,6 +668,68 @@ class TestValueErrorMapping:
         request.url.path = "/test"
         resp = await handle_product_exception(request, ValueError("bad input"))
         assert resp.status_code == 400
+
+
+class TestBOLAInfoDisclosure:
+    """403 responses must NOT leak caller/target agent IDs or payer/payee names."""
+
+    async def test_intent_403_no_id_leak(self, client, app):
+        """Third-party capturing an intent must get generic 403 message."""
+        payer_key = await _create_agent_key(app, "bola-payer-1")
+        await _create_agent_key(app, "bola-payee-1")
+        outsider_key = await _create_agent_key(app, "bola-outsider-1")
+
+        resp = await _create_intent(client, payer_key, payer="bola-payer-1", payee="bola-payee-1")
+        assert resp.status_code == 201
+        intent_id = resp.json()["id"]
+
+        resp = await client.post(
+            f"/v1/payments/intents/{intent_id}/capture",
+            headers={"Authorization": f"Bearer {outsider_key}"},
+        )
+        assert resp.status_code == 403
+        body = str(resp.json())
+        assert "bola-payer-1" not in body
+        assert "bola-payee-1" not in body
+        assert "bola-outsider-1" not in body
+
+    async def test_escrow_403_no_id_leak(self, client, app):
+        """Third-party releasing an escrow must get generic 403 message."""
+        payer_key = await _create_agent_key(app, "bola-epayer-1")
+        await _create_agent_key(app, "bola-epayee-1")
+        outsider_key = await _create_agent_key(app, "bola-eout-1")
+
+        resp = await _create_escrow(client, payer_key, payer="bola-epayer-1", payee="bola-epayee-1")
+        assert resp.status_code == 201
+        escrow_id = resp.json()["id"]
+
+        resp = await client.post(
+            f"/v1/payments/escrows/{escrow_id}/release",
+            headers={"Authorization": f"Bearer {outsider_key}"},
+        )
+        assert resp.status_code == 403
+        body = str(resp.json())
+        assert "bola-epayer-1" not in body
+        assert "bola-epayee-1" not in body
+        assert "bola-eout-1" not in body
+
+    async def test_escrow_cancel_403_no_id_leak(self, client, app):
+        """Payee cancelling an escrow must get generic 403 without leaking payer."""
+        payer_key = await _create_agent_key(app, "bola-cpayer-1")
+        payee_key = await _create_agent_key(app, "bola-cpayee-1")
+
+        resp = await _create_escrow(client, payer_key, payer="bola-cpayer-1", payee="bola-cpayee-1")
+        assert resp.status_code == 201
+        escrow_id = resp.json()["id"]
+
+        resp = await client.post(
+            f"/v1/payments/escrows/{escrow_id}/cancel",
+            headers={"Authorization": f"Bearer {payee_key}"},
+        )
+        assert resp.status_code == 403
+        body = str(resp.json())
+        assert "bola-cpayer-1" not in body
+        assert "bola-cpayee-1" not in body
 
 
 class TestEscrowCancelBOLA:

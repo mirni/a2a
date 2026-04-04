@@ -46,12 +46,12 @@ This document compares the CMO Marketing Report (2026-03-28) against the current
 |-----|--------|----------|
 | ~~**No hosted sandbox**~~ | ~~Developers must run gateway locally to try the platform.~~ **DONE**: sandbox.greenhelix.net live | ~~P0~~ |
 | ~~**Website has no docs/guides**~~ | ~~greenhelix.net is a brochure site.~~ **DONE**: website/docs.html has full developer guide | ~~P0~~ |
-| **SDK not on PyPI or npm** | Cannot `pip install a2a-sdk` or `npm install @a2a/sdk`. Packages exist locally but have no publishing configuration. | P0 |
+| **SDK not on PyPI or npm** | Cannot `pip install a2a-sdk` or `npm install @greenhelix/sdk`. Packages exist locally but have no publishing configuration. | P0 |
 | **No MCP registry listing** | Platform is invisible to the MCP ecosystem. Not registered on any MCP directory. | P0 |
 | **No GitHub topics/README optimization** | Repo is not discoverable via GitHub search. No topics, no badges. | P1 |
-| **No `/.well-known/agent-card.json`** | Not registered on any A2A protocol registry. A2A protocol now under Linux Foundation with 150+ orgs. | P1 |
-| **No AGENTS.md** | 60,000+ repos adopted AGENTS.md (under Linux Foundation). Coding agents read it automatically. | P0 |
-| **No SKILL.md** | skills.sh supports 41+ agents (Claude Code, Cursor, Codex, Copilot). Top skills have 26K+ installs. | P1 |
+| ~~**No `/.well-known/agent-card.json`**~~ | ~~Not registered on any A2A protocol registry.~~ **DONE** — deployed at api.greenhelix.net | ~~P1~~ |
+| ~~**No AGENTS.md**~~ | ~~60,000+ repos adopted AGENTS.md.~~ **DONE** — AGENTS.md created | ~~P0~~ |
+| ~~**No SKILL.md**~~ | ~~skills.sh supports 41+ agents.~~ **DONE** — SKILL.md created | ~~P1~~ |
 | **5 products lack READMEs** | identity, messaging, paywall, trust, shared have no documentation. | P2 |
 | **No Docker image published** | Cannot `docker run` the gateway. Dockerfile exists but no registry push. | P1 |
 
@@ -244,17 +244,17 @@ Priority search terms:
 | 9 | **Register on Official MCP Registry** | Engineering | Publish to PyPI/npm first. Use `mcp-publisher` CLI. |
 | 10 | ~~**Host sandbox at sandbox.greenhelix.net**~~ | ~~Engineering~~ | **DONE** — live at sandbox.greenhelix.net |
 | 11 | ~~**Add developer docs/guides to website**~~ | ~~Engineering~~ | **DONE** — website/docs.html with full developer guide |
-| 12 | **Create AGENTS.md** in repo root | Engineering | None. Adopted by 60K+ repos. Coding agents read it automatically. |
-| 13 | **Create SKILL.md** in repo root | Engineering | SDK published. Enables skills.sh distribution to 41+ agents. |
+| 12 | ~~**Create AGENTS.md** in repo root~~ | ~~Engineering~~ | **DONE** |
+| 13 | ~~**Create SKILL.md** in repo root~~ | ~~Engineering~~ | **DONE** |
 
 ### P1 — Do Next (Developer Adoption)
 
 | # | Task | Owner | Dependency |
 |---|------|-------|------------|
-| 12 | **Create SKILL.md** in repo root | Engineering | SDK published. Describe how to use A2A SDK for commerce. |
+| 12 | ~~**Create SKILL.md** in repo root~~ | ~~Engineering~~ | **DONE** |
 | 13 | **Submit to awesome-mcp-servers** (GitHub PR) | Human/Agent | MCP registry listing. |
 | 14 | **Submit to awesome-ai-agents-2026** (GitHub PR) | Human/Agent | None. |
-| 15 | **Publish `/.well-known/agent-card.json`** at api.greenhelix.net | Engineering | A2A protocol spec compliance. |
+| 15 | ~~**Publish `/.well-known/agent-card.json`** at api.greenhelix.net~~ | ~~Engineering~~ | **DONE** |
 | 16 | **Register on a2aregistry.org** | Human/Agent | Agent card published. |
 | 17 | **Write LangChain tool wrapper** | Engineering | SDK on PyPI. Submit PR to langchain-community. |
 | 18 | **Write 3 tutorial blog posts** | Content | SDK published. "Agent Payments in 5 Minutes", "Building a Marketplace Agent", "Escrow for AI Contracts". |
