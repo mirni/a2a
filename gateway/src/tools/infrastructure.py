@@ -196,8 +196,14 @@ async def _rotate_key(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]
     Uses BEGIN IMMEDIATE so revoke + create is atomic — no window where
     the old key is revoked but the new one doesn't exist yet.
     """
+    from gateway.src.tool_errors import ToolForbiddenError
+
     current_key = params["current_key"]
-    key_info = await ctx.key_manager.validate_key(current_key)
+    try:
+        key_info = await ctx.key_manager.validate_key(current_key)
+    except Exception:
+        # Generic error to prevent key state enumeration (L-2)
+        raise ToolForbiddenError("Key validation failed") from None
     agent_id = key_info["agent_id"]
     tier = key_info["tier"]
 
