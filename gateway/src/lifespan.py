@@ -202,6 +202,29 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await ensure_event_schemas_table(event_bus.db)
     await ensure_x402_nonces_table(tracker.storage.db)
 
+    # --- Restrict SQLite DB file permissions (owner-only) ---
+    import stat
+
+    for dsn_val in [
+        billing_dsn,
+        paywall_dsn,
+        payments_dsn,
+        marketplace_dsn,
+        trust_dsn,
+        identity_dsn,
+        event_bus_dsn,
+        webhook_dsn,
+        messaging_dsn,
+        dispute_dsn,
+    ]:
+        if dsn_val.startswith("sqlite:///"):
+            db_path = dsn_val.replace("sqlite:///", "")
+            if os.path.isfile(db_path):
+                try:
+                    os.chmod(db_path, stat.S_IRUSR | stat.S_IWUSR)  # 0o600
+                except OSError:
+                    logger.debug("Could not set permissions on %s", db_path)
+
     # --- Admin audit log table ---
     from gateway.src.admin_audit import ensure_admin_audit_table
 
