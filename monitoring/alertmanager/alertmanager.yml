@@ -1,0 +1,52 @@
+# =============================================================================
+# Alertmanager Configuration — A2A Commerce Platform
+# =============================================================================
+# Routes alerts from Prometheus to notification channels.
+# Configure ALERTMANAGER_WEBHOOK_URL env var for your notification endpoint
+# (Slack incoming webhook, PagerDuty Events API, Opsgenie, etc.).
+# =============================================================================
+
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: default-webhook
+  group_by: ['alertname', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+  routes:
+    # Critical alerts: immediate notification, minimal batching
+    - match:
+        severity: critical
+      receiver: default-webhook
+      group_wait: 10s
+      group_interval: 1m
+      repeat_interval: 1h
+
+    # Warning alerts: batched, less urgent
+    - match:
+        severity: warning
+      receiver: default-webhook
+      group_wait: 5m
+      group_interval: 10m
+      repeat_interval: 12h
+
+receivers:
+  - name: default-webhook
+    webhook_configs:
+      - url: 'http://host.docker.internal:9095/webhook'
+        send_resolved: true
+        # Replace with your actual webhook URL:
+        # Slack:     https://hooks.slack.com/services/T.../B.../...
+        # PagerDuty: https://events.pagerduty.com/integration/.../enqueue
+        # Opsgenie:  https://api.opsgenie.com/v2/alerts
+
+inhibit_rules:
+  # If a critical alert fires, suppress matching warning alerts
+  - source_match:
+      severity: critical
+    target_match:
+      severity: warning
+    equal: ['alertname']

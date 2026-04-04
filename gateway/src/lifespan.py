@@ -79,6 +79,22 @@ from gateway.src.webhooks import WebhookManager
 logger = logging.getLogger("a2a.lifespan")
 
 
+def _get_secret(name: str, default: str | None = None) -> str | None:
+    """Read a secret from systemd credentials directory, falling back to env vars.
+
+    When the service is configured with LoadCredential= directives, systemd
+    makes credentials available at $CREDENTIALS_DIRECTORY/<name>.  This
+    helper checks that path first and falls back to os.environ.
+    """
+    cred_dir = os.environ.get("CREDENTIALS_DIRECTORY")
+    if cred_dir:
+        path = os.path.join(cred_dir, name)
+        if os.path.isfile(path):
+            with open(path) as f:
+                return f.read().strip()
+    return os.environ.get(name, default)
+
+
 @dataclass
 class AppContext:
     """Holds all initialized product instances."""

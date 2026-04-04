@@ -59,7 +59,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install tools and runtime deps
-        run: pip install ruff mypy bandit pydantic aiosqlite cryptography httpx fastapi
+        run: pip install ruff mypy bandit pydantic aiosqlite cryptography httpx fastapi mcp pip-audit
 
       - name: Lint with ruff
         run: ruff check .
@@ -72,6 +72,14 @@ jobs:
 
       - name: Security scan with bandit
         run: bandit -r gateway/src products/ -ll -q --skip B101,B108,B608 --exclude '*/tests/*'
+
+      - name: SAST with semgrep
+        uses: docker://semgrep/semgrep:latest
+        with:
+          args: semgrep scan --config auto --error --exclude='**/tests/**' --exclude='**/node_modules/**'
+
+      - name: Dependency audit
+        run: pip-audit -r requirements.txt
 
   # ---------------------------------------------------------------------------
   # Test: all modules on Python 3.12 with coverage
@@ -189,6 +197,7 @@ jobs:
 
       - name: Update coverage baseline
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        continue-on-error: true
         run: |
           python scripts/ci/coverage_ratchet.py update coverage-*.xml
           if git diff --quiet .coverage-baseline.json 2>/dev/null; then

@@ -20,6 +20,16 @@ RestartSec=5
 StandardOutput=journal
 StandardError=journal
 
+# --- Secrets management (systemd credentials) ---
+# Uncomment to migrate secrets from .env to per-service credential files.
+# Create credential files in /etc/credstore/a2a/ (mode 0600, owner root:root).
+# The service reads them via $CREDENTIALS_DIRECTORY/<name> at runtime.
+# See docs/policies/secrets-management-policy.md for migration steps.
+#LoadCredential=stripe_secret_key:/etc/credstore/a2a/stripe_secret_key
+#LoadCredential=stripe_webhook_secret:/etc/credstore/a2a/stripe_webhook_secret
+#LoadCredential=jwt_secret:/etc/credstore/a2a/jwt_secret
+#LoadCredential=admin_key:/etc/credstore/a2a/admin_key
+
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
