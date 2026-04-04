@@ -265,10 +265,10 @@ or establish trust:
 
 | # | Task | Details | Decision Needed? |
 |---|------|---------|-------------------|
-| H1 | **Add GitHub repository topics** | Settings > Topics. Add: `ai-agents`, `mcp`, `mcp-servers`, `a2a`, `agent-commerce`, `agent-payments`, `escrow`, `trust-scoring`, `developer-tools`, `python`, `typescript` | No |
-| H2 | **Create PyPI account** | pypi.org — register, enable 2FA, create API token | No |
-| H3 | **Create npm org** | npmjs.com — create @a2a org, enable 2FA | Decision: org name `@a2a` or `@greenhelix`? |
-| H4 | **Create Docker Hub account** | hub.docker.com — create `greenhelix` org | Decision: org name? |
+| H1 | **Add GitHub repository topics** | Settings > Topics. Add: `ai-agents`, `mcp`, `mcp-servers`, `a2a`, `agent-commerce`, `agent-payments`, `escrow`, `trust-scoring`, `developer-tools`, `python`, `typescript` | No  |
+| H2 | **Create PyPI account** | pypi.org — register, enable 2FA, create API token | DONE -- token in .env |
+| H3 | **Create npm org** | npmjs.com — create @greenhelix org, enable 2FA | org name `@greenhelix` -- DONE |
+| H4 | **Create Docker Hub account** | hub.docker.com — create `greenhelix` org | DONE -- token in .env |
 | H5 | **Configure Stripe live credentials** | Set STRIPE_API_KEY + STRIPE_WEBHOOK_SECRET in production .env | No — already have Stripe account |
 
 ### Week 2
@@ -318,3 +318,25 @@ or establish trust:
 ---
 
 *This plan consolidates all distribution channels, prioritizes by ROI, and separates agent (engineering) from human actions. Execute Week 1 items immediately — they are all zero-cost and unblock everything downstream.*
+
+
+---
+
+# Human reponses + questions
+
+For all deployment/user-facing purposes, I would like `greenhelix` instead of `a2a` (or anything else).
+
+* H1: I don't see "Topics" in settings. Maybe because repo is still private?
+* H2: Done, token in your .env, `PYPI_DEPLOYMENT_TOKEN`
+* H3: Done. `NPM_DEPLOYMENT_TOKEN` in your .env to write to @greenhelix org.
+* H4: Done. `DOCKER_DEPLOYMENT_TOKEN` in your .env
+* H5: I already have `STRIPE_API_KEY=rk_live_..` set up on the server's .env. Is that good enough? How do I set up webooks exactly? Please provide detailed instructions on how to get value for STRIPE_WEBHOOK_SECRET.
+
+* H6: Please provide more detailed instructions. How exactly do I do this?
+
+
+* D1: `@greenhelix` setup done.
+* D2: `greenhelix` setup done.
+* D3: Deferred.
+* D4: keep MIT
+* D5: later
