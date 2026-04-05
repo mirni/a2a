@@ -163,6 +163,13 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Restore coverage baseline from cache
+        id: baseline-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .coverage-baseline.json
+          key: coverage-baseline
+
       - name: Download coverage XML
         uses: actions/download-artifact@v4
         with:
@@ -202,20 +209,22 @@ jobs:
           || gh pr comment "${{ github.event.pull_request.number }}" \
             --body-file /tmp/coverage-comment.md
 
-      - name: Update coverage baseline
+      - name: Update coverage baseline (main only)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        continue-on-error: true
-        run: |
-          python scripts/ci/coverage_ratchet.py update coverage-*.xml
-          if git diff --quiet .coverage-baseline.json 2>/dev/null; then
-            echo "Baseline unchanged."
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add .coverage-baseline.json
-            git commit -m "ci: update coverage baseline [skip ci]"
-            git push
-          fi
+        run: python scripts/ci/coverage_ratchet.py update coverage-*.xml
+
+      - name: Delete stale baseline cache
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.baseline-cache.outputs.cache-hit == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh cache delete coverage-baseline || true
+
+      - name: Save updated baseline to cache
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          path: .coverage-baseline.json
+          key: coverage-baseline
 
   # ---------------------------------------------------------------------------
   # Integration tests: run e2e_tests.py against a locally-started gateway

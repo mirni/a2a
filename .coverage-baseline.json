@@ -1,11 +1,11 @@
 {
-  "billing": 84.0,
+  "billing": 99.0,
   "gateway": 94.0,
   "identity": 96.0,
   "marketplace": 93.0,
   "messaging": 96.0,
-  "payments": 87.0,
-  "paywall": 89.0,
+  "payments": 98.0,
+  "paywall": 99.0,
   "shared": 94.0,
   "trust": 96.0
 }
