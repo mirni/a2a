@@ -16,6 +16,7 @@ from gateway.src.middleware import (
     AgentIdLengthMiddleware,
     BodySizeLimitMiddleware,
     CorrelationIDMiddleware,
+    HttpsEnforcementMiddleware,
     MetricsMiddleware,
     PublicRateLimitMiddleware,
     RequestTimeoutMiddleware,
@@ -245,6 +246,10 @@ def create_app() -> FastAPI:
     app.openapi = custom_openapi  # type: ignore[assignment]
 
     # Add middleware (FastAPI wraps in reverse order: last add = outermost)
+    # HttpsEnforcementMiddleware comes before AgentIdLengthMiddleware so that
+    # plaintext rejection happens before any app logic — but still below the
+    # outermost CorrelationIDMiddleware so redirects carry a request id.
+    app.add_middleware(HttpsEnforcementMiddleware)
     app.add_middleware(AgentIdLengthMiddleware)
     app.add_middleware(PublicRateLimitMiddleware)
     app.add_middleware(RequestTimeoutMiddleware)

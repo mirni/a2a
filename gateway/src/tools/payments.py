@@ -133,24 +133,66 @@ async def _capture_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, 
     }
 
 
+def _compute_create_intent_gateway_fee(amount: float) -> float:
+    """Recompute the gateway fee charged at create_intent time.
+
+    Audit H3: the fee is deterministic (percentage of intent amount, clamped to
+    [min_fee, max_fee] per the pricing config). We recompute rather than store
+    it on the intent to keep the schema stable.
+    """
+    from gateway.src.catalog import get_tool
+    from gateway.src.deps.billing import calculate_tool_cost
+
+    tool_def = get_tool("create_intent")
+    if not tool_def:
+        return 0.0
+    return calculate_tool_cost(tool_def.get("pricing", {}), {"amount": float(amount)})
+
+
 async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     """Refund a payment intent.
 
     - If pending: void it (no funds moved).
     - If settled: create a reverse transfer from payee to payer.
+
+    Audit H3: also credits back the gateway fee charged at create_intent time
+    so users aren't charged for cancelled workflows.
     """
     caller = params.get("_caller_agent_id", "")
     tier = params.get("_caller_tier", "")
     intent = await ctx.payment_engine.get_intent(params["intent_id"])
     _check_intent_ownership(caller, tier, intent)
 
+    gateway_fee = _compute_create_intent_gateway_fee(float(intent.amount))
+
+    async def _credit_gateway_fee() -> None:
+        """Credit the create_intent gateway fee back to the payer (CREDITS currency)."""
+        if gateway_fee > 0:
+            await ctx.tracker.wallet.deposit(
+                intent.payer,
+                gateway_fee,
+                description=f"refund_fee:create_intent:{intent.id}",
+                currency="CREDITS",
+            )
+
     if intent.status.value == "pending":
         voided = await ctx.payment_engine.void(intent.id, idempotency_key=params.get("idempotency_key"))
-        return {"id": voided.id, "status": "voided", "amount": str(voided.amount)}
+        await _credit_gateway_fee()
+        return {
+            "id": voided.id,
+            "status": "voided",
+            "amount": str(voided.amount),
+            "gateway_fee": str(gateway_fee),
+        }
 
     # Idempotency: if already voided and idempotency_key provided, return success
     if intent.status.value == "voided" and params.get("idempotency_key"):
-        return {"id": intent.id, "status": "voided", "amount": str(intent.amount)}
+        return {
+            "id": intent.id,
+            "status": "voided",
+            "amount": str(intent.amount),
+            "gateway_fee": str(gateway_fee),
+        }
 
     if intent.status.value == "settled":
         currency = (intent.metadata or {}).get("currency", "CREDITS")
@@ -166,7 +208,13 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
             description=f"refund:{intent.id}",
             currency=currency,
         )
-        return {"id": intent.id, "status": "refunded", "amount": str(intent.amount)}
+        await _credit_gateway_fee()
+        return {
+            "id": intent.id,
+            "status": "refunded",
+            "amount": str(intent.amount),
+            "gateway_fee": str(gateway_fee),
+        }
 
     from payments_src.engine import InvalidStateError
 

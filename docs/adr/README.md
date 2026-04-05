@@ -20,6 +20,7 @@ looks the way it does.
 | 007 | [Pydantic Request Validation with `extra = "forbid"`](007-pydantic-validation.md) | Accepted | 2026-03-30 |
 | 008 | [Capture Atomicity via Compare-and-Set + Compensation](008-capture-atomicity.md) | Accepted | 2026-04-05 |
 | 009 | [Authentication and Rate Limiting Architecture](009-auth-rate-limiting.md) | Accepted | 2026-03-30 |
+| 010 | [Path Parameter Error Semantics (403 vs 404)](010-path-error-semantics.md) | Accepted | 2026-04-05 |
 
 ## Writing a new ADR
 
