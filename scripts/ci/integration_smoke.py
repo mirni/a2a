@@ -139,7 +139,7 @@ def main() -> int:
     if intent_id:
         status, body = _req("POST", f"/v1/payments/intents/{intent_id}/refund")
         check(
-            f"refund intent → 200",
+            "refund intent → 200",
             status == 200,
             f"got {status} body={str(body)[:120]}",
         )
