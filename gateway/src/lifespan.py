@@ -124,6 +124,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Setup structured logging
     setup_structured_logging()
 
+    # Audit C1: refuse to boot if A2A_ENV disagrees with Stripe key prefix.
+    # (e.g. sandbox with sk_live_* would cause real charges.)
+    from gateway.src.stripe_env_check import assert_stripe_key_matches_env
+
+    assert_stripe_key_matches_env(
+        env=os.environ.get("A2A_ENV"),
+        stripe_key=_get_secret("STRIPE_API_KEY", "") or "",
+    )
+
     data_dir = os.environ.get("A2A_DATA_DIR", "/tmp/a2a_gateway")
     os.makedirs(data_dir, exist_ok=True)
 

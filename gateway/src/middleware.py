@@ -529,16 +529,17 @@ class AgentIdLengthMiddleware:
                     if len(segment) > _MAX_AGENT_ID_LENGTH:
                         body = json.dumps(
                             {
-                                "type": "about:blank",
-                                "title": "Validation Error",
-                                "status": 422,
+                                "type": "https://api.greenhelix.net/errors/path-too-long",
+                                "title": "Bad Request",
+                                "status": 400,
                                 "detail": f"Path segment exceeds maximum length of {_MAX_AGENT_ID_LENGTH} characters",
+                                "instance": path,
                             }
                         ).encode()
                         await send(
                             {
                                 "type": "http.response.start",
-                                "status": 422,
+                                "status": 400,
                                 "headers": [
                                     (b"content-type", b"application/problem+json"),
                                     (b"content-length", str(len(body)).encode()),

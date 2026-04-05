@@ -124,17 +124,71 @@ def create_app() -> FastAPI:
     async def _http_exception_handler(request: Request, exc: StarletteHTTPException) -> Response:
         return await error_response(exc.status_code, exc.detail, "http_error", request=request)
 
-    # Catch-all for uncaught exceptions: return RFC 9457 JSON 500, not
+    # Catch-all for uncaught exceptions: return RFC 9457 JSON, not
     # Starlette's plain-text default. This guards against lazy-import
     # ModuleNotFoundError and other crashes escaping route handlers
     # (v0.9.3 jsonschema regression).
+    #
+    # Audit H1: route handlers that forget to wrap product exceptions
+    # (e.g. InsufficientCreditsError → 402) used to surface as generic
+    # 500. Delegate to handle_product_exception first so product errors
+    # get their proper HTTP status code regardless of which route raised.
     import logging as _logging
+
+    from gateway.src.errors import handle_product_exception
 
     _gw_logger = _logging.getLogger("a2a.gateway")
 
+    # Exception types whose names are mapped inside handle_product_exception.
+    # Any other exception is treated as truly unexpected (500).
+    _PRODUCT_EXC_NAMES = frozenset(
+        {
+            "InvalidKeyError",
+            "ExpiredKeyError",
+            "PaywallAuthError",
+            "KeyScopeError",
+            "TierInsufficientError",
+            "RateLimitError",
+            "RateLimitExceededError",
+            "SpendCapExceededError",
+            "InsufficientCreditsError",
+            "InsufficientBalanceError",
+            "ServiceNotFoundError",
+            "ServerNotFoundError",
+            "IntentNotFoundError",
+            "EscrowNotFoundError",
+            "WalletNotFoundError",
+            "WalletFrozenError",
+            "SubscriptionNotFoundError",
+            "AgentNotFoundError",
+            "InvalidStateError",
+            "DuplicateIntentError",
+            "DuplicateServiceError",
+            "AgentAlreadyExistsError",
+            "InvalidMetricError",
+            "ToolValidationError",
+            "ToolForbiddenError",
+            "ToolNotFoundError",
+            "NegativeCostError",
+            "DisputeNotFoundError",
+            "DisputeStateError",
+            "OrgNotFoundError",
+            "MemberNotFoundError",
+            "LastOwnerError",
+            "SubscriptionStateError",
+            "PaymentError",
+            "X402VerificationError",
+            "X402ReplayError",
+        }
+    )
+
     @app.exception_handler(Exception)
     async def _uncaught_exception_handler(request: Request, exc: Exception) -> Response:
-        _gw_logger.exception("Unhandled exception in %s %s: %s", request.method, request.url.path, type(exc).__name__)
+        exc_name = type(exc).__name__
+        if exc_name in _PRODUCT_EXC_NAMES:
+            # Known product error — map to its proper HTTP status.
+            return await handle_product_exception(request, exc)
+        _gw_logger.exception("Unhandled exception in %s %s: %s", request.method, request.url.path, exc_name)
         # Generic detail — do not leak exception message (may contain secrets/paths)
         return await error_response(500, "Internal server error", "internal_error", request=request)
 

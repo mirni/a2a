@@ -97,11 +97,23 @@ async def _create_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
         metadata=params.get("metadata"),
         currency=currency,
     )
+    # Audit H3: disclose the gateway fee charged on this intent so clients
+    # can reconcile charges. The fee is deducted from the caller (not the
+    # intent amount) at tool-charge time.
+    from gateway.src.catalog import get_tool
+    from gateway.src.deps.billing import calculate_tool_cost
+
+    gateway_fee = 0.0
+    tool_def = get_tool("create_intent")
+    if tool_def:
+        gateway_fee = calculate_tool_cost(tool_def.get("pricing", {}), {"amount": float(params["amount"])})
+
     return {
         "id": intent.id,
         "status": intent.status.value,
         "amount": str(intent.amount),
         "currency": currency,
+        "gateway_fee": str(gateway_fee),
     }
 
 

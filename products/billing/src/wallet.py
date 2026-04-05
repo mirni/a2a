@@ -106,6 +106,29 @@ class Wallet:
         If *idempotency_key* is provided and a transaction with that key already
         exists, the cached balance is returned without performing another deposit.
         """
+        new_balance, _ = await self.deposit_with_txn(
+            agent_id,
+            amount,
+            description=description,
+            currency=currency,
+            idempotency_key=idempotency_key,
+        )
+        return new_balance
+
+    async def deposit_with_txn(
+        self,
+        agent_id: str,
+        amount: float,
+        description: str = "",
+        currency: str = "CREDITS",
+        idempotency_key: str | None = None,
+    ) -> tuple[float, int]:
+        """Add funds and return (new_balance, transaction_id).
+
+        Same semantics as :meth:`deposit` but also returns the ledger row id
+        (audit M1 — clients need to be able to look up the recorded
+        transaction after an idempotent deposit).
+        """
         # Idempotency check
         if idempotency_key is not None:
             existing = await self.storage.get_transaction_by_idempotency_key(idempotency_key)
@@ -114,8 +137,11 @@ class Wallet:
 
                 if existing.get("result_snapshot"):
                     snapshot = _json.loads(existing["result_snapshot"])
-                    return snapshot["new_balance"]
-                return await self.get_balance(agent_id, currency=currency)
+                    return snapshot["new_balance"], int(existing["id"])
+                return (
+                    await self.get_balance(agent_id, currency=currency),
+                    int(existing["id"]),
+                )
 
         if amount <= 0:
             raise ValueError("Deposit amount must be positive")
@@ -128,7 +154,7 @@ class Wallet:
         import json as _json
 
         snapshot = _json.dumps({"new_balance": new_balance})
-        await self.storage.record_transaction(
+        txn_id = await self.storage.record_transaction(
             agent_id,
             amount,
             "deposit",
@@ -142,7 +168,7 @@ class Wallet:
             agent_id,
             {"amount": amount, "new_balance": new_balance, "currency": currency},
         )
-        return new_balance
+        return new_balance, int(txn_id)
 
     async def withdraw(
         self,
