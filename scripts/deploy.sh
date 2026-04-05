@@ -93,7 +93,10 @@ SERVICE=$(service_for_component "$COMPONENT")
 
 DEB_BASENAME=$(basename "$DEB")
 SSH_TARGET="${USER}@${HOST}"
-REMOTE_DEB="/tmp/${DEB_BASENAME}"
+# Scope remote paths per-component so parallel deploys (e.g. gateway + website
+# running concurrently from GitHub Actions) don't collide on shared /tmp files.
+REMOTE_DIR="/tmp/a2a-deploy/${COMPONENT}"
+REMOTE_DEB="${REMOTE_DIR}/${DEB_BASENAME}"
 
 # ---------------------------------------------------------------------------
 # Dry-run summary
@@ -121,7 +124,7 @@ fi
 
 log "Copying $DEB_BASENAME to $SSH_TARGET:$REMOTE_DEB"
 # Use pipe-based transfer so any SSH command (e.g. "tailscale ssh") works.
-$SSH_CMD "$SSH_TARGET" "cat > '$REMOTE_DEB'" < "$DEB"
+$SSH_CMD "$SSH_TARGET" "mkdir -p '$REMOTE_DIR' && cat > '$REMOTE_DEB'" < "$DEB"
 
 # ---------------------------------------------------------------------------
 # Step 1b: Repair broken dpkg state and install prerequisites
@@ -171,21 +174,32 @@ fi
 for pre_deb in "${PRE_DEBS[@]}"; do
     [[ -f "$pre_deb" ]] || err "Pre-deb file not found: $pre_deb"
     pre_basename=$(basename "$pre_deb")
-    log "Copying prerequisite $pre_basename to $SSH_TARGET:/tmp/$pre_basename"
-    $SSH_CMD "$SSH_TARGET" "cat > '/tmp/$pre_basename'" < "$pre_deb"
+    pre_size=$(wc -c < "$pre_deb")
+    remote_pre_path="${REMOTE_DIR}/${pre_basename}"
+    log "Copying prerequisite $pre_basename ($pre_size bytes) to $SSH_TARGET:$remote_pre_path"
+    $SSH_CMD "$SSH_TARGET" "mkdir -p '$REMOTE_DIR' && cat > '$remote_pre_path'" < "$pre_deb"
+    # Verify the remote file exists + matches the local size before trying dpkg.
+    # If the copy silently 0-byted or landed elsewhere, surface it NOW.
+    remote_size=$($SSH_CMD "$SSH_TARGET" "stat -c%s '$remote_pre_path' 2>/dev/null || echo MISSING")
+    if [[ "$remote_size" == "MISSING" ]]; then
+        err "Pre-deb copy failed: $remote_pre_path does not exist on remote after scp"
+    fi
+    if [[ "$remote_size" != "$pre_size" ]]; then
+        err "Pre-deb copy size mismatch: local=$pre_size remote=$remote_size (transfer truncated)"
+    fi
     log "Installing prerequisite $pre_basename"
-    $SSH_CMD "$SSH_TARGET" bash -s -- "$pre_basename" << 'PRE_REMOTE'
+    $SSH_CMD "$SSH_TARGET" bash -s -- "$remote_pre_path" << 'PRE_REMOTE'
         set -euo pipefail
-        PRE_DEB="$1"
+        PRE_DEB_PATH="$1"
         tries=0; max_tries=24
         while (( tries < max_tries )); do
-            if dpkg -i "/tmp/$PRE_DEB"; then
-                echo "[+] $PRE_DEB installed"
-                rm -f "/tmp/$PRE_DEB"
+            if dpkg -i "$PRE_DEB_PATH"; then
+                echo "[+] $(basename "$PRE_DEB_PATH") installed"
+                rm -f "$PRE_DEB_PATH"
                 exit 0
             fi
             if ! fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then
-                echo "[x] $PRE_DEB install failed"
+                echo "[x] $(basename "$PRE_DEB_PATH") install failed"
                 exit 1
             fi
             tries=$((tries + 1))
@@ -206,11 +220,12 @@ if [[ -n "$SERVICE" ]]; then
     log "Installing $DEB_BASENAME on $HOST (service: $SERVICE)"
 
     $SSH_CMD "$SSH_TARGET" bash -s -- \
-        "$DEB_BASENAME" "$COMPONENT" "$SERVICE" "$NO_ROLLBACK" "$NO_VERIFY" \
+        "$REMOTE_DEB" "$COMPONENT" "$SERVICE" "$NO_ROLLBACK" "$NO_VERIFY" \
         << 'REMOTE'
         set -euo pipefail
 
-        DEB_BASENAME="$1"
+        DEB_PATH="$1"
+        DEB_BASENAME="$(basename "$DEB_PATH")"
         COMPONENT="$2"
         SERVICE="$3"
         NO_ROLLBACK="$4"
@@ -246,8 +261,8 @@ if [[ -n "$SERVICE" ]]; then
         fi
 
         # --- Install new package ---
-        echo "[+] Installing /tmp/$DEB_BASENAME..."
-        if dpkg_install "/tmp/$DEB_BASENAME"; then
+        echo "[+] Installing $DEB_PATH..."
+        if dpkg_install "$DEB_PATH"; then
             echo "[+] Package installed successfully"
         else
             echo "[x] dpkg -i failed — attempting rollback"
@@ -275,7 +290,7 @@ if [[ -n "$SERVICE" ]]; then
             fi
         fi
 
-        rm -f "/tmp/$DEB_BASENAME"
+        rm -f "$DEB_PATH"
 REMOTE
 
 else
@@ -283,11 +298,12 @@ else
     log "Installing $DEB_BASENAME on $HOST (no service)"
 
     $SSH_CMD "$SSH_TARGET" bash -s -- \
-        "$DEB_BASENAME" "$COMPONENT" "$NO_ROLLBACK" \
+        "$REMOTE_DEB" "$COMPONENT" "$NO_ROLLBACK" \
         << 'REMOTE'
         set -euo pipefail
 
-        DEB_BASENAME="$1"
+        DEB_PATH="$1"
+        DEB_BASENAME="$(basename "$DEB_PATH")"
         COMPONENT="$2"
         NO_ROLLBACK="$3"
 
@@ -319,8 +335,8 @@ else
         fi
 
         # --- Install new package ---
-        echo "[+] Installing /tmp/$DEB_BASENAME..."
-        if dpkg_install "/tmp/$DEB_BASENAME"; then
+        echo "[+] Installing $DEB_PATH..."
+        if dpkg_install "$DEB_PATH"; then
             echo "[+] Package installed successfully"
         else
             echo "[x] dpkg -i failed — rolling back"
@@ -331,7 +347,7 @@ else
             exit 1
         fi
 
-        rm -f "/tmp/$DEB_BASENAME"
+        rm -f "$DEB_PATH"
 REMOTE
 
 fi
