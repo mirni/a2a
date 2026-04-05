@@ -1,5 +1,39 @@
 # Changelog
 
+# Release v0.9.6
+
+**Date:** 2026-04-05
+**Commit:** 17afcfda
+**Previous:** v0.9.3
+
+## Changes
+
+### Bug Fixes
+
+- fix: scope deploy /tmp paths per-component to prevent parallel job race (#53) (`17afcfd`)
+- fix: missing jsonschema runtime dep — connector tools return 500 on v0.9.3 (#52) (`240528d`)
+
+### Tests
+
+- fix: missing jsonschema runtime dep — connector tools return 500 on v0.9.3 (#52) (`240528d`)
+
+### Other
+
+- Merge release v0.9.3 into main (`1fb403a`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 0.9.6 |
+| a2a-db-backup | 0.9.6 |
+| a2a-gateway | 0.9.6 |
+| a2a-gateway-sandbox | 0.9.6 |
+| a2a-gateway-test | 0.9.6 |
+| a2a-website | 0.9.6 |
+---
+
+
 # Release v0.9.3
 
 **Date:** 2026-04-05
