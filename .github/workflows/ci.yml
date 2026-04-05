@@ -218,6 +218,59 @@ jobs:
           fi
 
   # ---------------------------------------------------------------------------
+  # Integration tests: run e2e_tests.py against a locally-started gateway
+  # Runs on PRs and pushes to main — blocks merge to main on failure.
+  # ---------------------------------------------------------------------------
+  integration:
+    needs: [quality]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-3.12-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-3.12-
+
+      - name: Install dependencies
+        run: scripts/ci/install_deps.sh --with-test
+
+      - name: Start gateway
+        run: scripts/ci/start_gateway.sh
+        env:
+          GATEWAY_HOST: 127.0.0.1
+          GATEWAY_PORT: "8000"
+
+      - name: Provision admin API key
+        id: provision
+        run: |
+          KEY=$(python scripts/ci/provision_admin_key.py \
+            --data-dir "$A2A_DATA_DIR" \
+            --agent-id e2e-admin \
+            --balance 1000000)
+          echo "::add-mask::$KEY"
+          echo "A2A_API_KEY=$KEY" >> "$GITHUB_ENV"
+
+      - name: Run integration smoke test
+        env:
+          A2A_BASE_URL: http://127.0.0.1:8000
+          A2A_API_KEY: ${{ env.A2A_API_KEY }}
+        run: python scripts/ci/integration_smoke.py
+
+      - name: Stop gateway
+        if: always()
+        run: |
+          if [[ -n "${SERVER_PID:-}" ]]; then
+            kill "$SERVER_PID" 2>/dev/null || true
+          fi
+
+  # ---------------------------------------------------------------------------
   # Package: build debs + SDK wheel
   # ---------------------------------------------------------------------------
   package:
@@ -250,10 +303,35 @@ jobs:
           retention-days: 14
 
   # ---------------------------------------------------------------------------
+  # Post-package smoke test: extract .deb, boot the gateway, probe endpoints.
+  # Catches packaging regressions BEFORE staging deploy, not after.
+  # ---------------------------------------------------------------------------
+  smoke-package:
+    needs: [package]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download deb artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: deb-packages
+          path: dist/
+
+      - name: Install runtime deps
+        run: scripts/ci/install_deps.sh --with-test
+
+      - name: Smoke test built deb
+        run: scripts/ci/smoke_test_deb.sh "$(ls dist/a2a-gateway_*.deb | head -1)"
+
+  # ---------------------------------------------------------------------------
   # Staging deploy (PRs targeting main only, after all CI jobs pass)
   # ---------------------------------------------------------------------------
   staging:
-    needs: [quality, test, package, coverage]
+    needs: [quality, test, integration, package, smoke-package, coverage]
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
     uses: ./.github/workflows/staging.yml
     secrets: inherit
