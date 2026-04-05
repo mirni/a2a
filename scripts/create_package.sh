@@ -90,6 +90,15 @@ build_deb() {
 
     log "Building ${deb_name}.deb..."
 
+    # Website-specific: sync stats from catalog.json into HTML before packaging
+    if [[ "$pkg_name" == "a2a-website" ]]; then
+        if [[ -f "$REPO_ROOT/scripts/update_website_stats.py" ]]; then
+            log "  Syncing website stats from catalog.json..."
+            python3 "$REPO_ROOT/scripts/update_website_stats.py" --write || \
+                err "Failed to update website stats"
+        fi
+    fi
+
     # Create temporary staging directory
     local staging
     staging=$(mktemp -d)

@@ -12,3 +12,12 @@ repos:
       - id: bandit
         args: [-r, -ll, -q, --skip, B101]
         files: ^(gateway/src|products)/
+
+  - repo: local
+    hooks:
+      - id: update-website-stats
+        name: Sync website stats from catalog.json
+        entry: python scripts/update_website_stats.py --write
+        language: system
+        files: ^(gateway/src/catalog\.json|gateway/src/_version\.py|website/.*\.html)$
+        pass_filenames: false

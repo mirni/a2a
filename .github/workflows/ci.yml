@@ -85,6 +85,9 @@ jobs:
       - name: Dependency audit
         run: pip-audit -r requirements.txt
 
+      - name: Website stats in sync with catalog
+        run: python scripts/update_website_stats.py --check
+
   # ---------------------------------------------------------------------------
   # Test: all modules on Python 3.12 with coverage
   # ---------------------------------------------------------------------------
