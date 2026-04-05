@@ -25,6 +25,7 @@ log "Installing Python dependencies..."
     'aiosqlite>=0.20' \
     'pydantic>=2.0' \
     'cryptography>=42.0' \
+    'jsonschema>=4.0,<5.0' \
     -q
 
 log "Installing SDK in editable mode..."
