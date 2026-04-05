@@ -153,6 +153,10 @@ async def test_deposit_via_rest(client, api_key):
     assert "X-Charged" in resp.headers
     body = resp.json()
     assert "new_balance" in body
+    # Audit M1: deposit response must include transaction_id so clients can
+    # look up the recorded ledger row without a follow-up list call.
+    assert "transaction_id" in body
+    assert isinstance(body["transaction_id"], int)
 
 
 async def test_deposit_idempotency_key(client, api_key):
@@ -163,7 +167,9 @@ async def test_deposit_idempotency_key(client, api_key):
         headers=headers,
     )
     assert resp1.status_code == 200
-    bal1 = resp1.json()["new_balance"]
+    body1 = resp1.json()
+    bal1 = body1["new_balance"]
+    txn1 = body1["transaction_id"]
     # Second call with same key should be idempotent
     resp2 = await client.post(
         "/v1/billing/wallets/test-agent/deposit",
@@ -171,8 +177,11 @@ async def test_deposit_idempotency_key(client, api_key):
         headers=headers,
     )
     assert resp2.status_code == 200
-    bal2 = resp2.json()["new_balance"]
+    body2 = resp2.json()
+    bal2 = body2["new_balance"]
     assert bal1 == bal2
+    # Audit M1: the same transaction_id must be echoed on the replayed call.
+    assert body2["transaction_id"] == txn1
 
 
 # ---------------------------------------------------------------------------
@@ -546,6 +555,28 @@ class TestAmountValidation:
             headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 422
+
+    async def test_withdraw_insufficient_balance_returns_402(self, app, api_key):
+        """Audit H1: overdraft must return 402 insufficient_balance, not 500.
+
+        Uses a dedicated httpx client with raise_app_exceptions=False so the
+        registered exception handler's response is returned rather than the
+        raw exception (production behaviour).
+        """
+        import httpx
+
+        transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+            resp = await c.post(
+                "/v1/billing/wallets/test-agent/withdraw",
+                json={"amount": "99999.00"},
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+        assert resp.status_code == 402, f"expected 402, got {resp.status_code} body={resp.text[:200]}"
+        assert resp.headers.get("content-type", "").startswith("application/problem+json")
+        body = resp.json()
+        assert body["status"] == 402
+        assert body["type"].endswith("/insufficient-balance")
 
     async def test_deposit_sub_penny_rejected(self, client, api_key):
         resp = await client.post(

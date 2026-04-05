@@ -150,14 +150,18 @@ class TestIntentLifecycle:
             await engine.capture(intent.id)
 
     async def test_capture_deposit_failure_preserves_payer_balance(self, engine, funded_wallets):
-        """If deposit to payee fails after withdraw from payer, exception propagates.
+        """Audit C2: if deposit to payee fails, payer balance MUST be restored.
 
-        This tests the failure path where withdraw succeeds but deposit raises.
-        The payer's balance should be reduced (withdraw happened) and the exception
-        should propagate to the caller.
+        Previously (buggy): withdraw committed, deposit failed → payer debited
+        with no corresponding credit to payee, money vanished.
+        After fix: capture is atomic — on any failure, wallet state is unchanged
+        and intent status returns to PENDING so retry is safe.
         """
 
         wallet, _, _ = funded_wallets
+        payer_before = await wallet.get_balance("agent-a")
+        payee_before = await wallet.get_balance("agent-b")
+
         intent = await engine.create_intent(
             payer="agent-a",
             payee="agent-b",
@@ -177,6 +181,50 @@ class TestIntentLifecycle:
 
         # Restore deposit
         wallet.deposit = original_deposit
+
+        # C2 fix: payer balance restored, payee untouched
+        assert await wallet.get_balance("agent-a") == payer_before
+        assert await wallet.get_balance("agent-b") == payee_before
+
+        # Intent status reverted to PENDING so caller can retry
+        updated = await engine.get_intent(intent.id)
+        assert updated.status == IntentStatus.PENDING
+
+    async def test_double_capture_rejected_with_invalid_state(self, engine, funded_wallets):
+        """Audit C3: second capture call on same intent must raise InvalidStateError.
+
+        Without the fix, a retry after a silently-committed capture would create
+        a second withdrawal row and double-debit the payer.
+        """
+        wallet, _, _ = funded_wallets
+        intent = await engine.create_intent(
+            payer="agent-a",
+            payee="agent-b",
+            amount=10.0,
+        )
+        # First capture succeeds
+        await engine.capture(intent.id)
+        payer_after_first = await wallet.get_balance("agent-a")
+
+        # Second capture must raise InvalidStateError, not double-debit
+        with pytest.raises(InvalidStateError):
+            await engine.capture(intent.id)
+
+        # Payer balance unchanged after rejected second capture
+        assert await wallet.get_balance("agent-a") == payer_after_first
+
+    async def test_capture_insufficient_balance_leaves_intent_pending(self, engine, funded_wallets):
+        """If withdraw fails (insufficient credits), intent stays PENDING for retry."""
+        intent = await engine.create_intent(
+            payer="agent-a",
+            payee="agent-b",
+            amount=5000.0,  # more than agent-a has (1000)
+        )
+        with pytest.raises(InsufficientCreditsError):
+            await engine.capture(intent.id)
+
+        updated = await engine.get_intent(intent.id)
+        assert updated.status == IntentStatus.PENDING
 
     async def test_negative_amount_rejected(self, engine, funded_wallets):
         with pytest.raises(PaymentError, match="positive"):

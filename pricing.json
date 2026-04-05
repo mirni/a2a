@@ -45,6 +45,13 @@
       "billing_period": "monthly",
       "features": ["priority_support"]
     },
+    "team_monthly": {
+      "tier": "pro",
+      "price_cents": 7900,
+      "credits_included": 10000,
+      "billing_period": "monthly",
+      "features": ["priority_support", "shared_wallet"]
+    },
     "pro_monthly": {
       "tier": "pro",
       "price_cents": 19900,
@@ -67,7 +74,9 @@
     "per_dollar": 100,
     "min_purchase": 100,
     "max_per_transaction": 1000000,
-    "signup_bonus": 500
+    "signup_bonus": 500,
+    "referral_bonus": 500,
+    "credit_expiry_months": 24
   },
 
   "stripe_packages": {

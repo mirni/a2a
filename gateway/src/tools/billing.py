@@ -24,14 +24,14 @@ async def _get_usage_summary(ctx: AppContext, params: dict[str, Any]) -> dict[st
 
 async def _deposit(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     currency = params.get("currency", "CREDITS")
-    new_balance = await ctx.tracker.wallet.deposit(
+    new_balance, transaction_id = await ctx.tracker.wallet.deposit_with_txn(
         params["agent_id"],
         params["amount"],
         description=params.get("description", ""),
         currency=currency,
         idempotency_key=params.get("idempotency_key"),
     )
-    return {"new_balance": new_balance}
+    return {"new_balance": new_balance, "transaction_id": transaction_id}
 
 
 async def _get_transactions(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
@@ -40,6 +40,14 @@ async def _get_transactions(ctx: AppContext, params: dict[str, Any]) -> dict[str
         limit=params.get("limit", 100),
         offset=params.get("offset", 0),
     )
+    # Audit M2: expose `type` and `timestamp` aliases alongside the raw DB
+    # column names so clients built against the documented public contract
+    # (id, type, amount, timestamp, description) work.
+    for tx in txns:
+        if "tx_type" in tx and "type" not in tx:
+            tx["type"] = tx["tx_type"]
+        if "created_at" in tx and "timestamp" not in tx:
+            tx["timestamp"] = tx["created_at"]
     return {"transactions": txns}
 
 

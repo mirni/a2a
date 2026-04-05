@@ -144,6 +144,42 @@ class TestSubscriptionPlans:
         assert plan["credits_included"] == 25000
         assert plan["tier"] == "pro"
 
+    def test_team_plan(self, cfg: PricingConfig):
+        """Team monthly plan bridges starter and pro: $79 for 10K credits."""
+        plan = cfg.subscription_plans["team_monthly"]
+        assert plan["price_cents"] == 7900
+        assert plan["credits_included"] == 10000
+        assert plan["tier"] == "pro"
+        assert plan["billing_period"] == "monthly"
+
+    def test_team_plan_price_between_starter_and_pro(self, cfg: PricingConfig):
+        """Team pricing must fall strictly between starter and pro."""
+        starter = cfg.subscription_plans["starter_monthly"]["price_cents"]
+        team = cfg.subscription_plans["team_monthly"]["price_cents"]
+        pro = cfg.subscription_plans["pro_monthly"]["price_cents"]
+        assert starter < team < pro
+
+
+class TestCreditExpiryAndReferrals:
+    """CMO-requested fields: credit expiry and referral bonus."""
+
+    @pytest.fixture()
+    def cfg(self) -> PricingConfig:
+        return load_pricing_config()
+
+    def test_referral_bonus_present(self, cfg: PricingConfig):
+        """Both referrer and referee receive this many credits on signup."""
+        assert cfg.credits["referral_bonus"] == 500
+
+    def test_credit_expiry_months(self, cfg: PricingConfig):
+        """Purchased credits expire after this many months of inactivity."""
+        assert cfg.credits["credit_expiry_months"] == 24
+
+    def test_credit_expiry_is_positive_integer(self, cfg: PricingConfig):
+        expiry = cfg.credits["credit_expiry_months"]
+        assert isinstance(expiry, int)
+        assert expiry > 0
+
 
 class TestAutoReload:
     @pytest.fixture()

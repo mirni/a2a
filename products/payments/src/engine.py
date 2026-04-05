@@ -125,7 +125,15 @@ class PaymentEngine:
     async def capture(self, intent_id: str, idempotency_key: str | None = None) -> Settlement:
         """Capture a pending intent: move funds from payer to payee.
 
-        Transitions: pending -> settled (atomically).
+        Atomic transition: pending -> captured -> settled. Audit C2/C3:
+
+        1. ``compare_and_set_intent_status(pending -> captured)`` reserves the
+           intent. If the row is not in PENDING state (already captured, voided,
+           or concurrently captured), returns False and we raise InvalidStateError.
+           This prevents double-capture races.
+        2. Withdraw from payer, deposit to payee, insert settlement row.
+        3. On ANY failure after the reservation, reverse completed wallet ops
+           and transition captured -> pending so the caller can safely retry.
         """
         # Idempotency check
         if idempotency_key is not None:
@@ -141,38 +149,95 @@ class PaymentEngine:
         if intent.status != IntentStatus.PENDING:
             raise InvalidStateError(f"Cannot capture intent in state '{intent.status.value}'; must be 'pending'")
 
-        # Transfer funds: withdraw from payer, deposit to payee
+        # --- Reserve the intent (atomic lock) ---
+        reserved = await self.storage.compare_and_set_intent_status(
+            intent.id,
+            IntentStatus.PENDING.value,
+            IntentStatus.CAPTURED.value,
+        )
+        if not reserved:
+            # Another concurrent capture already claimed this intent.
+            current = await self.storage.get_intent(intent.id)
+            current_status = (current or {}).get("status", "unknown")
+            raise InvalidStateError(f"Cannot capture intent in state '{current_status}'; must be 'pending'")
+
         amount = float(intent.amount)
         currency = (intent.metadata or {}).get("currency", "CREDITS")
-        await self.wallet.withdraw(
-            intent.payer,
-            amount,
-            description=f"payment:{intent.id}",
-            currency=currency,
-        )
-        await self.wallet.deposit(
-            intent.payee,
-            amount,
-            description=f"payment:{intent.id}",
-            currency=currency,
-        )
+        withdraw_done = False
+        deposit_done = False
 
-        # Create settlement record
-        settlement = Settlement(
-            payer=intent.payer,
-            payee=intent.payee,
-            amount=intent.amount,
-            source_type="intent",
-            source_id=intent.id,
-            description=intent.description,
-            idempotency_key=idempotency_key,
-        )
-        await self.storage.insert_settlement(settlement.model_dump())
+        try:
+            # Withdraw from payer
+            await self.wallet.withdraw(
+                intent.payer,
+                amount,
+                description=f"payment:{intent.id}",
+                currency=currency,
+            )
+            withdraw_done = True
 
-        # Update intent status to settled
-        await self.storage.update_intent_status(intent.id, IntentStatus.SETTLED.value, settlement_id=settlement.id)
+            # Deposit to payee
+            await self.wallet.deposit(
+                intent.payee,
+                amount,
+                description=f"payment:{intent.id}",
+                currency=currency,
+            )
+            deposit_done = True
 
-        return settlement
+            # Create settlement record
+            settlement = Settlement(
+                payer=intent.payer,
+                payee=intent.payee,
+                amount=intent.amount,
+                source_type="intent",
+                source_id=intent.id,
+                description=intent.description,
+                idempotency_key=idempotency_key,
+            )
+            await self.storage.insert_settlement(settlement.model_dump())
+
+            # Finalize: captured -> settled with settlement_id
+            await self.storage.update_intent_status(intent.id, IntentStatus.SETTLED.value, settlement_id=settlement.id)
+            return settlement
+
+        except Exception:
+            # Compensate: reverse wallet operations that succeeded via the
+            # storage layer directly (bypasses higher-level validation that
+            # may have caused the original failure). Record the reversal in
+            # the ledger so the ops team can audit compensations.
+            storage = self.wallet.storage
+            if deposit_done:
+                try:
+                    await storage.atomic_currency_debit_strict(intent.payee, amount, currency)
+                    await storage.record_transaction(
+                        intent.payee,
+                        -amount,
+                        "reversal",
+                        f"payment:{intent.id}:reversal",
+                        currency=currency,
+                    )
+                except Exception:
+                    pass  # best-effort
+            if withdraw_done:
+                try:
+                    await storage.atomic_currency_credit(intent.payer, amount, currency)
+                    await storage.record_transaction(
+                        intent.payer,
+                        amount,
+                        "reversal",
+                        f"payment:{intent.id}:reversal",
+                        currency=currency,
+                    )
+                except Exception:
+                    pass
+            # Revert status captured -> pending so the caller can retry.
+            await self.storage.compare_and_set_intent_status(
+                intent.id,
+                IntentStatus.CAPTURED.value,
+                IntentStatus.PENDING.value,
+            )
+            raise
 
     async def void(self, intent_id: str, idempotency_key: str | None = None) -> PaymentIntent:
         """Void a pending intent. No funds move."""

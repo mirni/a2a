@@ -263,6 +263,27 @@ class PaymentStorage:
             )
         await self.db.commit()
 
+    async def compare_and_set_intent_status(
+        self,
+        intent_id: str,
+        from_status: str,
+        to_status: str,
+    ) -> bool:
+        """Atomically transition intent status iff current status matches from_status.
+
+        Returns True if the transition succeeded (one row updated). Returns False
+        if the intent does not exist OR its current status is not from_status.
+        Used to prevent double-capture races (audit C3) and to reserve an intent
+        for a multi-step operation.
+        """
+        now = time.time()
+        cursor = await self.db.execute(
+            "UPDATE payment_intents SET status = ?, updated_at = ? WHERE id = ? AND status = ?",
+            (to_status, now, intent_id, from_status),
+        )
+        await self.db.commit()
+        return cursor.rowcount == 1
+
     async def update_intent_amount(self, intent_id: str, amount: float) -> None:
         now = time.time()
         amt_atomic = credits_to_atomic(Decimal(str(amount)))
