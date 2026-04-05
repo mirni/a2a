@@ -124,6 +124,20 @@ def create_app() -> FastAPI:
     async def _http_exception_handler(request: Request, exc: StarletteHTTPException) -> Response:
         return await error_response(exc.status_code, exc.detail, "http_error", request=request)
 
+    # Catch-all for uncaught exceptions: return RFC 9457 JSON 500, not
+    # Starlette's plain-text default. This guards against lazy-import
+    # ModuleNotFoundError and other crashes escaping route handlers
+    # (v0.9.3 jsonschema regression).
+    import logging as _logging
+
+    _gw_logger = _logging.getLogger("a2a.gateway")
+
+    @app.exception_handler(Exception)
+    async def _uncaught_exception_handler(request: Request, exc: Exception) -> Response:
+        _gw_logger.exception("Unhandled exception in %s %s: %s", request.method, request.url.path, type(exc).__name__)
+        # Generic detail — do not leak exception message (may contain secrets/paths)
+        return await error_response(500, "Internal server error", "internal_error", request=request)
+
     # Standalone endpoints
     @app.get("/v1/metrics", include_in_schema=False)
     async def metrics(request: Request) -> Response:
