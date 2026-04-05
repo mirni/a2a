@@ -14,6 +14,7 @@ import os
 import time
 from typing import Any
 
+import jsonschema
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -104,8 +105,6 @@ def _validate_params(params: dict[str, Any], input_schema: dict[str, Any]) -> st
     since the catalog may not document all accepted params (e.g. internal
     flags like signup_bonus, idempotency_key).
     """
-    import jsonschema
-
     try:
         jsonschema.validate(instance=params, schema=input_schema)
     except jsonschema.ValidationError as exc:
