@@ -37,7 +37,8 @@ case "$1" in
         /opt/a2a-sandbox/venv/bin/pip install --upgrade pip wheel setuptools -q
         /opt/a2a-sandbox/venv/bin/pip install \
             'fastapi>=0.115' 'uvicorn>=0.29' 'httpx>=0.27' \
-            'aiosqlite>=0.20' 'pydantic>=2.0' 'cryptography>=46.0' -q
+            'aiosqlite>=0.20' 'pydantic>=2.0' 'cryptography>=46.0' \
+            'jsonschema>=4.0,<5.0' -q
         /opt/a2a-sandbox/venv/bin/pip install -e /opt/a2a-sandbox/sdk -q 2>/dev/null \
             || /opt/a2a-sandbox/venv/bin/pip install /opt/a2a-sandbox/sdk -q
 
