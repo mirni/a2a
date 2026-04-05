@@ -79,8 +79,7 @@ async def test_execute_invalid_param_type_returns_422_not_500(client, api_key) -
     )
     # Must NOT be plain-text 500 from Starlette's ServerErrorMiddleware
     assert resp.status_code != 500, (
-        f"Got 500: body={resp.text!r} — likely a missing dep or unhandled "
-        f"exception escaping error_response()"
+        f"Got 500: body={resp.text!r} — likely a missing dep or unhandled exception escaping error_response()"
     )
     assert resp.status_code == 422
     body = resp.json()
