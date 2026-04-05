@@ -1,5 +1,39 @@
 # Changelog
 
+# Release v0.9.3
+
+**Date:** 2026-04-05
+**Commit:** fb703c4e
+**Previous:** v0.9.2
+
+## Changes
+
+### Features
+
+- feat: implement all 11 SOC 2 immediate action items (#49) (`82ad4dc`)
+
+### Bug Fixes
+
+- fix: security audit remediation — 27 findings across 4 audit reports (#51) (`fb703c4`)
+
+### Other
+
+- Fix CI warnings, coverage paths, and update .env.example (#50) (`178f315`)
+- Merge release v0.9.2 into main (`159c5b1`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 0.9.3 |
+| a2a-db-backup | 0.9.3 |
+| a2a-gateway | 0.9.3 |
+| a2a-gateway-sandbox | 0.9.3 |
+| a2a-gateway-test | 0.9.3 |
+| a2a-website | 0.9.3 |
+---
+
+
 # Release v0.9.2
 
 **Date:** 2026-04-04
