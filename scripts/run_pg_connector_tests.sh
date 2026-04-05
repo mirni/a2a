@@ -161,8 +161,10 @@ asyncio.run(check())
 log "Running integration test suite..."
 cd "$HARNESS_DIR"
 
-# PYTHONPATH includes the connector root so tests can `from src.client import ...`
-PYTHONPATH="$REPO_ROOT/products/connectors/postgres${PYTHONPATH:+:$PYTHONPATH}" \
+# PYTHONPATH includes:
+#   - the connector root (so tests can `from src.client import ...`)
+#   - the products/ root (so src/tools.py can `import shared.src.errors` et al)
+PYTHONPATH="$REPO_ROOT/products/connectors/postgres:$REPO_ROOT/products${PYTHONPATH:+:$PYTHONPATH}" \
     "$PYTHON" -m pytest . $PYTEST_ARGS
 
 log "Done."

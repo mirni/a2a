@@ -43,7 +43,27 @@ class PostgresClient:
 
     async def connect(self) -> None:
         """Initialize the connection pool."""
+        import json
+
         import asyncpg
+
+        async def _init_connection(conn: "asyncpg.Connection") -> None:
+            # Decode JSON/JSONB columns to Python dict/list on the way out and
+            # encode Python objects to JSON on the way in. Without this, asyncpg
+            # returns JSONB as a raw string, which breaks downstream consumers
+            # that expect structured data.
+            await conn.set_type_codec(
+                "jsonb",
+                encoder=json.dumps,
+                decoder=json.loads,
+                schema="pg_catalog",
+            )
+            await conn.set_type_codec(
+                "json",
+                encoder=json.dumps,
+                decoder=json.loads,
+                schema="pg_catalog",
+            )
 
         self._pool = await asyncpg.create_pool(
             host=self._config.host,
@@ -54,6 +74,7 @@ class PostgresClient:
             min_size=self._config.min_pool_size,
             max_size=self._config.max_pool_size,
             command_timeout=60,
+            init=_init_connection,
         )
         logger.info(
             "Connected to PostgreSQL %s:%d/%s (pool: %d-%d)",
