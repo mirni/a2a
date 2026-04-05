@@ -39,7 +39,8 @@ case "$1" in
         "$INSTALL_DIR/venv/bin/pip" install --upgrade pip wheel setuptools -q
         "$INSTALL_DIR/venv/bin/pip" install \
             'fastapi>=0.115' 'uvicorn>=0.29' 'httpx>=0.27' \
-            'aiosqlite>=0.20' 'pydantic>=2.0' 'cryptography>=46.0' -q
+            'aiosqlite>=0.20' 'pydantic>=2.0' 'cryptography>=46.0' \
+            'jsonschema>=4.0,<5.0' -q
         "$INSTALL_DIR/venv/bin/pip" install -e "$INSTALL_DIR/sdk" -q 2>/dev/null \
             || "$INSTALL_DIR/venv/bin/pip" install "$INSTALL_DIR/sdk" -q
 
