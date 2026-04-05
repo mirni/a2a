@@ -159,9 +159,7 @@ class PaymentEngine:
             # Another concurrent capture already claimed this intent.
             current = await self.storage.get_intent(intent.id)
             current_status = (current or {}).get("status", "unknown")
-            raise InvalidStateError(
-                f"Cannot capture intent in state '{current_status}'; must be 'pending'"
-            )
+            raise InvalidStateError(f"Cannot capture intent in state '{current_status}'; must be 'pending'")
 
         amount = float(intent.amount)
         currency = (intent.metadata or {}).get("currency", "CREDITS")
@@ -200,9 +198,7 @@ class PaymentEngine:
             await self.storage.insert_settlement(settlement.model_dump())
 
             # Finalize: captured -> settled with settlement_id
-            await self.storage.update_intent_status(
-                intent.id, IntentStatus.SETTLED.value, settlement_id=settlement.id
-            )
+            await self.storage.update_intent_status(intent.id, IntentStatus.SETTLED.value, settlement_id=settlement.id)
             return settlement
 
         except Exception:
