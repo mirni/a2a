@@ -171,8 +171,18 @@ fi
 for pre_deb in "${PRE_DEBS[@]}"; do
     [[ -f "$pre_deb" ]] || err "Pre-deb file not found: $pre_deb"
     pre_basename=$(basename "$pre_deb")
-    log "Copying prerequisite $pre_basename to $SSH_TARGET:/tmp/$pre_basename"
+    pre_size=$(wc -c < "$pre_deb")
+    log "Copying prerequisite $pre_basename ($pre_size bytes) to $SSH_TARGET:/tmp/$pre_basename"
     $SSH_CMD "$SSH_TARGET" "cat > '/tmp/$pre_basename'" < "$pre_deb"
+    # Verify the remote file exists + matches the local size before trying dpkg.
+    # If the copy silently 0-byted or landed elsewhere, surface it NOW.
+    remote_size=$($SSH_CMD "$SSH_TARGET" "stat -c%s '/tmp/$pre_basename' 2>/dev/null || echo MISSING")
+    if [[ "$remote_size" == "MISSING" ]]; then
+        err "Pre-deb copy failed: /tmp/$pre_basename does not exist on remote after scp"
+    fi
+    if [[ "$remote_size" != "$pre_size" ]]; then
+        err "Pre-deb copy size mismatch: local=$pre_size remote=$remote_size (transfer truncated)"
+    fi
     log "Installing prerequisite $pre_basename"
     $SSH_CMD "$SSH_TARGET" bash -s -- "$pre_basename" << 'PRE_REMOTE'
         set -euo pipefail
