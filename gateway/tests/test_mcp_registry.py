@@ -14,8 +14,6 @@ import tempfile
 
 import pytest
 
-pytestmark = pytest.mark.asyncio
-
 
 class TestConnectorConfig:
     """Test ConnectorConfig model validation."""

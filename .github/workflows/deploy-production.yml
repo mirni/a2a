@@ -72,11 +72,59 @@ jobs:
           echo "Deploying component=$COMPONENT from ref=$GIT_REF"
 
   # ---------------------------------------------------------------------------
+  # Gate: verify Release pipeline passed (release/* branches only)
+  # ---------------------------------------------------------------------------
+  release-gate:
+    runs-on: ubuntu-latest
+    needs: [validate]
+    if: startsWith(github.ref, 'refs/heads/release/')
+    steps:
+      - name: Verify Release workflow succeeded
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          echo "Checking Release workflow status on branch: $BRANCH"
+
+          # Find the most recent Release workflow run on this branch
+          RUN_JSON=$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow "Release" \
+            --branch "$BRANCH" \
+            --limit 1 \
+            --json databaseId,conclusion,status \
+            --jq '.[0] // empty')
+
+          if [[ -z "$RUN_JSON" ]]; then
+            echo "::error::No Release workflow run found for branch $BRANCH"
+            exit 1
+          fi
+
+          CONCLUSION=$(echo "$RUN_JSON" | jq -r '.conclusion // "null"')
+          STATUS=$(echo "$RUN_JSON" | jq -r '.status')
+          RUN_ID=$(echo "$RUN_JSON" | jq -r '.databaseId')
+
+          echo "Release run $RUN_ID: status=$STATUS conclusion=$CONCLUSION"
+
+          if [[ "$STATUS" != "completed" ]]; then
+            echo "::error::Release workflow (run $RUN_ID) is still $STATUS — wait for it to complete"
+            exit 1
+          fi
+
+          if [[ "$CONCLUSION" != "success" ]]; then
+            echo "::error::Release workflow (run $RUN_ID) concluded with '$CONCLUSION' — cannot deploy"
+            exit 1
+          fi
+
+          echo "Release workflow passed — proceeding with deployment"
+
+  # ---------------------------------------------------------------------------
   # Build selected packages
   # ---------------------------------------------------------------------------
   package:
     runs-on: ubuntu-latest
-    needs: [validate]
+    needs: [validate, release-gate]
+    if: always() && needs.validate.result == 'success' && (needs.release-gate.result == 'success' || needs.release-gate.result == 'skipped')
     steps:
       - uses: actions/checkout@v5
 
