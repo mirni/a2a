@@ -421,6 +421,146 @@ class TestStripeWebhook:
         )
         assert resp.status_code == 400
 
+
+# ---------------------------------------------------------------------------
+# GET /v1/checkout/success and /v1/checkout/cancelled (HTML pages)
+# ---------------------------------------------------------------------------
+
+
+class TestCheckoutPages:
+    """Tests for the post-checkout HTML pages."""
+
+    async def test_success_page_returns_html(self, client):
+        resp = await client.get("/v1/checkout/success")
+        assert resp.status_code == 200
+        assert "text/html" in resp.headers["content-type"]
+        body = resp.text
+        assert "Payment Successful" in body
+        assert "credits" in body.lower()
+
+    async def test_cancelled_page_returns_html(self, client):
+        resp = await client.get("/v1/checkout/cancelled")
+        assert resp.status_code == 200
+        assert "text/html" in resp.headers["content-type"]
+        body = resp.text
+        assert "cancelled" in body.lower() or "canceled" in body.lower()
+
+
+class TestCheckoutDefaultUrls:
+    """Test that create_checkout uses /v1/checkout/success and /v1/checkout/cancelled as defaults."""
+
+    async def test_default_success_url_points_to_success_page(self, client, api_key, monkeypatch):
+        monkeypatch.setenv("STRIPE_API_KEY", "sk_test_fake")
+
+        fake_resp = Mock()
+        fake_resp.status_code = 200
+        fake_resp.json.return_value = {
+            "id": "cs_test_urls",
+            "url": "https://checkout.stripe.com/pay/cs_test_urls",
+        }
+
+        captured_data = {}
+
+        with patch("gateway.src.stripe_checkout.httpx.AsyncClient") as MockClient:
+            mock_instance = AsyncMock()
+
+            async def capture_post(*args, **kwargs):
+                captured_data.update(kwargs.get("data", {}))
+                return fake_resp
+
+            mock_instance.post = capture_post
+            mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
+            mock_instance.__aexit__ = AsyncMock(return_value=None)
+            MockClient.return_value = mock_instance
+
+            resp = await client.post(
+                "/v1/checkout",
+                json={"package": "starter"},
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+
+        assert resp.status_code == 200
+        assert "/v1/checkout/success" in captured_data.get("success_url", "")
+        assert "/v1/checkout/cancelled" in captured_data.get("cancel_url", "")
+
+    async def test_custom_urls_override_defaults(self, client, api_key, monkeypatch):
+        monkeypatch.setenv("STRIPE_API_KEY", "sk_test_fake")
+
+        fake_resp = Mock()
+        fake_resp.status_code = 200
+        fake_resp.json.return_value = {
+            "id": "cs_test_custom_urls",
+            "url": "https://checkout.stripe.com/pay/cs_test_custom_urls",
+        }
+
+        captured_data = {}
+
+        with patch("gateway.src.stripe_checkout.httpx.AsyncClient") as MockClient:
+            mock_instance = AsyncMock()
+
+            async def capture_post(*args, **kwargs):
+                captured_data.update(kwargs.get("data", {}))
+                return fake_resp
+
+            mock_instance.post = capture_post
+            mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
+            mock_instance.__aexit__ = AsyncMock(return_value=None)
+            MockClient.return_value = mock_instance
+
+            resp = await client.post(
+                "/v1/checkout",
+                json={
+                    "package": "starter",
+                    "success_url": "https://myapp.com/thanks",
+                    "cancel_url": "https://myapp.com/cancel",
+                },
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+
+        assert resp.status_code == 200
+        assert captured_data["success_url"] == "https://myapp.com/thanks"
+        assert captured_data["cancel_url"] == "https://myapp.com/cancel"
+
+
+# ---------------------------------------------------------------------------
+# Webhook dedup tests (continued from TestStripeWebhook)
+# ---------------------------------------------------------------------------
+
+
+class TestStripeWebhookDedup:
+    """Dedup tests that were split out for clarity."""
+
+    _WEBHOOK_SECRET = "whsec_test_secret_for_webhook"
+
+    _session_counter = 1000
+
+    def _checkout_completed_event(self, agent_id: str, credits: int, *, session_id: str | None = None) -> dict:
+        if session_id is None:
+            TestStripeWebhookDedup._session_counter += 1
+            session_id = f"cs_test_{TestStripeWebhookDedup._session_counter}"
+        return {
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "id": session_id,
+                    "metadata": {
+                        "agent_id": agent_id,
+                        "credits": str(credits),
+                    },
+                }
+            },
+        }
+
+    def _signed_headers(self, payload: bytes, secret: str | None = None) -> dict:
+        s = secret or self._WEBHOOK_SECRET
+        ts = str(int(time.time()))
+        signed = f"{ts}.".encode() + payload
+        sig = hmac.new(s.encode(), signed, hashlib.sha256).hexdigest()
+        return {
+            "Content-Type": "application/json",
+            "stripe-signature": f"t={ts},v1={sig}",
+        }
+
     async def test_webhook_replay_same_session_deposits_only_once(self, client, app, monkeypatch):
         """Replaying the same webhook event (same session id) must not double-deposit."""
         monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", self._WEBHOOK_SECRET)

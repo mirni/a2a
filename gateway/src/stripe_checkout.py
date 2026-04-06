@@ -17,7 +17,7 @@ from typing import Any
 
 import httpx
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from gateway.src.auth import extract_api_key
 from gateway.src.errors import error_response, handle_product_exception
@@ -42,6 +42,66 @@ PACKAGES: dict[str, dict[str, int | str]] = {
     "scale": {"credits": 25_000, "price_cents": 20000, "label": "25,000 credits"},
     "enterprise": {"credits": 100_000, "price_cents": 75000, "label": "100,000 credits"},
 }
+
+
+_PAGE_STYLE = """\
+<style>
+  :root { --bg: #0a0e17; --surface: #111827; --border: #1e293b;
+          --text: #e2e8f0; --muted: #94a3b8; --accent: #22c55e; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+         background: var(--bg); color: var(--text); min-height: 100vh;
+         display: flex; align-items: center; justify-content: center; }
+  .card { background: var(--surface); border: 1px solid var(--border);
+          border-radius: 12px; padding: 3rem; max-width: 480px;
+          text-align: center; }
+  .icon { font-size: 3rem; margin-bottom: 1rem; }
+  h1 { font-size: 1.5rem; margin-bottom: 0.75rem; }
+  p { color: var(--muted); line-height: 1.6; margin-bottom: 1.5rem; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+</style>
+"""
+
+_SUCCESS_HTML = f"""\
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payment Successful</title>{_PAGE_STYLE}</head>
+<body><div class="card">
+  <div class="icon">&#10003;</div>
+  <h1>Payment Successful</h1>
+  <p>Thank you for your purchase! Your credits are being added to your account.
+     This usually takes just a few seconds.</p>
+  <a href="https://greenhelix.net">Back to Green Helix</a>
+</div></body></html>
+"""
+
+_CANCELLED_HTML = f"""\
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payment Cancelled</title>{_PAGE_STYLE}</head>
+<body><div class="card">
+  <div class="icon">&#10007;</div>
+  <h1>Payment Cancelled</h1>
+  <p>Your payment was cancelled and you have not been charged.
+     You can try again whenever you're ready.</p>
+  <a href="https://greenhelix.net">Back to Green Helix</a>
+</div></body></html>
+"""
+
+
+@router.get("/v1/checkout/success")
+async def checkout_success() -> HTMLResponse:
+    """Branded post-payment confirmation page."""
+    return HTMLResponse(_SUCCESS_HTML)
+
+
+@router.get("/v1/checkout/cancelled")
+async def checkout_cancelled() -> HTMLResponse:
+    """Branded payment-cancelled page."""
+    return HTMLResponse(_CANCELLED_HTML)
 
 
 def _stripe_key() -> str:
@@ -127,8 +187,8 @@ async def create_checkout(request: Request) -> JSONResponse:
     # Determine URLs
     domain = os.environ.get("A2A_DOMAIN", request.headers.get("host", "localhost"))
     scheme = "https" if "greenhelix" in domain else "http"
-    success_url = body.get("success_url", f"{scheme}://{domain}/v1/health")
-    cancel_url = body.get("cancel_url", f"{scheme}://{domain}/v1/health")
+    success_url = body.get("success_url", f"{scheme}://{domain}/v1/checkout/success")
+    cancel_url = body.get("cancel_url", f"{scheme}://{domain}/v1/checkout/cancelled")
 
     # Create Stripe Checkout session
     try:
