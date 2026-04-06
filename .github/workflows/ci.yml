@@ -277,6 +277,68 @@ jobs:
           fi
 
   # ---------------------------------------------------------------------------
+  # Postgres connector: live-DB integration tests (non-blocking)
+  # ---------------------------------------------------------------------------
+  postgres-integration:
+    needs: [quality]
+    runs-on: ubuntu-latest
+    continue-on-error: true  # Non-blocking while stabilising
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: a2a_connector_test
+          POSTGRES_USER: a2a_test
+          POSTGRES_PASSWORD: a2a_test_pwd_local_only
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U a2a_test -d a2a_connector_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      PG_HOST: localhost
+      PG_PORT: "5433"
+      PG_DATABASE: a2a_connector_test
+      PG_USER: a2a_test
+      PG_PASSWORD: a2a_test_pwd_local_only
+      PG_READ_ONLY: "false"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "pytest>=8" "pytest-asyncio>=0.23" "asyncpg>=0.30" "pydantic>=2.0"
+
+      - name: Install psql client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Seed database
+        env:
+          PGPASSWORD: a2a_test_pwd_local_only
+        run: |
+          psql -h localhost -p 5433 -U a2a_test -d a2a_connector_test \
+            -v ON_ERROR_STOP=1 \
+            -f products/connectors/postgres/tests_integration/seed.sql
+
+      - name: Run integration tests
+        run: scripts/run_pg_connector_tests.sh
+
+      - name: Show pytest log on failure
+        if: failure()
+        run: |
+          echo "::group::Last 200 lines of any pytest output"
+          find /tmp -name "*.log" -newer /tmp -mmin -10 2>/dev/null -exec tail -n 200 {} + || true
+          echo "::endgroup::"
+
+  # ---------------------------------------------------------------------------
   # Package: build debs + SDK wheel
   # ---------------------------------------------------------------------------
   package:
