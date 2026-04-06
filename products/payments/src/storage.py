@@ -159,14 +159,39 @@ class PaymentStorage:
         SQLite's CREATE TABLE IF NOT EXISTS does not alter existing tables,
         so columns added in later versions must be added via ALTER TABLE.
         Each ALTER is guarded by a column-existence check so this is idempotent.
+
+        IMPORTANT: executescript(_SCHEMA) runs AFTER this method and creates
+        indexes like ``CREATE INDEX ... ON settlements(source_type, source_id)``.
+        If the table exists but lacks those columns, executescript fails with
+        ``OperationalError: no such column: source_type`` — the root cause of
+        audit finding C2 (100% capture failure on production servers whose DBs
+        were created by an older code version).
         """
         assert self._db is not None
         migrations = [
+            # --- payment_intents ---
             ("payment_intents", "idempotency_key", "TEXT"),
+            ("payment_intents", "settlement_id", "TEXT"),
+            ("payment_intents", "metadata", "TEXT NOT NULL DEFAULT '{}'"),
+            # --- escrows ---
             ("escrows", "idempotency_key", "TEXT"),
+            ("escrows", "settlement_id", "TEXT"),
+            ("escrows", "timeout_at", "REAL"),
+            ("escrows", "metadata", "TEXT NOT NULL DEFAULT '{}'"),
+            # --- subscriptions ---
             ("subscriptions", "idempotency_key", "TEXT"),
-            ("refunds", "idempotency_key", "TEXT"),
+            ("subscriptions", "cancelled_by", "TEXT"),
+            ("subscriptions", "metadata", "TEXT NOT NULL DEFAULT '{}'"),
+            # --- settlements ---
             ("settlements", "idempotency_key", "TEXT"),
+            ("settlements", "source_type", "TEXT NOT NULL DEFAULT ''"),
+            ("settlements", "source_id", "TEXT NOT NULL DEFAULT ''"),
+            ("settlements", "description", "TEXT NOT NULL DEFAULT ''"),
+            ("settlements", "status", "TEXT NOT NULL DEFAULT 'settled'"),
+            # --- refunds ---
+            ("refunds", "idempotency_key", "TEXT"),
+            ("refunds", "reason", "TEXT NOT NULL DEFAULT ''"),
+            ("refunds", "status", "TEXT NOT NULL DEFAULT 'completed'"),
         ]
         for table, column, col_type in migrations:
             cursor = await self._db.execute(  # nosemgrep: formatted-sql-query, sqlalchemy-execute-raw-query
