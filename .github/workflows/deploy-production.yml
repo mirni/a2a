@@ -245,9 +245,12 @@ jobs:
 
       - name: Post-deploy smoke tests
         if: needs.deploy-gateway.result == 'success'
+        env:
+          STRESS_ADMIN_KEY: ${{ secrets.STRESS_ADMIN_KEY }}
         run: |
           python scripts/stress_test.py \
             --base-url "https://api.greenhelix.net" \
             --customers 5 \
-            --duration 15
+            --duration 15 \
+            --admin-key "$STRESS_ADMIN_KEY"
 
