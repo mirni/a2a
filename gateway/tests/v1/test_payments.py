@@ -389,6 +389,71 @@ async def test_process_due_subscriptions_via_rest(client, app):
 # ---------------------------------------------------------------------------
 
 
+class TestRefundBalanceConservation:
+    """H-NEW: create→capture→refund via REST must conserve balance exactly."""
+
+    async def test_rest_refund_no_balance_drift(self, client, app):
+        """After create→capture→refund, payer must end up at starting balance.
+
+        Bug: require_tool() passed empty {} to calculate_tool_cost(), so
+        percentage-based fees defaulted to min_fee (0.01) instead of the
+        real fee. The refund then credited back the correctly computed fee,
+        creating a per-cycle profit of (real_fee - min_fee).
+        """
+        payer_key = await _create_agent_key(app, "drift-payer", balance=1000.0)
+        await _create_agent_key(app, "drift-payee", balance=0.0)
+
+        ctx = app.state.ctx
+        balance_before = await ctx.tracker.get_balance("drift-payer")
+
+        # Create intent via REST (percentage-based fee: 2% of 50 = 1.0)
+        resp = await client.post(
+            "/v1/payments/intents",
+            json={"payer": "drift-payer", "payee": "drift-payee", "amount": "50.00"},
+            headers={"Authorization": f"Bearer {payer_key}"},
+        )
+        assert resp.status_code == 201
+        intent_id = resp.json()["id"]
+        charged_header = float(resp.headers.get("X-Charged", "0"))
+
+        # Capture
+        resp = await client.post(
+            f"/v1/payments/intents/{intent_id}/capture",
+            headers={"Authorization": f"Bearer {payer_key}"},
+        )
+        assert resp.status_code == 200
+
+        # Refund
+        resp = await client.post(
+            f"/v1/payments/intents/{intent_id}/refund",
+            headers={"Authorization": f"Bearer {payer_key}"},
+        )
+        assert resp.status_code == 200
+
+        balance_after = await ctx.tracker.get_balance("drift-payer")
+
+        # The payer must end up exactly where they started — no profit
+        assert balance_after == balance_before, (
+            f"Balance drift: started at {balance_before}, ended at {balance_after} "
+            f"(delta={balance_after - balance_before}, charged_header={charged_header})"
+        )
+
+    async def test_x_charged_header_matches_percentage_fee(self, client, app):
+        """X-Charged header on create_intent must reflect the percentage fee."""
+        payer_key = await _create_agent_key(app, "xch-payer", balance=1000.0)
+        await _create_agent_key(app, "xch-payee", balance=0.0)
+
+        resp = await client.post(
+            "/v1/payments/intents",
+            json={"payer": "xch-payer", "payee": "xch-payee", "amount": "50.00"},
+            headers={"Authorization": f"Bearer {payer_key}"},
+        )
+        assert resp.status_code == 201
+        charged = float(resp.headers.get("X-Charged", "0"))
+        # 2% of 50 = 1.0 (not 0.01 min_fee)
+        assert charged == 1.0, f"Expected X-Charged=1.0 (2% of 50), got {charged}"
+
+
 class TestPaymentAmountValidation:
     """All payment request models must reject amount <= 0, > 1 billion, and > 2 decimal places."""
 
