@@ -409,3 +409,109 @@ class TestPricingWrapper:
         result = get_discount_tier(0)
         assert isinstance(result, int)
         assert 0 <= result <= 100
+
+
+# ---------------------------------------------------------------------------
+# storage.py — BEGIN IMMEDIATE rollback paths
+# ---------------------------------------------------------------------------
+
+
+class TestAtomicRollbackPaths:
+    """Ensure rollback is called when an exception occurs inside a transaction."""
+
+    async def test_atomic_credit_rollback_on_error(self, storage: StorageBackend, monkeypatch):
+        """atomic_credit rolls back and re-raises on exception inside txn."""
+        await storage.create_wallet("rollback-credit", initial_balance=100.0)
+        call_count = 0
+        _orig = storage.db.execute
+
+        async def _patched(sql, params=None):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 3:  # Third execute (UPDATE) — raise error
+                raise RuntimeError("simulated DB error")
+            if params:
+                return await _orig(sql, params)
+            return await _orig(sql)
+
+        monkeypatch.setattr(storage.db, "execute", _patched)
+        with pytest.raises(RuntimeError, match="simulated DB error"):
+            await storage.atomic_credit("rollback-credit", 10.0)
+
+    async def test_atomic_debit_rollback_on_error(self, storage: StorageBackend, monkeypatch):
+        """atomic_debit rolls back and re-raises on exception inside txn."""
+        await storage.create_wallet("rollback-debit", initial_balance=100.0)
+        call_count = 0
+        _orig = storage.db.execute
+
+        async def _patched(sql, params=None):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 3:
+                raise RuntimeError("simulated DB error")
+            if params:
+                return await _orig(sql, params)
+            return await _orig(sql)
+
+        monkeypatch.setattr(storage.db, "execute", _patched)
+        with pytest.raises(RuntimeError, match="simulated DB error"):
+            await storage.atomic_debit("rollback-debit", 10.0)
+
+    async def test_atomic_debit_strict_rollback_on_error(self, storage: StorageBackend, monkeypatch):
+        """atomic_debit_strict rolls back and re-raises on exception inside txn."""
+        await storage.create_wallet("rollback-debit-strict", initial_balance=100.0)
+        call_count = 0
+        _orig = storage.db.execute
+
+        async def _patched(sql, params=None):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 3:
+                raise RuntimeError("simulated DB error")
+            if params:
+                return await _orig(sql, params)
+            return await _orig(sql)
+
+        monkeypatch.setattr(storage.db, "execute", _patched)
+        with pytest.raises(RuntimeError, match="simulated DB error"):
+            await storage.atomic_debit_strict("rollback-debit-strict", 10.0)
+
+    async def test_atomic_currency_credit_rollback_on_error(self, storage: StorageBackend, monkeypatch):
+        """atomic_currency_credit (non-CREDITS) rolls back on error."""
+        await storage.create_wallet("rollback-curr-credit", initial_balance=100.0)
+        call_count = 0
+        _orig = storage.db.execute
+
+        async def _patched(sql, params=None):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 3:
+                raise RuntimeError("simulated DB error")
+            if params:
+                return await _orig(sql, params)
+            return await _orig(sql)
+
+        monkeypatch.setattr(storage.db, "execute", _patched)
+        with pytest.raises(RuntimeError, match="simulated DB error"):
+            await storage.atomic_currency_credit("rollback-curr-credit", 10.0, "USD")
+
+    async def test_atomic_currency_debit_strict_rollback_on_error(self, storage: StorageBackend, monkeypatch):
+        """atomic_currency_debit_strict (non-CREDITS) rolls back on error."""
+        await storage.create_wallet("rollback-curr-debit", initial_balance=100.0)
+        # First credit some USD so debit has something to work with
+        await storage.atomic_currency_credit("rollback-curr-debit", 50.0, "USD")
+        call_count = 0
+        _orig = storage.db.execute
+
+        async def _patched(sql, params=None):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 3:
+                raise RuntimeError("simulated DB error")
+            if params:
+                return await _orig(sql, params)
+            return await _orig(sql)
+
+        monkeypatch.setattr(storage.db, "execute", _patched)
+        with pytest.raises(RuntimeError, match="simulated DB error"):
+            await storage.atomic_currency_debit_strict("rollback-curr-debit", 10.0, "USD")
