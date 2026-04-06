@@ -8,9 +8,10 @@ Conversion happens at the storage boundary using the shared money module.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
@@ -29,7 +30,18 @@ except ImportError:
 
 @dataclass
 class StorageBackend(BaseStorage):
-    """Async SQLite storage backend for all billing data."""
+    """Async SQLite storage backend for all billing data.
+
+    Uses autocommit (isolation_level=None) so that atomic wallet methods
+    can use explicit ``BEGIN IMMEDIATE`` for proper write-lock acquisition
+    under concurrent access.
+    """
+
+    _ISOLATION_LEVEL: str | None = None
+
+    # Lock for explicit transactions — prevents coroutine interleaving between
+    # BEGIN IMMEDIATE and COMMIT on the shared aiosqlite connection.
+    _txn_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False, repr=False)
 
     _SCHEMA: str = """
 CREATE TABLE IF NOT EXISTS wallets (
@@ -326,18 +338,25 @@ CREATE INDEX IF NOT EXISTS idx_api_audit_ts ON api_audit_log(timestamp);
     async def atomic_debit(self, agent_id: str, amount: float) -> float | None:
         """Atomically debit amount from wallet if sufficient balance.
 
-        Uses a single UPDATE ... WHERE balance >= ? to avoid read-check-write races.
+        Uses BEGIN IMMEDIATE to acquire a write lock, then a single
+        UPDATE ... WHERE balance >= ? to avoid read-check-write races.
         Returns the new balance on success, or None if insufficient funds.
         """
         now = time.time()
         amt_atomic = self._to_atomic(amount)
-        await self.db.execute(
-            "UPDATE wallets SET balance = balance - ?, updated_at = ? WHERE agent_id = ? AND balance >= ?",
-            (amt_atomic, now, agent_id, amt_atomic),
-        )
-        await self.db.commit()
-        cursor = await self.db.execute("SELECT balance FROM wallets WHERE agent_id = ?", (agent_id,))
-        row = await cursor.fetchone()
+        async with self._txn_lock:
+            await self.db.execute("BEGIN IMMEDIATE")
+            try:
+                await self.db.execute(
+                    "UPDATE wallets SET balance = balance - ?, updated_at = ? WHERE agent_id = ? AND balance >= ?",
+                    (amt_atomic, now, agent_id, amt_atomic),
+                )
+                cursor = await self.db.execute("SELECT balance FROM wallets WHERE agent_id = ?", (agent_id,))
+                row = await cursor.fetchone()
+                await self.db.commit()
+            except Exception:
+                await self.db.rollback()
+                raise
         if row is None:
             return None
         return self._from_atomic(row[0])
@@ -345,23 +364,27 @@ CREATE INDEX IF NOT EXISTS idx_api_audit_ts ON api_audit_log(timestamp);
     async def atomic_debit_strict(self, agent_id: str, amount: float) -> tuple[bool, float]:
         """Atomically debit amount from wallet.
 
-        The UPDATE SET balance = balance - ? WHERE balance >= ? is a single
-        atomic SQL statement that avoids read-check-write races.  The
-        subsequent SELECT reads the updated balance within the same implicit
-        transaction before commit.
+        Uses BEGIN IMMEDIATE to acquire a write lock, then UPDATE ... WHERE
+        balance >= ? followed by SELECT within the same transaction.
         Returns (success, balance) where success=True if debit was applied,
         and balance is the current balance after the operation.
         """
         now = time.time()
         amt_atomic = self._to_atomic(amount)
-        cursor = await self.db.execute(
-            "UPDATE wallets SET balance = balance - ?, updated_at = ? WHERE agent_id = ? AND balance >= ?",
-            (amt_atomic, now, agent_id, amt_atomic),
-        )
-        affected = cursor.rowcount
-        cur2 = await self.db.execute("SELECT balance FROM wallets WHERE agent_id = ?", (agent_id,))
-        row = await cur2.fetchone()
-        await self.db.commit()
+        async with self._txn_lock:
+            await self.db.execute("BEGIN IMMEDIATE")
+            try:
+                cursor = await self.db.execute(
+                    "UPDATE wallets SET balance = balance - ?, updated_at = ? WHERE agent_id = ? AND balance >= ?",
+                    (amt_atomic, now, agent_id, amt_atomic),
+                )
+                affected = cursor.rowcount
+                cur2 = await self.db.execute("SELECT balance FROM wallets WHERE agent_id = ?", (agent_id,))
+                row = await cur2.fetchone()
+                await self.db.commit()
+            except Exception:
+                await self.db.rollback()
+                raise
         if row is None:
             return (False, 0.0)
         return (affected > 0, self._from_atomic(row[0]))
@@ -369,21 +392,26 @@ CREATE INDEX IF NOT EXISTS idx_api_audit_ts ON api_audit_log(timestamp);
     async def atomic_credit(self, agent_id: str, amount: float) -> tuple[bool, float]:
         """Atomically credit amount to wallet.
 
-        The UPDATE SET balance = balance + ? is a single atomic SQL statement
-        that avoids read-check-write races.  The subsequent SELECT reads the
-        updated balance within the same implicit transaction before commit.
+        Uses BEGIN IMMEDIATE to acquire a write lock, then UPDATE + SELECT
+        within the same transaction before commit.
         Returns (success, new_balance) where success=True if agent exists.
         """
         now = time.time()
         amt_atomic = self._to_atomic(amount)
-        cursor = await self.db.execute(
-            "UPDATE wallets SET balance = balance + ?, updated_at = ? WHERE agent_id = ?",
-            (amt_atomic, now, agent_id),
-        )
-        affected = cursor.rowcount
-        cur2 = await self.db.execute("SELECT balance FROM wallets WHERE agent_id = ?", (agent_id,))
-        row = await cur2.fetchone()
-        await self.db.commit()
+        async with self._txn_lock:
+            await self.db.execute("BEGIN IMMEDIATE")
+            try:
+                cursor = await self.db.execute(
+                    "UPDATE wallets SET balance = balance + ?, updated_at = ? WHERE agent_id = ?",
+                    (amt_atomic, now, agent_id),
+                )
+                affected = cursor.rowcount
+                cur2 = await self.db.execute("SELECT balance FROM wallets WHERE agent_id = ?", (agent_id,))
+                row = await cur2.fetchone()
+                await self.db.commit()
+            except Exception:
+                await self.db.rollback()
+                raise
         if row is None:
             return (False, 0.0)
         return (affected > 0, self._from_atomic(row[0]))
@@ -729,7 +757,7 @@ CREATE INDEX IF NOT EXISTS idx_api_audit_ts ON api_audit_log(timestamp);
         """Atomically credit amount in a specific currency.
 
         For CREDITS, delegates to atomic_credit (wallets table).
-        For other currencies, upserts into currency_balances.
+        For other currencies, uses BEGIN IMMEDIATE + upsert into currency_balances.
         Returns (success, new_balance).
         """
         if currency == "CREDITS":
@@ -737,19 +765,25 @@ CREATE INDEX IF NOT EXISTS idx_api_audit_ts ON api_audit_log(timestamp);
 
         now = time.time()
         amt_atomic = self._to_atomic(amount)
-        await self.db.execute(
-            "INSERT INTO currency_balances (agent_id, currency, balance, updated_at) "
-            "VALUES (?, ?, ?, ?) "
-            "ON CONFLICT(agent_id, currency) DO UPDATE SET "
-            "balance = balance + ?, updated_at = ?",
-            (agent_id, currency, amt_atomic, now, amt_atomic, now),
-        )
-        await self.db.commit()
-        cursor = await self.db.execute(
-            "SELECT balance FROM currency_balances WHERE agent_id = ? AND currency = ?",
-            (agent_id, currency),
-        )
-        row = await cursor.fetchone()
+        async with self._txn_lock:
+            await self.db.execute("BEGIN IMMEDIATE")
+            try:
+                await self.db.execute(
+                    "INSERT INTO currency_balances (agent_id, currency, balance, updated_at) "
+                    "VALUES (?, ?, ?, ?) "
+                    "ON CONFLICT(agent_id, currency) DO UPDATE SET "
+                    "balance = balance + ?, updated_at = ?",
+                    (agent_id, currency, amt_atomic, now, amt_atomic, now),
+                )
+                cursor = await self.db.execute(
+                    "SELECT balance FROM currency_balances WHERE agent_id = ? AND currency = ?",
+                    (agent_id, currency),
+                )
+                row = await cursor.fetchone()
+                await self.db.commit()
+            except Exception:
+                await self.db.rollback()
+                raise
         if row is None:
             return (False, 0.0)
         return (True, self._from_atomic(row[0]))
@@ -760,7 +794,7 @@ CREATE INDEX IF NOT EXISTS idx_api_audit_ts ON api_audit_log(timestamp);
         """Atomically debit amount in a specific currency.
 
         For CREDITS, delegates to atomic_debit_strict (wallets table).
-        For other currencies, uses currency_balances with balance >= check.
+        For other currencies, uses BEGIN IMMEDIATE + UPDATE with balance >= check.
         Returns (success, balance).
         """
         if currency == "CREDITS":
@@ -768,19 +802,24 @@ CREATE INDEX IF NOT EXISTS idx_api_audit_ts ON api_audit_log(timestamp);
 
         now = time.time()
         amt_atomic = self._to_atomic(amount)
-        cursor = await self.db.execute(
-            "UPDATE currency_balances SET balance = balance - ?, updated_at = ? "
-            "WHERE agent_id = ? AND currency = ? AND balance >= ?",
-            (amt_atomic, now, agent_id, currency, amt_atomic),
-        )
-        await self.db.commit()
-        affected = cursor.rowcount
-
-        cur2 = await self.db.execute(
-            "SELECT balance FROM currency_balances WHERE agent_id = ? AND currency = ?",
-            (agent_id, currency),
-        )
-        row = await cur2.fetchone()
+        async with self._txn_lock:
+            await self.db.execute("BEGIN IMMEDIATE")
+            try:
+                cursor = await self.db.execute(
+                    "UPDATE currency_balances SET balance = balance - ?, updated_at = ? "
+                    "WHERE agent_id = ? AND currency = ? AND balance >= ?",
+                    (amt_atomic, now, agent_id, currency, amt_atomic),
+                )
+                affected = cursor.rowcount
+                cur2 = await self.db.execute(
+                    "SELECT balance FROM currency_balances WHERE agent_id = ? AND currency = ?",
+                    (agent_id, currency),
+                )
+                row = await cur2.fetchone()
+                await self.db.commit()
+            except Exception:
+                await self.db.rollback()
+                raise
         if row is None:
             return (False, 0.0)
         return (affected > 0, self._from_atomic(row[0]))

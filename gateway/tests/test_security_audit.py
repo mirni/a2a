@@ -429,3 +429,98 @@ class TestBackupPathTraversal:
         source = inspect.getsource(_restore_database)
         assert "os.path.isfile" in source
         assert "os.path.exists(backup_path)" not in source
+
+
+# ---------------------------------------------------------------------------
+# M3 — Messaging endpoint returns 201 (not 500)
+# ---------------------------------------------------------------------------
+
+
+class TestMessagingSendMessage:
+    """POST /v1/messaging/messages must succeed with a valid message_type string."""
+
+    async def test_send_text_message_returns_201(self, client, app):
+        key = await _create_agent(app, "alice-msg-m3", tier="pro")
+        await _create_agent(app, "bob-msg-m3", tier="pro")
+        resp = await client.post(
+            "/v1/messaging/messages",
+            json={
+                "sender": "alice-msg-m3",
+                "recipient": "bob-msg-m3",
+                "message_type": "text",
+                "body": "hello",
+            },
+            headers={"Authorization": f"Bearer {key}"},
+        )
+        assert resp.status_code == 201, f"Expected 201 but got {resp.status_code}: {resp.text}"
+        data = resp.json()
+        assert data["message_type"] == "text"
+
+    async def test_send_price_negotiation_message_returns_201(self, client, app):
+        key = await _create_agent(app, "alice-msg-m3b", tier="pro")
+        await _create_agent(app, "bob-msg-m3b", tier="pro")
+        resp = await client.post(
+            "/v1/messaging/messages",
+            json={
+                "sender": "alice-msg-m3b",
+                "recipient": "bob-msg-m3b",
+                "message_type": "price_negotiation",
+                "body": "offer",
+            },
+            headers={"Authorization": f"Bearer {key}"},
+        )
+        assert resp.status_code == 201, f"Expected 201 but got {resp.status_code}: {resp.text}"
+
+
+# ---------------------------------------------------------------------------
+# M4 — Identity org creation returns 201 (not 500)
+# ---------------------------------------------------------------------------
+
+
+class TestIdentityOrgCreation:
+    """POST /v1/identity/orgs must succeed and return org details."""
+
+    async def test_create_org_returns_201(self, client, app):
+        key = await _create_agent(app, "alice-org-m4", tier="pro")
+        resp = await client.post(
+            "/v1/identity/orgs",
+            json={"org_name": "Test Org M4", "agent_id": "alice-org-m4"},
+            headers={"Authorization": f"Bearer {key}"},
+        )
+        assert resp.status_code == 201, f"Expected 201 but got {resp.status_code}: {resp.text}"
+        data = resp.json()
+        assert data["name"] == "Test Org M4"
+        assert "org_id" in data
+
+
+# ---------------------------------------------------------------------------
+# H-RACE — atomic_credit uses BEGIN IMMEDIATE
+# ---------------------------------------------------------------------------
+
+
+class TestAtomicTransactionIsolation:
+    """Billing atomic methods must use BEGIN IMMEDIATE for SQLite write lock."""
+
+    def test_atomic_credit_uses_begin_immediate(self):
+        import inspect
+
+        from products.billing.src.storage import StorageBackend
+
+        source = inspect.getsource(StorageBackend.atomic_credit)
+        assert "BEGIN IMMEDIATE" in source
+
+    def test_atomic_debit_uses_begin_immediate(self):
+        import inspect
+
+        from products.billing.src.storage import StorageBackend
+
+        source = inspect.getsource(StorageBackend.atomic_debit)
+        assert "BEGIN IMMEDIATE" in source
+
+    def test_atomic_debit_strict_uses_begin_immediate(self):
+        import inspect
+
+        from products.billing.src.storage import StorageBackend
+
+        source = inspect.getsource(StorageBackend.atomic_debit_strict)
+        assert "BEGIN IMMEDIATE" in source

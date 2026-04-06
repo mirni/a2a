@@ -34,6 +34,11 @@ class BaseStorage:
     # Timeout in seconds for DB operations (schema creation, migrations)
     _DB_TIMEOUT: float = 5.0
 
+    # Subclasses can override to use explicit transaction management.
+    # None = autocommit (callers must use BEGIN/COMMIT explicitly for atomicity).
+    # "" = deferred implicit transactions (default aiosqlite behavior).
+    _ISOLATION_LEVEL: str | None = ""
+
     async def connect(self, *, apply_migrations: bool = False) -> None:
         """Open the database connection and ensure schema exists.
 
@@ -47,7 +52,7 @@ class BaseStorage:
             from src.db_security import harden_connection
 
         db_path = self.dsn.replace("sqlite:///", "")
-        self._db = await aiosqlite.connect(db_path)
+        self._db = await aiosqlite.connect(db_path, isolation_level=self._ISOLATION_LEVEL)
         self._db.row_factory = aiosqlite.Row
         await harden_connection(self._db)
 
