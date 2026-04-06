@@ -107,8 +107,17 @@ def require_tool(tool_name: str):
             raise _ResponseError(resp) from exc
 
         # 6. Cost calculation + balance check
+        # Parse request body for percentage-based pricing (needs "amount" param).
         tool_pricing = tool_def.get("pricing", {})
-        cost = calculate_tool_cost(tool_pricing, {})
+        cost_params: dict[str, Any] = {}
+        if tool_pricing.get("model") == "percentage":
+            try:
+                body = await request.json()
+                if isinstance(body, dict) and "amount" in body:
+                    cost_params["amount"] = body["amount"]
+            except Exception:
+                pass
+        cost = calculate_tool_cost(tool_pricing, cost_params)
 
         if agent_tier != ADMIN_TIER and cost > 0:
             try:

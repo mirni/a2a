@@ -71,8 +71,10 @@ async def test_capture_refund_round_trip_restores_payer_balance(client, api_key,
     payer_after = await ctx.tracker.get_balance("test-agent")
     payee_after = await ctx.tracker.get_balance("c4-payee")
 
-    # Payer ends up BETTER than pre-capture baseline because the gateway_fee
-    # deducted at create_intent is now refunded alongside the intent amount.
+    # Payer is fully restored: the refund returns the intent amount AND the
+    # gateway fee, exactly cancelling the charges made at create+capture time.
+    # Via /v1/execute the gateway_fee was already deducted before payer_before
+    # was measured, so after refund the payer ends up at payer_before + gateway_fee.
     assert payer_after == payer_before + gateway_fee
     assert payee_after == payee_before
 

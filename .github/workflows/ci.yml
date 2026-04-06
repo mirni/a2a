@@ -86,7 +86,7 @@ jobs:
         run: python scripts/update_website_stats.py --check
 
   # ---------------------------------------------------------------------------
-  # Test: gateway + products split across parallel jobs × Python versions
+  # Test: gateway sharded across 3 parallel jobs × Python versions
   # ---------------------------------------------------------------------------
   test-gateway:
     needs: [quality]
@@ -95,7 +95,8 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.12", "3.13"]
-    name: test-gateway (py${{ matrix.python-version }})
+        shard: [0, 1, 2]
+    name: test-gateway (py${{ matrix.python-version }}, shard ${{ matrix.shard }})
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -117,15 +118,27 @@ jobs:
         run: ./check_server.sh
         continue-on-error: true
 
-      - name: Test gateway
-        run: scripts/run_tests.sh gateway --cov=gateway --cov-report=xml:coverage-gateway.xml --cov-report=term-missing
+      - name: Determine shard test files
+        run: |
+          FILES=$(python scripts/ci/shard_tests.py gateway/tests/ ${{ matrix.shard }} 3 | tr '\n' ' ')
+          echo "SHARD_FILES=$FILES" >> "$GITHUB_ENV"
+
+      - name: Test gateway (shard ${{ matrix.shard }})
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          python -m pytest $SHARD_FILES \
+            -x -q --tb=short \
+            --cov=gateway \
+            --cov-report=xml:coverage-gateway-${{ matrix.shard }}.xml \
+            --cov-report=term-missing
 
       - name: Upload coverage XML
         if: always() && matrix.python-version == '3.12'
         uses: actions/upload-artifact@v6
         with:
-          name: coverage-xml-gateway
-          path: coverage-*.xml
+          name: coverage-xml-gateway-${{ matrix.shard }}
+          path: coverage-gateway-*.xml
           retention-days: 7
 
   test-products:
@@ -208,14 +221,23 @@ jobs:
       - name: Download gateway coverage XML
         uses: actions/download-artifact@v7
         with:
-          name: coverage-xml-gateway
+          pattern: coverage-xml-gateway-*
+          merge-multiple: true
 
       - name: Download products coverage XML
         uses: actions/download-artifact@v7
         with:
           name: coverage-xml-products
 
+      - name: Merge gateway shard coverage XMLs
+        run: |
+          python scripts/ci/merge_coverage_xml.py \
+            coverage-gateway-*.xml \
+            -o coverage-gateway.xml
+          rm -f coverage-gateway-[0-9]*.xml
+
       - name: Coverage ratchet check
+        shell: bash {0}
         run: |
           python scripts/ci/coverage_ratchet.py check \
             --markdown=/tmp/coverage-comment.md \
