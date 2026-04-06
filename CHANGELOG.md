@@ -1,5 +1,38 @@
 # Changelog
 
+# Release v1.0.1
+
+**Date:** 2026-04-06
+**Commit:** e2467ca8
+**Previous:** v1.0.0
+
+## Changes
+
+### Bug Fixes
+
+- fix(security): remediate audit findings C1, C2, H2 (#60) (`e2467ca`)
+
+### Chores
+
+- chore: rename SDK to a2a-greenhelix-sdk + bump versions to 1.0.0 (`8197a27`)
+
+### Other
+
+- Merge release v1.0.0 into main (`0e2eb4e`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 1.0.1 |
+| a2a-db-backup | 1.0.1 |
+| a2a-gateway | 1.0.1 |
+| a2a-gateway-sandbox | 1.0.1 |
+| a2a-gateway-test | 1.0.1 |
+| a2a-website | 1.0.1 |
+---
+
+
 # Release v1.0.0
 
 **Date:** 2026-04-06

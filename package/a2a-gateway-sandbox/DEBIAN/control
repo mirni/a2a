@@ -1,5 +1,5 @@
 Package: a2a-gateway-sandbox
-Version: 1.0.0
+Version: 1.0.1
 Architecture: all
 Depends: python3 (>= 3.12), sqlite3, curl
 Maintainer: A2A Team <team@greenhelix.net>
