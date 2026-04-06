@@ -56,9 +56,9 @@ jobs:
       PG_PASSWORD: a2a_test_pwd_local_only
       PG_READ_ONLY: "false"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 

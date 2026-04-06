@@ -78,9 +78,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [validate]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -99,7 +99,7 @@ jobs:
         run: scripts/create_package.sh a2a-website
 
       - name: Upload deb artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: production-debs
           path: dist/*.deb
@@ -114,10 +114,10 @@ jobs:
     if: needs.validate.outputs.deploy_gateway == 'true'
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Download deb artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: production-debs
           path: dist/
@@ -174,10 +174,10 @@ jobs:
     if: needs.validate.outputs.deploy_website == 'true'
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Download deb artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: production-debs
           path: dist/
@@ -234,9 +234,9 @@ jobs:
     # Run if at least one deploy job ran (skip if both were skipped)
     if: always() && (needs.deploy-gateway.result == 'success' || needs.deploy-website.result == 'success')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
