@@ -237,6 +237,7 @@ jobs:
           rm -f coverage-gateway-[0-9]*.xml
 
       - name: Coverage ratchet check
+        shell: bash {0}
         run: |
           python scripts/ci/coverage_ratchet.py check \
             --markdown=/tmp/coverage-comment.md \
