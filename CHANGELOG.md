@@ -1,5 +1,34 @@
 # Changelog
 
+# Release v1.0.3
+
+**Date:** 2026-04-06
+**Commit:** 21db2078
+**Previous:** v1.0.2
+
+## Changes
+
+### Bug Fixes
+
+- fix(ci): deploy gate, test split, pytest warning (#62) (`21db207`)
+
+### Other
+
+- Merge release v1.0.2 into main (`00d3cee`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 1.0.3 |
+| a2a-db-backup | 1.0.3 |
+| a2a-gateway | 1.0.3 |
+| a2a-gateway-sandbox | 1.0.3 |
+| a2a-gateway-test | 1.0.3 |
+| a2a-website | 1.0.3 |
+---
+
+
 # Release v1.0.2
 
 **Date:** 2026-04-06
