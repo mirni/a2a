@@ -7,11 +7,12 @@ this, production OperationalErrors are impossible to diagnose remotely.
 
 from __future__ import annotations
 
+import io
+import json
 import logging
 import sqlite3
 
 import pytest
-from starlette.testclient import TestClient
 
 pytestmark = pytest.mark.asyncio
 
@@ -28,8 +29,6 @@ async def test_unknown_exception_is_logged_with_full_details():
     # Simulate the OperationalError that occurs on production
     exc = sqlite3.OperationalError("no such column: source_type")
 
-    import io
-
     logger = logging.getLogger("a2a.errors")
     handler = logging.StreamHandler(io.StringIO())
     handler.setLevel(logging.ERROR)
@@ -45,8 +44,6 @@ async def test_unknown_exception_is_logged_with_full_details():
     # Response must be sanitized (no raw SQL error in response body)
     assert resp.status_code == 500
     body_bytes = resp.body
-    import json
-
     body = json.loads(body_bytes)
     assert body["detail"] == "Internal error: OperationalError"
 
@@ -59,15 +56,14 @@ async def test_known_exception_is_not_logged_as_error():
     """Known exceptions (e.g. IntentNotFoundError) should NOT be logged at ERROR."""
     from unittest.mock import MagicMock
 
-    from gateway.src.errors import handle_product_exception
     from payments_src.engine import IntentNotFoundError
+
+    from gateway.src.errors import handle_product_exception
 
     request = MagicMock()
     request.url.path = "/v1/payments/intents/abc123"
 
     exc = IntentNotFoundError("Intent abc123 not found")
-
-    import io
 
     logger = logging.getLogger("a2a.errors")
     handler = logging.StreamHandler(io.StringIO())

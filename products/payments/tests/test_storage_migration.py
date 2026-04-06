@@ -8,12 +8,10 @@ production DB, capture fails with OperationalError.
 
 from __future__ import annotations
 
-import sqlite3
 import time
 
 import aiosqlite
 import pytest
-
 from payments.storage import PaymentStorage
 
 pytestmark = pytest.mark.asyncio
