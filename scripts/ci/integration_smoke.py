@@ -42,9 +42,9 @@ def _req(
     if auth and API_KEY:
         req.add_header("Authorization", f"Bearer {API_KEY}")
     try:
-        with urllib.request.urlopen(
+        with urllib.request.urlopen(  # nosemgrep: dynamic-urllib-use-detected
             req, timeout=timeout
-        ) as resp:  # nosemgrep: dynamic-urllib-use-detected  — URL from CI env var, not user input
+        ) as resp:
             text = resp.read().decode()
             try:
                 return resp.status, json.loads(text)

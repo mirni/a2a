@@ -622,6 +622,45 @@ class TestIntentCapture500:
         )
         assert resp.status_code == 409
 
+    async def test_capture_by_payee_returns_403(self, client, app):
+        """BOLA: payee must NOT be able to capture payer's intent.
+
+        Only the payer (who authorized the payment) can trigger capture.
+        Allowing the payee to capture enables wallet theft — the payee
+        can force-settle any pending intent, draining the payer's wallet.
+        """
+        payer_key = await _create_agent_key(app, "bola-payer")
+        payee_key = await _create_agent_key(app, "bola-payee")
+
+        resp = await _create_intent(client, payer_key, payer="bola-payer", payee="bola-payee")
+        assert resp.status_code == 201
+        intent_id = resp.json()["id"]
+
+        # Payee tries to capture — must be 403
+        resp = await client.post(
+            f"/v1/payments/intents/{intent_id}/capture",
+            headers={"Authorization": f"Bearer {payee_key}"},
+        )
+        assert resp.status_code == 403, f"BOLA: payee captured payer's intent! Got {resp.status_code}: {resp.json()}"
+
+    async def test_partial_capture_by_payee_returns_403(self, client, app):
+        """BOLA: payee must NOT be able to partial-capture payer's intent."""
+        payer_key = await _create_agent_key(app, "bola-payer-pc")
+        payee_key = await _create_agent_key(app, "bola-payee-pc")
+
+        resp = await _create_intent(client, payer_key, payer="bola-payer-pc", payee="bola-payee-pc", amount="200.00")
+        assert resp.status_code == 201
+        intent_id = resp.json()["id"]
+
+        resp = await client.post(
+            f"/v1/payments/intents/{intent_id}/partial-capture",
+            json={"amount": "50.00"},
+            headers={"Authorization": f"Bearer {payee_key}"},
+        )
+        assert resp.status_code == 403, (
+            f"BOLA: payee partial-captured payer's intent! Got {resp.status_code}: {resp.json()}"
+        )
+
     async def test_capture_by_owner_returns_200(self, client, app):
         """Owner (payer) capturing a valid intent must succeed."""
         payer_key = await _create_agent_key(app, "cap-payer-3")
