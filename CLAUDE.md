@@ -29,7 +29,7 @@ Infrastructure code is exempt from this rule.
 ## Packaging
 * Debian packages are built via `scripts/create_package.sh` (not the old `packaging/` dir).
 * Package definitions live in `package/` with symlinks to repo content.
-* Available packages: `a2a-gateway` (prod), `a2a-gateway-test` (staging), `a2a-website`, `a2a-sdk` (wheel).
+* Available packages: `a2a-gateway` (prod), `a2a-gateway-test` (staging), `a2a-website`, `a2a-greenhelix-sdk` (wheel).
 * Build all: `scripts/create_package.sh ALL`. Build one: `scripts/create_package.sh a2a-gateway`.
 * Output goes to `dist/`.
 

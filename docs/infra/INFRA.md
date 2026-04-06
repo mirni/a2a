@@ -305,7 +305,7 @@ package/
 │   ├── opt/a2a-test/
 │   └── usr/lib/systemd/system/
 │
-└── a2a-sdk/                    # Python wheel (built separately)
+└── a2a-greenhelix-sdk/                    # Python wheel (built separately)
 ```
 
 ### 6.2 Control File Template

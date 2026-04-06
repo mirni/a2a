@@ -613,7 +613,7 @@ fi
 
 # --- PyPI ---
 if [[ "$PUBLISH_PYPI" == true ]]; then
-    info "Publishing a2a-sdk to PyPI..."
+    info "Publishing a2a-greenhelix-sdk to PyPI..."
     if [[ -z "${PYPI_DEPLOYMENT_TOKEN:-}" ]]; then
         warn "PYPI_DEPLOYMENT_TOKEN not set — skipping PyPI publish"
     else
@@ -627,7 +627,7 @@ if [[ "$PUBLISH_PYPI" == true ]]; then
                 --password "$PYPI_DEPLOYMENT_TOKEN" \
                 "$REPO_ROOT/dist/pypi/"*
         )
-        log "Published a2a-sdk==${VERSION} to PyPI"
+        log "Published a2a-greenhelix-sdk==${VERSION} to PyPI"
     fi
 fi
 

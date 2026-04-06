@@ -62,7 +62,7 @@ Agent → SDK (httpx / fetch) → Gateway (FastAPI + Uvicorn)
 ### Python SDK
 
 ```bash
-pip install a2a-sdk
+pip install a2a-greenhelix-sdk
 ```
 
 ### TypeScript SDK

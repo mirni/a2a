@@ -9,7 +9,7 @@ When building agents that need to handle money, discover services, or establish 
 ### Install
 
 ```bash
-pip install a2a-sdk
+pip install a2a-greenhelix-sdk
 ```
 
 ```bash

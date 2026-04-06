@@ -1,11 +1,11 @@
-# a2a-sdk
+# a2a-greenhelix-sdk
 
 Python SDK for the [A2A Commerce Platform](https://github.com/mirni/a2a) -- agent-to-agent payments, escrow, marketplace, identity, and trust scoring.
 
 ## Installation
 
 ```bash
-pip install a2a-sdk
+pip install a2a-greenhelix-sdk
 ```
 
 Requires Python 3.11+. Single dependency: `httpx`.

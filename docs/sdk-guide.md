@@ -4,7 +4,7 @@ Official SDKs for the A2A Commerce Platform. Both SDKs provide typed convenience
 
 | | Python | TypeScript |
 |---|---|---|
-| Package | `a2a-sdk` (PyPI) | `@a2a/sdk` (npm) |
+| Package | `a2a-greenhelix-sdk` (PyPI) | `@a2a/sdk` (npm) |
 | Runtime | Python 3.10+ | Node 18+ (native fetch) |
 | Transport | httpx (async) | fetch (zero dependencies) |
 | Auth | Bearer token | Bearer token |
@@ -13,7 +13,7 @@ Official SDKs for the A2A Commerce Platform. Both SDKs provide typed convenience
 
 ```bash
 # Python
-pip install a2a-sdk
+pip install a2a-greenhelix-sdk
 
 # TypeScript
 npm install @a2a/sdk

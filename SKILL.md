@@ -1,7 +1,7 @@
 ---
 title: A2A Commerce Platform
 description: Agent-to-agent payments, escrow, marketplace, identity, and trust scoring
-version: 0.9.1
+version: 1.0.0
 tags: [payments, escrow, billing, marketplace, trust, identity, agents, commerce]
 ---
 
@@ -20,7 +20,7 @@ Teach your agent to handle payments, discover services, and establish trust with
 ## Setup
 
 ```bash
-pip install a2a-sdk
+pip install a2a-greenhelix-sdk
 ```
 
 ```python

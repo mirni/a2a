@@ -46,7 +46,7 @@ This document compares the CMO Marketing Report (2026-03-28) against the current
 |-----|--------|----------|
 | ~~**No hosted sandbox**~~ | ~~Developers must run gateway locally to try the platform.~~ **DONE**: sandbox.greenhelix.net live | ~~P0~~ |
 | ~~**Website has no docs/guides**~~ | ~~greenhelix.net is a brochure site.~~ **DONE**: website/docs.html has full developer guide | ~~P0~~ |
-| **SDK not on PyPI or npm** | Cannot `pip install a2a-sdk` or `npm install @greenhelix/sdk`. Packages exist locally but have no publishing configuration. | P0 |
+| **SDK not on PyPI or npm** | Cannot `pip install a2a-greenhelix-sdk` or `npm install @greenhelix/sdk`. Packages exist locally but have no publishing configuration. | P0 |
 | **No MCP registry listing** | Platform is invisible to the MCP ecosystem. Not registered on any MCP directory. | P0 |
 | **No GitHub topics/README optimization** | Repo is not discoverable via GitHub search. No topics, no badges. | P1 |
 | ~~**No `/.well-known/agent-card.json`**~~ | ~~Not registered on any A2A protocol registry.~~ **DONE** — deployed at api.greenhelix.net | ~~P1~~ |
@@ -94,7 +94,7 @@ The platform's connectors (Stripe, GitHub, PostgreSQL) and the gateway itself sh
 
 | Registry | Package | Action |
 |----------|---------|--------|
-| **PyPI** | `a2a-sdk` | `python -m build && twine upload dist/*`. Add classifiers: `Framework :: AI`, `Topic :: Scientific/Engineering :: Artificial Intelligence`. Keywords: `mcp`, `ai-agent`, `a2a`, `payments`, `escrow`, `trust`. |
+| **PyPI** | `a2a-greenhelix-sdk` | `python -m build && twine upload dist/*`. Add classifiers: `Framework :: AI`, `Topic :: Scientific/Engineering :: Artificial Intelligence`. Keywords: `mcp`, `ai-agent`, `a2a`, `payments`, `escrow`, `trust`. |
 | **PyPI** | `a2a-gateway` | Publish the gateway as an installable package. |
 | **npm** | `@a2a/sdk` | `npm publish --access public`. Keywords: `mcp`, `ai-agent`, `a2a-commerce`, `agent-payments`. |
 | **Docker Hub** | `greenhelix/a2a-gateway` | Publish Docker image. One-command start: `docker run -p 8000:8000 greenhelix/a2a-gateway`. |
@@ -111,7 +111,7 @@ The platform's connectors (Stripe, GitHub, PostgreSQL) and the gateway itself sh
 
 **README improvements:**
 - Add badges (CI status, PyPI version, npm version, license)
-- Add one-command quickstart: `pip install a2a-sdk && python -c "from a2a_client import A2AClient; ..."`
+- Add one-command quickstart: `pip install a2a-greenhelix-sdk && python -c "from a2a_client import A2AClient; ..."`
 - Add architecture diagram
 - Add "Try it now" section pointing to sandbox
 
@@ -233,7 +233,7 @@ Priority search terms:
 
 | # | Task | Owner | Dependency |
 |---|------|-------|------------|
-| 1 | **Publish `a2a-sdk` to PyPI** | Engineering | None. Run `python -m build && twine upload`. Add classifiers and keywords. |
+| 1 | **Publish `a2a-greenhelix-sdk` to PyPI** | Engineering | None. Run `python -m build && twine upload`. Add classifiers and keywords. |
 | 2 | **Publish `@a2a/sdk` to npm** | Engineering | None. Run `npm publish --access public`. |
 | 3 | **Publish Docker image** to Docker Hub | Engineering | None. `docker build && docker push greenhelix/a2a-gateway`. |
 | 4 | **Add GitHub repository topics** | Human | None. Settings > Topics. Add: `ai-agents`, `mcp`, `mcp-servers`, `a2a`, `agent-commerce`, `agent-payments`, `developer-tools`. |
@@ -293,7 +293,7 @@ Priority search terms:
 
 | Metric | Target (Month 3) | Target (Month 6) | Target (Month 12) |
 |--------|-------------------|-------------------|---------------------|
-| PyPI downloads (a2a-sdk) | 500/mo | 5,000/mo | 20,000/mo |
+| PyPI downloads (a2a-greenhelix-sdk) | 500/mo | 5,000/mo | 20,000/mo |
 | npm downloads (@a2a/sdk) | 200/mo | 2,000/mo | 10,000/mo |
 | MCP registry views | 100/mo | 1,000/mo | 5,000/mo |
 | Registered agents (with wallet) | 50 | 200 | 500 |

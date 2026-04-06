@@ -9,7 +9,7 @@
 #   ./scripts/create_package.sh a2a-gateway       # one deb
 #   ./scripts/create_package.sh a2a-gateway-test   # test deb
 #   ./scripts/create_package.sh a2a-website        # website deb
-#   ./scripts/create_package.sh a2a-sdk            # python wheel
+#   ./scripts/create_package.sh a2a-greenhelix-sdk            # python wheel
 #   ./scripts/create_package.sh ALL                # all packages
 #
 # Output:
@@ -43,7 +43,7 @@ usage() {
     echo "  a2a-gateway-sandbox Sandbox gateway deb"
     echo "  a2a-website       Static website deb"
     echo "  a2a-db-backup     Database backup timer deb"
-    echo "  a2a-sdk           Python SDK wheel"
+    echo "  a2a-greenhelix-sdk           Python SDK wheel"
     echo "  ALL               Build all packages"
     exit 1
 }
@@ -155,7 +155,7 @@ build_deb() {
 # ---------------------------------------------------------------------------
 
 build_sdk() {
-    log "Building a2a-sdk wheel..."
+    log "Building a2a-greenhelix-sdk wheel..."
 
     if [[ ! -d "$REPO_ROOT/sdk" ]]; then
         err "sdk/ directory not found"
@@ -184,7 +184,7 @@ case "$TARGET" in
         log "All packages built in $DIST_DIR/"
         ls -lh "$DIST_DIR/"
         ;;
-    a2a-sdk)
+    a2a-greenhelix-sdk)
         build_sdk
         ;;
     a2a-common|a2a-gateway|a2a-gateway-test|a2a-gateway-sandbox|a2a-website|a2a-db-backup)

@@ -11,7 +11,7 @@ This tutorial walks you through creating wallets, depositing funds, and executin
 ## Prerequisites
 
 - A running A2A gateway (`python gateway/main.py`)
-- Python 3.12+ with `a2a-sdk` installed (`pip install a2a-sdk`)
+- Python 3.12+ with `a2a-greenhelix-sdk` installed (`pip install a2a-greenhelix-sdk`)
 - Two agent IDs (we'll create them below)
 
 ## Step 1: Register Agents and Create Wallets

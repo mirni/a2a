@@ -21,7 +21,7 @@ classifiers = [
 ]
 dependencies = [
     "langchain-core>=0.2",
-    "a2a-sdk",
+    "a2a-greenhelix-sdk",
     "pydantic>=2.0",
 ]
 
