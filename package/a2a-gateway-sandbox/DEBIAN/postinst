@@ -44,6 +44,7 @@ case "$1" in
         # Create .env if missing
         if [[ ! -f /opt/a2a-sandbox/.env ]]; then
             cat > /opt/a2a-sandbox/.env << 'ENVEOF'
+A2A_ENV=sandbox
 HOST=127.0.0.1
 PORT=8002
 A2A_DATA_DIR=/var/lib/a2a-sandbox
@@ -58,6 +59,7 @@ IDENTITY_DSN=sqlite:////var/lib/a2a-sandbox/identity.db
 MESSAGING_DSN=sqlite:////var/lib/a2a-sandbox/messaging.db
 DISPUTE_DSN=sqlite:////var/lib/a2a-sandbox/disputes.db
 LOG_LEVEL=INFO
+FORCE_HTTPS=1
 ENVEOF
             chmod 600 /opt/a2a-sandbox/.env
         fi

@@ -232,11 +232,14 @@ class PaymentEngine:
                 except Exception:
                     pass
             # Revert status captured -> pending so the caller can retry.
-            await self.storage.compare_and_set_intent_status(
-                intent.id,
-                IntentStatus.CAPTURED.value,
-                IntentStatus.PENDING.value,
-            )
+            try:
+                await self.storage.compare_and_set_intent_status(
+                    intent.id,
+                    IntentStatus.CAPTURED.value,
+                    IntentStatus.PENDING.value,
+                )
+            except Exception:
+                pass  # best-effort; original exception must propagate
             raise
 
     async def void(self, intent_id: str, idempotency_key: str | None = None) -> PaymentIntent:

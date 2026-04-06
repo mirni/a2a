@@ -226,6 +226,58 @@ class TestIntentLifecycle:
         updated = await engine.get_intent(intent.id)
         assert updated.status == IntentStatus.PENDING
 
+    async def test_capture_status_revert_failure_preserves_original_error(self, engine, funded_wallets):
+        """Audit C2: if settlement insert fails AND status revert also fails,
+        the original error must propagate — not an OperationalError from cleanup.
+
+        Without the fix, the unprotected compare_and_set_intent_status call in
+        the except block raises its own exception, masking the original error.
+        """
+        wallet, _, _ = funded_wallets
+        payer_before = await wallet.get_balance("agent-a")
+        payee_before = await wallet.get_balance("agent-b")
+
+        intent = await engine.create_intent(
+            payer="agent-a",
+            payee="agent-b",
+            amount=10.0,
+        )
+
+        # Patch insert_settlement to fail AFTER wallet ops succeed
+        original_insert = engine.storage.insert_settlement
+
+        async def failing_insert(*args, **kwargs):
+            raise RuntimeError("Settlement DB write failed")
+
+        engine.storage.insert_settlement = failing_insert
+
+        # Patch compare_and_set_intent_status to succeed on the first call
+        # (reservation: pending→captured) but fail on the second call
+        # (recovery: captured→pending).
+        original_cas = engine.storage.compare_and_set_intent_status
+        cas_call_count = 0
+
+        async def failing_cas_on_recovery(*args, **kwargs):
+            nonlocal cas_call_count
+            cas_call_count += 1
+            if cas_call_count == 1:
+                return await original_cas(*args, **kwargs)
+            raise OSError("DB locked during recovery")
+
+        engine.storage.compare_and_set_intent_status = failing_cas_on_recovery
+
+        # The ORIGINAL error (RuntimeError) must propagate, not OSError
+        with pytest.raises(RuntimeError, match="Settlement DB write failed"):
+            await engine.capture(intent.id)
+
+        # Restore
+        engine.storage.insert_settlement = original_insert
+        engine.storage.compare_and_set_intent_status = original_cas
+
+        # Wallet balances must be restored despite recovery failure
+        assert await wallet.get_balance("agent-a") == payer_before
+        assert await wallet.get_balance("agent-b") == payee_before
+
     async def test_negative_amount_rejected(self, engine, funded_wallets):
         with pytest.raises(PaymentError, match="positive"):
             await engine.create_intent(
