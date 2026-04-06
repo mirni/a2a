@@ -19,11 +19,11 @@ def extract_api_key(request: Request) -> str | None:
     # 1. Authorization header
     auth = request.headers.get("authorization", "")
     if auth.lower().startswith("bearer "):
-        return auth[7:].strip()
+        return auth[7:]
 
     # 2. X-API-Key header
     api_key_header = request.headers.get("x-api-key", "")
     if api_key_header:
-        return api_key_header.strip()
+        return api_key_header
 
     return None

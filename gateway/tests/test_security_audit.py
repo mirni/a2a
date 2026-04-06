@@ -385,6 +385,39 @@ class TestStripeMetadataValidation:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# M2 — API key whitespace stripping
+# ---------------------------------------------------------------------------
+
+
+class TestApiKeyWhitespace:
+    """Keys with trailing/leading whitespace must be rejected, not silently stripped."""
+
+    async def test_key_with_trailing_spaces_returns_401(self, client, app):
+        key = await _create_agent(app, "ws-agent")
+        resp = await client.get(
+            "/v1/billing/wallets/ws-agent/balance",
+            headers={"Authorization": f"Bearer {key}   "},
+        )
+        assert resp.status_code == 401, f"Key with trailing spaces should be rejected, got {resp.status_code}"
+
+    async def test_key_with_leading_spaces_returns_401(self, client, app):
+        key = await _create_agent(app, "ws-agent2")
+        resp = await client.get(
+            "/v1/billing/wallets/ws-agent2/balance",
+            headers={"Authorization": f"Bearer    {key}"},
+        )
+        assert resp.status_code == 401, f"Key with leading spaces should be rejected, got {resp.status_code}"
+
+    async def test_xapikey_with_trailing_spaces_returns_401(self, client, app):
+        key = await _create_agent(app, "ws-agent3")
+        resp = await client.get(
+            "/v1/billing/wallets/ws-agent3/balance",
+            headers={"X-API-Key": f"{key}   "},
+        )
+        assert resp.status_code == 401, f"X-API-Key with trailing spaces should be rejected, got {resp.status_code}"
+
+
 class TestBackupPathTraversal:
     """Restore must reject paths pointing to directories, not just out-of-dir."""
 
