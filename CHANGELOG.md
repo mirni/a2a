@@ -1,5 +1,39 @@
 # Changelog
 
+# Release v1.0.4
+
+**Date:** 2026-04-06
+**Commit:** c31062db
+**Previous:** v1.0.2
+
+## Changes
+
+### Bug Fixes
+
+- fix(security): CRITICAL BOLA — restrict capture to payer only (#63) (`8466664`)
+- fix(ci): move nosemgrep comment to correct line for urllib finding (`3c0b119`)
+- fix(security): CRITICAL BOLA — restrict capture to payer only (`4dbf92c`)
+- fix(ci): deploy gate, test split, pytest warning (#62) (`21db207`)
+
+### Other
+
+- Merge branch 'release/1.0.3' (`c31062d`)
+- release: v1.0.3 (`87aacdd`)
+- Merge release v1.0.2 into main (`00d3cee`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 1.0.4 |
+| a2a-db-backup | 1.0.4 |
+| a2a-gateway | 1.0.4 |
+| a2a-gateway-sandbox | 1.0.4 |
+| a2a-gateway-test | 1.0.4 |
+| a2a-website | 1.0.4 |
+---
+
+
 # Release v1.0.3
 
 **Date:** 2026-04-06
