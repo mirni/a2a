@@ -119,17 +119,8 @@ jobs:
             --cov-report=xml:coverage-gateway-${{ matrix.shard }}.xml \
             --cov-report=term-missing
 
-      - name: Coverage ratchet check (gateway shard ${{ matrix.shard }})
-        if: matrix.python-version == '3.12'
-        run: python scripts/ci/coverage_ratchet.py check coverage-*.xml | tee /tmp/coverage-report.txt
-
-      - name: Coverage summary
-        if: always() && matrix.python-version == '3.12'
-        run: |
-          echo '## Coverage Ratchet Report (Gateway shard ${{ matrix.shard }})' >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          cat /tmp/coverage-report.txt >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "No report generated" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+      # Per-shard coverage ratchet is skipped — each shard only covers ~1/3 of
+      # lines. The full ratchet runs in the CI workflow's unified coverage job.
 
   test-products:
     needs: [quality]

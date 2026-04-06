@@ -229,6 +229,13 @@ jobs:
         with:
           name: coverage-xml-products
 
+      - name: Merge gateway shard coverage XMLs
+        run: |
+          python scripts/ci/merge_coverage_xml.py \
+            coverage-gateway-*.xml \
+            -o coverage-gateway.xml
+          rm -f coverage-gateway-[0-9]*.xml
+
       - name: Coverage ratchet check
         run: |
           python scripts/ci/coverage_ratchet.py check \
