@@ -1,5 +1,48 @@
 # Changelog
 
+# Release v1.0.0
+
+**Date:** 2026-04-06
+**Commit:** e35f5b17
+**Previous:** v0.9.6
+
+## Changes
+
+### Features
+
+- feat(ci): add PG connector live-DB integration tests to CI (#55) (`15be376`)
+
+### Bug Fixes
+
+- fix: audit H2/H3 + M4/M5 docs + CI integration & package smoke jobs (#58) (`b5a94b2`)
+- fix: audit remediation — C1-C4/H1/H3/M1-M3 + CTO runbooks + ADRs 002-009 (#57) (`100382f`)
+
+### Documentation
+
+- fix: audit remediation — C1-C4/H1/H3/M1-M3 + CTO runbooks + ADRs 002-009 (#57) (`100382f`)
+
+### Tests
+
+- test: raise billing/payments/paywall coverage to 99% (#56) (`b48a433`)
+
+### Other
+
+- Fix/audit h2 m4 m5 (#59) (`e35f5b1`)
+- Merge release v0.9.6 into main (`e513ade`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 1.0.0 |
+| a2a-db-backup | 1.0.0 |
+| a2a-gateway | 1.0.0 |
+| a2a-gateway-sandbox | 1.0.0 |
+| a2a-gateway-test | 1.0.0 |
+| a2a-website | 1.0.0 |
+---
+
+
 # Release v0.9.6
 
 **Date:** 2026-04-05

@@ -1,6 +1,6 @@
 [project]
 name = "a2a-sdk"
-version = "0.9.6"
+version = "1.0.0"
 description = "Python SDK for the A2A Commerce gateway — agent-to-agent payments, escrow, marketplace, identity, and trust scoring"
 requires-python = ">=3.11"
 license = "MIT"
