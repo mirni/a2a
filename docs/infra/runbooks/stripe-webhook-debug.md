@@ -155,7 +155,7 @@ sqlite3 /var/lib/a2a/billing.db \
 
 ```bash
 # Stripe CLI (install: https://stripe.com/docs/stripe-cli)
-stripe listen --forward-to http://localhost:8000/v1/webhooks/stripe
+stripe listen --forward-to http://localhost:8000/v1/stripe-webhook
 
 # In another terminal, trigger:
 stripe trigger checkout.session.completed

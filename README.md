@@ -267,3 +267,4 @@ python3 -m pytest sdk/tests/ -q
 | `products/disputes/` | Dispute lifecycle management |
 | `products/connectors/` | Stripe, GitHub, PostgreSQL integrations |
 | `products/shared/` | Common errors, audit log, migrations, rate limiting |
+

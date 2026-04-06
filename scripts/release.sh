@@ -67,6 +67,10 @@ DEPLOY_TIMEOUT=600  # Max seconds to wait for deploy
 POLL_INTERVAL=15    # Seconds between status checks
 SKIP_CI=false
 SKIP_DEPLOY=false
+PUBLISH=false
+PUBLISH_PYPI=false
+PUBLISH_NPM=false
+PUBLISH_DOCKER=false
 
 # ---------------------------------------------------------------------------
 # Parse arguments
@@ -85,6 +89,10 @@ Optional:
   --dry-run                Prepare release branch but don't push or deploy
   --skip-ci                Skip waiting for CI (deploy immediately)
   --skip-deploy            Create release branch but don't trigger deploy
+  --publish                Publish packages after deploy (pypi + npm + docker)
+  --publish-pypi           Publish only the Python SDK to PyPI
+  --publish-npm            Publish only the TypeScript SDK to npm
+  --publish-docker         Publish only the Docker image to Docker Hub
   --ci-timeout <seconds>   Max time to wait for CI (default: 600)
   --deploy-timeout <secs>  Max time to wait for deploy (default: 600)
   -h, --help               Show this help message
@@ -100,6 +108,10 @@ while [[ $# -gt 0 ]]; do
         --dry-run)      DRY_RUN=true;        shift   ;;
         --skip-ci)      SKIP_CI=true;        shift   ;;
         --skip-deploy)  SKIP_DEPLOY=true;    shift   ;;
+        --publish)      PUBLISH=true;        shift   ;;
+        --publish-pypi) PUBLISH_PYPI=true;   shift   ;;
+        --publish-npm)  PUBLISH_NPM=true;    shift   ;;
+        --publish-docker) PUBLISH_DOCKER=true; shift  ;;
         --ci-timeout)   CI_TIMEOUT="$2";     shift 2 ;;
         --deploy-timeout) DEPLOY_TIMEOUT="$2"; shift 2 ;;
         -h|--help)      usage ;;
@@ -585,7 +597,77 @@ git -C "$REPO_ROOT" push origin --delete "$RELEASE_BRANCH"
 log "Deleted release branch ${RELEASE_BRANCH}"
 
 # ---------------------------------------------------------------------------
-# Step 12: Summary
+# Step 12: Publish packages (optional)
+# ---------------------------------------------------------------------------
+
+# --publish enables all; individual flags enable specific targets
+if [[ "$PUBLISH" == true ]]; then
+    PUBLISH_PYPI=true
+    PUBLISH_NPM=true
+    PUBLISH_DOCKER=true
+fi
+
+if [[ "$PUBLISH_PYPI" == true || "$PUBLISH_NPM" == true || "$PUBLISH_DOCKER" == true ]]; then
+    header "Step 12: Publish packages"
+fi
+
+# --- PyPI ---
+if [[ "$PUBLISH_PYPI" == true ]]; then
+    info "Publishing a2a-sdk to PyPI..."
+    if [[ -z "${PYPI_DEPLOYMENT_TOKEN:-}" ]]; then
+        warn "PYPI_DEPLOYMENT_TOKEN not set — skipping PyPI publish"
+    else
+        (
+            cd "$REPO_ROOT/sdk"
+            pip install --quiet build twine 2>/dev/null
+            python -m build --sdist --wheel --outdir "$REPO_ROOT/dist/pypi/"
+            python -m twine upload \
+                --non-interactive \
+                --username __token__ \
+                --password "$PYPI_DEPLOYMENT_TOKEN" \
+                "$REPO_ROOT/dist/pypi/"*
+        )
+        log "Published a2a-sdk==${VERSION} to PyPI"
+    fi
+fi
+
+# --- npm ---
+if [[ "$PUBLISH_NPM" == true ]]; then
+    info "Publishing @greenhelix/sdk to npm..."
+    if [[ -z "${NPM_DEPLOYMENT_TOKEN:-}" ]]; then
+        warn "NPM_DEPLOYMENT_TOKEN not set — skipping npm publish"
+    else
+        (
+            cd "$REPO_ROOT/sdk-ts"
+            # Set version from release
+            npm version "$VERSION" --no-git-tag-version --allow-same-version 2>/dev/null || true
+            npm run build
+            echo "//registry.npmjs.org/:_authToken=${NPM_DEPLOYMENT_TOKEN}" > .npmrc
+            npm publish --access public
+            rm -f .npmrc
+        )
+        log "Published @greenhelix/sdk@${VERSION} to npm"
+    fi
+fi
+
+# --- Docker ---
+if [[ "$PUBLISH_DOCKER" == true ]]; then
+    info "Publishing Docker image to Docker Hub..."
+    if [[ -z "${DOCKER_DEPLOYMENT_TOKEN:-}" ]]; then
+        warn "DOCKER_DEPLOYMENT_TOKEN not set — skipping Docker publish"
+    else
+        DOCKER_IMAGE="greenhelix/a2a-gateway"
+        echo "$DOCKER_DEPLOYMENT_TOKEN" | docker login --username greenhelix --password-stdin
+        docker build -t "${DOCKER_IMAGE}:${VERSION}" -t "${DOCKER_IMAGE}:latest" "$REPO_ROOT"
+        docker push "${DOCKER_IMAGE}:${VERSION}"
+        docker push "${DOCKER_IMAGE}:latest"
+        docker logout
+        log "Published ${DOCKER_IMAGE}:${VERSION} to Docker Hub"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Step 13: Summary
 # ---------------------------------------------------------------------------
 
 header "Release v${VERSION} Complete"
@@ -596,6 +678,9 @@ log "Commit:     ${RELEASE_SHA:0:8}"
 log "Component:  ${COMPONENT}"
 log "Tag:        v${VERSION}"
 log "Deploy run: gh run view ${RUN_ID}"
+if [[ "$PUBLISH_PYPI" == true || "$PUBLISH_NPM" == true || "$PUBLISH_DOCKER" == true ]]; then
+    log "Published:  ${PUBLISH_PYPI:+pypi }${PUBLISH_NPM:+npm }${PUBLISH_DOCKER:+docker}"
+fi
 echo ""
 info "Next steps:"
 info "  - Verify production: curl -sf https://api.greenhelix.net/v1/health"
