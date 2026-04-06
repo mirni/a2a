@@ -25,7 +25,7 @@ def _merge(xml_paths: list[str]) -> ET.ElementTree:
     file_meta: dict[str, tuple[str, str, str]] = {}
 
     for xml_path in xml_paths:
-        tree = ET.parse(xml_path)  # noqa: S314 — trusted CI-generated XML
+        tree = ET.parse(xml_path)  # noqa: S314  # nosemgrep: python.lang.security.use-defused-xml-parse.use-defused-xml-parse  — trusted CI-generated XML
         for pkg in tree.findall(".//package"):
             pkg_name = pkg.get("name", "")
             for cls in pkg.findall("classes/class"):
