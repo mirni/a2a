@@ -1,5 +1,34 @@
 # Changelog
 
+# Release v1.0.5
+
+**Date:** 2026-04-06
+**Commit:** bc0dafa9
+**Previous:** v1.0.4
+
+## Changes
+
+### Refactoring
+
+- refactor(ci): shard test-gateway + fix audit findings H-NEW/H-RACE/M2/M3/M4 (#64) (`bc0dafa`)
+
+### Other
+
+- Merge release v1.0.4 into main (`e2f8cc6`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 1.0.5 |
+| a2a-db-backup | 1.0.5 |
+| a2a-gateway | 1.0.5 |
+| a2a-gateway-sandbox | 1.0.5 |
+| a2a-gateway-test | 1.0.5 |
+| a2a-website | 1.0.5 |
+---
+
+
 # Release v1.0.4
 
 **Date:** 2026-04-06
