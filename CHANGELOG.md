@@ -1,5 +1,34 @@
 # Changelog
 
+# Release v1.0.7
+
+**Date:** 2026-04-06
+**Commit:** 78990b5d
+**Previous:** v1.0.6
+
+## Changes
+
+### Bug Fixes
+
+- fix(release): ensure npm and Docker publish with --publish (#66) (`78990b5`)
+
+### Other
+
+- Merge release v1.0.6 into main (`ef8fca5`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 1.0.7 |
+| a2a-db-backup | 1.0.7 |
+| a2a-gateway | 1.0.7 |
+| a2a-gateway-sandbox | 1.0.7 |
+| a2a-gateway-test | 1.0.7 |
+| a2a-website | 1.0.7 |
+---
+
+
 # Release v1.0.6
 
 **Date:** 2026-04-06
