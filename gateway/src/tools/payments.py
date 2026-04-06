@@ -9,16 +9,25 @@ from gateway.src.lifespan import AppContext
 from gateway.src.tool_errors import ToolForbiddenError, ToolValidationError
 
 
-def _check_intent_ownership(caller: str, tier: str, intent) -> None:
-    """Verify the caller is a party to the intent (payer or payee).
+def _check_intent_ownership(caller: str, tier: str, intent, *, payer_only: bool = False) -> None:
+    """Verify the caller is authorized to act on the intent.
+
+    Args:
+        payer_only: If True, only the *payer* is authorized (used for capture/
+            void — operations that debit the payer's wallet). If False, either
+            payer or payee may access (used for read operations like get_intent).
 
     Admin-tier callers bypass this check.
-    Raises ToolForbiddenError if the caller is not involved.
+    Raises ToolForbiddenError if the caller is not authorized.
     """
     if tier == ADMIN_TIER:
         return
-    if caller not in (intent.payer, intent.payee):
-        raise ToolForbiddenError("Forbidden: you do not have access to this resource")
+    if payer_only:
+        if caller != intent.payer:
+            raise ToolForbiddenError("Forbidden: only the payer can perform this action")
+    else:
+        if caller not in (intent.payer, intent.payee):
+            raise ToolForbiddenError("Forbidden: you do not have access to this resource")
 
 
 def _check_escrow_ownership(caller: str, tier: str, escrow) -> None:
@@ -121,7 +130,7 @@ async def _capture_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, 
     caller = params.get("_caller_agent_id", "")
     tier = params.get("_caller_tier", "")
     intent = await ctx.payment_engine.get_intent(params["intent_id"])
-    _check_intent_ownership(caller, tier, intent)
+    _check_intent_ownership(caller, tier, intent, payer_only=True)
     settlement = await ctx.payment_engine.capture(
         params["intent_id"],
         idempotency_key=params.get("idempotency_key"),
@@ -231,6 +240,10 @@ async def _get_payment_history(ctx: AppContext, params: dict[str, Any]) -> dict[
 
 
 async def _partial_capture(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    caller = params.get("_caller_agent_id", "")
+    tier = params.get("_caller_tier", "")
+    intent = await ctx.payment_engine.get_intent(params["intent_id"])
+    _check_intent_ownership(caller, tier, intent, payer_only=True)
     settlement, remaining = await ctx.payment_engine.partial_capture(
         intent_id=params["intent_id"],
         amount=params["amount"],

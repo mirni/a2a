@@ -132,7 +132,7 @@ class TestDepositOwnership:
 
 
 class TestCaptureIntentOwnership:
-    """capture_intent must verify that the caller is the payer or payee."""
+    """capture_intent must verify that the caller is the payer (not payee or third party)."""
 
     async def test_non_party_cannot_capture_intent(self, client, app):
         """403: unrelated agent cannot capture an intent between two others."""
@@ -197,8 +197,11 @@ class TestCaptureIntentOwnership:
 
         assert resp.status_code == 200
 
-    async def test_payee_can_capture_intent(self, client, app):
-        """200: payee can capture an intent addressed to them."""
+    async def test_payee_cannot_capture_intent(self, client, app):
+        """403: payee must NOT capture — only the payer can debit their wallet.
+
+        BOLA fix: allowing payee to capture enables wallet theft at scale.
+        """
         key_alice = await _create_agent(app, "alice-ci3")
         key_bob = await _create_agent(app, "bob-ci3")
 
@@ -225,7 +228,7 @@ class TestCaptureIntentOwnership:
             key_bob,
         )
 
-        assert resp.status_code == 200
+        assert resp.status_code == 403, f"BOLA: payee captured! Got {resp.status_code}: {resp.json()}"
 
 
 # ---------------------------------------------------------------------------
