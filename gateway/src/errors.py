@@ -8,9 +8,12 @@ All error responses use RFC 9457 Problem Details format:
 from __future__ import annotations
 
 import http
+import logging
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
+
+logger = logging.getLogger("a2a.errors")
 
 _BASE_URI = "https://api.greenhelix.net/errors"
 
@@ -125,4 +128,5 @@ async def handle_product_exception(request: Request, exc: Exception) -> JSONResp
         return await error_response(status, msg, code, request=request)
 
     # Unknown → 500
+    logger.error("Unhandled %s in %s: %s", exc_type, request.url.path, exc, exc_info=exc)
     return await error_response(500, f"Internal error: {exc_type}", "internal_error", request=request)

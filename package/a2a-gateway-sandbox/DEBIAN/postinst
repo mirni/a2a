@@ -64,6 +64,13 @@ ENVEOF
             chmod 600 /opt/a2a-sandbox/.env
         fi
 
+        # Ensure critical env vars exist in .env (fixes audit H2/C1 for upgrades)
+        _env_file="/opt/a2a-sandbox/.env"
+        if [[ -f "$_env_file" ]]; then
+            grep -q '^FORCE_HTTPS=' "$_env_file" || echo 'FORCE_HTTPS=1' >> "$_env_file"
+            grep -q '^A2A_ENV=' "$_env_file" || echo 'A2A_ENV=sandbox' >> "$_env_file"
+        fi
+
         # --- Cloudflare Authenticated Origin Pulls ---
         CF_CA_PATH="/etc/nginx/cloudflare-origin-pull-ca.pem"
         CF_CA_URL="https://developers.cloudflare.com/ssl/static/authenticated_origin_pull_ca.pem"

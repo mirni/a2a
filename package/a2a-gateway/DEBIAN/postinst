@@ -66,6 +66,12 @@ ENVEOF
             chmod 600 "$INSTALL_DIR/.env"
         fi
 
+        # Ensure critical env vars exist in .env (fixes audit H2/C1 for upgrades)
+        if [[ -f "$INSTALL_DIR/.env" ]]; then
+            grep -q '^FORCE_HTTPS=' "$INSTALL_DIR/.env" || echo 'FORCE_HTTPS=1' >> "$INSTALL_DIR/.env"
+            grep -q '^A2A_ENV=' "$INSTALL_DIR/.env" || echo 'A2A_ENV=production' >> "$INSTALL_DIR/.env"
+        fi
+
         # --- Cloudflare Authenticated Origin Pulls ---
         # Download the Cloudflare origin-pull CA certificate so nginx can
         # verify that incoming TLS connections originate from Cloudflare,
