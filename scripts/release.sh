@@ -41,6 +41,31 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # ---------------------------------------------------------------------------
+# Bootstrap: load .env and activate Python venv
+# ---------------------------------------------------------------------------
+
+# Source .env for deployment tokens (PYPI, NPM, DOCKER, GITHUB, etc.)
+if [[ -f "$REPO_ROOT/.env" ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "$REPO_ROOT/.env"
+    set +a
+fi
+
+# Ensure a working Python venv exists and activate it
+VENV_DIR="$REPO_ROOT/.venv"
+if [[ ! -x "$VENV_DIR/bin/python3" ]] || ! "$VENV_DIR/bin/python3" --version &>/dev/null; then
+    echo "[i] Creating Python venv at $VENV_DIR ..."
+    python3 -m venv "$VENV_DIR"
+    "$VENV_DIR/bin/pip" install --quiet --upgrade pip 2>/dev/null
+    if [[ -f "$REPO_ROOT/requirements.txt" ]]; then
+        "$VENV_DIR/bin/pip" install --quiet -r "$REPO_ROOT/requirements.txt" 2>/dev/null
+    fi
+fi
+# shellcheck disable=SC1091
+source "$VENV_DIR/bin/activate"
+
+# ---------------------------------------------------------------------------
 # Colors and logging
 # ---------------------------------------------------------------------------
 
