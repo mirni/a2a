@@ -72,7 +72,7 @@ jobs:
         run: pip-audit
 
   # ---------------------------------------------------------------------------
-  # Test: gateway + products split across parallel jobs × Python versions
+  # Test: gateway sharded across 3 parallel jobs × Python versions
   # ---------------------------------------------------------------------------
   test-gateway:
     needs: [quality]
@@ -81,7 +81,8 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.12", "3.13"]
-    name: test-gateway (py${{ matrix.python-version }})
+        shard: [0, 1, 2]
+    name: test-gateway (py${{ matrix.python-version }}, shard ${{ matrix.shard }})
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -103,17 +104,29 @@ jobs:
         run: ./check_server.sh
         continue-on-error: true
 
-      - name: Test gateway
-        run: scripts/run_tests.sh gateway --cov=gateway --cov-report=xml:coverage-gateway.xml --cov-report=term-missing
+      - name: Determine shard test files
+        run: |
+          FILES=$(python scripts/ci/shard_tests.py gateway/tests/ ${{ matrix.shard }} 3 | tr '\n' ' ')
+          echo "SHARD_FILES=$FILES" >> "$GITHUB_ENV"
 
-      - name: Coverage ratchet check (gateway)
+      - name: Test gateway (shard ${{ matrix.shard }})
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          python -m pytest $SHARD_FILES \
+            -x -q --tb=short \
+            --cov=gateway \
+            --cov-report=xml:coverage-gateway-${{ matrix.shard }}.xml \
+            --cov-report=term-missing
+
+      - name: Coverage ratchet check (gateway shard ${{ matrix.shard }})
         if: matrix.python-version == '3.12'
         run: python scripts/ci/coverage_ratchet.py check coverage-*.xml | tee /tmp/coverage-report.txt
 
       - name: Coverage summary
         if: always() && matrix.python-version == '3.12'
         run: |
-          echo '## Coverage Ratchet Report (Gateway)' >> "$GITHUB_STEP_SUMMARY"
+          echo '## Coverage Ratchet Report (Gateway shard ${{ matrix.shard }})' >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           cat /tmp/coverage-report.txt >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "No report generated" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
@@ -177,7 +190,6 @@ jobs:
           echo '## Coverage Ratchet Report (Products)' >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           cat /tmp/coverage-report.txt >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "No report generated" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
   # ---------------------------------------------------------------------------
