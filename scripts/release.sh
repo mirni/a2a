@@ -22,6 +22,9 @@
 #   # Dry-run (no push, no deploy)
 #   ./scripts/release.sh --version 1.0.0 --component all --dry-run
 #
+#   # Re-run publishing for an existing release (publish-only mode)
+#   ./scripts/release.sh --version 1.0.7 --component all --skip-ci --skip-deploy --publish-pypi
+#
 # Components:
 #   a2a-gateway   Deploy only the API gateway
 #   a2a-website   Deploy only the static website
@@ -137,6 +140,14 @@ case "$COMPONENT" in
     *) err "Invalid component: '$COMPONENT'. Must be: a2a-gateway, a2a-website, or all" ;;
 esac
 
+# Resolve --publish umbrella flag early (needed for publish-only detection)
+if [[ "$PUBLISH" == true ]]; then
+    PUBLISH_PYPI=true
+    PUBLISH_NPM=true
+    PUBLISH_DOCKER=true
+fi
+WANT_PUBLISH=$([[ "$PUBLISH_PYPI" == true || "$PUBLISH_NPM" == true || "$PUBLISH_DOCKER" == true ]] && echo true || echo false)
+
 # Default SHA to HEAD
 if [[ -z "$SHA" ]]; then
     SHA=$(git -C "$REPO_ROOT" rev-parse HEAD)
@@ -156,22 +167,35 @@ if [[ "$DRY_RUN" == false ]] && ! command -v gh &>/dev/null; then
     err "gh CLI not found. Install: https://cli.github.com"
 fi
 
-# Check for clean working tree
-if ! git -C "$REPO_ROOT" diff --quiet 2>/dev/null || \
-   ! git -C "$REPO_ROOT" diff --cached --quiet 2>/dev/null; then
-    err "Working tree has uncommitted changes. Commit or stash before releasing."
-fi
-
-# Check tag doesn't already exist
-if git -C "$REPO_ROOT" tag -l "v${VERSION}" | grep -q "v${VERSION}"; then
-    err "Tag v${VERSION} already exists. Choose a different version."
+# ---------------------------------------------------------------------------
+# Detect publish-only mode: re-running publish for an existing release
+# ---------------------------------------------------------------------------
+PUBLISH_ONLY=false
+if [[ "$WANT_PUBLISH" == true && "$SKIP_CI" == true && "$SKIP_DEPLOY" == true ]]; then
+    if git -C "$REPO_ROOT" tag -l "v${VERSION}" | grep -q "v${VERSION}"; then
+        PUBLISH_ONLY=true
+        info "Tag v${VERSION} exists — publish-only mode (skipping steps 1–11)"
+    fi
 fi
 
 RELEASE_BRANCH="release/${VERSION}"
 
-# Check branch doesn't already exist
-if git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/${RELEASE_BRANCH}" 2>/dev/null; then
-    err "Branch '${RELEASE_BRANCH}' already exists locally."
+if [[ "$PUBLISH_ONLY" == false ]]; then
+    # Check for clean working tree
+    if ! git -C "$REPO_ROOT" diff --quiet 2>/dev/null || \
+       ! git -C "$REPO_ROOT" diff --cached --quiet 2>/dev/null; then
+        err "Working tree has uncommitted changes. Commit or stash before releasing."
+    fi
+
+    # Check tag doesn't already exist
+    if git -C "$REPO_ROOT" tag -l "v${VERSION}" | grep -q "v${VERSION}"; then
+        err "Tag v${VERSION} already exists. Choose a different version."
+    fi
+
+    # Check branch doesn't already exist
+    if git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/${RELEASE_BRANCH}" 2>/dev/null; then
+        err "Branch '${RELEASE_BRANCH}' already exists locally."
+    fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -181,18 +205,25 @@ fi
 header "Release Plan"
 info "Version:   ${VERSION}"
 info "SHA:       ${SHA:0:8} ($(git -C "$REPO_ROOT" log --oneline -1 "$SHA"))"
-info "Branch:    ${RELEASE_BRANCH}"
+if [[ "$PUBLISH_ONLY" == true ]]; then
+    info "Mode:      publish-only (re-run)"
+else
+    info "Branch:    ${RELEASE_BRANCH}"
+fi
 info "Component: ${COMPONENT}"
 info "Dry run:   ${DRY_RUN}"
 echo ""
 
-if [[ "$DRY_RUN" == false ]]; then
+if [[ "$DRY_RUN" == false && "$PUBLISH_ONLY" == false ]]; then
     read -rp "Proceed with release? [y/N] " confirm
     if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
         info "Release cancelled."
         exit 0
     fi
 fi
+
+# Skip steps 1–11 in publish-only mode
+if [[ "$PUBLISH_ONLY" == false ]]; then
 
 # ---------------------------------------------------------------------------
 # Step 1: Create release branch
@@ -494,8 +525,10 @@ if [[ "$SKIP_DEPLOY" == true ]]; then
     info "Release branch pushed and CI passed."
     info "To deploy manually:"
     info "  gh workflow run 'Deploy Production' --ref ${RELEASE_BRANCH} -f confirm=deploy -f component=${COMPONENT}"
-    exit 0
-fi
+    if [[ "$WANT_PUBLISH" == false ]]; then
+        exit 0
+    fi
+else
 
 header "Step 8: Deploy to production"
 
@@ -603,16 +636,13 @@ git -C "$REPO_ROOT" branch -d "$RELEASE_BRANCH"
 git -C "$REPO_ROOT" push origin --delete "$RELEASE_BRANCH"
 log "Deleted release branch ${RELEASE_BRANCH}"
 
+fi  # end of SKIP_DEPLOY else block (steps 8–11)
+
+fi  # end of PUBLISH_ONLY == false guard (steps 1–11)
+
 # ---------------------------------------------------------------------------
 # Step 12: Publish packages (optional)
 # ---------------------------------------------------------------------------
-
-# --publish enables all; individual flags enable specific targets
-if [[ "$PUBLISH" == true ]]; then
-    PUBLISH_PYPI=true
-    PUBLISH_NPM=true
-    PUBLISH_DOCKER=true
-fi
 
 if [[ "$PUBLISH_PYPI" == true || "$PUBLISH_NPM" == true || "$PUBLISH_DOCKER" == true ]]; then
     header "Step 12: Publish packages"
@@ -701,16 +731,29 @@ fi
 # Step 13: Summary
 # ---------------------------------------------------------------------------
 
-header "Release v${VERSION} Complete"
+if [[ "$PUBLISH_ONLY" == true ]]; then
+    header "Publish v${VERSION} Complete"
+else
+    header "Release v${VERSION} Complete"
+fi
 echo ""
 log "Version:    v${VERSION}"
-log "Branch:     main (merged from ${RELEASE_BRANCH})"
-log "Commit:     ${RELEASE_SHA:0:8}"
+if [[ "$PUBLISH_ONLY" == false ]]; then
+    log "Branch:     main (merged from ${RELEASE_BRANCH})"
+    log "Commit:     ${RELEASE_SHA:0:8}"
+    log "Tag:        v${VERSION}"
+    [[ -n "${RUN_ID:-}" ]] && log "Deploy run: gh run view ${RUN_ID}"
+fi
 log "Component:  ${COMPONENT}"
-log "Tag:        v${VERSION}"
-log "Deploy run: gh run view ${RUN_ID}"
-if [[ "$PUBLISH_PYPI" == true || "$PUBLISH_NPM" == true || "$PUBLISH_DOCKER" == true ]]; then
-    log "Published:  ${PUBLISH_PYPI:+pypi }${PUBLISH_NPM:+npm }${PUBLISH_DOCKER:+docker}"
+if [[ "$WANT_PUBLISH" == true ]]; then
+    published=""
+    [[ "$PUBLISH_PYPI" == true ]] && published+="pypi "
+    [[ "$PUBLISH_NPM" == true ]] && published+="npm "
+    [[ "$PUBLISH_DOCKER" == true ]] && published+="docker "
+    log "Published:  ${published:-none}"
+fi
+if (( ${PUBLISH_FAILURES:-0} > 0 )); then
+    warn "Some publish targets failed — re-run with --skip-ci --skip-deploy --publish-<target>"
 fi
 echo ""
 info "Next steps:"
