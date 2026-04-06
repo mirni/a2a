@@ -45,7 +45,8 @@ RUN pip install --no-cache-dir \
     "httpx>=0.27" \
     "aiosqlite>=0.20" \
     "pydantic>=2.0" \
-    "cryptography>=46.0.6"
+    "cryptography>=46.0.6" \
+    "jsonschema>=4.0"
 
 # ---------------------------------------------------------------------------
 # Application layer

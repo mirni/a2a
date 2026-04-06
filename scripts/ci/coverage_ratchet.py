@@ -25,7 +25,7 @@ TOLERANCE = 0.1  # percentage points
 
 def _parse_coverage(xml_path: str) -> tuple[str, float]:
     """Extract module name and line coverage % from a Cobertura XML report."""
-    tree = ET.parse(xml_path)  # noqa: S314
+    tree = ET.parse(xml_path)  # noqa: S314  # nosemgrep: use-defused-xml-parse  — trusted CI-generated XML
     rate = float(tree.getroot().get("line-rate", "0"))
     pct = round(rate * 100, 2)
     # Module name from filename: coverage-gateway.xml -> gateway
