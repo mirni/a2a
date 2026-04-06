@@ -112,6 +112,11 @@ class PostgresClient:
         if not self._pool:
             raise RuntimeError("Not connected. Call connect() first.")
 
+        # Defense-in-depth: cast and clamp max_rows even though pydantic
+        # validates at the model boundary.  Prevents SQL injection if a
+        # caller bypasses the model layer and passes a string or huge int.
+        max_rows = min(int(max_rows), 10_000)
+
         async with self._pool.acquire() as conn:
             if self._config.read_only:
                 await conn.execute("SET TRANSACTION READ ONLY")

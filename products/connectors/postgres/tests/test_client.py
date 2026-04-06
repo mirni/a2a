@@ -1,7 +1,7 @@
 """Tests for PostgreSQL client (connection config and read-only enforcement)."""
 
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from src.client import PostgresClient
@@ -96,3 +96,69 @@ class TestReadOnlyEnforcement:
 
         with pytest.raises(RuntimeError, match="Not connected"):
             await client.list_schemas()
+
+
+class TestMaxRowsDefenseInDepth:
+    """Defense-in-depth: max_rows is cast to int and clamped before SQL interpolation."""
+
+    @pytest.mark.asyncio
+    async def test_max_rows_cast_to_int(self):
+        """If max_rows bypasses pydantic and arrives as a string, it must be cast to int."""
+        config = ConnectionConfig(database="db", user="u", read_only=False)
+        client = PostgresClient(config=config)
+
+        mock_pool = MagicMock()
+        mock_conn = AsyncMock()
+        mock_conn.fetch = AsyncMock(return_value=[])
+        mock_conn.execute = AsyncMock()
+
+        # Set up context manager chain: pool.acquire() -> conn
+        mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
+        mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=False)
+        client._pool = mock_pool
+
+        await client.query("SELECT 1", [], max_rows=50)
+
+        # Verify the SQL passed to fetch ends with " LIMIT 50" (int, not string)
+        call_args = mock_conn.fetch.call_args
+        sql_arg = call_args[0][0]
+        assert sql_arg == "SELECT 1 LIMIT 50"
+
+    @pytest.mark.asyncio
+    async def test_max_rows_clamped_to_10000(self):
+        """Even if a caller passes max_rows > 10000, it must be clamped."""
+        config = ConnectionConfig(database="db", user="u", read_only=False)
+        client = PostgresClient(config=config)
+
+        mock_pool = MagicMock()
+        mock_conn = AsyncMock()
+        mock_conn.fetch = AsyncMock(return_value=[])
+        mock_conn.execute = AsyncMock()
+
+        mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
+        mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=False)
+        client._pool = mock_pool
+
+        await client.query("SELECT 1", [], max_rows=99999)
+
+        call_args = mock_conn.fetch.call_args
+        sql_arg = call_args[0][0]
+        assert sql_arg == "SELECT 1 LIMIT 10000"
+
+    @pytest.mark.asyncio
+    async def test_max_rows_string_rejected(self):
+        """A string max_rows must raise TypeError/ValueError, not interpolate into SQL."""
+        config = ConnectionConfig(database="db", user="u", read_only=False)
+        client = PostgresClient(config=config)
+
+        mock_pool = MagicMock()
+        mock_conn = AsyncMock()
+        mock_conn.fetch = AsyncMock(return_value=[])
+        mock_conn.execute = AsyncMock()
+
+        mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
+        mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=False)
+        client._pool = mock_pool
+
+        with pytest.raises((TypeError, ValueError)):
+            await client.query("SELECT 1", [], max_rows="10; DROP TABLE users --")
