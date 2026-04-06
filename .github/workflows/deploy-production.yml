@@ -79,44 +79,55 @@ jobs:
     needs: [validate]
     if: startsWith(github.ref, 'refs/heads/release/')
     steps:
-      - name: Verify Release workflow succeeded
+      - name: Wait for Release workflow to succeed
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           BRANCH="${GITHUB_REF#refs/heads/}"
-          echo "Checking Release workflow status on branch: $BRANCH"
+          MAX_WAIT=900   # 15 minutes
+          POLL=15        # seconds between checks
+          ELAPSED=0
 
-          # Find the most recent Release workflow run on this branch
-          RUN_JSON=$(gh run list \
-            --repo "$GITHUB_REPOSITORY" \
-            --workflow "Release" \
-            --branch "$BRANCH" \
-            --limit 1 \
-            --json databaseId,conclusion,status \
-            --jq '.[0] // empty')
+          echo "Waiting for Release workflow on branch: $BRANCH"
 
-          if [[ -z "$RUN_JSON" ]]; then
-            echo "::error::No Release workflow run found for branch $BRANCH"
-            exit 1
-          fi
+          while (( ELAPSED < MAX_WAIT )); do
+            RUN_JSON=$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow "Release" \
+              --branch "$BRANCH" \
+              --limit 1 \
+              --json databaseId,conclusion,status \
+              --jq '.[0] // empty')
 
-          CONCLUSION=$(echo "$RUN_JSON" | jq -r '.conclusion // "null"')
-          STATUS=$(echo "$RUN_JSON" | jq -r '.status')
-          RUN_ID=$(echo "$RUN_JSON" | jq -r '.databaseId')
+            if [[ -z "$RUN_JSON" ]]; then
+              echo "No Release workflow run found yet (${ELAPSED}s / ${MAX_WAIT}s)..."
+              sleep "$POLL"
+              ELAPSED=$((ELAPSED + POLL))
+              continue
+            fi
 
-          echo "Release run $RUN_ID: status=$STATUS conclusion=$CONCLUSION"
+            STATUS=$(echo "$RUN_JSON" | jq -r '.status')
+            CONCLUSION=$(echo "$RUN_JSON" | jq -r '.conclusion // "null"')
+            RUN_ID=$(echo "$RUN_JSON" | jq -r '.databaseId')
 
-          if [[ "$STATUS" != "completed" ]]; then
-            echo "::error::Release workflow (run $RUN_ID) is still $STATUS — wait for it to complete"
-            exit 1
-          fi
+            echo "Release run $RUN_ID: status=$STATUS conclusion=$CONCLUSION (${ELAPSED}s / ${MAX_WAIT}s)"
 
-          if [[ "$CONCLUSION" != "success" ]]; then
-            echo "::error::Release workflow (run $RUN_ID) concluded with '$CONCLUSION' — cannot deploy"
-            exit 1
-          fi
+            if [[ "$STATUS" == "completed" ]]; then
+              if [[ "$CONCLUSION" == "success" ]]; then
+                echo "Release workflow passed — proceeding with deployment"
+                exit 0
+              else
+                echo "::error::Release workflow (run $RUN_ID) concluded with '$CONCLUSION' — cannot deploy"
+                exit 1
+              fi
+            fi
 
-          echo "Release workflow passed — proceeding with deployment"
+            sleep "$POLL"
+            ELAPSED=$((ELAPSED + POLL))
+          done
+
+          echo "::error::Timed out waiting for Release workflow after ${MAX_WAIT}s"
+          exit 1
 
   # ---------------------------------------------------------------------------
   # Build selected packages

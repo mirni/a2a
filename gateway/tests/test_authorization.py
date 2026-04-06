@@ -313,8 +313,13 @@ class TestNoOwnershipParam:
         # Should not be 403
         assert resp.status_code != 403
 
-    async def test_capture_intent_no_ownership(self, client, app):
-        """capture_intent has no ownership-relevant param — any caller works."""
+    async def test_capture_intent_route_ownership_passes(self, client, app):
+        """Route-level check_ownership passes for capture (no ownership fields in params).
+
+        The real payer-only check happens at the tool level via
+        _check_intent_ownership(payer_only=True). With a nonexistent intent
+        we get 404 before the tool-level check fires.
+        """
         key = await _create_agent(app, "capturer")
         resp = await client.post(
             "/v1/execute",
@@ -324,8 +329,8 @@ class TestNoOwnershipParam:
             },
             headers={"Authorization": f"Bearer {key}"},
         )
-        # May be 404 (intent not found) but NOT 403 (ownership)
-        assert resp.status_code != 403
+        # 404 (intent not found) — route-level ownership doesn't block
+        assert resp.status_code == 404
 
 
 # ---------------------------------------------------------------------------
