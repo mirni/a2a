@@ -46,6 +46,7 @@ case "$1" in
         # --- Create .env if missing ---
         if [[ ! -f "$INSTALL_DIR/.env" ]]; then
             cat > "$INSTALL_DIR/.env" << 'ENVEOF'
+A2A_ENV=production
 HOST=127.0.0.1
 PORT=8000
 A2A_DATA_DIR=/var/lib/a2a
@@ -60,6 +61,7 @@ IDENTITY_DSN=sqlite:////var/lib/a2a/identity.db
 MESSAGING_DSN=sqlite:////var/lib/a2a/messaging.db
 DISPUTE_DSN=sqlite:////var/lib/a2a/disputes.db
 LOG_LEVEL=INFO
+FORCE_HTTPS=1
 ENVEOF
             chmod 600 "$INSTALL_DIR/.env"
         fi
