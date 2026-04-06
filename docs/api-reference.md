@@ -823,8 +823,15 @@ Create a payment intent between two agents.
 
 **Response:**
 ```json
-{"id": "intent_abc123", "status": "pending", "amount": 50.0}
+{"id": "intent_abc123", "status": "pending", "amount": "50.0", "currency": "CREDITS", "gateway_fee": "1.0"}
 ```
+
+> **Gateway fee:** `create_intent` charges a percentage-based platform fee
+> (2% of amount, clamped to [0.01, 5.0] credits). The fee is deducted from
+> the **caller's** CREDITS wallet at tool-call time, not from the intent
+> amount. The fee is echoed in the response as `gateway_fee` so you can
+> reconcile charges. **This fee is refunded** when the intent is voided or
+> refunded via `refund_intent` — see `refund_intent` below.
 
 **Example:**
 ```bash
@@ -910,8 +917,13 @@ Refund a payment intent: voids if pending, reverse-transfers if settled.
 
 **Response:**
 ```json
-{"id": "intent_abc123", "status": "refunded", "amount": 50.0}
+{"id": "intent_abc123", "status": "refunded", "amount": "50.0", "gateway_fee": "1.0"}
 ```
+
+> **Gateway-fee reversal:** when an intent is voided (status was `pending`)
+> or refunded (status was `settled`), the gateway fee originally charged by
+> `create_intent` is credited back to the payer's CREDITS wallet. The
+> amount credited is echoed in the `gateway_fee` response field.
 
 ---
 

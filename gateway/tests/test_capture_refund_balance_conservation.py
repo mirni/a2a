@@ -33,18 +33,23 @@ async def _create_intent(client, api_key, payer: str, payee: str, amount: float)
 
 
 async def test_capture_refund_round_trip_restores_payer_balance(client, api_key, app):
-    """Audit C4: capture then refund must leave payer balance unchanged.
+    """Audit C4+H3: capture then refund returns the full intent amount AND
+    reverses the gateway fee charged at create_intent time.
 
-    Prior bug: refund returned 200 voided without moving funds, causing
+    Prior bug (C4): refund returned 200 voided without moving funds, causing
     silent data-loss when the refund hit a stuck-pending intent.
+    Prior bug (H3): gateway_fee charged at create_intent was never refunded,
+    letting the platform keep fees on cancelled workflows.
     """
     ctx = app.state.ctx
     await _ensure_wallet(ctx, "c4-payee", 0.0)
 
     intent_id = await _create_intent(client, api_key, "test-agent", "c4-payee", 25.0)
+    # 2% of 25.0 = 0.5, clamped to [0.01, 5.0] = 0.5
+    gateway_fee = 0.5
 
     # Measure balances AFTER create_intent (gateway fee already deducted)
-    # and BEFORE capture — the refund should restore to this baseline.
+    # and BEFORE capture.
     payer_before = await ctx.tracker.get_balance("test-agent")
     payee_before = await ctx.tracker.get_balance("c4-payee")
 
@@ -66,7 +71,9 @@ async def test_capture_refund_round_trip_restores_payer_balance(client, api_key,
     payer_after = await ctx.tracker.get_balance("test-agent")
     payee_after = await ctx.tracker.get_balance("c4-payee")
 
-    assert payer_after == payer_before
+    # Payer ends up BETTER than pre-capture baseline because the gateway_fee
+    # deducted at create_intent is now refunded alongside the intent amount.
+    assert payer_after == payer_before + gateway_fee
     assert payee_after == payee_before
 
 

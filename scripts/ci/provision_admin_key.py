@@ -21,11 +21,12 @@ sys.path.insert(0, REPO_ROOT)
 async def main(data_dir: str, agent_id: str, balance: float) -> str:
     os.environ["A2A_DATA_DIR"] = data_dir
 
+    import gateway.src.bootstrap  # noqa: F401, I001 — must run first to register namespace packages
+
+    # isort: split
     from billing_src.tracker import UsageTracker
     from paywall_src.keys import KeyManager
     from paywall_src.storage import PaywallStorage
-
-    import gateway.src.bootstrap  # noqa: F401 — triggers side-effects
 
     ps = PaywallStorage(f"sqlite:///{data_dir}/paywall.db")
     await ps.connect()
