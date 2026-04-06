@@ -1,5 +1,5 @@
 Package: a2a-gateway
-Version: 1.0.4
+Version: 1.0.6
 Architecture: all
 Depends: a2a-common (>= 0.4.9), python3 (>= 3.12), nginx, sqlite3, curl, ufw
 Maintainer: A2A Team <team@greenhelix.net>

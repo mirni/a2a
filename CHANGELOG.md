@@ -1,5 +1,38 @@
 # Changelog
 
+# Release v1.0.6
+
+**Date:** 2026-04-06
+**Commit:** 7c992212
+**Previous:** v1.0.4
+
+## Changes
+
+### Bug Fixes
+
+- fix(ci): suppress semgrep XXE false positive in merge_coverage_xml.py (#65) (`7c99221`)
+
+### Refactoring
+
+- refactor(ci): shard test-gateway + fix audit findings H-NEW/H-RACE/M2/M3/M4 (#64) (`bc0dafa`)
+
+### Other
+
+- Merge release v1.0.4 into main (`e2f8cc6`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 1.0.6 |
+| a2a-db-backup | 1.0.6 |
+| a2a-gateway | 1.0.6 |
+| a2a-gateway-sandbox | 1.0.6 |
+| a2a-gateway-test | 1.0.6 |
+| a2a-website | 1.0.6 |
+---
+
+
 # Release v1.0.4
 
 **Date:** 2026-04-06
