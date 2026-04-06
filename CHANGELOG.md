@@ -1,5 +1,34 @@
 # Changelog
 
+# Release v1.0.2
+
+**Date:** 2026-04-06
+**Commit:** 01f15229
+**Previous:** v1.0.1
+
+## Changes
+
+### Bug Fixes
+
+- fix(payments): resolve C2 capture OperationalError + H2 HTTPS enforcement (#61) (`01f1522`)
+
+### Other
+
+- Merge release v1.0.1 into main (`c0e656f`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 1.0.2 |
+| a2a-db-backup | 1.0.2 |
+| a2a-gateway | 1.0.2 |
+| a2a-gateway-sandbox | 1.0.2 |
+| a2a-gateway-test | 1.0.2 |
+| a2a-website | 1.0.2 |
+---
+
+
 # Release v1.0.1
 
 **Date:** 2026-04-06
