@@ -86,24 +86,29 @@ jobs:
         run: python scripts/update_website_stats.py --check
 
   # ---------------------------------------------------------------------------
-  # Test: all modules on Python 3.12 with coverage
+  # Test: gateway + products split across parallel jobs × Python versions
   # ---------------------------------------------------------------------------
-  test:
+  test-gateway:
     needs: [quality]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    name: test-gateway (py${{ matrix.python-version }})
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
 
       - name: Cache pip packages
         uses: actions/cache@v5
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-3.12-${{ hashFiles('**/pyproject.toml') }}
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/pyproject.toml') }}
           restore-keys: |
-            ${{ runner.os }}-pip-3.12-
+            ${{ runner.os }}-pip-${{ matrix.python-version }}-
 
       - name: Install dependencies
         run: scripts/ci/install_deps.sh --with-test
@@ -114,6 +119,39 @@ jobs:
 
       - name: Test gateway
         run: scripts/run_tests.sh gateway --cov=gateway --cov-report=xml:coverage-gateway.xml --cov-report=term-missing
+
+      - name: Upload coverage XML
+        if: always() && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v6
+        with:
+          name: coverage-xml-gateway
+          path: coverage-*.xml
+          retention-days: 7
+
+  test-products:
+    needs: [quality]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    name: test-products (py${{ matrix.python-version }})
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip packages
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ matrix.python-version }}-
+
+      - name: Install dependencies
+        run: scripts/ci/install_deps.sh --with-test
 
       - name: Test billing
         run: scripts/run_tests.sh products/billing --cov=products/billing/src --cov-report=xml:coverage-billing.xml --cov-report=term-missing
@@ -140,10 +178,10 @@ jobs:
         run: scripts/run_tests.sh products/messaging --cov=products/messaging/src --cov-report=xml:coverage-messaging.xml --cov-report=term-missing
 
       - name: Upload coverage XML
-        if: always()
+        if: always() && matrix.python-version == '3.12'
         uses: actions/upload-artifact@v6
         with:
-          name: coverage-xml
+          name: coverage-xml-products
           path: coverage-*.xml
           retention-days: 7
 
@@ -151,8 +189,8 @@ jobs:
   # Coverage ratchet: separate job so it's a distinct required check
   # ---------------------------------------------------------------------------
   coverage:
-    needs: [test]
-    if: always() && needs.test.result == 'success'
+    needs: [test-gateway, test-products]
+    if: always() && needs.test-gateway.result == 'success' && needs.test-products.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -167,10 +205,15 @@ jobs:
           path: .coverage-baseline.json
           key: coverage-baseline
 
-      - name: Download coverage XML
+      - name: Download gateway coverage XML
         uses: actions/download-artifact@v7
         with:
-          name: coverage-xml
+          name: coverage-xml-gateway
+
+      - name: Download products coverage XML
+        uses: actions/download-artifact@v7
+        with:
+          name: coverage-xml-products
 
       - name: Coverage ratchet check
         run: |
@@ -399,7 +442,7 @@ jobs:
   # Staging deploy (PRs targeting main only, after all CI jobs pass)
   # ---------------------------------------------------------------------------
   staging:
-    needs: [quality, test, integration, package, smoke-package, coverage]
+    needs: [quality, test-gateway, test-products, integration, package, smoke-package, coverage]
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
     uses: ./.github/workflows/staging.yml
     secrets: inherit

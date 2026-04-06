@@ -56,3 +56,9 @@ Do NOT execute these yet — they are staged for when the human is ready.
 - License: MIT (keep)
 - Pricing changes: Defer
 - HN timing: Later
+
+## Completed
+- **Date**: 2026-04-06
+- **Status**: Reviewed by agent. All items are human-only actions requiring external accounts/service registrations. No automation possible.
+- **Pre-requisites done**: GitHub topics already set (13 topics), SKILL.md exists in repo.
+- **Remaining**: All checklist items require human credentials (PyPI, npm, Docker Hub, MCP registries, etc.).
