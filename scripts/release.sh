@@ -243,6 +243,12 @@ if [[ -f "$VERSION_PY" ]]; then
     log "Bumped gateway/_version.py → ${VERSION}"
 fi
 
+# Bump sdk-ts/package.json (TypeScript SDK)
+if [[ -f "$REPO_ROOT/sdk-ts/package.json" ]]; then
+    (cd "$REPO_ROOT/sdk-ts" && npm version "$VERSION" --no-git-tag-version --allow-same-version 2>/dev/null)
+    log "Bumped sdk-ts/package.json → ${VERSION}"
+fi
+
 # ---------------------------------------------------------------------------
 # Step 3: Generate release notes and changelog
 # ---------------------------------------------------------------------------
@@ -379,6 +385,7 @@ git -C "$REPO_ROOT" add \
 [[ -f "$REPO_ROOT/pyproject.toml" ]] && git -C "$REPO_ROOT" add pyproject.toml || true
 [[ -f "$REPO_ROOT/sdk/pyproject.toml" ]] && git -C "$REPO_ROOT" add sdk/pyproject.toml || true
 [[ -f "$REPO_ROOT/gateway/src/_version.py" ]] && git -C "$REPO_ROOT" add gateway/src/_version.py || true
+[[ -f "$REPO_ROOT/sdk-ts/package.json" ]] && git -C "$REPO_ROOT" add sdk-ts/package.json sdk-ts/package-lock.json || true
 
 git -C "$REPO_ROOT" commit -m "$(cat <<EOF
 release: v${VERSION}
@@ -611,23 +618,38 @@ if [[ "$PUBLISH_PYPI" == true || "$PUBLISH_NPM" == true || "$PUBLISH_DOCKER" == 
     header "Step 12: Publish packages"
 fi
 
+# Pre-flight checks for publish targets
+if [[ "$PUBLISH_NPM" == true ]] && ! command -v npm &>/dev/null; then
+    warn "npm not found — skipping npm publish"
+    PUBLISH_NPM=false
+fi
+if [[ "$PUBLISH_DOCKER" == true ]] && ! command -v docker &>/dev/null; then
+    warn "docker not found — skipping Docker publish"
+    PUBLISH_DOCKER=false
+fi
+
+# Track publish failures so one target doesn't block the others
+PUBLISH_FAILURES=0
+
 # --- PyPI ---
 if [[ "$PUBLISH_PYPI" == true ]]; then
     info "Publishing a2a-greenhelix-sdk to PyPI..."
     if [[ -z "${PYPI_DEPLOYMENT_TOKEN:-}" ]]; then
         warn "PYPI_DEPLOYMENT_TOKEN not set — skipping PyPI publish"
-    else
-        (
-            cd "$REPO_ROOT/sdk"
-            pip install --quiet build twine 2>/dev/null
-            python -m build --sdist --wheel --outdir "$REPO_ROOT/dist/pypi/"
-            python -m twine upload \
-                --non-interactive \
-                --username __token__ \
-                --password "$PYPI_DEPLOYMENT_TOKEN" \
-                "$REPO_ROOT/dist/pypi/"*
-        )
+    elif (
+        cd "$REPO_ROOT/sdk"
+        pip install --quiet build twine 2>/dev/null
+        python -m build --sdist --wheel --outdir "$REPO_ROOT/dist/pypi/"
+        python -m twine upload \
+            --non-interactive \
+            --username __token__ \
+            --password "$PYPI_DEPLOYMENT_TOKEN" \
+            "$REPO_ROOT/dist/pypi/"*
+    ); then
         log "Published a2a-greenhelix-sdk==${VERSION} to PyPI"
+    else
+        warn "PyPI publish failed (exit $?) — continuing with other targets"
+        PUBLISH_FAILURES=$((PUBLISH_FAILURES + 1))
     fi
 fi
 
@@ -636,17 +658,18 @@ if [[ "$PUBLISH_NPM" == true ]]; then
     info "Publishing @greenhelix/sdk to npm..."
     if [[ -z "${NPM_DEPLOYMENT_TOKEN:-}" ]]; then
         warn "NPM_DEPLOYMENT_TOKEN not set — skipping npm publish"
-    else
-        (
-            cd "$REPO_ROOT/sdk-ts"
-            # Set version from release
-            npm version "$VERSION" --no-git-tag-version --allow-same-version 2>/dev/null || true
-            npm run build
-            echo "//registry.npmjs.org/:_authToken=${NPM_DEPLOYMENT_TOKEN}" > .npmrc
-            npm publish --access public
-            rm -f .npmrc
-        )
+    elif (
+        cd "$REPO_ROOT/sdk-ts"
+        npm install --ignore-scripts 2>/dev/null
+        npm run build
+        echo "//registry.npmjs.org/:_authToken=${NPM_DEPLOYMENT_TOKEN}" > .npmrc
+        npm publish --access public
+        rm -f .npmrc
+    ); then
         log "Published @greenhelix/sdk@${VERSION} to npm"
+    else
+        warn "npm publish failed (exit $?) — continuing with other targets"
+        PUBLISH_FAILURES=$((PUBLISH_FAILURES + 1))
     fi
 fi
 
@@ -655,15 +678,23 @@ if [[ "$PUBLISH_DOCKER" == true ]]; then
     info "Publishing Docker image to Docker Hub..."
     if [[ -z "${DOCKER_DEPLOYMENT_TOKEN:-}" ]]; then
         warn "DOCKER_DEPLOYMENT_TOKEN not set — skipping Docker publish"
-    else
+    elif (
         DOCKER_IMAGE="greenhelix/a2a-gateway"
         echo "$DOCKER_DEPLOYMENT_TOKEN" | docker login --username greenhelix --password-stdin
         docker build -t "${DOCKER_IMAGE}:${VERSION}" -t "${DOCKER_IMAGE}:latest" "$REPO_ROOT"
         docker push "${DOCKER_IMAGE}:${VERSION}"
         docker push "${DOCKER_IMAGE}:latest"
         docker logout
-        log "Published ${DOCKER_IMAGE}:${VERSION} to Docker Hub"
+    ); then
+        log "Published greenhelix/a2a-gateway:${VERSION} to Docker Hub"
+    else
+        warn "Docker publish failed (exit $?) — continuing"
+        PUBLISH_FAILURES=$((PUBLISH_FAILURES + 1))
     fi
+fi
+
+if (( PUBLISH_FAILURES > 0 )); then
+    warn "${PUBLISH_FAILURES} publish target(s) failed — check output above"
 fi
 
 # ---------------------------------------------------------------------------
