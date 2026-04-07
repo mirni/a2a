@@ -131,9 +131,7 @@ class TestExtraForbid:
     )
     def test_config_extra_is_forbid(self, model_cls):
         """The model's ConfigDict must set extra='forbid'."""
-        assert model_cls.model_config.get("extra") == "forbid", (
-            f"{model_cls.__name__} does not have extra='forbid'"
-        )
+        assert model_cls.model_config.get("extra") == "forbid", f"{model_cls.__name__} does not have extra='forbid'"
 
 
 # ===================================================================
@@ -201,12 +199,8 @@ class TestHypothesisBilling:
         threshold=st.floats(min_value=0.0, max_value=1.0, allow_nan=False),
     )
     @settings(max_examples=50)
-    def test_budget_cap_optional_fields(
-        self, daily: Decimal | None, monthly: Decimal | None, threshold: float
-    ):
-        req = BudgetCapRequest(
-            daily_cap=daily, monthly_cap=monthly, alert_threshold=threshold
-        )
+    def test_budget_cap_optional_fields(self, daily: Decimal | None, monthly: Decimal | None, threshold: float):
+        req = BudgetCapRequest(daily_cap=daily, monthly_cap=monthly, alert_threshold=threshold)
         assert req.daily_cap == daily
         assert req.monthly_cap == monthly
 
@@ -227,9 +221,7 @@ class TestHypothesisPayments:
         amount=_valid_amount,
     )
     @settings(max_examples=50)
-    def test_create_intent_valid_inputs(
-        self, payer: str, payee: str, amount: Decimal
-    ):
+    def test_create_intent_valid_inputs(self, payer: str, payee: str, amount: Decimal):
         req = CreateIntentRequest(payer=payer, payee=payee, amount=amount)
         assert req.payer == payer
         assert req.payee == payee
@@ -242,9 +234,7 @@ class TestHypothesisPayments:
         amount=_valid_amount,
     )
     @settings(max_examples=50)
-    def test_create_escrow_valid_inputs(
-        self, payer: str, payee: str, amount: Decimal
-    ):
+    def test_create_escrow_valid_inputs(self, payer: str, payee: str, amount: Decimal):
         req = CreateEscrowRequest(payer=payer, payee=payee, amount=amount)
         assert req.timeout_hours is None
         assert req.metadata is None
@@ -363,7 +353,5 @@ class TestBoundary:
 
     def test_subscription_interval_freeform(self):
         """Interval field accepts any string (validated at business layer)."""
-        req = CreateSubscriptionRequest(
-            payer="a", payee="b", amount=Decimal("9.99"), interval="biweekly"
-        )
+        req = CreateSubscriptionRequest(payer="a", payee="b", amount=Decimal("9.99"), interval="biweekly")
         assert req.interval == "biweekly"
