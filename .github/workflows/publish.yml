@@ -1,0 +1,162 @@
+# =============================================================================
+# A2A Commerce Platform — Publish SDKs to PyPI + npm
+# =============================================================================
+# Triggered by version tags pushed by release.sh (step 10).
+# Uses trusted publishing (OIDC) for PyPI and a granular access token for npm.
+#
+# Setup required (one-time, manual):
+#
+# PyPI Trusted Publisher:
+#   1. https://pypi.org/manage/project/a2a-greenhelix-sdk/settings/publishing/
+#   2. Add publisher: owner=mirni, repo=a2a, workflow=publish.yml, environment=pypi
+#
+# GitHub Environments:
+#   1. Create environment "pypi" (no secrets needed — uses OIDC)
+#   2. Create environment "npm" with secret NPM_TOKEN
+#
+# npm Granular Access Token:
+#   1. https://www.npmjs.com/ → Access Tokens → Granular Access Token
+#   2. Scope to @greenhelix/sdk, read+write permissions
+#   3. Store as NPM_TOKEN in GitHub "npm" environment
+# =============================================================================
+
+name: Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Validate: extract version from tag, verify it matches SDK sources
+  # ---------------------------------------------------------------------------
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: extract
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Tag version: $TAG"
+
+      - name: Verify sdk/pyproject.toml version
+        run: |
+          EXPECTED="${{ steps.extract.outputs.version }}"
+          ACTUAL=$(python3 -c "
+          import re, pathlib
+          text = pathlib.Path('sdk/pyproject.toml').read_text()
+          m = re.search(r'^version\s*=\s*\"([^\"]+)\"', text, re.MULTILINE)
+          print(m.group(1) if m else 'NOT_FOUND')
+          ")
+          echo "sdk/pyproject.toml version: $ACTUAL (expected: $EXPECTED)"
+          if [[ "$ACTUAL" != "$EXPECTED" ]]; then
+            echo "::error::Version mismatch: sdk/pyproject.toml has $ACTUAL, tag is v$EXPECTED"
+            exit 1
+          fi
+
+      - name: Verify sdk-ts/package.json version
+        run: |
+          EXPECTED="${{ steps.extract.outputs.version }}"
+          ACTUAL=$(node -p "require('./sdk-ts/package.json').version")
+          echo "sdk-ts/package.json version: $ACTUAL (expected: $EXPECTED)"
+          if [[ "$ACTUAL" != "$EXPECTED" ]]; then
+            echo "::error::Version mismatch: sdk-ts/package.json has $ACTUAL, tag is v$EXPECTED"
+            exit 1
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Publish Python SDK to PyPI via Trusted Publishing (OIDC)
+  # ---------------------------------------------------------------------------
+  publish-pypi:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write   # OIDC for Trusted Publishing
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build sdist and wheel
+        run: |
+          pip install --quiet build
+          cd sdk
+          python -m build --sdist --wheel --outdir ../dist/pypi/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/pypi/
+
+  # ---------------------------------------------------------------------------
+  # Publish TypeScript SDK to npm with provenance (bypasses OTP)
+  # ---------------------------------------------------------------------------
+  publish-npm:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      id-token: write   # OIDC for npm provenance attestation
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install and build
+        working-directory: sdk-ts
+        run: |
+          npm ci
+          npm run build
+
+      - name: Publish with provenance
+        working-directory: sdk-ts
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  # Verify: install published packages from registries
+  # ---------------------------------------------------------------------------
+  verify:
+    needs: [validate, publish-pypi, publish-npm]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for registry propagation
+        run: sleep 30
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verify PyPI package
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          python3 -m venv /tmp/verify-venv
+          /tmp/verify-venv/bin/pip install --quiet "a2a-greenhelix-sdk==${VERSION}"
+          /tmp/verify-venv/bin/python -c "from a2a_client import A2AClient; print('PyPI: import OK')"
+
+      - name: Verify npm package
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          mkdir /tmp/verify-npm && cd /tmp/verify-npm
+          npm init -y --silent
+          npm install "@greenhelix/sdk@${VERSION}" --silent
+          node -e "const { A2AClient } = require('@greenhelix/sdk'); console.log('npm: import OK')"
