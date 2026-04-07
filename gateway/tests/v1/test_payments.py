@@ -393,12 +393,11 @@ class TestRefundBalanceConservation:
     """H-NEW: create→capture→refund via REST must conserve balance exactly."""
 
     async def test_rest_refund_no_balance_drift(self, client, app):
-        """After create→capture→refund, payer must end up at starting balance.
+        """After create→capture→refund, payer loses only the gateway fee.
 
-        Bug: require_tool() passed empty {} to calculate_tool_cost(), so
-        percentage-based fees defaulted to min_fee (0.01) instead of the
-        real fee. The refund then credited back the correctly computed fee,
-        creating a per-cycle profit of (real_fee - min_fee).
+        H-REF: The gateway fee (2% of intent amount, clamped [0.01, 5.0]) is a
+        non-refundable one-time service charge.  Refund restores the intent
+        amount only — the payer ends up at (start - gateway_fee).
         """
         payer_key = await _create_agent_key(app, "drift-payer", balance=1000.0)
         await _create_agent_key(app, "drift-payee", balance=0.0)
@@ -414,7 +413,7 @@ class TestRefundBalanceConservation:
         )
         assert resp.status_code == 201
         intent_id = resp.json()["id"]
-        charged_header = float(resp.headers.get("X-Charged", "0"))
+        gateway_fee = float(resp.json().get("gateway_fee", "0"))
 
         # Capture
         resp = await client.post(
@@ -432,10 +431,10 @@ class TestRefundBalanceConservation:
 
         balance_after = await ctx.tracker.get_balance("drift-payer")
 
-        # The payer must end up exactly where they started — no profit
-        assert balance_after == balance_before, (
+        # Payer should be down by exactly the non-refundable gateway fee
+        assert balance_after == balance_before - gateway_fee, (
             f"Balance drift: started at {balance_before}, ended at {balance_after} "
-            f"(delta={balance_after - balance_before}, charged_header={charged_header})"
+            f"(delta={balance_after - balance_before}, gateway_fee={gateway_fee})"
         )
 
     async def test_x_charged_header_matches_percentage_fee(self, client, app):

@@ -33,20 +33,18 @@ async def _create_intent(client, api_key, payer: str, payee: str, amount: float)
 
 
 async def test_capture_refund_round_trip_restores_payer_balance(client, api_key, app):
-    """Audit C4+H3: capture then refund returns the full intent amount AND
-    reverses the gateway fee charged at create_intent time.
+    """Audit C4 + H-REF: capture then refund returns the intent amount only.
 
-    Prior bug (C4): refund returned 200 voided without moving funds, causing
-    silent data-loss when the refund hit a stuck-pending intent.
-    Prior bug (H3): gateway_fee charged at create_intent was never refunded,
-    letting the platform keep fees on cancelled workflows.
+    The gateway fee (charged at create_intent time) is non-refundable — it is
+    a one-time service charge.  Refund restores only the captured amount.
+
+    Prior bug (C4): refund returned 200 voided without moving funds.
+    Prior bug (H-REF): refund double-credited the gateway fee, causing drift.
     """
     ctx = app.state.ctx
     await _ensure_wallet(ctx, "c4-payee", 0.0)
 
     intent_id = await _create_intent(client, api_key, "test-agent", "c4-payee", 25.0)
-    # 2% of 25.0 = 0.5, clamped to [0.01, 5.0] = 0.5
-    gateway_fee = 0.5
 
     # Measure balances AFTER create_intent (gateway fee already deducted)
     # and BEFORE capture.
@@ -71,11 +69,8 @@ async def test_capture_refund_round_trip_restores_payer_balance(client, api_key,
     payer_after = await ctx.tracker.get_balance("test-agent")
     payee_after = await ctx.tracker.get_balance("c4-payee")
 
-    # Payer is fully restored: the refund returns the intent amount AND the
-    # gateway fee, exactly cancelling the charges made at create+capture time.
-    # Via /v1/execute the gateway_fee was already deducted before payer_before
-    # was measured, so after refund the payer ends up at payer_before + gateway_fee.
-    assert payer_after == payer_before + gateway_fee
+    # Payer is restored to pre-capture balance (gateway fee is non-refundable)
+    assert payer_after == payer_before
     assert payee_after == payee_before
 
 

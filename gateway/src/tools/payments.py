@@ -174,19 +174,8 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
 
     gateway_fee = _compute_create_intent_gateway_fee(float(intent.amount))
 
-    async def _credit_gateway_fee() -> None:
-        """Credit the create_intent gateway fee back to the payer (CREDITS currency)."""
-        if gateway_fee > 0:
-            await ctx.tracker.wallet.deposit(
-                intent.payer,
-                gateway_fee,
-                description=f"refund_fee:create_intent:{intent.id}",
-                currency="CREDITS",
-            )
-
     if intent.status.value == "pending":
         voided = await ctx.payment_engine.void(intent.id, idempotency_key=params.get("idempotency_key"))
-        await _credit_gateway_fee()
         return {
             "id": voided.id,
             "status": "voided",
@@ -217,7 +206,6 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
             description=f"refund:{intent.id}",
             currency=currency,
         )
-        await _credit_gateway_fee()
         return {
             "id": intent.id,
             "status": "refunded",

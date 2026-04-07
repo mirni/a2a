@@ -245,10 +245,8 @@ class MessageStorage:
         {
             "current_amount",
             "status",
-            "counter_party_id",
             "expires_at",
             "updated_at",
-            "metadata",
         }
     )
 
