@@ -1,5 +1,38 @@
 # Changelog
 
+# Release v1.1.0
+
+**Date:** 2026-04-07
+**Commit:** 79ccb76b
+**Previous:** v1.0.7
+
+## Changes
+
+### Bug Fixes
+
+- fix(onboarding): auto-register identity, add hints, update pricing (#70) (`17efadb`)
+- fix(audit): remediate H-REF, M2, M3 from v1.0.7 audit (#69) (`af73be3`)
+- fix(release): auto-bootstrap venv and source .env (#68) (`92087bb`)
+- fix(release): support publish-only re-runs for existing releases (#67) (`cc57169`)
+
+### Other
+
+- Update master log (`79ccb76`)
+- Merge release v1.0.7 into main (`81d3175`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 1.1.0 |
+| a2a-db-backup | 1.1.0 |
+| a2a-gateway | 1.1.0 |
+| a2a-gateway-sandbox | 1.1.0 |
+| a2a-gateway-test | 1.1.0 |
+| a2a-website | 1.1.0 |
+---
+
+
 # Release v1.0.7
 
 **Date:** 2026-04-06
