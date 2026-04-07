@@ -71,7 +71,17 @@ async def register(request: Request) -> JSONResponse:
     except (TypeError, ValueError):
         balance = 0.0
 
-    logger.info("Agent registered: %s", agent_id)
+    # Auto-register cryptographic identity (best-effort, non-blocking)
+    identity_registered = False
+    public_key = None
+    try:
+        identity = await ctx.identity_api.register_agent(agent_id=agent_id)
+        identity_registered = True
+        public_key = identity.public_key
+    except Exception:
+        logger.warning("Auto identity registration failed for %s", agent_id)
+
+    logger.info("Agent registered: %s (identity=%s)", agent_id, identity_registered)
 
     return JSONResponse(
         {
@@ -79,6 +89,13 @@ async def register(request: Request) -> JSONResponse:
             "api_key": key_info["key"],
             "tier": "free",
             "balance": balance,
+            "identity_registered": identity_registered,
+            "public_key": public_key,
+            "next_steps": {
+                "onboarding": "/v1/onboarding",
+                "docs": "/docs",
+                "pricing": "/v1/pricing",
+            },
         },
         status_code=201,
     )

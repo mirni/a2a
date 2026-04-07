@@ -39,7 +39,7 @@ class TestTierConfigs:
     def test_free_tier(self):
         cfg = TIER_CONFIGS[TierName.FREE]
         assert cfg.rate_limit_per_hour == 100
-        assert cfg.cost_per_call == 0
+        assert cfg.cost_per_call == 0.001
         assert cfg.audit_log_retention_days is None
         assert cfg.support_level == "none"
 

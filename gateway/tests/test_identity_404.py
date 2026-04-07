@@ -32,6 +32,30 @@ class TestIdentity404:
         )
         assert resp.status_code == 404
 
+    async def test_get_identity_404_includes_registration_hint(self, client, api_key):
+        """404 error for get_agent_identity should include registration hint."""
+        resp = await client.post(
+            "/v1/execute",
+            json={"tool": "get_agent_identity", "params": {"agent_id": "no-such-agent"}},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 404
+        detail = resp.json().get("detail", "")
+        assert "Register identity first" in detail
+        assert "/v1/identity/agents" in detail
+
+    async def test_get_reputation_404_includes_registration_hint(self, client, api_key):
+        """404 error for get_agent_reputation should include registration hint."""
+        resp = await client.post(
+            "/v1/execute",
+            json={"tool": "get_agent_reputation", "params": {"agent_id": "no-such-agent"}},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 404
+        detail = resp.json().get("detail", "")
+        assert "Register identity first" in detail
+        assert "/v1/identity/agents" in detail
+
     async def test_get_identity_existing_returns_200(self, client, api_key, app):
         """get_agent_identity for existing agent should return 200."""
         ctx = app.state.ctx

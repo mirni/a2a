@@ -94,8 +94,8 @@ class TestGatedCostZero:
 class TestGatedRequireBalanceCostZero:
     """gated(require_balance=True, cost=0) — require_balance is True but cost=0.
     The effective_cost calculation depends on tier_config.cost_per_call.
-    For free tier, cost_per_call=0, so effective_cost=0 regardless of declared cost.
-    For pro tier, cost_per_call=1, so effective_cost=cost.
+    For free tier, cost_per_call=0.001, so effective_cost=cost (enabled).
+    For pro tier, cost_per_call=0, so effective_cost=0.
     With cost=0 and require_balance=True, effective_cost=0 so balance check is skipped."""
 
     async def test_require_balance_true_cost_zero_free_tier(
@@ -107,7 +107,7 @@ class TestGatedRequireBalanceCostZero:
         async def my_tool(agent_id: str):
             return {"ok": True}
 
-        # Should succeed — effective_cost = 0 because free tier cost_per_call = 0
+        # Should succeed — effective_cost = 0 because cost=0 (even though cost_per_call > 0)
         result = await my_tool(agent_id="agent-rb")
         assert result == {"ok": True}
 
