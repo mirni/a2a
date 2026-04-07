@@ -119,9 +119,12 @@ All authenticated endpoints require an API key. The SDK sends it as `Authorizati
 
 ```python
 # Get a free-tier key via self-registration
+# This also auto-registers a cryptographic identity for marketplace operations
 import httpx
 resp = httpx.post("https://api.greenhelix.net/v1/register", json={"agent_id": "my-agent"})
-api_key = resp.json()["api_key"]
+data = resp.json()
+api_key = data["api_key"]
+# data also includes: identity_registered, public_key, next_steps
 
 # Use it with the SDK
 client = A2AClient("https://api.greenhelix.net", api_key=api_key)
