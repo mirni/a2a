@@ -6743,3 +6743,42 @@ Fix stale `@a2a/sdk` npm references in docs → `@greenhelix/sdk`.
 - Branch: `fix/npm-package-refs`
 - PR: #45 — CI green, ready for review.
 
+---
+
+## 2026-04-07 — Felix Agent Remediation: Identity Gap, Error Hints, Pricing
+
+### Prompt
+Implement plan: auto-register identity during /v1/register, add hints to error responses, add identity step to onboarding, set free tier cost_per_call to 0.001, create backlog todo.
+
+### Output
+
+**Task 1: Auto-register identity during /v1/register**
+- `gateway/src/routes/register.py`: After wallet + key creation, auto-register cryptographic identity (best-effort, non-blocking). Response now includes `identity_registered`, `public_key`, and `next_steps`.
+- 3 new tests in `gateway/tests/test_register.py` (10 total).
+
+**Task 2: Error hints in identity 404s**
+- `gateway/src/tools/identity.py`: `_get_agent_identity` and `_get_agent_reputation` now include `Register identity first: POST /v1/identity/agents` in error messages.
+- 2 new tests in `gateway/tests/test_identity_404.py` (5 total).
+
+**Task 3: Onboarding quickstart identity step**
+- `gateway/src/routes/onboarding.py`: Inserted step 2 "Register your cryptographic identity", renumbered to 5 steps.
+- 2 new tests in `gateway/tests/test_onboarding.py` (8 total).
+
+**Task 4: Free tier cost_per_call**
+- `pricing.json`: free tier `cost_per_call` changed from 0 to 0.001.
+- Updated paywall tests: `test_tiers.py`, `test_middleware.py`, `test_middleware_edges.py`, `test_usage_api.py`.
+
+**Task 5: Backlog**
+- Created `tasks/backlog/agent-onboarding-improvements.md`.
+
+**Documentation updates:**
+- `README.md`: Updated quickstart step 3 to use `POST /v1/register` with new response format. Added cost/call to free tier pricing table.
+- `docs/api-reference.md`: Added `POST /v1/register` endpoint section. Updated agent registration workflow (4.1) to one-step flow. Updated `agent_not_found` error recovery guidance.
+- `docs/sdk-guide.md`: Added identity auto-registration note in authentication section.
+- `docs/infra/DISTRIBUTION.md`: Updated free tier from "0 cost" to "0.001 credits/call".
+
+### Result
+- Branch: `feat/felix-agent-remediation`
+- PR: #70 — CI green (all jobs including staging), ready for review.
+- 1428 gateway tests passed, 151 paywall tests passed.
+
