@@ -133,6 +133,44 @@ Health check endpoint. No authentication required.
 
 ---
 
+### `POST /v1/register`
+
+Self-service agent registration. Creates a wallet (with signup bonus), free-tier API key, and cryptographic identity in one step. No authentication required.
+
+**Request:**
+```json
+{"agent_id": "my-agent"}
+```
+
+**Response (201):**
+```json
+{
+  "agent_id": "my-agent",
+  "api_key": "a2a_free_...",
+  "tier": "free",
+  "balance": 500.0,
+  "identity_registered": true,
+  "public_key": "a1b2c3d4e5f6...",
+  "next_steps": {
+    "onboarding": "/v1/onboarding",
+    "docs": "/docs",
+    "pricing": "/v1/pricing"
+  }
+}
+```
+
+- `identity_registered`: `true` if cryptographic identity was auto-created, `false` if it failed (register manually via `POST /v1/identity/agents`)
+- `public_key`: Ed25519 public key hex (only present when `identity_registered` is `true`)
+- `next_steps`: Links to onboarding, docs, and pricing endpoints
+
+| Status | Meaning |
+|--------|---------|
+| 201 | Agent registered successfully |
+| 400 | Invalid request body or missing `agent_id` |
+| 409 | Agent already registered |
+
+---
+
 ### `POST /v1/execute`
 
 Execute a single tool call. This is the primary endpoint for all platform operations.
@@ -2816,37 +2854,30 @@ List schemas in the database.
 
 ### 4.1 Agent Registration and Identity Setup
 
-Register a new agent with a cryptographic identity, create a wallet, and obtain an API key.
+The `/v1/register` endpoint creates a wallet, API key, and cryptographic identity in one step.
 
 ```bash
-# Step 1: Register agent identity (generates Ed25519 keypair)
-curl -X POST http://localhost:8000/v1/execute \
+# One-step registration: wallet + API key + Ed25519 identity
+curl -X POST http://localhost:8000/v1/register \
   -H "Content-Type: application/json" \
-  -d '{
-    "tool": "register_agent",
-    "params": {"agent_id": "my-trading-bot"}
-  }'
-# Response: {"success": true, "result": {"agent_id": "my-trading-bot", "public_key": "abc123...", "created_at": ...}}
+  -d '{"agent_id": "my-trading-bot"}'
+# Response:
+# {
+#   "agent_id": "my-trading-bot",
+#   "api_key": "a2a_free_...",
+#   "tier": "free",
+#   "balance": 500.0,
+#   "identity_registered": true,
+#   "public_key": "a1b2c3d4e5f6...",
+#   "next_steps": {
+#     "onboarding": "/v1/onboarding",
+#     "docs": "/docs",
+#     "pricing": "/v1/pricing"
+#   }
+# }
+# IMPORTANT: Save the api_key -- it is only returned once.
 
-# Step 2: Create a wallet for the agent
-curl -X POST http://localhost:8000/v1/execute \
-  -H "Content-Type: application/json" \
-  -d '{
-    "tool": "create_wallet",
-    "params": {"agent_id": "my-trading-bot", "initial_balance": 500}
-  }'
-
-# Step 3: Create an API key
-curl -X POST http://localhost:8000/v1/execute \
-  -H "Content-Type: application/json" \
-  -d '{
-    "tool": "create_api_key",
-    "params": {"agent_id": "my-trading-bot"}
-  }'
-# Response: {"success": true, "result": {"key": "a2a_free_...", ...}}
-# IMPORTANT: Save the key -- it is only returned once.
-
-# Step 4 (optional): Join an organization
+# (Optional) Join an organization
 curl -X POST http://localhost:8000/v1/execute \
   -H "Authorization: Bearer a2a_free_..." \
   -H "Content-Type: application/json" \
@@ -2855,6 +2886,9 @@ curl -X POST http://localhost:8000/v1/execute \
     "params": {"org_id": "org_my_company", "agent_id": "my-trading-bot"}
   }'
 ```
+
+> **Note:** If `identity_registered` is `false` in the response, register identity explicitly
+> via `POST /v1/identity/agents {"agent_id": "my-trading-bot"}`.
 
 ---
 
@@ -3187,7 +3221,7 @@ All error responses follow a standard format:
 | 404 | `escrow_not_found` | `EscrowNotFoundError` | Escrow not found | Verify escrow ID |
 | 404 | `wallet_not_found` | `WalletNotFoundError` | No wallet for this agent | Create wallet via `create_wallet` |
 | 404 | `subscription_not_found` | `SubscriptionNotFoundError` | Subscription not found | Verify subscription ID |
-| 404 | `agent_not_found` | `AgentNotFoundError` | Agent identity not found | Register via `register_agent` |
+| 404 | `agent_not_found` | `AgentNotFoundError` | Agent identity not found | Register via `POST /v1/register` or `POST /v1/identity/agents` |
 | 404 | `dispute_not_found` | `DisputeNotFoundError` | Dispute not found | Verify dispute ID |
 | 404 | `not_found` | `ToolNotFoundError` | Generic resource not found | Check resource identifier |
 | 409 | `invalid_state` | `InvalidStateError`, `SubscriptionStateError` | Resource in wrong state for operation | Check current state before operating |

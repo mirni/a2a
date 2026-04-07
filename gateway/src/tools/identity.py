@@ -65,7 +65,10 @@ async def _get_agent_identity(ctx: AppContext, params: dict[str, Any]) -> dict[s
 
     identity = await ctx.identity_api.get_identity(params["agent_id"])
     if identity is None:
-        raise ToolNotFoundError(f"Agent not found: {params['agent_id']}")
+        raise ToolNotFoundError(
+            f"Agent not found: {params['agent_id']}. "
+            f'Register identity first: POST /v1/identity/agents {{"agent_id": "{params["agent_id"]}"}}'
+        )
     return {
         "agent_id": identity.agent_id,
         "public_key": identity.public_key,
@@ -106,7 +109,9 @@ async def _get_agent_reputation(ctx: AppContext, params: dict[str, Any]) -> dict
 
     reputation = await ctx.identity_api.get_reputation(params["agent_id"])
     if reputation is None:
-        raise ToolNotFoundError(f"Agent reputation not found: {params['agent_id']}")
+        raise ToolNotFoundError(
+            f"Agent reputation not found: {params['agent_id']}. Register identity first: POST /v1/identity/agents"
+        )
     return {
         "agent_id": reputation.agent_id,
         "payment_reliability": reputation.payment_reliability,

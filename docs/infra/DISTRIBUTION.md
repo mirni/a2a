@@ -26,7 +26,7 @@ This document compares the CMO Marketing Report (2026-03-28) against the current
 | Free credits | **500 signup bonus** via `pricing.json` `signup_bonus: 500`. Auto-applied on `create_wallet(signup_bonus=True)`. |
 | Auto-reload billing | **Implemented** in `products/billing/src/wallet.py`. Configurable threshold (default 100 credits) and reload amount (default 1,000 credits). Triggers automatically on debit. |
 | Interactive API docs | **Swagger UI** at `/docs` (gateway/src/swagger.py). OpenAPI 3.1.0 spec at `/v1/openapi.json`. |
-| Pricing tiers | **4 tiers** defined in `pricing.json`: Free (100 calls/hr, 0 cost), Starter ($29/mo, 3,500 credits), Pro ($199/mo, 25K credits), Enterprise ($5K-50K/yr). |
+| Pricing tiers | **4 tiers** defined in `pricing.json`: Free (100 calls/hr, 0.001 credits/call), Starter ($29/mo, 3,500 credits), Pro ($199/mo, 25K credits), Enterprise ($5K-50K/yr). |
 | Subscriptions | **Fully exposed**: create_subscription, cancel_subscription, reactivate_subscription, get_subscription, list_subscriptions, process_due_subscriptions |
 | Disputes | **Full state machine**: open_dispute, respond_to_dispute, resolve_dispute, list_disputes, get_dispute. 7-day response deadline. Resolutions: refund or release. |
 | Identity | **Ed25519 cryptographic identity**: register_agent, verify_agent, get_agent_reputation, metric commitments, claim chains, org management (17 tools) |

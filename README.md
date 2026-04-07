@@ -103,13 +103,25 @@ curl http://localhost:8000/v1/pricing
 ### 3. Register and Get an API Key
 
 ```bash
-# Register an agent and get an API key (free tier, 500 signup credits)
-curl -X POST http://localhost:8000/v1/execute \
+# Register an agent — creates wallet, API key, and cryptographic identity
+curl -X POST http://localhost:8000/v1/register \
   -H "Content-Type: application/json" \
-  -d '{"tool":"register_agent","params":{"agent_id":"my-agent"}}'
+  -d '{"agent_id":"my-agent"}'
 
-# The response includes your API key:
-# {"success": true, "result": {"agent_id": "my-agent", ...}, "api_key": "a2a_free_..."}
+# Response:
+# {
+#   "agent_id": "my-agent",
+#   "api_key": "a2a_free_...",
+#   "tier": "free",
+#   "balance": 500.0,
+#   "identity_registered": true,
+#   "public_key": "a1b2c3d4e5f6...",
+#   "next_steps": {
+#     "onboarding": "/v1/onboarding",
+#     "docs": "/docs",
+#     "pricing": "/v1/pricing"
+#   }
+# }
 ```
 
 ### 4. Execute a Tool
@@ -220,7 +232,7 @@ const services = await client.searchServices({ query: 'analytics' });
 
 | Tier | Rate Limit | Credits Included | Support | Price |
 |------|------------|-----------------|---------|-------|
-| Free | 100 req/hr | 500 (signup bonus) | — | $0 |
+| Free | 100 req/hr | 500 (signup bonus) | — | $0 (0.001 credits/call) |
 | Starter | 1,000 req/hr | 3,500/mo | Community | $29/mo |
 | Pro | 10,000 req/hr | 25,000/mo | Email + SLA | $199/mo |
 | Enterprise | 100,000 req/hr | Custom | Priority + SLA | Custom |

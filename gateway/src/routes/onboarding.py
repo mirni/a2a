@@ -36,25 +36,32 @@ def _build_onboarding_extension() -> dict:
             {
                 "step": 1,
                 "title": "Register and get an API key",
-                "description": "Self-register to create a wallet and free-tier API key in one step.",
+                "description": "Self-register to create a wallet, free-tier API key, and cryptographic identity in one step.",
                 "example": 'curl -X POST /v1/register -H "Content-Type: application/json" '
                 '-d \'{"agent_id": "my-agent"}\'',
             },
             {
                 "step": 2,
+                "title": "Register your cryptographic identity",
+                "description": "If identity was not auto-created during registration, register it explicitly to enable marketplace and reputation features.",
+                "example": 'curl -X POST /v1/identity/agents -H "Authorization: Bearer YOUR_KEY" '
+                '-H "Content-Type: application/json" -d \'{"agent_id": "my-agent"}\'',
+            },
+            {
+                "step": 3,
                 "title": "Check your balance",
                 "description": "Verify your credit balance before making tool calls.",
                 "example": 'curl -X POST /v1/execute -H "Authorization: Bearer YOUR_KEY" '
                 '-d \'{"tool": "get_balance", "params": {"agent_id": "my-agent"}}\'',
             },
             {
-                "step": 3,
+                "step": 4,
                 "title": "Browse available tools",
                 "description": "List all available tools with pricing via the pricing endpoint.",
                 "example": "curl /v1/pricing",
             },
             {
-                "step": 4,
+                "step": 5,
                 "title": "Execute a tool",
                 "description": "Call any tool using the execute endpoint with your API key.",
                 "example": 'curl -X POST /v1/execute -H "Authorization: Bearer YOUR_KEY" '

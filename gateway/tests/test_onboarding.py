@@ -34,12 +34,20 @@ class TestOnboardingEndpoint:
         assert "quickstart" in onboarding
         assert "authentication" in onboarding
 
-    async def test_quickstart_has_steps(self, client):
+    async def test_quickstart_has_5_steps(self, client):
         resp = await client.get("/v1/onboarding")
         onboarding = resp.json()["info"]["x-onboarding"]
         steps = onboarding["quickstart"]
         assert isinstance(steps, list)
-        assert len(steps) >= 3
+        assert len(steps) == 5
+
+    async def test_quickstart_step2_is_identity(self, client):
+        resp = await client.get("/v1/onboarding")
+        steps = resp.json()["info"]["x-onboarding"]["quickstart"]
+        step2 = steps[1]
+        assert step2["step"] == 2
+        assert "identity" in step2["title"].lower()
+        assert "/v1/identity/agents" in step2["example"]
 
     async def test_authentication_instructions(self, client):
         resp = await client.get("/v1/onboarding")

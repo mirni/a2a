@@ -103,4 +103,4 @@ class TestProjectedCost:
 
         projection = await usage_api.get_projected_cost("agent-1")
         assert projection["tier"] == "free"
-        assert projection["cost_per_call"] == 0
+        assert projection["cost_per_call"] == 0.001

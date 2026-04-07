@@ -287,17 +287,23 @@ class TestWalletCheck:
         balance = await tracker.get_balance("agent-1")
         assert balance == 100.0  # No charge because cost_per_call=0
 
-    async def test_free_tier_cost_zero_even_if_declared(self, middleware: PaywallMiddleware, key_manager: KeyManager):
-        """Free tier should not charge even if cost is declared (cost_per_call=0)."""
+    async def test_free_tier_charges_declared_cost(
+        self, middleware: PaywallMiddleware, key_manager: KeyManager, tracker
+    ):
+        """Free tier with cost_per_call>0 charges the declared tool cost."""
         await key_manager.create_key(agent_id="agent-1", tier="free")
+        await tracker.wallet.create("agent-1", initial_balance=100.0, signup_bonus=False)
 
         @middleware.gated(tier="free", cost=5)
         async def tool(agent_id: str):
             return {"ok": True}
 
-        # Should succeed without wallet because free tier cost_per_call=0
         result = await tool(agent_id="agent-1")
         assert result == {"ok": True}
+
+        # Balance should be reduced by the declared cost
+        balance = await tracker.get_balance("agent-1")
+        assert balance == 95.0
 
 
 class TestAuditLogging:

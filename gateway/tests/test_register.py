@@ -106,3 +106,52 @@ async def test_register_extra_fields_rejected(client):
         json={"agent_id": "extra-field-agent", "evil": "payload"},
     )
     assert resp.status_code == 400
+
+
+async def test_register_auto_creates_identity(client, app):
+    """Registration should auto-register a cryptographic identity."""
+    resp = await client.post(
+        "/v1/register",
+        json={"agent_id": "identity-agent"},
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["identity_registered"] is True
+    assert "public_key" in data
+    assert len(data["public_key"]) > 0
+
+
+async def test_register_includes_next_steps(client):
+    """Registration response should include next_steps guidance."""
+    resp = await client.post(
+        "/v1/register",
+        json={"agent_id": "nextsteps-agent"},
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert "next_steps" in data
+    next_steps = data["next_steps"]
+    assert next_steps["onboarding"] == "/v1/onboarding"
+    assert next_steps["docs"] == "/docs"
+    assert next_steps["pricing"] == "/v1/pricing"
+
+
+async def test_register_identity_failure_still_succeeds(client, app):
+    """If identity auto-registration fails, registration still succeeds."""
+    original = app.state.ctx.identity_api.register_agent
+
+    async def _broken(*args, **kwargs):
+        raise RuntimeError("identity backend down")
+
+    app.state.ctx.identity_api.register_agent = _broken
+    try:
+        resp = await client.post(
+            "/v1/register",
+            json={"agent_id": "broken-identity-agent"},
+        )
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["identity_registered"] is False
+        assert "next_steps" in data
+    finally:
+        app.state.ctx.identity_api.register_agent = original

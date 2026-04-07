@@ -5,7 +5,7 @@
   "tiers": {
     "free": {
       "rate_limit_per_hour": 100,
-      "cost_per_call": 0,
+      "cost_per_call": 0.001,
       "audit_log_retention_days": null,
       "support_level": "none",
       "burst_allowance": 10,
