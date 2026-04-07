@@ -117,9 +117,9 @@ Optional:
   --dry-run                Prepare release branch but don't push or deploy
   --skip-ci                Skip waiting for CI (deploy immediately)
   --skip-deploy            Create release branch but don't trigger deploy
-  --publish                Publish packages after deploy (pypi + npm + docker)
-  --publish-pypi           Publish only the Python SDK to PyPI
-  --publish-npm            Publish only the TypeScript SDK to npm
+  --publish                Publish Docker image after deploy
+  --publish-pypi           (deprecated — now via GitHub Actions on tag push)
+  --publish-npm            (deprecated — now via GitHub Actions on tag push)
   --publish-docker         Publish only the Docker image to Docker Hub
   --ci-timeout <seconds>   Max time to wait for CI (default: 600)
   --deploy-timeout <secs>  Max time to wait for deploy (default: 600)
@@ -165,13 +165,21 @@ case "$COMPONENT" in
     *) err "Invalid component: '$COMPONENT'. Must be: a2a-gateway, a2a-website, or all" ;;
 esac
 
-# Resolve --publish umbrella flag early (needed for publish-only detection)
+# Deprecate --publish-pypi and --publish-npm (now handled by .github/workflows/publish.yml on tag push)
+if [[ "$PUBLISH_PYPI" == true ]]; then
+    warn "--publish-pypi is deprecated: PyPI publishing is now triggered automatically via GitHub Actions when the version tag is pushed."
+    PUBLISH_PYPI=false
+fi
+if [[ "$PUBLISH_NPM" == true ]]; then
+    warn "--publish-npm is deprecated: npm publishing is now triggered automatically via GitHub Actions when the version tag is pushed."
+    PUBLISH_NPM=false
+fi
+
+# Resolve --publish umbrella flag (now only enables Docker)
 if [[ "$PUBLISH" == true ]]; then
-    PUBLISH_PYPI=true
-    PUBLISH_NPM=true
     PUBLISH_DOCKER=true
 fi
-WANT_PUBLISH=$([[ "$PUBLISH_PYPI" == true || "$PUBLISH_NPM" == true || "$PUBLISH_DOCKER" == true ]] && echo true || echo false)
+WANT_PUBLISH=$([[ "$PUBLISH_DOCKER" == true ]] && echo true || echo false)
 
 # Default SHA to HEAD
 if [[ -z "$SHA" ]]; then
@@ -637,6 +645,8 @@ header "Step 10: Tag release"
 git -C "$REPO_ROOT" tag -a "v${VERSION}" -m "Release v${VERSION}" "$RELEASE_SHA"
 git -C "$REPO_ROOT" push origin "v${VERSION}"
 log "Created and pushed tag v${VERSION}"
+info "Tag v${VERSION} pushed — PyPI + npm publish triggered via GitHub Actions"
+info "Monitor: gh run list --workflow Publish --limit 1"
 
 # ---------------------------------------------------------------------------
 # Step 11: Update main with release
@@ -669,64 +679,21 @@ fi  # end of PUBLISH_ONLY == false guard (steps 1–11)
 # Step 12: Publish packages (optional)
 # ---------------------------------------------------------------------------
 
-if [[ "$PUBLISH_PYPI" == true || "$PUBLISH_NPM" == true || "$PUBLISH_DOCKER" == true ]]; then
-    header "Step 12: Publish packages"
+if [[ "$PUBLISH_DOCKER" == true ]]; then
+    header "Step 12: Publish Docker image"
 fi
 
+# NOTE: PyPI and npm publishing is now handled by .github/workflows/publish.yml
+# triggered automatically by the version tag push in step 10.
+
 # Pre-flight checks for publish targets
-if [[ "$PUBLISH_NPM" == true ]] && ! command -v npm &>/dev/null; then
-    warn "npm not found — skipping npm publish"
-    PUBLISH_NPM=false
-fi
 if [[ "$PUBLISH_DOCKER" == true ]] && ! command -v docker &>/dev/null; then
     warn "docker not found — skipping Docker publish"
     PUBLISH_DOCKER=false
 fi
 
-# Track publish failures so one target doesn't block the others
+# Track publish failures
 PUBLISH_FAILURES=0
-
-# --- PyPI ---
-if [[ "$PUBLISH_PYPI" == true ]]; then
-    info "Publishing a2a-greenhelix-sdk to PyPI..."
-    if [[ -z "${PYPI_DEPLOYMENT_TOKEN:-}" ]]; then
-        warn "PYPI_DEPLOYMENT_TOKEN not set — skipping PyPI publish"
-    elif (
-        cd "$REPO_ROOT/sdk"
-        pip install --quiet build twine 2>/dev/null
-        python -m build --sdist --wheel --outdir "$REPO_ROOT/dist/pypi/"
-        python -m twine upload \
-            --non-interactive \
-            --username __token__ \
-            --password "$PYPI_DEPLOYMENT_TOKEN" \
-            "$REPO_ROOT/dist/pypi/"*
-    ); then
-        log "Published a2a-greenhelix-sdk==${VERSION} to PyPI"
-    else
-        warn "PyPI publish failed (exit $?) — continuing with other targets"
-        PUBLISH_FAILURES=$((PUBLISH_FAILURES + 1))
-    fi
-fi
-
-# --- npm ---
-if [[ "$PUBLISH_NPM" == true ]]; then
-    info "Publishing @greenhelix/sdk to npm..."
-    if [[ -z "${NPM_DEPLOYMENT_TOKEN:-}" ]]; then
-        warn "NPM_DEPLOYMENT_TOKEN not set — skipping npm publish"
-    elif (
-        cd "$REPO_ROOT/sdk-ts"
-        npm install --ignore-scripts 2>/dev/null
-        npm run build
-        echo "//registry.npmjs.org/:_authToken=${NPM_DEPLOYMENT_TOKEN}" > .npmrc
-        npm publish --access public
-        rm -f .npmrc
-    ); then
-        log "Published @greenhelix/sdk@${VERSION} to npm"
-    else
-        warn "npm publish failed (exit $?) — continuing with other targets"
-        PUBLISH_FAILURES=$((PUBLISH_FAILURES + 1))
-    fi
-fi
 
 # --- Docker ---
 if [[ "$PUBLISH_DOCKER" == true ]]; then
@@ -753,46 +720,15 @@ if (( PUBLISH_FAILURES > 0 )); then
 fi
 
 # ---------------------------------------------------------------------------
-# Step 13: Post-publish smoke tests
+# Step 13: Post-publish smoke tests (Docker only; PyPI/npm verified by publish.yml)
 # ---------------------------------------------------------------------------
 
 VERIFY_FAILURES=0
 
-if [[ "$PUBLISH_PYPI" == true || "$PUBLISH_NPM" == true || "$PUBLISH_DOCKER" == true ]]; then
-    header "Step 13: Post-publish verification"
-    info "Waiting 30s for registries to propagate..."
+if [[ "$PUBLISH_DOCKER" == true ]]; then
+    header "Step 13: Post-publish verification (Docker)"
+    info "Waiting 30s for Docker Hub to propagate..."
     sleep 30
-fi
-
-# --- Verify PyPI ---
-if [[ "$PUBLISH_PYPI" == true ]]; then
-    info "Verifying a2a-greenhelix-sdk==${VERSION} on PyPI..."
-    VERIFY_VENV=$(mktemp -d)/venv
-    if python3 -m venv "$VERIFY_VENV" && \
-       "$VERIFY_VENV/bin/pip" install --quiet "a2a-greenhelix-sdk==${VERSION}" 2>/dev/null && \
-       "$VERIFY_VENV/bin/python" -c "from a2a_client import A2AClient; print('import OK')" 2>/dev/null; then
-        log "PyPI: a2a-greenhelix-sdk==${VERSION} installs and imports OK"
-    else
-        warn "PyPI: a2a-greenhelix-sdk==${VERSION} verification FAILED"
-        VERIFY_FAILURES=$((VERIFY_FAILURES + 1))
-    fi
-    rm -rf "$(dirname "$VERIFY_VENV")"
-fi
-
-# --- Verify npm ---
-if [[ "$PUBLISH_NPM" == true ]]; then
-    info "Verifying @greenhelix/sdk@${VERSION} on npm..."
-    VERIFY_NPM_DIR=$(mktemp -d)
-    if (cd "$VERIFY_NPM_DIR" && \
-        npm init -y --silent 2>/dev/null && \
-        npm install "@greenhelix/sdk@${VERSION}" --silent 2>/dev/null && \
-        node -e "const { A2AClient } = require('@greenhelix/sdk'); console.log('import OK')" 2>/dev/null); then
-        log "npm: @greenhelix/sdk@${VERSION} installs and imports OK"
-    else
-        warn "npm: @greenhelix/sdk@${VERSION} verification FAILED"
-        VERIFY_FAILURES=$((VERIFY_FAILURES + 1))
-    fi
-    rm -rf "$VERIFY_NPM_DIR"
 fi
 
 # --- Verify Docker ---
@@ -831,14 +767,12 @@ if [[ "$PUBLISH_ONLY" == false ]]; then
 fi
 log "Component:  ${COMPONENT}"
 if [[ "$WANT_PUBLISH" == true ]]; then
-    published=""
-    [[ "$PUBLISH_PYPI" == true ]] && published+="pypi "
-    [[ "$PUBLISH_NPM" == true ]] && published+="npm "
-    [[ "$PUBLISH_DOCKER" == true ]] && published+="docker "
-    log "Published:  ${published:-none}"
+    [[ "$PUBLISH_DOCKER" == true ]] && log "Published:  docker"
 fi
+log "SDK publish: PyPI + npm triggered via GitHub Actions (publish.yml)"
+log "Monitor:     gh run list --workflow Publish --limit 1"
 if (( ${PUBLISH_FAILURES:-0} > 0 )); then
-    warn "Some publish targets failed — re-run with --skip-ci --skip-deploy --publish-<target>"
+    warn "Some publish targets failed — re-run with --skip-ci --skip-deploy --publish-docker"
 fi
 if (( ${VERIFY_FAILURES:-0} > 0 )); then
     warn "Some post-publish verifications failed — check packages manually!"
@@ -846,4 +780,5 @@ fi
 echo ""
 info "Next steps:"
 info "  - Verify production: curl -sf https://api.greenhelix.net/v1/health"
+info "  - Verify SDK publish: gh run list --workflow Publish --limit 1"
 echo ""
