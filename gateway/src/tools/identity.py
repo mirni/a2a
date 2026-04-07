@@ -149,8 +149,8 @@ async def _create_org(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]
 
     db = ctx.identity_api.storage.db
     await db.execute(
-        "INSERT INTO orgs (id, name, owner_agent_id, created_at) VALUES (?, ?, ?, ?)",
-        (org_id, org_name, owner_agent_id, now),
+        "INSERT INTO orgs (id, name, owner_agent_id, created_at, metadata) VALUES (?, ?, ?, ?, ?)",
+        (org_id, org_name, owner_agent_id, now, "{}"),
     )
     # Auto-add the owner as a member with role='owner'
     if owner_agent_id:

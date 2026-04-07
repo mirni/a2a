@@ -84,11 +84,11 @@ async def test_refund_settled_intent_creates_reverse_transfer(client, api_key, a
     assert body["status"] == "refunded"
     assert float(body["amount"]) == 100.0
 
-    # Payee should have been debited and payer credited
-    # Audit H3: refund also restores the create_intent gateway fee (2% of 100.0 = 2.0)
+    # Payee should have been debited and payer credited the intent amount only.
+    # Audit H-REF: gateway fee (2% of 100.0 = 2.0) is non-refundable.
     payee_after = await ctx.tracker.get_balance("ri-payee")
     payer_after = await ctx.tracker.get_balance("test-agent")
-    assert payer_after == payer_before + 100.0 + 2.0
+    assert payer_after == payer_before + 100.0
     assert payee_after == payee_before - 100.0
 
 

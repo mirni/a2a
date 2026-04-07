@@ -524,3 +524,92 @@ class TestAtomicTransactionIsolation:
 
         source = inspect.getsource(StorageBackend.atomic_debit_strict)
         assert "BEGIN IMMEDIATE" in source
+
+
+# ---------------------------------------------------------------------------
+# H-REF: Refund must NOT credit back the gateway fee
+# ---------------------------------------------------------------------------
+
+
+class TestRefundNoFeeCredit:
+    """H-REF: refund_intent should restore only the intent amount, not the gateway fee.
+
+    The gateway fee is a one-time charge at create_intent time. Refund should
+    not double-credit it back to the payer.
+    """
+
+    async def test_refund_source_has_no_credit_gateway_fee(self):
+        """The _refund_intent function must not call _credit_gateway_fee for settled intents."""
+        import inspect
+
+        from gateway.src.tools.payments import _refund_intent
+
+        source = inspect.getsource(_refund_intent)
+        # The settled-path refund should not credit the gateway fee
+        # Count occurrences: should be 0 in the refund code (only the helper def)
+        # The helper _credit_gateway_fee is defined but should never be called
+        assert "_credit_gateway_fee()" not in source, (
+            "refund_intent must not call _credit_gateway_fee() — "
+            "gateway fee is a one-time charge, not refundable"
+        )
+
+    async def test_void_source_has_no_credit_gateway_fee(self):
+        """Voiding a pending intent must also not credit back the fee."""
+        import inspect
+
+        from gateway.src.tools.payments import _refund_intent
+
+        source = inspect.getsource(_refund_intent)
+        # The function definition of _credit_gateway_fee may exist as a local,
+        # but it must never be awaited/called
+        lines = [ln.strip() for ln in source.splitlines()]
+        call_lines = [ln for ln in lines if "await _credit_gateway_fee()" in ln and not ln.startswith("#")]
+        assert len(call_lines) == 0, (
+            f"Found {len(call_lines)} call(s) to _credit_gateway_fee(); expected 0"
+        )
+
+
+# ---------------------------------------------------------------------------
+# M3: Identity org creation must include metadata column
+# ---------------------------------------------------------------------------
+
+
+class TestIdentityOrgInsert:
+    """M3: _create_org INSERT must include the metadata column."""
+
+    def test_create_org_includes_metadata_column(self):
+        import inspect
+
+        from gateway.src.tools.identity import _create_org
+
+        source = inspect.getsource(_create_org)
+        assert "metadata" in source.lower(), (
+            "_create_org INSERT must include the metadata column"
+        )
+        # Specifically, the INSERT statement should have 5 columns not 4
+        assert "VALUES (?, ?, ?, ?, ?)" in source, (
+            "_create_org INSERT should have 5 placeholders (id, name, owner, created_at, metadata)"
+        )
+
+
+# ---------------------------------------------------------------------------
+# M2: Messaging negotiation column allowlist must match schema
+# ---------------------------------------------------------------------------
+
+
+class TestMessagingNegotiationColumns:
+    """M2: _NEGOTIATION_COLUMNS must only contain columns that exist in the schema."""
+
+    def test_no_phantom_columns(self):
+        from products.messaging.src.storage import MessageStorage
+
+        # These columns exist in the negotiations table schema
+        valid_columns = {
+            "id", "thread_id", "initiator", "responder",
+            "proposed_amount", "current_amount", "status",
+            "service_id", "expires_at", "created_at", "updated_at",
+        }
+        for col in MessageStorage._NEGOTIATION_COLUMNS:
+            assert col in valid_columns, (
+                f"_NEGOTIATION_COLUMNS contains '{col}' which is not in the negotiations schema"
+            )
