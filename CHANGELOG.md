@@ -1,5 +1,37 @@
 # Changelog
 
+# Release v1.1.1
+
+**Date:** 2026-04-07
+**Commit:** a28ef9b0
+**Previous:** v1.1.0
+
+## Changes
+
+### Bug Fixes
+
+- fix(sdk): add missing pydantic dep, add post-publish smoke tests (#71) (`bc757bb`)
+- fix(sdk-ts): sync package-lock.json name with package.json (@greenhelix/sdk) (`621879d`)
+- fix(website): sync docs.html version with catalog (1.1.0) (`8f19eda`)
+
+### Other
+
+- ci: stop running CI on push to main (redundant) (`a28ef9b`)
+- Merge release v1.1.0 into main (`36d10d2`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 1.1.1 |
+| a2a-db-backup | 1.1.1 |
+| a2a-gateway | 1.1.1 |
+| a2a-gateway-sandbox | 1.1.1 |
+| a2a-gateway-test | 1.1.1 |
+| a2a-website | 1.1.1 |
+---
+
+
 # Release v1.1.0
 
 **Date:** 2026-04-07
