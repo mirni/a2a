@@ -753,7 +753,67 @@ if (( PUBLISH_FAILURES > 0 )); then
 fi
 
 # ---------------------------------------------------------------------------
-# Step 13: Summary
+# Step 13: Post-publish smoke tests
+# ---------------------------------------------------------------------------
+
+VERIFY_FAILURES=0
+
+if [[ "$PUBLISH_PYPI" == true || "$PUBLISH_NPM" == true || "$PUBLISH_DOCKER" == true ]]; then
+    header "Step 13: Post-publish verification"
+    info "Waiting 30s for registries to propagate..."
+    sleep 30
+fi
+
+# --- Verify PyPI ---
+if [[ "$PUBLISH_PYPI" == true ]]; then
+    info "Verifying a2a-greenhelix-sdk==${VERSION} on PyPI..."
+    VERIFY_VENV=$(mktemp -d)/venv
+    if python3 -m venv "$VERIFY_VENV" && \
+       "$VERIFY_VENV/bin/pip" install --quiet "a2a-greenhelix-sdk==${VERSION}" 2>/dev/null && \
+       "$VERIFY_VENV/bin/python" -c "from a2a_client import A2AClient; print('import OK')" 2>/dev/null; then
+        log "PyPI: a2a-greenhelix-sdk==${VERSION} installs and imports OK"
+    else
+        warn "PyPI: a2a-greenhelix-sdk==${VERSION} verification FAILED"
+        VERIFY_FAILURES=$((VERIFY_FAILURES + 1))
+    fi
+    rm -rf "$(dirname "$VERIFY_VENV")"
+fi
+
+# --- Verify npm ---
+if [[ "$PUBLISH_NPM" == true ]]; then
+    info "Verifying @greenhelix/sdk@${VERSION} on npm..."
+    VERIFY_NPM_DIR=$(mktemp -d)
+    if (cd "$VERIFY_NPM_DIR" && \
+        npm init -y --silent 2>/dev/null && \
+        npm install "@greenhelix/sdk@${VERSION}" --silent 2>/dev/null && \
+        node -e "const { A2AClient } = require('@greenhelix/sdk'); console.log('import OK')" 2>/dev/null); then
+        log "npm: @greenhelix/sdk@${VERSION} installs and imports OK"
+    else
+        warn "npm: @greenhelix/sdk@${VERSION} verification FAILED"
+        VERIFY_FAILURES=$((VERIFY_FAILURES + 1))
+    fi
+    rm -rf "$VERIFY_NPM_DIR"
+fi
+
+# --- Verify Docker ---
+if [[ "$PUBLISH_DOCKER" == true ]] && command -v docker &>/dev/null; then
+    info "Verifying greenhelix/a2a-gateway:${VERSION} on Docker Hub..."
+    if docker pull "greenhelix/a2a-gateway:${VERSION}" >/dev/null 2>&1 && \
+       docker run --rm "greenhelix/a2a-gateway:${VERSION}" \
+           python -c "from gateway.src._version import __version__; assert __version__ == '${VERSION}'; print('version OK')" 2>/dev/null; then
+        log "Docker: greenhelix/a2a-gateway:${VERSION} pulls and runs OK"
+    else
+        warn "Docker: greenhelix/a2a-gateway:${VERSION} verification FAILED"
+        VERIFY_FAILURES=$((VERIFY_FAILURES + 1))
+    fi
+fi
+
+if (( VERIFY_FAILURES > 0 )); then
+    warn "${VERIFY_FAILURES} post-publish verification(s) failed — packages may be broken!"
+fi
+
+# ---------------------------------------------------------------------------
+# Step 14: Summary
 # ---------------------------------------------------------------------------
 
 if [[ "$PUBLISH_ONLY" == true ]]; then
@@ -779,6 +839,9 @@ if [[ "$WANT_PUBLISH" == true ]]; then
 fi
 if (( ${PUBLISH_FAILURES:-0} > 0 )); then
     warn "Some publish targets failed — re-run with --skip-ci --skip-deploy --publish-<target>"
+fi
+if (( ${VERIFY_FAILURES:-0} > 0 )); then
+    warn "Some post-publish verifications failed — check packages manually!"
 fi
 echo ""
 info "Next steps:"
