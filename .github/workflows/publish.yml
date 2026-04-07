@@ -1,7 +1,8 @@
 # =============================================================================
 # A2A Commerce Platform — Publish SDKs to PyPI + npm
 # =============================================================================
-# Triggered by version tags pushed by release.sh (step 10).
+# Triggered by version tags pushed by release.sh (step 10), or manually via:
+#   gh workflow run Publish -f version=1.2.3
 # Uses trusted publishing (OIDC) for PyPI and a granular access token for npm.
 #
 # Setup required (one-time, manual):
@@ -26,6 +27,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g. 1.2.3) — tag v<version> must exist'
+        required: true
+        type: string
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -36,14 +43,20 @@ jobs:
     outputs:
       version: ${{ steps.extract.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Extract version from tag
+      - name: Extract version
         id: extract
         run: |
-          TAG="${GITHUB_REF#refs/tags/v}"
-          echo "version=$TAG" >> "$GITHUB_OUTPUT"
-          echo "Tag version: $TAG"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ steps.extract.outputs.version }}
 
       - name: Verify sdk/pyproject.toml version
         run: |
@@ -82,6 +95,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.validate.outputs.version }}
 
       - uses: actions/setup-python@v5
         with:
@@ -110,6 +125,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.validate.outputs.version }}
 
       - uses: actions/setup-node@v4
         with:
