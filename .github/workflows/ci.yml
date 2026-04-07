@@ -119,7 +119,7 @@ jobs:
         run: |
           python -m pytest $SHARD_FILES \
             -x -q --tb=short \
-            --cov=gateway \
+            --cov=gateway/src \
             --cov-report=xml:coverage-gateway-${{ matrix.shard }}.xml \
             --cov-report=term-missing
 
