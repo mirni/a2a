@@ -55,12 +55,11 @@ _SERVICES = [
 ]
 
 
-@router.get("/.well-known/agent-card.json", include_in_schema=False)
-async def agent_card(request: Request) -> JSONResponse:
-    """Return A2A protocol agent card for service discovery."""
+def _build_agent_card(request: Request) -> dict:
+    """Build the agent card payload."""
     base_url = os.environ.get("A2A_BASE_URL", str(request.base_url).rstrip("/"))
 
-    card = {
+    return {
         "name": "A2A Commerce Gateway",
         "description": "Agent-to-agent commerce infrastructure: billing, payments, escrow, marketplace, identity, messaging, and trust scoring",
         "url": base_url,
@@ -90,4 +89,14 @@ async def agent_card(request: Request) -> JSONResponse:
         "defaultOutputModes": ["application/json"],
     }
 
-    return JSONResponse(card)
+
+@router.get("/.well-known/agent.json", include_in_schema=False)
+async def agent_json(request: Request) -> JSONResponse:
+    """Return A2A protocol agent card at the standard well-known path."""
+    return JSONResponse(_build_agent_card(request))
+
+
+@router.get("/.well-known/agent-card.json", include_in_schema=False)
+async def agent_card(request: Request) -> JSONResponse:
+    """Return A2A protocol agent card (legacy path)."""
+    return JSONResponse(_build_agent_card(request))

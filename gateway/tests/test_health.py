@@ -240,3 +240,39 @@ async def test_agent_card_includes_auth_info(client):
     data = resp.json()
     assert "authentication" in data
     assert data["authentication"]["schemes"] is not None
+
+
+# ---------------------------------------------------------------------------
+# /.well-known/agent.json (A2A standard path)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_agent_json_returns_valid_json(client):
+    """/.well-known/agent.json (A2A standard path) must return valid agent card."""
+    resp = await client.get("/.well-known/agent.json")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
+    data = resp.json()
+    assert data["name"] == "A2A Commerce Gateway"
+    assert "url" in data
+    assert "version" in data
+    assert "capabilities" in data
+    assert "skills" in data
+    assert isinstance(data["skills"], list)
+    assert len(data["skills"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_agent_json_no_auth_required(client):
+    """/.well-known/agent.json must be accessible without authentication."""
+    resp = await client.get("/.well-known/agent.json")
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_agent_json_matches_agent_card(client):
+    """/.well-known/agent.json and agent-card.json must return identical data."""
+    resp_card = await client.get("/.well-known/agent-card.json")
+    resp_json = await client.get("/.well-known/agent.json")
+    assert resp_card.json() == resp_json.json()
