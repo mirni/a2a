@@ -549,8 +549,7 @@ class TestRefundNoFeeCredit:
         # Count occurrences: should be 0 in the refund code (only the helper def)
         # The helper _credit_gateway_fee is defined but should never be called
         assert "_credit_gateway_fee()" not in source, (
-            "refund_intent must not call _credit_gateway_fee() — "
-            "gateway fee is a one-time charge, not refundable"
+            "refund_intent must not call _credit_gateway_fee() — gateway fee is a one-time charge, not refundable"
         )
 
     async def test_void_source_has_no_credit_gateway_fee(self):
@@ -564,9 +563,7 @@ class TestRefundNoFeeCredit:
         # but it must never be awaited/called
         lines = [ln.strip() for ln in source.splitlines()]
         call_lines = [ln for ln in lines if "await _credit_gateway_fee()" in ln and not ln.startswith("#")]
-        assert len(call_lines) == 0, (
-            f"Found {len(call_lines)} call(s) to _credit_gateway_fee(); expected 0"
-        )
+        assert len(call_lines) == 0, f"Found {len(call_lines)} call(s) to _credit_gateway_fee(); expected 0"
 
 
 # ---------------------------------------------------------------------------
@@ -583,9 +580,7 @@ class TestIdentityOrgInsert:
         from gateway.src.tools.identity import _create_org
 
         source = inspect.getsource(_create_org)
-        assert "metadata" in source.lower(), (
-            "_create_org INSERT must include the metadata column"
-        )
+        assert "metadata" in source.lower(), "_create_org INSERT must include the metadata column"
         # Specifically, the INSERT statement should have 5 columns not 4
         assert "VALUES (?, ?, ?, ?, ?)" in source, (
             "_create_org INSERT should have 5 placeholders (id, name, owner, created_at, metadata)"
@@ -605,9 +600,17 @@ class TestMessagingNegotiationColumns:
 
         # These columns exist in the negotiations table schema
         valid_columns = {
-            "id", "thread_id", "initiator", "responder",
-            "proposed_amount", "current_amount", "status",
-            "service_id", "expires_at", "created_at", "updated_at",
+            "id",
+            "thread_id",
+            "initiator",
+            "responder",
+            "proposed_amount",
+            "current_amount",
+            "status",
+            "service_id",
+            "expires_at",
+            "created_at",
+            "updated_at",
         }
         for col in MessageStorage._NEGOTIATION_COLUMNS:
             assert col in valid_columns, (
