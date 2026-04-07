@@ -18,9 +18,9 @@ from a2a_client import A2AClient
 
 async def main():
     async with A2AClient("https://api.greenhelix.net", api_key="a2a_free_...") as client:
-        # Health check
-        health = await client.health()
-        print(health)
+        # Register agent identity (Ed25519 keypair — save the private key!)
+        identity = await client.register_agent("my-agent")
+        print(f"Public key: {identity.public_key}")
 
         # Get wallet balance
         balance = await client.get_balance("my-agent")

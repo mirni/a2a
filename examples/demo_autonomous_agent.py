@@ -1,11 +1,12 @@
-"""Demo: Autonomous Agent — full loop: discover, pay, execute, verify.
+"""Demo: Autonomous Agent — full loop: register, discover, pay, execute, verify.
 
 Demonstrates an autonomous agent that:
-1. Discovers services in the marketplace
-2. Checks its wallet balance
-3. Creates payment intents for services
-4. Executes tool calls via the gateway
-5. Verifies results and tracks spending
+1. Registers its cryptographic identity
+2. Discovers services in the marketplace
+3. Checks its wallet balance
+4. Creates payment intents for services
+5. Executes tool calls via the gateway
+6. Verifies results and tracks spending
 
 Usage:
     # Start the gateway first:
@@ -48,8 +49,23 @@ async def main() -> None:
         print("  Autonomous Agent Demo")
         print("=" * 60)
 
-        # Phase 1: Discovery
-        print("\n--- Phase 1: Discovery ---")
+        # Phase 1: Identity Registration
+        print("\n--- Phase 1: Identity Registration ---")
+        try:
+            identity = await client.register_agent(agent_id)
+            print(f"Registered: {identity.agent_id}")
+            print(f"Public key: {identity.public_key[:16]}...")
+            print("(Save the private key returned on first registration!)")
+        except A2AError as e:
+            if "already exists" in str(e.message).lower():
+                print(f"Agent {agent_id} already registered")
+                identity_info = await client.get_agent_identity(agent_id)
+                print(f"Public key: {identity_info.public_key[:16]}...")
+            else:
+                raise
+
+        # Phase 2: Discovery
+        print("\n--- Phase 2: Discovery ---")
         health = await client.health()
         print(f"Gateway: {health.status} (v{health.version}, {health.tools} tools)")
 
@@ -58,8 +74,8 @@ async def main() -> None:
         paid_tools = [t for t in tools if t.pricing.get("per_call", 0) > 0]
         print(f"Free tools: {len(free_tools)}, Paid tools: {len(paid_tools)}")
 
-        # Phase 2: Budget Assessment
-        print("\n--- Phase 2: Budget Assessment ---")
+        # Phase 3: Budget Assessment
+        print("\n--- Phase 3: Budget Assessment ---")
         try:
             balance = await client.get_balance(agent_id)
             print(f"Wallet balance: {balance} credits")
@@ -71,8 +87,8 @@ async def main() -> None:
         print(f"Estimated cost for all paid tools: {total_cost_estimate} credits")
         print(f"Budget sufficient: {balance >= total_cost_estimate}")
 
-        # Phase 3: Search for services
-        print("\n--- Phase 3: Marketplace Search ---")
+        # Phase 4: Search for services
+        print("\n--- Phase 4: Marketplace Search ---")
         services = await client.search_services()
         print(f"Marketplace services: {len(services)}")
 
@@ -82,8 +98,8 @@ async def main() -> None:
             svc = m["service"]
             print(f"  [{m['rank_score']:.2f}] {svc['name']}: {svc['description']}")
 
-        # Phase 4: Execute operations
-        print("\n--- Phase 4: Execute Operations ---")
+        # Phase 5: Execute operations
+        print("\n--- Phase 5: Execute Operations ---")
 
         # 4a: Get usage summary
         try:
@@ -109,8 +125,8 @@ async def main() -> None:
         except A2AError as e:
             print(f"Payment flow: {e.message}")
 
-        # Phase 5: Verify
-        print("\n--- Phase 5: Verification ---")
+        # Phase 6: Verify
+        print("\n--- Phase 6: Verification ---")
         try:
             final_balance = await client.get_balance(agent_id)
             print(f"Final balance: {final_balance} credits")
