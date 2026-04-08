@@ -45,9 +45,12 @@ jobs:
     steps:
       - name: Extract version
         id: extract
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            VERSION="${{ inputs.version }}"
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            VERSION="$INPUT_VERSION"
           else
             VERSION="${GITHUB_REF#refs/tags/v}"
           fi
@@ -59,8 +62,9 @@ jobs:
           ref: v${{ steps.extract.outputs.version }}
 
       - name: Verify sdk/pyproject.toml version
+        env:
+          EXPECTED: ${{ steps.extract.outputs.version }}
         run: |
-          EXPECTED="${{ steps.extract.outputs.version }}"
           ACTUAL=$(python3 -c "
           import re, pathlib
           text = pathlib.Path('sdk/pyproject.toml').read_text()
@@ -74,8 +78,9 @@ jobs:
           fi
 
       - name: Verify sdk-ts/package.json version
+        env:
+          EXPECTED: ${{ steps.extract.outputs.version }}
         run: |
-          EXPECTED="${{ steps.extract.outputs.version }}"
           ACTUAL=$(node -p "require('./sdk-ts/package.json').version")
           echo "sdk-ts/package.json version: $ACTUAL (expected: $EXPECTED)"
           if [[ "$ACTUAL" != "$EXPECTED" ]]; then
@@ -164,15 +169,17 @@ jobs:
           node-version: '20'
 
       - name: Verify PyPI package
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
-          VERSION="${{ needs.validate.outputs.version }}"
           python3 -m venv /tmp/verify-venv
           /tmp/verify-venv/bin/pip install --quiet "a2a-greenhelix-sdk==${VERSION}"
           /tmp/verify-venv/bin/python -c "from a2a_client import A2AClient; print('PyPI: import OK')"
 
       - name: Verify npm package
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
-          VERSION="${{ needs.validate.outputs.version }}"
           mkdir /tmp/verify-npm && cd /tmp/verify-npm
           npm init -y --silent
           npm install "@greenhelix/sdk@${VERSION}" --silent
