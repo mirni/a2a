@@ -402,6 +402,22 @@ CI/CD connects to deploy targets via Tailscale mesh VPN:
 
 This avoids exposing SSH on the public internet.
 
+#### Setting up Tailscale OAuth credentials
+
+1. Go to the **Tailscale Admin Console**: https://login.tailscale.com/admin/settings/oauth
+2. Click **Generate OAuth client**
+3. Grant the required scopes:
+   - `devices:read` — allows the CI runner to see the tailnet
+   - `devices:write` — allows the CI runner to register as a device
+   - Optionally add `auth-keys` scope if your workflow generates ephemeral auth keys
+4. Add a **tag** (e.g. `tag:ci`) so the CI runner gets the correct ACL permissions
+5. Copy the credentials and store them as **GitHub repository secrets**:
+   - **Client ID** → `TS_OAUTH_CLIENT_ID`
+   - **Client Secret** → `TS_OAUTH_SECRET`
+6. Also store the Tailscale IP of your deploy target as `TAILSCALE_IP`
+
+The OAuth client does not expire, but the ephemeral auth keys generated per CI run are short-lived and auto-cleaned from the tailnet.
+
 ### 9.2 Staging vs Production URLs
 
 | Environment | URL | Package |
