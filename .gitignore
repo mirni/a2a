@@ -58,6 +58,9 @@ tmp/
 reports/archive/
 reports/customer/
 
+# Mutation testing (mutmut)
+**/mutants/
+
 # Build artifacts
 *.deb
 .pip_packages

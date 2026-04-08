@@ -10,7 +10,7 @@ import logging
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from gateway.src.errors import error_response
 
@@ -24,7 +24,7 @@ class RegisterRequestBody(BaseModel):
 
     model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"agent_id": "my-agent-001"}})
 
-    agent_id: str
+    agent_id: str = Field(min_length=1, max_length=128)
 
 
 @router.post("/v1/register")
