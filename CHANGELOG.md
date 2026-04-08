@@ -1,5 +1,44 @@
 # Changelog
 
+# Release v1.1.2
+
+**Date:** 2026-04-08
+**Commit:** ea2aff07
+**Previous:** v1.1.1
+
+## Changes
+
+### Features
+
+- feat: agent onboarding improvements + contract/mutation testing (#74) (`9e12d2c`)
+- feat(ci): migrate SDK publishing to GitHub Actions trusted publishing (#72) (`20405ea`)
+
+### Bug Fixes
+
+- fix(ci): add workflow_dispatch to publish.yml for manual re-publishing (#73) (`c3105d1`)
+
+### Tests
+
+- feat: agent onboarding improvements + contract/mutation testing (#74) (`9e12d2c`)
+
+### Other
+
+- Update instructions on infra (`ea2aff0`)
+- Merge release v1.1.1 into main (`b940d25`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 1.1.2 |
+| a2a-db-backup | 1.1.2 |
+| a2a-gateway | 1.1.2 |
+| a2a-gateway-sandbox | 1.1.2 |
+| a2a-gateway-test | 1.1.2 |
+| a2a-website | 1.1.2 |
+---
+
+
 # Release v1.1.1
 
 **Date:** 2026-04-07
