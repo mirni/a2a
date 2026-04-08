@@ -20,8 +20,9 @@ const client = new A2AClient({
   apiKey: 'a2a_free_...',
 });
 
-// Health check
-const health = await client.health();
+// Register agent identity (Ed25519 keypair — save the private key!)
+const identity = await client.registerAgent('my-agent', 'My Trading Bot');
+console.log(`Public key: ${identity.public_key}`);
 
 // Get wallet balance
 const balance = await client.getBalance('my-agent');
