@@ -136,6 +136,26 @@ async def test_register_includes_next_steps(client):
     assert next_steps["pricing"] == "/v1/pricing"
 
 
+async def test_register_long_agent_id_rejected(client):
+    """Agent IDs longer than 128 characters should be rejected."""
+    long_id = "a" * 129
+    resp = await client.post(
+        "/v1/register",
+        json={"agent_id": long_id},
+    )
+    assert resp.status_code == 400
+
+
+async def test_register_max_length_agent_id_accepted(client):
+    """Agent IDs exactly 128 characters should be accepted."""
+    max_id = "b" * 128
+    resp = await client.post(
+        "/v1/register",
+        json={"agent_id": max_id},
+    )
+    assert resp.status_code == 201
+
+
 async def test_register_identity_failure_still_succeeds(client, app):
     """If identity auto-registration fails, registration still succeeds."""
     original = app.state.ctx.identity_api.register_agent

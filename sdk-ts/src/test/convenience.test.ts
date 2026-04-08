@@ -331,11 +331,10 @@ describe("Webhook convenience methods", () => {
     assert.equal(result.active, true);
   });
 
-  it("listWebhooks calls list_webhooks with agent_id", async () => {
+  it("listWebhooks calls list_webhooks (agent filtered by auth)", async () => {
     executeResult = { webhooks: [{ id: "wh-1" }, { id: "wh-2" }] };
-    const result: WebhookListResponse = await client().listWebhooks("agent-1");
+    const result: WebhookListResponse = await client().listWebhooks();
     assert.equal(lastExecuteCall?.tool, "list_webhooks");
-    assert.equal(lastExecuteCall?.params.agent_id, "agent-1");
     assert.equal(result.webhooks.length, 2);
   });
 

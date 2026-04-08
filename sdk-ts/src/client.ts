@@ -88,6 +88,7 @@ export class A2AClient {
     method: string,
     path: string,
     body?: unknown,
+    extraHeaders?: Record<string, string>,
   ): Promise<Response> {
     let lastResponse: Response | undefined;
 
@@ -98,7 +99,7 @@ export class A2AClient {
       try {
         const resp = await fetch(`${this.baseUrl}${path}`, {
           method,
-          headers: this.headers(),
+          headers: { ...this.headers(), ...extraHeaders },
           body: body !== undefined ? JSON.stringify(body) : undefined,
           signal: controller.signal,
         });
@@ -149,7 +150,7 @@ export class A2AClient {
   private async rest(
     method: string,
     path: string,
-    options: { body?: unknown; params?: Record<string, any> } = {},
+    options: { body?: unknown; params?: Record<string, any>; headers?: Record<string, string> } = {},
   ): Promise<any> {
     let url = path;
     if (options.params) {
@@ -163,7 +164,7 @@ export class A2AClient {
         url = `${path}?${qs}`;
       }
     }
-    const resp = await this.request(method, url, options.body);
+    const resp = await this.request(method, url, options.body, options.headers);
     const data = await resp.json();
     if (!resp.ok) raiseForStatus(resp.status, data);
     return data;
@@ -243,8 +244,8 @@ export class A2AClient {
     return this.rest("GET", `/v1/billing/wallets/${agentId}/balance`);
   }
 
-  /** Deposit credits into a wallet. Returns new balance. */
-  async deposit(agentId: string, amount: number, description = ""): Promise<number> {
+  /** Deposit credits into a wallet. Returns new balance (string, monetary). */
+  async deposit(agentId: string, amount: number, description = ""): Promise<string> {
     const r = await this.rest("POST", `/v1/billing/wallets/${agentId}/deposit`, {
       body: { amount, description },
     });
@@ -269,9 +270,10 @@ export class A2AClient {
     description = "",
     idempotencyKey?: string,
   ): Promise<PaymentIntent> {
-    // Note: idempotency key should be a header, but we keep it simple here
+    const headers = idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined;
     return this.rest("POST", "/v1/payments/intents", {
       body: { payer, payee, amount, description },
+      headers,
     });
   }
 
@@ -563,8 +565,8 @@ export class A2AClient {
     return this.rest("POST", "/v1/infra/webhooks", { body });
   }
 
-  /** List all registered webhooks for an agent. */
-  async listWebhooks(agentId: string): Promise<WebhookListResponse> {
+  /** List all registered webhooks for the authenticated agent. */
+  async listWebhooks(): Promise<WebhookListResponse> {
     return this.rest("GET", "/v1/infra/webhooks");
   }
 
