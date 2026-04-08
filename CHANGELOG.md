@@ -1,5 +1,54 @@
 # Changelog
 
+# Release v1.1.3
+
+**Date:** 2026-04-08
+**Commit:** 225438fe
+**Previous:** v1.1.2
+
+## Changes
+
+### Features
+
+- feat: add /.well-known/agent.json (A2A standard discovery path) (`bdd0761`)
+- feat: onboarding improvements + contract/mutation testing setup (`1bc96af`)
+
+### Bug Fixes
+
+- Merge pull request #75 from mirni/feat/onboarding-and-findings (`225438f`)
+- fix: sync website/docs.html with catalog v1.1.2 (`33dc83a`)
+- fix: remediate SDK audit findings (4 bugs) (`7fdb7f4`)
+- fix(ci): reset coverage baseline and remove bad coverage config (`c51202a`)
+- fix(ci): exclude test files from coverage measurement (`5dce47a`)
+- fix(ci): measure coverage on gateway/src only, not gateway/tests (`761a473`)
+
+### Tests
+
+- fix(ci): exclude test files from coverage measurement (`5dce47a`)
+
+### Chores
+
+- chore: update task files with completion status (`80a7f25`)
+
+### Other
+
+- Merge branch 'main' into feat/onboarding-and-findings (`1f25286`)
+- Merge release v1.1.2 into main (`d6ec259`)
+- style: format test_contract_models.py with ruff (`7293edd`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 1.1.3 |
+| a2a-db-backup | 1.1.3 |
+| a2a-gateway | 1.1.3 |
+| a2a-gateway-sandbox | 1.1.3 |
+| a2a-gateway-test | 1.1.3 |
+| a2a-website | 1.1.3 |
+---
+
+
 # Release v1.1.2
 
 **Date:** 2026-04-08
