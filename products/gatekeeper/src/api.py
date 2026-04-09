@@ -120,7 +120,9 @@ class GatekeeperAPI:
         if self.verifier is not None:
             await self._execute_job(job)
             # Reload to get updated state
-            job = await self.storage.get_job(job.id)
+            updated = await self.storage.get_job(job.id)
+            if updated is not None:
+                job = updated
 
         return job
 
@@ -154,8 +156,10 @@ class GatekeeperAPI:
         ):
             raise JobAlreadyTerminalError(f"Job {job_id} is in terminal state: {job.status}")
 
-        job = await self.storage.update_job_status(job_id, VerificationStatus.CANCELLED)
-        return job
+        updated = await self.storage.update_job_status(job_id, VerificationStatus.CANCELLED)
+        if updated is None:
+            raise JobNotFoundError(f"Job not found after update: {job_id}")
+        return updated
 
     async def get_proof(self, proof_id: str) -> ProofArtifact:
         """Retrieve a proof artifact."""

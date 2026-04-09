@@ -41,8 +41,8 @@ class VerifierClient:
         self.function_url = function_url or os.environ.get("VERIFIER_FUNCTION_URL", "")
         self.shared_secret = shared_secret or os.environ.get("VERIFIER_SHARED_SECRET", "")
 
-        self._boto_client = None
-        self._http_client = None
+        self._boto_client: Any = None
+        self._http_client: Any = None
 
     async def invoke(self, job_spec: dict[str, Any]) -> dict[str, Any]:
         """Invoke the Z3 verifier and return the result.
