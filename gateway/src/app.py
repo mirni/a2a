@@ -34,12 +34,12 @@ from gateway.src.routes.register import router as register_router
 from gateway.src.routes.sse import router as sse_router
 from gateway.src.routes.v1.billing import router as billing_router
 from gateway.src.routes.v1.disputes import router as disputes_router
+from gateway.src.routes.v1.gatekeeper import router as gatekeeper_router
 from gateway.src.routes.v1.identity import router as identity_router
 from gateway.src.routes.v1.infra import router as infra_router
 from gateway.src.routes.v1.marketplace import router as marketplace_router
 from gateway.src.routes.v1.messaging import router as messaging_router
 from gateway.src.routes.v1.payments import router as payments_router
-from gateway.src.routes.v1.gatekeeper import router as gatekeeper_router
 from gateway.src.routes.v1.trust import router as trust_router
 from gateway.src.routes.websocket import router as ws_router
 from gateway.src.signing import signing_key_handler
