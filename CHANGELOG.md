@@ -1,5 +1,34 @@
 # Changelog
 
+# Release v1.2.0
+
+**Date:** 2026-04-09
+**Commit:** 26042ce7
+**Previous:** v1.1.3
+
+## Changes
+
+### Features
+
+- feat: formal gatekeeper service with Z3 verification (#76) (`26042ce`)
+
+### Other
+
+- Merge release v1.1.3 into main (`00e18e2`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 1.2.0 |
+| a2a-db-backup | 1.2.0 |
+| a2a-gateway-sandbox | 1.2.0 |
+| a2a-gateway-test | 1.2.0 |
+| a2a-gateway | 1.2.0 |
+| a2a-website | 1.2.0 |
+---
+
+
 # Release v1.1.3
 
 **Date:** 2026-04-08
