@@ -134,6 +134,7 @@ def bootstrap() -> None:
     _load_product_simple("trust", "trust")
     _load_product_simple("identity", "identity")
     _load_product_simple("messaging", "messaging")
+    _load_product_simple("gatekeeper", "gatekeeper")
 
     _bootstrapped = True
 

@@ -34,6 +34,7 @@ from gateway.src.routes.register import router as register_router
 from gateway.src.routes.sse import router as sse_router
 from gateway.src.routes.v1.billing import router as billing_router
 from gateway.src.routes.v1.disputes import router as disputes_router
+from gateway.src.routes.v1.gatekeeper import router as gatekeeper_router
 from gateway.src.routes.v1.identity import router as identity_router
 from gateway.src.routes.v1.infra import router as infra_router
 from gateway.src.routes.v1.marketplace import router as marketplace_router
@@ -101,6 +102,7 @@ def create_app() -> FastAPI:
     app.include_router(marketplace_router)
     app.include_router(messaging_router)
     app.include_router(trust_router)
+    app.include_router(gatekeeper_router)
     app.include_router(_redirect_router)
 
     # Exception handler for deps._ResponseError (auth/rate-limit failures in Depends)
@@ -180,6 +182,10 @@ def create_app() -> FastAPI:
             "PaymentError",
             "X402VerificationError",
             "X402ReplayError",
+            "JobNotFoundError",
+            "ProofNotFoundError",
+            "JobAlreadyTerminalError",
+            "IdempotencyConflictError",
         }
     )
 

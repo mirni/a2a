@@ -1,0 +1,289 @@
+"""Tests for VerifierClient — Lambda invocation with mocked backends."""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+# Ensure project root is importable
+_project_root = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
+from products.connectors.verifier.src.client import VerifierClient, VerifierError
+
+# ---------------------------------------------------------------------------
+# HTTP mode tests
+# ---------------------------------------------------------------------------
+
+
+class TestHTTPMode:
+    @pytest.mark.asyncio
+    async def test_invoke_http_success(self):
+        client = VerifierClient(
+            auth_mode="shared_secret",
+            function_url="https://test.lambda-url.on.aws/",
+            shared_secret="test-secret",
+        )
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "job_id": "vj-test",
+            "status": "completed",
+            "result": "satisfied",
+            "property_results": [],
+            "proof_data": "{}",
+            "proof_hash": "abc",
+            "duration_ms": 10,
+        }
+
+        mock_http = AsyncMock()
+        mock_http.post = AsyncMock(return_value=mock_response)
+        client._http_client = mock_http
+
+        result = await client.invoke({"job_id": "vj-test", "properties": []})
+
+        assert result["result"] == "satisfied"
+        mock_http.post.assert_called_once()
+        call_args = mock_http.post.call_args
+        assert call_args[1]["headers"]["X-Verifier-Secret"] == "test-secret"
+
+    @pytest.mark.asyncio
+    async def test_invoke_http_error(self):
+        client = VerifierClient(
+            auth_mode="shared_secret",
+            function_url="https://test.lambda-url.on.aws/",
+        )
+
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        mock_response.text = "Internal Server Error"
+
+        mock_http = AsyncMock()
+        mock_http.post = AsyncMock(return_value=mock_response)
+        client._http_client = mock_http
+
+        with pytest.raises(VerifierError, match="Verifier returned 500"):
+            await client.invoke({"job_id": "vj-test", "properties": []})
+
+    @pytest.mark.asyncio
+    async def test_invoke_http_no_url(self):
+        client = VerifierClient(auth_mode="shared_secret", function_url="")
+
+        with pytest.raises(VerifierError, match="VERIFIER_FUNCTION_URL is not configured"):
+            await client.invoke({"job_id": "vj-test"})
+
+    @pytest.mark.asyncio
+    async def test_invoke_http_no_secret_header(self):
+        """When no shared_secret is configured, no auth header is sent."""
+        client = VerifierClient(
+            auth_mode="shared_secret",
+            function_url="https://test.lambda-url.on.aws/",
+            shared_secret="",
+        )
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"result": "satisfied"}
+
+        mock_http = AsyncMock()
+        mock_http.post = AsyncMock(return_value=mock_response)
+        client._http_client = mock_http
+
+        await client.invoke({"job_id": "vj-test"})
+        call_args = mock_http.post.call_args
+        assert "X-Verifier-Secret" not in call_args[1]["headers"]
+
+    @pytest.mark.asyncio
+    async def test_invoke_http_transport_error(self):
+        """Transport errors are wrapped in VerifierError."""
+        import httpx
+
+        client = VerifierClient(
+            auth_mode="shared_secret",
+            function_url="https://test.lambda-url.on.aws/",
+        )
+
+        mock_http = AsyncMock()
+        mock_http.post = AsyncMock(side_effect=httpx.ConnectTimeout("timeout"))
+        client._http_client = mock_http
+
+        with pytest.raises(VerifierError, match="Connection error"):
+            await client.invoke({"job_id": "vj-test"})
+
+    @pytest.mark.asyncio
+    async def test_invoke_http_invalid_json_response(self):
+        """Invalid JSON response is wrapped in VerifierError."""
+        client = VerifierClient(
+            auth_mode="shared_secret",
+            function_url="https://test.lambda-url.on.aws/",
+        )
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.side_effect = json.JSONDecodeError("bad", "", 0)
+
+        mock_http = AsyncMock()
+        mock_http.post = AsyncMock(return_value=mock_response)
+        client._http_client = mock_http
+
+        with pytest.raises(VerifierError, match="invalid JSON"):
+            await client.invoke({"job_id": "vj-test"})
+
+
+# ---------------------------------------------------------------------------
+# IAM mode tests
+# ---------------------------------------------------------------------------
+
+
+class TestIAMMode:
+    @pytest.mark.asyncio
+    async def test_invoke_iam_success(self):
+        client = VerifierClient(
+            auth_mode="iam",
+            function_name="z3-verifier",
+            region="us-east-1",
+        )
+
+        result_payload = json.dumps(
+            {
+                "job_id": "vj-test",
+                "status": "completed",
+                "result": "satisfied",
+                "property_results": [],
+                "proof_data": "{}",
+                "proof_hash": "abc",
+                "duration_ms": 10,
+            }
+        ).encode()
+
+        mock_payload = MagicMock()
+        mock_payload.read.return_value = result_payload
+
+        mock_boto = MagicMock()
+        mock_boto.invoke.return_value = {
+            "Payload": mock_payload,
+            "StatusCode": 200,
+        }
+        client._boto_client = mock_boto
+
+        result = await client.invoke({"job_id": "vj-test", "properties": []})
+        assert result["result"] == "satisfied"
+        mock_boto.invoke.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_invoke_iam_function_error(self):
+        client = VerifierClient(
+            auth_mode="iam",
+            function_name="z3-verifier",
+            region="us-east-1",
+        )
+
+        mock_payload = MagicMock()
+        mock_payload.read.return_value = b'{"errorMessage": "timeout"}'
+
+        mock_boto = MagicMock()
+        mock_boto.invoke.return_value = {
+            "Payload": mock_payload,
+            "StatusCode": 200,
+            "FunctionError": "Unhandled",
+        }
+        client._boto_client = mock_boto
+
+        with pytest.raises(VerifierError, match="Lambda function error"):
+            await client.invoke({"job_id": "vj-test"})
+
+    @pytest.mark.asyncio
+    async def test_invoke_iam_invalid_json(self):
+        """Lambda returns invalid JSON payload."""
+        client = VerifierClient(auth_mode="iam", function_name="z3-verifier")
+
+        mock_payload = MagicMock()
+        mock_payload.read.return_value = b"not json at all"
+
+        mock_boto = MagicMock()
+        mock_boto.invoke.return_value = {"Payload": mock_payload, "StatusCode": 200}
+        client._boto_client = mock_boto
+
+        with pytest.raises(VerifierError, match="invalid JSON"):
+            await client.invoke({"job_id": "vj-test"})
+
+
+# ---------------------------------------------------------------------------
+# Validation
+# ---------------------------------------------------------------------------
+
+
+class TestValidation:
+    def test_invalid_auth_mode(self):
+        with pytest.raises(ValueError, match="Invalid auth_mode"):
+            VerifierClient(auth_mode="bogus")
+
+    def test_http_url_must_be_https(self):
+        with pytest.raises(ValueError, match="HTTPS"):
+            VerifierClient(
+                auth_mode="shared_secret",
+                function_url="http://insecure.example.com/",
+            )
+
+    def test_https_url_accepted(self):
+        client = VerifierClient(
+            auth_mode="shared_secret",
+            function_url="https://secure.example.com/",
+        )
+        assert client.function_url == "https://secure.example.com/"
+
+    def test_empty_url_accepted(self):
+        """Empty URL is allowed at construction (fails at invoke time)."""
+        client = VerifierClient(auth_mode="shared_secret", function_url="")
+        assert client.function_url == ""
+
+
+# ---------------------------------------------------------------------------
+# Close
+# ---------------------------------------------------------------------------
+
+
+class TestClose:
+    @pytest.mark.asyncio
+    async def test_close_http(self):
+        client = VerifierClient(auth_mode="shared_secret")
+        mock_http = AsyncMock()
+        client._http_client = mock_http
+
+        await client.close()
+        mock_http.aclose.assert_called_once()
+        assert client._http_client is None
+
+    @pytest.mark.asyncio
+    async def test_close_no_client(self):
+        client = VerifierClient(auth_mode="shared_secret")
+        await client.close()  # Should not raise
+
+
+# ---------------------------------------------------------------------------
+# Default construction
+# ---------------------------------------------------------------------------
+
+
+class TestDefaults:
+    def test_default_values(self):
+        client = VerifierClient()
+        assert client.function_name == "z3-verifier"
+        assert client.region == "us-east-1"
+        assert client.auth_mode == "iam"
+
+    def test_env_override(self, monkeypatch):
+        monkeypatch.setenv("VERIFIER_LAMBDA_FUNCTION", "custom-fn")
+        monkeypatch.setenv("VERIFIER_LAMBDA_REGION", "eu-west-1")
+        monkeypatch.setenv("VERIFIER_AUTH_MODE", "shared_secret")
+
+        client = VerifierClient()
+        assert client.function_name == "custom-fn"
+        assert client.region == "eu-west-1"
+        assert client.auth_mode == "shared_secret"

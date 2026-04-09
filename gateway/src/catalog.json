@@ -5644,5 +5644,251 @@
       "max_latency_ms": 500
     },
     "tier_required": "free"
+  },
+  {
+    "name": "submit_verification",
+    "service": "gatekeeper",
+    "description": "Submit a formal verification job with Z3 SMT properties. Returns a job ID for tracking.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "description": "The agent submitting the verification"
+        },
+        "properties": {
+          "type": "array",
+          "description": "List of Z3 SMT-LIB2 property specifications to verify",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "scope": { "type": "string", "enum": ["economic", "workflow", "network", "contract"] },
+              "language": { "type": "string", "default": "z3_smt2" },
+              "expression": { "type": "string" },
+              "description": { "type": "string" }
+            },
+            "required": ["name", "expression"]
+          }
+        },
+        "scope": {
+          "type": "string",
+          "description": "Verification domain scope",
+          "enum": ["economic", "workflow", "network", "contract"],
+          "default": "economic"
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "description": "Max verification time (10-900s)",
+          "default": 300
+        },
+        "webhook_url": {
+          "type": "string",
+          "description": "Optional webhook URL for completion notification"
+        },
+        "idempotency_key": {
+          "type": "string",
+          "description": "Optional idempotency key to prevent duplicate submissions"
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Optional metadata to attach to the job"
+        }
+      },
+      "required": ["agent_id", "properties"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "job_id": { "type": "string" },
+        "status": { "type": "string" },
+        "cost": { "type": "string" },
+        "created_at": { "type": "number" }
+      }
+    },
+    "pricing": {
+      "per_call": 5.0,
+      "description": "5 base + 1 per property"
+    },
+    "sla": {
+      "max_latency_ms": 30000
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "get_verification_status",
+    "service": "gatekeeper",
+    "description": "Get the current status and result of a verification job.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "job_id": {
+          "type": "string",
+          "description": "The verification job ID"
+        }
+      },
+      "required": ["job_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "job_id": { "type": "string" },
+        "agent_id": { "type": "string" },
+        "status": { "type": "string" },
+        "result": { "type": "string" },
+        "proof_artifact_id": { "type": "string" },
+        "cost": { "type": "string" },
+        "created_at": { "type": "number" },
+        "updated_at": { "type": "number" }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "list_verification_jobs",
+    "service": "gatekeeper",
+    "description": "List verification jobs for an agent with optional status filter.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "description": "The agent whose jobs to list"
+        },
+        "status": {
+          "type": "string",
+          "description": "Optional status filter",
+          "enum": ["pending", "running", "completed", "failed", "timeout", "cancelled"]
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Max results (default 50)",
+          "default": 50
+        },
+        "cursor": {
+          "type": "string",
+          "description": "Pagination cursor (created_at timestamp)"
+        }
+      },
+      "required": ["agent_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "jobs": { "type": "array" },
+        "count": { "type": "integer" }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "cancel_verification",
+    "service": "gatekeeper",
+    "description": "Cancel a pending or running verification job.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "job_id": {
+          "type": "string",
+          "description": "The verification job ID to cancel"
+        }
+      },
+      "required": ["job_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "job_id": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "get_proof",
+    "service": "gatekeeper",
+    "description": "Retrieve a formal verification proof artifact by ID.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "proof_id": {
+          "type": "string",
+          "description": "The proof artifact ID"
+        }
+      },
+      "required": ["proof_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "proof_id": { "type": "string" },
+        "job_id": { "type": "string" },
+        "agent_id": { "type": "string" },
+        "result": { "type": "string" },
+        "proof_hash": { "type": "string" },
+        "valid_until": { "type": "number" },
+        "property_results": { "type": "array" },
+        "created_at": { "type": "number" }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
+    "tier_required": "pro"
+  },
+  {
+    "name": "verify_proof",
+    "service": "gatekeeper",
+    "description": "Verify a formal verification proof by its SHA3-256 hash. Returns validity status.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "proof_hash": {
+          "type": "string",
+          "description": "The SHA3-256 hash of the proof to verify"
+        }
+      },
+      "required": ["proof_hash"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "valid": { "type": "boolean" },
+        "proof_id": { "type": "string" },
+        "job_id": { "type": "string" },
+        "agent_id": { "type": "string" },
+        "result": { "type": "string" },
+        "valid_until": { "type": "number" },
+        "reason": { "type": "string" }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 500
+    },
+    "tier_required": "free"
   }
 ]

@@ -37,6 +37,10 @@ from payments_src.storage import PaymentStorage  # noqa: E402
 from paywall_src.keys import KeyManager  # noqa: E402
 from paywall_src.storage import PaywallStorage  # noqa: E402
 
+# Gatekeeper
+from gatekeeper_src.api import GatekeeperAPI  # noqa: E402
+from gatekeeper_src.storage import GatekeeperStorage  # noqa: E402
+
 # Shared — Event Bus
 from shared_src.event_bus import EventBus  # noqa: E402
 
@@ -115,6 +119,7 @@ class AppContext:
     signing_manager: SigningManager | None = None
     mcp_proxy: object | None = None
     x402_verifier: object | None = None
+    gatekeeper_api: GatekeeperAPI | None = None
 
 
 @asynccontextmanager
@@ -189,6 +194,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await messaging_storage.connect()
     messaging_api = MessagingAPI(storage=messaging_storage)
 
+    # --- Gatekeeper ---
+    gatekeeper_dsn = os.environ.get("GATEKEEPER_DSN", f"sqlite:///{data_dir}/gatekeeper.db")
+    gatekeeper_storage = GatekeeperStorage(gatekeeper_dsn)
+    await gatekeeper_storage.connect()
+    gatekeeper_api = GatekeeperAPI.from_env(gatekeeper_storage)
+
     # --- Dispute Engine ---
     dispute_dsn = os.environ.get("DISPUTE_DSN", f"sqlite:///{data_dir}/disputes.db")
     dispute_engine = DisputeEngine(dsn=dispute_dsn, payment_engine=payment_engine)
@@ -224,6 +235,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         event_bus_dsn,
         webhook_dsn,
         messaging_dsn,
+        gatekeeper_dsn,
         dispute_dsn,
     ]:
         if dsn_val.startswith("sqlite:///"):
@@ -350,6 +362,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         signing_manager=signing_manager,
         mcp_proxy=mcp_proxy,
         x402_verifier=x402_verifier,
+        gatekeeper_api=gatekeeper_api,
     )
     app.state.ctx = ctx
     app.state.signing_manager = signing_manager
@@ -410,6 +423,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except asyncio.CancelledError:
         pass
 
+    await gatekeeper_storage.close()
     await messaging_storage.close()
     await dispute_engine.close()
     await webhook_manager.close()
