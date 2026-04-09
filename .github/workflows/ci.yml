@@ -189,6 +189,22 @@ jobs:
           retention-days: 7
 
   # ---------------------------------------------------------------------------
+  # Lambda handler: Z3 verifier unit tests (pure Python, no AWS)
+  # ---------------------------------------------------------------------------
+  test-lambda-handler:
+    needs: [quality]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install z3-solver==4.13.4.0 pytest
+      - name: Test Lambda handler
+        run: python -m pytest lambda/z3-verifier/tests/ -x -q
+
+  # ---------------------------------------------------------------------------
   # Coverage ratchet: separate job so it's a distinct required check
   # ---------------------------------------------------------------------------
   coverage:

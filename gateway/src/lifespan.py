@@ -198,7 +198,25 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     gatekeeper_dsn = os.environ.get("GATEKEEPER_DSN", f"sqlite:///{data_dir}/gatekeeper.db")
     gatekeeper_storage = GatekeeperStorage(gatekeeper_dsn)
     await gatekeeper_storage.connect()
-    gatekeeper_api = GatekeeperAPI.from_env(gatekeeper_storage)
+
+    verifier_client: object | None = None
+    verifier_auth_mode = os.environ.get("VERIFIER_AUTH_MODE", "")
+    if verifier_auth_mode:
+        try:
+            if verifier_auth_mode == "mock":
+                from products.connectors.verifier.src.client import MockVerifierClient
+
+                verifier_client = MockVerifierClient()
+                logger.info("Gatekeeper verifier: mock (in-process Z3)")
+            else:
+                from products.connectors.verifier.src.client import VerifierClient
+
+                verifier_client = VerifierClient()
+                logger.info("Gatekeeper verifier: %s", verifier_auth_mode)
+        except Exception:
+            logger.warning("Failed to initialize verifier client — jobs will stay pending", exc_info=True)
+
+    gatekeeper_api = GatekeeperAPI.from_env(gatekeeper_storage, verifier=verifier_client)
 
     # --- Dispute Engine ---
     dispute_dsn = os.environ.get("DISPUTE_DSN", f"sqlite:///{data_dir}/disputes.db")
@@ -423,6 +441,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except asyncio.CancelledError:
         pass
 
+    if verifier_client is not None:
+        await verifier_client.close()
     await gatekeeper_storage.close()
     await messaging_storage.close()
     await dispute_engine.close()

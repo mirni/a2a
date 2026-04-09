@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
 from gateway.src.errors import handle_product_exception
@@ -41,7 +41,7 @@ class RegisterAgentRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid", json_schema_extra={"example": {"agent_id": "agent-alice", "public_key": "ed25519:abc123..."}}
     )
-    agent_id: str
+    agent_id: str = Field(max_length=128)
     public_key: str | None = None
 
 
@@ -80,7 +80,7 @@ class AddMemberRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid", json_schema_extra={"example": {"agent_id": "agent-bob", "role": "member"}}
     )
-    agent_id: str
+    agent_id: str = Field(max_length=128)
     role: str = "member"
 
 
@@ -95,7 +95,7 @@ class IngestMetricsRequest(BaseModel):
             }
         },
     )
-    agent_id: str
+    agent_id: str = Field(max_length=128)
     metrics: dict[str, Any]
     data_source: str = "self_reported"
     signature: str | None = None
