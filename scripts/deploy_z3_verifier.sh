@@ -55,6 +55,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 LAMBDA_DIR="$REPO_ROOT/lambda/z3-verifier"
 
+# To avoid conflicts with evi aws acct
+export AWS_PROFILE=greenhelix
+
 # ---- Colors -----------------------------------------------------------------
 
 RED='\033[0;31m'
