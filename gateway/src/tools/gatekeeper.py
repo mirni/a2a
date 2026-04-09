@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from gateway.src.lifespan import AppContext
-from gateway.src.tool_errors import ToolForbiddenError, ToolNotFoundError
+from gateway.src.tool_errors import ToolForbiddenError
 
 ADMIN_TIER = "admin"
 

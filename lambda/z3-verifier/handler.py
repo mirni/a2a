@@ -5,7 +5,7 @@ import json
 import time
 import traceback
 
-from z3 import Solver, parse_smt2_string, sat, unknown, unsat
+from z3 import Solver, parse_smt2_string, sat, unsat
 
 
 def lambda_handler(event, context):

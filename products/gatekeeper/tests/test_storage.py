@@ -14,7 +14,6 @@ from products.gatekeeper.src.models import (
     VerificationStatus,
 )
 
-
 # ---------------------------------------------------------------------------
 # Verification Jobs
 # ---------------------------------------------------------------------------
@@ -93,7 +92,7 @@ class TestJobCRUD:
 
     @pytest.mark.asyncio
     async def test_list_jobs(self, storage):
-        for i in range(5):
+        for _i in range(5):
             job = VerificationJob(
                 agent_id="agent-list",
                 properties=[],

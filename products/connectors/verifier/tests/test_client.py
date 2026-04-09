@@ -5,8 +5,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -16,7 +15,6 @@ if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 from products.connectors.verifier.src.client import VerifierClient, VerifierError
-
 
 # ---------------------------------------------------------------------------
 # HTTP mode tests

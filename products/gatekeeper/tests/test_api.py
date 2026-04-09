@@ -13,7 +13,6 @@ import pytest
 
 from products.gatekeeper.src.api import (
     GatekeeperAPI,
-    IdempotencyConflictError,
     JobAlreadyTerminalError,
     JobNotFoundError,
     ProofNotFoundError,
@@ -22,7 +21,6 @@ from products.gatekeeper.src.models import (
     VerificationResult,
     VerificationStatus,
 )
-
 
 # ---------------------------------------------------------------------------
 # Mock verifier backend

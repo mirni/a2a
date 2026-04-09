@@ -5,7 +5,6 @@ Orchestrates job lifecycle, Lambda invocation, proof generation, and signing.
 
 from __future__ import annotations
 
-import base64
 import hashlib
 import time
 from dataclasses import dataclass, field
