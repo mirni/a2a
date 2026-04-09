@@ -77,20 +77,25 @@ The deployment script needs an IAM user/role with these permissions. The `Admini
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "ECR",
+      "Sid": "ECRAuth",
+      "Effect": "Allow",
+      "Action": "ecr:GetAuthorizationToken",
+      "Resource": "*"
+    },
+    {
+      "Sid": "ECRRepo",
       "Effect": "Allow",
       "Action": [
         "ecr:CreateRepository",
         "ecr:DescribeRepositories",
         "ecr:DeleteRepository",
-        "ecr:GetAuthorizationToken",
         "ecr:BatchCheckLayerAvailability",
         "ecr:InitiateLayerUpload",
         "ecr:UploadLayerPart",
         "ecr:CompleteLayerUpload",
         "ecr:PutImage"
       ],
-      "Resource": "*"
+      "Resource": "arn:aws:ecr:*:*:repository/greenhelix/z3-verifier"
     },
     {
       "Sid": "Lambda",
@@ -107,15 +112,32 @@ The deployment script needs an IAM user/role with these permissions. The `Admini
       "Resource": "arn:aws:lambda:*:*:function:z3-verifier"
     },
     {
-      "Sid": "IAM",
+      "Sid": "IAMRoles",
       "Effect": "Allow",
       "Action": [
         "iam:CreateRole",
         "iam:DeleteRole",
         "iam:GetRole",
         "iam:AttachRolePolicy",
-        "iam:DetachRolePolicy",
-        "iam:PassRole",
+        "iam:DetachRolePolicy"
+      ],
+      "Resource": "arn:aws:iam::*:role/z3-verifier-lambda-role"
+    },
+    {
+      "Sid": "IAMPassRole",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::*:role/z3-verifier-lambda-role",
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": "lambda.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "IAMUsers",
+      "Effect": "Allow",
+      "Action": [
         "iam:CreateUser",
         "iam:DeleteUser",
         "iam:GetUser",
@@ -125,14 +147,21 @@ The deployment script needs an IAM user/role with these permissions. The `Admini
         "iam:DeleteAccessKey",
         "iam:ListAccessKeys"
       ],
-      "Resource": "*"
+      "Resource": "arn:aws:iam::*:user/a2a-gateway-verifier"
     },
     {
       "Sid": "CloudWatch",
       "Effect": "Allow",
       "Action": [
         "cloudwatch:PutMetricAlarm",
-        "cloudwatch:DeleteAlarms",
+        "cloudwatch:DeleteAlarms"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "SNS",
+      "Effect": "Allow",
+      "Action": [
         "sns:CreateTopic",
         "sns:Subscribe"
       ],
