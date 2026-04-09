@@ -1,0 +1,28 @@
+# Semgrep ignore patterns (supplements --exclude flags in CI)
+# Note: when .semgrepignore exists, semgrep's defaults are replaced,
+# so we replicate the essential defaults here.
+
+# Default ignores (from semgrep defaults)
+.git/
+node_modules/
+.tox/
+.eggs/
+.mypy_cache/
+.pytest_cache/
+__pycache__/
+*.pyc
+.venv/
+venv/
+dist/
+build/
+*.min.js
+*.bundle.js
+
+# Test files (covered by --exclude in CI, but include here too)
+**/tests/**
+**/*_test.py
+**/*_test.go
+**/test_*.py
+
+# AWS Lambda container images — runtime manages user model internally.
+lambda/
