@@ -1,9 +1,6 @@
 """Gateway-level tests for the Formal Gatekeeper verification endpoints."""
 
-from __future__ import annotations
-
 import pytest
-
 
 _VALID_PROPERTY = {
     "name": "balance_check",
