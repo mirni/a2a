@@ -13,6 +13,10 @@ from products.gatekeeper.src.models import (
     VerificationResult,
     VerificationStatus,
 )
+from products.gatekeeper.src.storage import GatekeeperStorage
+
+_PROP = PropertySpec(name="p1", expression="(assert true)")
+
 
 # ---------------------------------------------------------------------------
 # Verification Jobs
@@ -24,7 +28,7 @@ class TestJobCRUD:
     async def test_create_and_get_job(self, storage):
         job = VerificationJob(
             agent_id="agent-test",
-            properties=[PropertySpec(name="p1", expression="(assert true)")],
+            properties=[_PROP],
             cost=Decimal("6"),
         )
         created = await storage.create_job(job)
@@ -47,7 +51,7 @@ class TestJobCRUD:
     async def test_idempotency_key_lookup(self, storage):
         job = VerificationJob(
             agent_id="agent-test",
-            properties=[PropertySpec(name="p1", expression="(assert true)")],
+            properties=[_PROP],
             idempotency_key="idem-123",
         )
         await storage.create_job(job)
@@ -61,21 +65,30 @@ class TestJobCRUD:
 
     @pytest.mark.asyncio
     async def test_update_job_status(self, storage):
-        job = VerificationJob(
-            agent_id="agent-test",
-            properties=[],
-        )
+        job = VerificationJob(agent_id="agent-test", properties=[_PROP])
         await storage.create_job(job)
 
         updated = await storage.update_job_status(job.id, VerificationStatus.RUNNING)
         assert updated.status == VerificationStatus.RUNNING
 
     @pytest.mark.asyncio
-    async def test_update_job_with_result(self, storage):
-        job = VerificationJob(
-            agent_id="agent-test",
-            properties=[],
+    async def test_update_job_with_result_only(self, storage):
+        """Update with result but no proof_artifact_id (middle branch)."""
+        job = VerificationJob(agent_id="agent-test", properties=[_PROP])
+        await storage.create_job(job)
+
+        updated = await storage.update_job_status(
+            job.id,
+            VerificationStatus.FAILED,
+            result=VerificationResult.ERROR,
         )
+        assert updated.status == VerificationStatus.FAILED
+        assert updated.result == VerificationResult.ERROR
+        assert updated.proof_artifact_id is None
+
+    @pytest.mark.asyncio
+    async def test_update_job_with_result_and_proof(self, storage):
+        job = VerificationJob(agent_id="agent-test", properties=[_PROP])
         await storage.create_job(job)
 
         updated = await storage.update_job_status(
@@ -91,19 +104,15 @@ class TestJobCRUD:
     @pytest.mark.asyncio
     async def test_list_jobs(self, storage):
         for _i in range(5):
-            job = VerificationJob(
-                agent_id="agent-list",
-                properties=[],
-            )
-            await storage.create_job(job)
+            await storage.create_job(VerificationJob(agent_id="agent-list", properties=[_PROP]))
 
         jobs = await storage.list_jobs("agent-list")
         assert len(jobs) == 5
 
     @pytest.mark.asyncio
     async def test_list_jobs_filter_status(self, storage):
-        job1 = VerificationJob(agent_id="agent-filter", properties=[])
-        job2 = VerificationJob(agent_id="agent-filter", properties=[])
+        job1 = VerificationJob(agent_id="agent-filter", properties=[_PROP])
+        job2 = VerificationJob(agent_id="agent-filter", properties=[_PROP])
         await storage.create_job(job1)
         await storage.create_job(job2)
         await storage.update_job_status(job2.id, VerificationStatus.RUNNING)
@@ -115,18 +124,73 @@ class TestJobCRUD:
     @pytest.mark.asyncio
     async def test_list_jobs_limit(self, storage):
         for _ in range(10):
-            await storage.create_job(VerificationJob(agent_id="agent-limit", properties=[]))
+            await storage.create_job(VerificationJob(agent_id="agent-limit", properties=[_PROP]))
 
         jobs = await storage.list_jobs("agent-limit", limit=3)
         assert len(jobs) == 3
 
     @pytest.mark.asyncio
+    async def test_list_jobs_limit_capped_at_200(self, storage):
+        """Even if limit=999, storage caps at 200."""
+        for _ in range(3):
+            await storage.create_job(VerificationJob(agent_id="agent-cap", properties=[_PROP]))
+        jobs = await storage.list_jobs("agent-cap", limit=999)
+        assert len(jobs) == 3  # only 3 exist, but limit was capped
+
+    @pytest.mark.asyncio
     async def test_list_jobs_different_agent(self, storage):
-        await storage.create_job(VerificationJob(agent_id="agent-a", properties=[]))
-        await storage.create_job(VerificationJob(agent_id="agent-b", properties=[]))
+        await storage.create_job(VerificationJob(agent_id="agent-a", properties=[_PROP]))
+        await storage.create_job(VerificationJob(agent_id="agent-b", properties=[_PROP]))
 
         jobs_a = await storage.list_jobs("agent-a")
         assert len(jobs_a) == 1
+
+    @pytest.mark.asyncio
+    async def test_list_jobs_cursor_pagination(self, storage):
+        """Cursor-based pagination returns only jobs before the cursor timestamp."""
+        j1 = VerificationJob(agent_id="agent-pag", properties=[_PROP], created_at=1000.0)
+        j2 = VerificationJob(agent_id="agent-pag", properties=[_PROP], created_at=2000.0)
+        j3 = VerificationJob(agent_id="agent-pag", properties=[_PROP], created_at=3000.0)
+        await storage.create_job(j1)
+        await storage.create_job(j2)
+        await storage.create_job(j3)
+
+        # Cursor at 2500 should return j2, j1 (created_at < 2500, ordered DESC)
+        jobs = await storage.list_jobs("agent-pag", cursor="2500.0")
+        assert len(jobs) == 2
+        assert jobs[0].id == j2.id
+        assert jobs[1].id == j1.id
+
+    @pytest.mark.asyncio
+    async def test_list_jobs_invalid_cursor(self, storage):
+        """Invalid cursor returns empty list instead of crashing."""
+        jobs = await storage.list_jobs("agent-test", cursor="not-a-number")
+        assert jobs == []
+
+    @pytest.mark.asyncio
+    async def test_cost_fractional_round_trip(self, storage):
+        """Fractional costs survive the SCALE conversion."""
+        job = VerificationJob(
+            agent_id="agent-test",
+            properties=[_PROP],
+            cost=Decimal("6.50"),
+        )
+        await storage.create_job(job)
+        fetched = await storage.get_job(job.id)
+        assert fetched.cost == Decimal("6.50")
+
+    @pytest.mark.asyncio
+    async def test_db_property_raises_when_disconnected(self):
+        """Accessing .db before connect() raises RuntimeError."""
+        s = GatekeeperStorage(dsn="sqlite:///nope.db")
+        with pytest.raises(RuntimeError, match="Storage not connected"):
+            _ = s.db
+
+    @pytest.mark.asyncio
+    async def test_close_when_not_connected(self):
+        """close() is safe when never connected."""
+        s = GatekeeperStorage(dsn="sqlite:///nope.db")
+        await s.close()  # Should not raise
 
 
 # ---------------------------------------------------------------------------
@@ -171,6 +235,11 @@ class TestProofCRUD:
         found = await storage.get_proof_by_job("vj-lookup")
         assert found is not None
         assert found.job_id == "vj-lookup"
+
+    @pytest.mark.asyncio
+    async def test_get_proof_by_job_not_found(self, storage):
+        result = await storage.get_proof_by_job("vj-nonexistent")
+        assert result is None
 
     @pytest.mark.asyncio
     async def test_get_proof_by_hash(self, storage):

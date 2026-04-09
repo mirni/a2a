@@ -14,6 +14,8 @@ from typing import Any
 
 logger = logging.getLogger("a2a.verifier")
 
+_VALID_AUTH_MODES = frozenset({"iam", "shared_secret"})
+
 
 class VerifierError(Exception):
     """Raised when the verifier backend returns an error."""
@@ -40,6 +42,12 @@ class VerifierClient:
         self.auth_mode = auth_mode or os.environ.get("VERIFIER_AUTH_MODE", "iam")
         self.function_url = function_url or os.environ.get("VERIFIER_FUNCTION_URL", "")
         self.shared_secret = shared_secret or os.environ.get("VERIFIER_SHARED_SECRET", "")
+
+        if self.auth_mode not in _VALID_AUTH_MODES:
+            raise ValueError(f"Invalid auth_mode '{self.auth_mode}'. Must be one of: {sorted(_VALID_AUTH_MODES)}")
+
+        if self.auth_mode == "shared_secret" and self.function_url and not self.function_url.startswith("https://"):
+            raise ValueError("function_url must use HTTPS")
 
         self._boto_client: Any = None
         self._http_client: Any = None
@@ -79,7 +87,10 @@ class VerifierClient:
             payload = response["Payload"].read()
             if response.get("FunctionError"):
                 raise VerifierError(f"Lambda function error: {payload.decode()}")
-            return json.loads(payload)
+            try:
+                return json.loads(payload)
+            except json.JSONDecodeError as e:
+                raise VerifierError(f"Lambda returned invalid JSON: {e}") from e
 
         return await loop.run_in_executor(None, _sync_invoke)
 
@@ -88,7 +99,7 @@ class VerifierClient:
         import httpx
 
         if self._http_client is None:
-            self._http_client = httpx.AsyncClient(timeout=900.0)
+            self._http_client = httpx.AsyncClient(timeout=330.0)
 
         if not self.function_url:
             raise VerifierError("VERIFIER_FUNCTION_URL is not configured")
@@ -97,16 +108,22 @@ class VerifierClient:
         if self.shared_secret:
             headers["X-Verifier-Secret"] = self.shared_secret
 
-        response = await self._http_client.post(
-            self.function_url,
-            json=job_spec,
-            headers=headers,
-        )
+        try:
+            response = await self._http_client.post(
+                self.function_url,
+                json=job_spec,
+                headers=headers,
+            )
+        except httpx.TransportError as e:
+            raise VerifierError(f"Connection error: {e}") from e
 
         if response.status_code != 200:
             raise VerifierError(f"Verifier returned {response.status_code}: {response.text}")
 
-        return response.json()
+        try:
+            return response.json()
+        except json.JSONDecodeError as e:
+            raise VerifierError(f"Verifier returned invalid JSON: {e}") from e
 
     async def close(self) -> None:
         """Clean up HTTP client resources."""

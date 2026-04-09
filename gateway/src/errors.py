@@ -121,6 +121,11 @@ async def handle_product_exception(request: Request, exc: Exception) -> JSONResp
         # x402 protocol
         "X402VerificationError": (402, "payment_verification_failed"),
         "X402ReplayError": (402, "payment_replay_detected"),
+        # Gatekeeper
+        "JobNotFoundError": (404, "job_not_found"),
+        "ProofNotFoundError": (404, "proof_not_found"),
+        "JobAlreadyTerminalError": (409, "job_already_terminal"),
+        "IdempotencyConflictError": (409, "idempotency_conflict"),
     }
 
     if exc_type in mapping:

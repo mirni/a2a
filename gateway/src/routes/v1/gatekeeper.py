@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ConfigDict, Field
 
 from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
@@ -28,11 +28,11 @@ router = APIRouter(prefix="/v1/gatekeeper", tags=["gatekeeper"])
 
 class PropertySpecRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    name: str
+    name: str = Field(max_length=128)
     scope: str = "economic"
     language: str = "z3_smt2"
-    expression: str
-    description: str = ""
+    expression: str = Field(max_length=1_000_000)
+    description: str = Field(default="", max_length=1000)
 
 
 class SubmitVerificationRequest(BaseModel):
@@ -55,8 +55,8 @@ class SubmitVerificationRequest(BaseModel):
             }
         },
     )
-    agent_id: str
-    properties: list[PropertySpecRequest]
+    agent_id: str = Field(max_length=128)
+    properties: list[PropertySpecRequest] = Field(min_length=1, max_length=100)
     scope: str = "economic"
     timeout_seconds: int = Field(default=300, ge=10, le=900)
     webhook_url: str | None = None
@@ -71,7 +71,7 @@ class VerifyProofRequest(BaseModel):
             "example": {"proof_hash": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2"}
         },
     )
-    proof_hash: str
+    proof_hash: str = Field(max_length=128)
 
 
 # ---------------------------------------------------------------------------
@@ -120,7 +120,7 @@ async def submit_verification(
 async def list_verification_jobs(
     agent_id: str,
     status: str | None = None,
-    limit: int = 50,
+    limit: int = Query(default=50, ge=1, le=200),
     cursor: str | None = None,
     tc: ToolContext = Depends(require_tool("list_verification_jobs")),  # noqa: B008
 ):
@@ -134,7 +134,10 @@ async def list_verification_jobs(
         },
     )
     await check_ownership(tc, params)
-    result = await _list_verification_jobs(tc.ctx, params)
+    try:
+        result = await _list_verification_jobs(tc.ctx, params)
+    except Exception as exc:
+        return await handle_product_exception(tc.request, exc)
     return await finalize_response(tc, result)
 
 
@@ -188,5 +191,8 @@ async def verify_proof(
     tc: ToolContext = Depends(require_tool("verify_proof")),  # noqa: B008
 ):
     params = {"proof_hash": body.proof_hash}
-    result = await _verify_proof(tc.ctx, params)
+    try:
+        result = await _verify_proof(tc.ctx, params)
+    except Exception as exc:
+        return await handle_product_exception(tc.request, exc)
     return await finalize_response(tc, result)

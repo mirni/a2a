@@ -5707,7 +5707,8 @@
       }
     },
     "pricing": {
-      "per_call": 5.0
+      "per_call": 5.0,
+      "description": "5 base + 1 per property"
     },
     "sla": {
       "max_latency_ms": 30000

@@ -21,6 +21,16 @@ def _check_caller_owns_agent_id(params: dict[str, Any]) -> None:
         raise ToolForbiddenError("Forbidden: you do not have access to this resource")
 
 
+def _check_caller_owns_job(job_agent_id: str, params: dict[str, Any]) -> None:
+    """Raise ToolForbiddenError if caller does not own the job's agent_id."""
+    caller = params.get("_caller_agent_id")
+    tier = params.get("_caller_tier")
+    if tier == ADMIN_TIER or caller is None:
+        return
+    if caller != job_agent_id:
+        raise ToolForbiddenError("Forbidden: you do not have access to this resource")
+
+
 async def _submit_verification(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     _check_caller_owns_agent_id(params)
     job = await ctx.gatekeeper_api.submit_verification(
@@ -41,8 +51,8 @@ async def _submit_verification(ctx: AppContext, params: dict[str, Any]) -> dict[
 
 
 async def _get_verification_status(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
-    _check_caller_owns_agent_id(params)
     job = await ctx.gatekeeper_api.get_verification_status(params["job_id"])
+    _check_caller_owns_job(job.agent_id, params)
     return {
         "job_id": job.id,
         "agent_id": job.agent_id,
@@ -79,16 +89,19 @@ async def _list_verification_jobs(ctx: AppContext, params: dict[str, Any]) -> di
 
 
 async def _cancel_verification(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
-    _check_caller_owns_agent_id(params)
-    job = await ctx.gatekeeper_api.cancel_verification(params["job_id"])
+    # Fetch job first to check ownership before mutating
+    job = await ctx.gatekeeper_api.get_verification_status(params["job_id"])
+    _check_caller_owns_job(job.agent_id, params)
+    cancelled = await ctx.gatekeeper_api.cancel_verification(params["job_id"])
     return {
-        "job_id": job.id,
-        "status": job.status.value,
+        "job_id": cancelled.id,
+        "status": cancelled.status.value,
     }
 
 
 async def _get_proof(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     proof = await ctx.gatekeeper_api.get_proof(params["proof_id"])
+    _check_caller_owns_job(proof.agent_id, params)
     return {
         "proof_id": proof.id,
         "job_id": proof.job_id,

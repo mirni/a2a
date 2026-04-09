@@ -15,7 +15,7 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 
 class VerificationStatus(StrEnum):
@@ -65,11 +65,11 @@ class PropertySpec(BaseModel):
         },
     )
 
-    name: str
+    name: str = Field(max_length=128)
     scope: VerificationScope = VerificationScope.ECONOMIC
     language: str = "z3_smt2"  # Only z3_smt2 for Phase 1
-    expression: str
-    description: str = ""
+    expression: str = Field(max_length=1_000_000)  # 1MB cap
+    description: str = Field(default="", max_length=1000)
 
 
 class VerificationJob(BaseModel):
@@ -80,7 +80,7 @@ class VerificationJob(BaseModel):
         json_schema_extra={
             "examples": [
                 {
-                    "id": "vj-abc12345",
+                    "id": "vj-a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
                     "agent_id": "agent-alice",
                     "scope": "economic",
                     "status": "pending",
@@ -107,11 +107,11 @@ class VerificationJob(BaseModel):
         },
     )
 
-    id: str = Field(default_factory=lambda: f"vj-{uuid.uuid4().hex[:12]}")
-    agent_id: str
+    id: str = Field(default_factory=lambda: f"vj-{uuid.uuid4().hex}")
+    agent_id: str = Field(max_length=128)
     scope: VerificationScope = VerificationScope.ECONOMIC
     status: VerificationStatus = VerificationStatus.PENDING
-    properties: list[PropertySpec]
+    properties: list[PropertySpec] = Field(min_length=1)
     timeout_seconds: int = Field(default=300, ge=10, le=900)
     result: VerificationResult | None = None
     proof_artifact_id: str | None = None
@@ -121,6 +121,20 @@ class VerificationJob(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: float = Field(default_factory=time.time)
     updated_at: float = Field(default_factory=time.time)
+
+    @field_validator("webhook_url")
+    @classmethod
+    def _validate_webhook_url(cls, v: str | None) -> str | None:
+        if v is not None and not v.startswith("https://"):
+            raise ValueError("webhook_url must use HTTPS")
+        return v
+
+    @field_validator("properties")
+    @classmethod
+    def _validate_properties_count(cls, v: list[PropertySpec]) -> list[PropertySpec]:
+        if len(v) > 100:
+            raise ValueError("Maximum 100 properties per job")
+        return v
 
     @field_serializer("cost")
     @classmethod
@@ -136,8 +150,8 @@ class ProofArtifact(BaseModel):
         json_schema_extra={
             "examples": [
                 {
-                    "id": "pf-abc12345",
-                    "job_id": "vj-abc12345",
+                    "id": "pf-a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+                    "job_id": "vj-a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
                     "agent_id": "agent-alice",
                     "result": "satisfied",
                     "proof_hash": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
@@ -153,7 +167,7 @@ class ProofArtifact(BaseModel):
         },
     )
 
-    id: str = Field(default_factory=lambda: f"pf-{uuid.uuid4().hex[:12]}")
+    id: str = Field(default_factory=lambda: f"pf-{uuid.uuid4().hex}")
     job_id: str
     agent_id: str
     result: VerificationResult

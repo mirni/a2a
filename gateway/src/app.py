@@ -182,6 +182,10 @@ def create_app() -> FastAPI:
             "PaymentError",
             "X402VerificationError",
             "X402ReplayError",
+            "JobNotFoundError",
+            "ProofNotFoundError",
+            "JobAlreadyTerminalError",
+            "IdempotencyConflictError",
         }
     )
 

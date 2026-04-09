@@ -6,10 +6,13 @@ Orchestrates job lifecycle, Lambda invocation, proof generation, and signing.
 from __future__ import annotations
 
 import hashlib
+import logging
 import time
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Protocol
+
+logger = logging.getLogger("a2a.gatekeeper")
 
 from .models import (
     ProofArtifact,
@@ -95,6 +98,8 @@ class GatekeeperAPI:
         if idempotency_key:
             existing = await self.storage.get_job_by_idempotency_key(idempotency_key)
             if existing is not None:
+                if existing.agent_id != agent_id:
+                    raise IdempotencyConflictError(f"Idempotency key '{idempotency_key}' belongs to a different agent")
                 return existing
 
         # Parse properties
@@ -153,6 +158,7 @@ class GatekeeperAPI:
             VerificationStatus.COMPLETED,
             VerificationStatus.FAILED,
             VerificationStatus.CANCELLED,
+            VerificationStatus.TIMEOUT,
         ):
             raise JobAlreadyTerminalError(f"Job {job_id} is in terminal state: {job.status}")
 
@@ -250,6 +256,7 @@ class GatekeeperAPI:
             )
 
         except Exception:
+            logger.exception("Verification job %s failed", job.id)
             await self.storage.update_job_status(
                 job.id,
                 VerificationStatus.FAILED,

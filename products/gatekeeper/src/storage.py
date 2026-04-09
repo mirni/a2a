@@ -145,7 +145,7 @@ class GatekeeperStorage:
 
     async def create_job(self, job: VerificationJob) -> VerificationJob:
         """Insert a new verification job."""
-        await self._db.execute(
+        await self.db.execute(
             """INSERT INTO verification_jobs
                (id, agent_id, scope, status, properties, timeout_seconds,
                 result, proof_artifact_id, webhook_url, idempotency_key,
@@ -168,18 +168,18 @@ class GatekeeperStorage:
                 job.updated_at,
             ),
         )
-        await self._db.commit()
+        await self.db.commit()
         return job
 
     async def get_job(self, job_id: str) -> VerificationJob | None:
         """Retrieve a verification job by ID."""
-        cursor = await self._db.execute("SELECT * FROM verification_jobs WHERE id = ?", (job_id,))
+        cursor = await self.db.execute("SELECT * FROM verification_jobs WHERE id = ?", (job_id,))
         row = await cursor.fetchone()
         return _job_from_row(row) if row else None
 
     async def get_job_by_idempotency_key(self, idempotency_key: str) -> VerificationJob | None:
         """Retrieve a job by its idempotency key."""
-        cursor = await self._db.execute(
+        cursor = await self.db.execute(
             "SELECT * FROM verification_jobs WHERE idempotency_key = ?",
             (idempotency_key,),
         )
@@ -196,25 +196,25 @@ class GatekeeperStorage:
         """Update job status, optionally setting result and proof ID."""
         now = time.time()
         if result is not None and proof_artifact_id is not None:
-            await self._db.execute(
+            await self.db.execute(
                 """UPDATE verification_jobs
                    SET status = ?, result = ?, proof_artifact_id = ?, updated_at = ?
                    WHERE id = ?""",
                 (status.value, result.value, proof_artifact_id, now, job_id),
             )
         elif result is not None:
-            await self._db.execute(
+            await self.db.execute(
                 """UPDATE verification_jobs
                    SET status = ?, result = ?, updated_at = ?
                    WHERE id = ?""",
                 (status.value, result.value, now, job_id),
             )
         else:
-            await self._db.execute(
+            await self.db.execute(
                 """UPDATE verification_jobs SET status = ?, updated_at = ? WHERE id = ?""",
                 (status.value, now, job_id),
             )
-        await self._db.commit()
+        await self.db.commit()
         return await self.get_job(job_id)
 
     async def list_jobs(
@@ -233,13 +233,16 @@ class GatekeeperStorage:
             params.append(status)
 
         if cursor:
+            try:
+                params.append(float(cursor))
+            except (ValueError, TypeError):
+                return []
             query += " AND created_at < ?"
-            params.append(float(cursor))
 
         query += " ORDER BY created_at DESC LIMIT ?"
-        params.append(limit)
+        params.append(min(limit, 200))
 
-        cursor_result = await self._db.execute(query, params)
+        cursor_result = await self.db.execute(query, params)
         rows = await cursor_result.fetchall()
         return [_job_from_row(r) for r in rows]
 
@@ -247,7 +250,7 @@ class GatekeeperStorage:
 
     async def create_proof(self, proof: ProofArtifact) -> ProofArtifact:
         """Insert a new proof artifact."""
-        await self._db.execute(
+        await self.db.execute(
             """INSERT INTO proof_artifacts
                (id, job_id, agent_id, result, proof_hash, proof_data,
                 signature, signer_public_key, counterexample,
@@ -268,23 +271,23 @@ class GatekeeperStorage:
                 proof.created_at,
             ),
         )
-        await self._db.commit()
+        await self.db.commit()
         return proof
 
     async def get_proof(self, proof_id: str) -> ProofArtifact | None:
         """Retrieve a proof artifact by ID."""
-        cursor = await self._db.execute("SELECT * FROM proof_artifacts WHERE id = ?", (proof_id,))
+        cursor = await self.db.execute("SELECT * FROM proof_artifacts WHERE id = ?", (proof_id,))
         row = await cursor.fetchone()
         return _proof_from_row(row) if row else None
 
     async def get_proof_by_job(self, job_id: str) -> ProofArtifact | None:
         """Retrieve the proof artifact for a given job."""
-        cursor = await self._db.execute("SELECT * FROM proof_artifacts WHERE job_id = ?", (job_id,))
+        cursor = await self.db.execute("SELECT * FROM proof_artifacts WHERE job_id = ?", (job_id,))
         row = await cursor.fetchone()
         return _proof_from_row(row) if row else None
 
     async def get_proof_by_hash(self, proof_hash: str) -> ProofArtifact | None:
         """Retrieve a proof by its hash."""
-        cursor = await self._db.execute("SELECT * FROM proof_artifacts WHERE proof_hash = ?", (proof_hash,))
+        cursor = await self.db.execute("SELECT * FROM proof_artifacts WHERE proof_hash = ?", (proof_hash,))
         row = await cursor.fetchone()
         return _proof_from_row(row) if row else None
