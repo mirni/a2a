@@ -9,6 +9,14 @@ from collections.abc import Callable, Coroutine
 from typing import Any
 
 from gateway.src.lifespan import AppContext
+from gateway.src.tools.gatekeeper import (
+    _cancel_verification,
+    _get_proof,
+    _get_verification_status,
+    _list_verification_jobs,
+    _submit_verification,
+    _verify_proof,
+)
 from gateway.src.tools.billing import (
     _convert_currency,
     _create_wallet,
@@ -256,6 +264,13 @@ TOOL_REGISTRY: dict[str, ToolFunc] = {
     "query_metrics": _query_metrics,
     "get_metric_deltas": _get_metric_deltas,
     "get_metric_averages": _get_metric_averages,
+    # Gatekeeper — Formal Verification
+    "submit_verification": _submit_verification,
+    "get_verification_status": _get_verification_status,
+    "list_verification_jobs": _list_verification_jobs,
+    "cancel_verification": _cancel_verification,
+    "get_proof": _get_proof,
+    "verify_proof": _verify_proof,
 }
 
 

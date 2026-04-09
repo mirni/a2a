@@ -39,6 +39,7 @@ from gateway.src.routes.v1.infra import router as infra_router
 from gateway.src.routes.v1.marketplace import router as marketplace_router
 from gateway.src.routes.v1.messaging import router as messaging_router
 from gateway.src.routes.v1.payments import router as payments_router
+from gateway.src.routes.v1.gatekeeper import router as gatekeeper_router
 from gateway.src.routes.v1.trust import router as trust_router
 from gateway.src.routes.websocket import router as ws_router
 from gateway.src.signing import signing_key_handler
@@ -101,6 +102,7 @@ def create_app() -> FastAPI:
     app.include_router(marketplace_router)
     app.include_router(messaging_router)
     app.include_router(trust_router)
+    app.include_router(gatekeeper_router)
     app.include_router(_redirect_router)
 
     # Exception handler for deps._ResponseError (auth/rate-limit failures in Depends)
