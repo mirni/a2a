@@ -67,7 +67,7 @@ jobs:
         continue-on-error: true  # Non-blocking while findings are triaged
         uses: docker://semgrep/semgrep
         with:
-          args: semgrep scan --config auto --error --exclude='**/tests/**' --exclude='**/node_modules/**' --exclude='lambda/**' .
+          args: semgrep scan --config auto --error --exclude='**/tests/**' --exclude='**/node_modules/**' .
 
       - name: Dependency audit
         run: pip-audit -r requirements.txt
