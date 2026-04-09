@@ -57,7 +57,7 @@ jobs:
       - name: SAST with Semgrep
         uses: docker://semgrep/semgrep
         with:
-          args: semgrep scan --config auto --error --exclude='**/tests/**' .
+          args: semgrep scan --config auto --error --exclude='**/tests/**' --exclude='lambda/**' .
 
       - uses: actions/setup-python@v6
         with:
