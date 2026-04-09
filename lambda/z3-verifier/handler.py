@@ -55,46 +55,57 @@ def lambda_handler(event, context):
 
             if check == sat:
                 model_str = str(solver.model())
-                property_results.append({
-                    "name": name,
-                    "result": "satisfied",
-                    "model": model_str,
-                })
+                property_results.append(
+                    {
+                        "name": name,
+                        "result": "satisfied",
+                        "model": model_str,
+                    }
+                )
             elif check == unsat:
-                property_results.append({
-                    "name": name,
-                    "result": "violated",
-                    "reason": "unsatisfiable",
-                    "proof": str(solver.proof()) if solver.proof() else None,
-                })
+                property_results.append(
+                    {
+                        "name": name,
+                        "result": "violated",
+                        "reason": "unsatisfiable",
+                        "proof": str(solver.proof()) if solver.proof() else None,
+                    }
+                )
                 overall_result = "violated"
             else:
-                property_results.append({
-                    "name": name,
-                    "result": "unknown",
-                    "reason": str(solver.reason_unknown()),
-                })
+                property_results.append(
+                    {
+                        "name": name,
+                        "result": "unknown",
+                        "reason": str(solver.reason_unknown()),
+                    }
+                )
                 if overall_result == "satisfied":
                     overall_result = "unknown"
 
         except Exception as e:
-            property_results.append({
-                "name": name,
-                "result": "error",
-                "reason": str(e),
-                "traceback": traceback.format_exc(),
-            })
+            property_results.append(
+                {
+                    "name": name,
+                    "result": "error",
+                    "reason": str(e),
+                    "traceback": traceback.format_exc(),
+                }
+            )
             overall_result = "error"
 
     duration_ms = int((time.monotonic() - start) * 1000)
 
     # Build proof data blob for hashing
-    proof_blob = json.dumps({
-        "job_id": job_id,
-        "result": overall_result,
-        "property_results": property_results,
-        "timestamp": time.time(),
-    }, sort_keys=True)
+    proof_blob = json.dumps(
+        {
+            "job_id": job_id,
+            "result": overall_result,
+            "property_results": property_results,
+            "timestamp": time.time(),
+        },
+        sort_keys=True,
+    )
     proof_hash = hashlib.sha3_256(proof_blob.encode()).hexdigest()
 
     return {

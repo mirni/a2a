@@ -93,15 +93,17 @@ class TestIAMMode:
             region="us-east-1",
         )
 
-        result_payload = json.dumps({
-            "job_id": "vj-test",
-            "status": "completed",
-            "result": "satisfied",
-            "property_results": [],
-            "proof_data": "{}",
-            "proof_hash": "abc",
-            "duration_ms": 10,
-        }).encode()
+        result_payload = json.dumps(
+            {
+                "job_id": "vj-test",
+                "status": "completed",
+                "result": "satisfied",
+                "property_results": [],
+                "proof_data": "{}",
+                "proof_hash": "abc",
+                "duration_ms": 10,
+            }
+        ).encode()
 
         mock_payload = MagicMock()
         mock_payload.read.return_value = result_payload

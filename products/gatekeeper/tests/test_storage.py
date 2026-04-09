@@ -67,9 +67,7 @@ class TestJobCRUD:
         )
         await storage.create_job(job)
 
-        updated = await storage.update_job_status(
-            job.id, VerificationStatus.RUNNING
-        )
+        updated = await storage.update_job_status(job.id, VerificationStatus.RUNNING)
         assert updated.status == VerificationStatus.RUNNING
 
     @pytest.mark.asyncio
@@ -117,21 +115,15 @@ class TestJobCRUD:
     @pytest.mark.asyncio
     async def test_list_jobs_limit(self, storage):
         for _ in range(10):
-            await storage.create_job(
-                VerificationJob(agent_id="agent-limit", properties=[])
-            )
+            await storage.create_job(VerificationJob(agent_id="agent-limit", properties=[]))
 
         jobs = await storage.list_jobs("agent-limit", limit=3)
         assert len(jobs) == 3
 
     @pytest.mark.asyncio
     async def test_list_jobs_different_agent(self, storage):
-        await storage.create_job(
-            VerificationJob(agent_id="agent-a", properties=[])
-        )
-        await storage.create_job(
-            VerificationJob(agent_id="agent-b", properties=[])
-        )
+        await storage.create_job(VerificationJob(agent_id="agent-a", properties=[]))
+        await storage.create_job(VerificationJob(agent_id="agent-b", properties=[]))
 
         jobs_a = await storage.list_jobs("agent-a")
         assert len(jobs_a) == 1

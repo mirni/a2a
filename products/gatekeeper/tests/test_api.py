@@ -29,12 +29,15 @@ from products.gatekeeper.src.models import (
 
 def _make_satisfied_response(job_id: str = "vj-test") -> dict[str, Any]:
     """Create a mock Lambda response indicating SAT."""
-    proof_blob = json.dumps({
-        "job_id": job_id,
-        "result": "satisfied",
-        "property_results": [{"name": "p1", "result": "satisfied", "model": "[x = 5]"}],
-        "timestamp": time.time(),
-    }, sort_keys=True)
+    proof_blob = json.dumps(
+        {
+            "job_id": job_id,
+            "result": "satisfied",
+            "property_results": [{"name": "p1", "result": "satisfied", "model": "[x = 5]"}],
+            "timestamp": time.time(),
+        },
+        sort_keys=True,
+    )
     return {
         "job_id": job_id,
         "status": "completed",
@@ -48,12 +51,15 @@ def _make_satisfied_response(job_id: str = "vj-test") -> dict[str, Any]:
 
 def _make_violated_response(job_id: str = "vj-test") -> dict[str, Any]:
     """Create a mock Lambda response indicating UNSAT."""
-    proof_blob = json.dumps({
-        "job_id": job_id,
-        "result": "violated",
-        "property_results": [{"name": "p1", "result": "violated", "reason": "unsatisfiable"}],
-        "timestamp": time.time(),
-    }, sort_keys=True)
+    proof_blob = json.dumps(
+        {
+            "job_id": job_id,
+            "result": "violated",
+            "property_results": [{"name": "p1", "result": "violated", "reason": "unsatisfiable"}],
+            "timestamp": time.time(),
+        },
+        sort_keys=True,
+    )
     return {
         "job_id": job_id,
         "status": "completed",
@@ -76,10 +82,12 @@ class TestSubmitVerification:
         """Job is created in PENDING state when no verifier is attached."""
         job = await api.submit_verification(
             agent_id="agent-test",
-            properties=[{
-                "name": "p1",
-                "expression": "(assert true)",
-            }],
+            properties=[
+                {
+                    "name": "p1",
+                    "expression": "(assert true)",
+                }
+            ],
         )
         assert job.status == VerificationStatus.PENDING
         assert job.cost == Decimal("6")  # 5 base + 1 per property
@@ -151,10 +159,7 @@ class TestSubmitVerification:
         """Cost is 5 base + 1 per property."""
         job = await api.submit_verification(
             agent_id="agent-test",
-            properties=[
-                {"name": f"p{i}", "expression": "(assert true)"}
-                for i in range(3)
-            ],
+            properties=[{"name": f"p{i}", "expression": "(assert true)"} for i in range(3)],
         )
         assert job.cost == Decimal("8")  # 5 + 3
 

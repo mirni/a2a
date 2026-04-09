@@ -55,9 +55,7 @@ class TestVerificationJob:
     def test_create_minimal(self):
         job = VerificationJob(
             agent_id="agent-test",
-            properties=[
-                PropertySpec(name="p1", expression="(assert true)")
-            ],
+            properties=[PropertySpec(name="p1", expression="(assert true)")],
         )
         assert job.id.startswith("vj-")
         assert job.status == VerificationStatus.PENDING
@@ -104,9 +102,7 @@ class TestVerificationJob:
 
     def test_all_statuses(self):
         for status in VerificationStatus:
-            assert status.value in (
-                "pending", "running", "completed", "failed", "timeout", "cancelled"
-            )
+            assert status.value in ("pending", "running", "completed", "failed", "timeout", "cancelled")
 
     def test_all_results(self):
         for result in VerificationResult:

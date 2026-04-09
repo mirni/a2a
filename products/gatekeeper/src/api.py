@@ -139,9 +139,7 @@ class GatekeeperAPI:
         cursor: str | None = None,
     ) -> list[VerificationJob]:
         """List verification jobs for an agent."""
-        return await self.storage.list_jobs(
-            agent_id=agent_id, status=status, limit=limit, cursor=cursor
-        )
+        return await self.storage.list_jobs(agent_id=agent_id, status=status, limit=limit, cursor=cursor)
 
     async def cancel_verification(self, job_id: str) -> VerificationJob:
         """Cancel a pending or running verification job."""
@@ -154,13 +152,9 @@ class GatekeeperAPI:
             VerificationStatus.FAILED,
             VerificationStatus.CANCELLED,
         ):
-            raise JobAlreadyTerminalError(
-                f"Job {job_id} is in terminal state: {job.status}"
-            )
+            raise JobAlreadyTerminalError(f"Job {job_id} is in terminal state: {job.status}")
 
-        job = await self.storage.update_job_status(
-            job_id, VerificationStatus.CANCELLED
-        )
+        job = await self.storage.update_job_status(job_id, VerificationStatus.CANCELLED)
         return job
 
     async def get_proof(self, proof_id: str) -> ProofArtifact:

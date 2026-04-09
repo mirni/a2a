@@ -35,15 +35,11 @@ class VerifierClient:
         function_url: str | None = None,
         shared_secret: str | None = None,
     ):
-        self.function_name = function_name or os.environ.get(
-            "VERIFIER_LAMBDA_FUNCTION", "z3-verifier"
-        )
+        self.function_name = function_name or os.environ.get("VERIFIER_LAMBDA_FUNCTION", "z3-verifier")
         self.region = region or os.environ.get("VERIFIER_LAMBDA_REGION", "us-east-1")
         self.auth_mode = auth_mode or os.environ.get("VERIFIER_AUTH_MODE", "iam")
         self.function_url = function_url or os.environ.get("VERIFIER_FUNCTION_URL", "")
-        self.shared_secret = shared_secret or os.environ.get(
-            "VERIFIER_SHARED_SECRET", ""
-        )
+        self.shared_secret = shared_secret or os.environ.get("VERIFIER_SHARED_SECRET", "")
 
         self._boto_client = None
         self._http_client = None
@@ -63,9 +59,7 @@ class VerifierClient:
         if self._boto_client is None:
             import boto3
 
-            self._boto_client = boto3.client(
-                "lambda", region_name=self.region
-            )
+            self._boto_client = boto3.client("lambda", region_name=self.region)
 
     async def _invoke_boto(self, job_spec: dict[str, Any]) -> dict[str, Any]:
         """Invoke Lambda via boto3 (synchronous, wrapped in executor)."""
@@ -84,9 +78,7 @@ class VerifierClient:
 
             payload = response["Payload"].read()
             if response.get("FunctionError"):
-                raise VerifierError(
-                    f"Lambda function error: {payload.decode()}"
-                )
+                raise VerifierError(f"Lambda function error: {payload.decode()}")
             return json.loads(payload)
 
         return await loop.run_in_executor(None, _sync_invoke)
@@ -112,9 +104,7 @@ class VerifierClient:
         )
 
         if response.status_code != 200:
-            raise VerifierError(
-                f"Verifier returned {response.status_code}: {response.text}"
-            )
+            raise VerifierError(f"Verifier returned {response.status_code}: {response.text}")
 
         return response.json()
 

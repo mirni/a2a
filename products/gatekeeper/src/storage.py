@@ -173,15 +173,11 @@ class GatekeeperStorage:
 
     async def get_job(self, job_id: str) -> VerificationJob | None:
         """Retrieve a verification job by ID."""
-        cursor = await self._db.execute(
-            "SELECT * FROM verification_jobs WHERE id = ?", (job_id,)
-        )
+        cursor = await self._db.execute("SELECT * FROM verification_jobs WHERE id = ?", (job_id,))
         row = await cursor.fetchone()
         return _job_from_row(row) if row else None
 
-    async def get_job_by_idempotency_key(
-        self, idempotency_key: str
-    ) -> VerificationJob | None:
+    async def get_job_by_idempotency_key(self, idempotency_key: str) -> VerificationJob | None:
         """Retrieve a job by its idempotency key."""
         cursor = await self._db.execute(
             "SELECT * FROM verification_jobs WHERE idempotency_key = ?",
@@ -277,24 +273,18 @@ class GatekeeperStorage:
 
     async def get_proof(self, proof_id: str) -> ProofArtifact | None:
         """Retrieve a proof artifact by ID."""
-        cursor = await self._db.execute(
-            "SELECT * FROM proof_artifacts WHERE id = ?", (proof_id,)
-        )
+        cursor = await self._db.execute("SELECT * FROM proof_artifacts WHERE id = ?", (proof_id,))
         row = await cursor.fetchone()
         return _proof_from_row(row) if row else None
 
     async def get_proof_by_job(self, job_id: str) -> ProofArtifact | None:
         """Retrieve the proof artifact for a given job."""
-        cursor = await self._db.execute(
-            "SELECT * FROM proof_artifacts WHERE job_id = ?", (job_id,)
-        )
+        cursor = await self._db.execute("SELECT * FROM proof_artifacts WHERE job_id = ?", (job_id,))
         row = await cursor.fetchone()
         return _proof_from_row(row) if row else None
 
     async def get_proof_by_hash(self, proof_hash: str) -> ProofArtifact | None:
         """Retrieve a proof by its hash."""
-        cursor = await self._db.execute(
-            "SELECT * FROM proof_artifacts WHERE proof_hash = ?", (proof_hash,)
-        )
+        cursor = await self._db.execute("SELECT * FROM proof_artifacts WHERE proof_hash = ?", (proof_hash,))
         row = await cursor.fetchone()
         return _proof_from_row(row) if row else None
