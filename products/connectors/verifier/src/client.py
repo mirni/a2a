@@ -1,8 +1,9 @@
 """Verifier client — invokes AWS Lambda Z3 function for formal verification.
 
-Supports two auth modes:
+Supports three auth modes:
   - IAM (boto3 Lambda invoke with SigV4 signing)
   - Shared secret (httpx POST to Function URL with X-Verifier-Secret header)
+  - Mock (calls handler.lambda_handler directly — for CI/testing)
 """
 
 from __future__ import annotations
@@ -130,3 +131,30 @@ class VerifierClient:
         if self._http_client is not None:
             await self._http_client.aclose()
             self._http_client = None
+
+
+class MockVerifierClient:
+    """In-process mock that calls the Lambda handler directly.
+
+    Used when VERIFIER_AUTH_MODE=mock (CI and local testing).
+    Requires z3-solver to be installed.
+    """
+
+    async def invoke(self, job_spec: dict[str, Any]) -> dict[str, Any]:
+        import asyncio
+        import importlib
+        import sys
+
+        # Import the handler from the lambda directory
+        handler_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "lambda", "z3-verifier")
+        handler_path = os.path.normpath(handler_path)
+
+        if handler_path not in sys.path:
+            sys.path.insert(0, handler_path)
+
+        handler_mod = importlib.import_module("handler")
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, handler_mod.lambda_handler, job_spec, None)
+
+    async def close(self) -> None:
+        pass

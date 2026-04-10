@@ -56,8 +56,8 @@ class CreateIntentRequest(BaseModel):
             }
         },
     )
-    payer: str
-    payee: str
+    payer: str = Field(max_length=128)
+    payee: str = Field(max_length=128)
     amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=2)
     description: str = ""
     currency: str = "CREDITS"
@@ -77,8 +77,8 @@ class CreateEscrowRequest(BaseModel):
             }
         },
     )
-    payer: str
-    payee: str
+    payer: str = Field(max_length=128)
+    payee: str = Field(max_length=128)
     amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=2)
     description: str = ""
     currency: str = "CREDITS"
@@ -100,8 +100,8 @@ class CreatePerformanceEscrowRequest(BaseModel):
             }
         },
     )
-    payer: str
-    payee: str
+    payer: str = Field(max_length=128)
+    payee: str = Field(max_length=128)
     amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=2)
     metric_name: str
     threshold: str
@@ -115,7 +115,7 @@ class PartialCaptureRequest(BaseModel):
 
 class SplitEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    payee: str
+    payee: str = Field(max_length=128)
     percentage: float
 
 
@@ -131,7 +131,7 @@ class CreateSplitIntentRequest(BaseModel):
             }
         },
     )
-    payer: str
+    payer: str = Field(max_length=128)
     amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=2)
     splits: list[SplitEntry]
     description: str = ""
@@ -159,8 +159,8 @@ class CreateSubscriptionRequest(BaseModel):
             }
         },
     )
-    payer: str
-    payee: str
+    payer: str = Field(max_length=128)
+    payee: str = Field(max_length=128)
     amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=2)
     interval: str
     description: str = ""

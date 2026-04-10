@@ -19,7 +19,10 @@ def calculate_tool_cost(pricing: dict[str, Any], params: dict[str, Any]) -> floa
 
     model = pricing.get("model")
     if model == "percentage":
-        amount = float(params.get("amount", 0))
+        try:
+            amount = float(params.get("amount", 0))
+        except (ValueError, TypeError):
+            amount = 0.0
         pct = float(pricing.get("percentage", 0))
         min_fee = float(pricing.get("min_fee", 0))
         max_fee = float(pricing.get("max_fee", float("inf")))

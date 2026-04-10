@@ -45,7 +45,7 @@ class CreateWalletRequest(BaseModel):
         extra="forbid",
         json_schema_extra={"example": {"agent_id": "agent-alice", "initial_balance": "100.00", "signup_bonus": True}},
     )
-    agent_id: str
+    agent_id: str = Field(max_length=128)
     initial_balance: Decimal = Decimal("0")
     signup_bonus: bool = True
 
