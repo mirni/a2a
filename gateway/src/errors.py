@@ -103,6 +103,7 @@ async def handle_product_exception(request: Request, exc: Exception) -> JSONResp
         "ValidationError": (400, "validation_error"),
         "InvalidMetricError": (400, "invalid_metric"),
         "ValueError": (400, "validation_error"),
+        "UnsupportedCurrencyError": (422, "unsupported_currency"),
         # Tool-level errors
         "ToolValidationError": (400, "validation_error"),
         "ToolForbiddenError": (403, "forbidden"),
@@ -126,6 +127,7 @@ async def handle_product_exception(request: Request, exc: Exception) -> JSONResp
         "ProofNotFoundError": (404, "proof_not_found"),
         "JobAlreadyTerminalError": (409, "job_already_terminal"),
         "IdempotencyConflictError": (409, "idempotency_conflict"),
+        "InvalidPolicyError": (400, "invalid_policy"),
     }
 
     if exc_type in mapping:

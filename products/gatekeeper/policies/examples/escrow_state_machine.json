@@ -1,0 +1,32 @@
+{
+  "name": "escrow_state_machine",
+  "description": "An escrow is either funded OR released OR refunded, and never two states at once. Encodes mutual exclusion as a boolean invariant.",
+  "variables": [
+    {"name": "funded",   "type": "bool"},
+    {"name": "released", "type": "bool"},
+    {"name": "refunded", "type": "bool"}
+  ],
+  "assertions": [
+    {
+      "op": "=>",
+      "args": [
+        {"op": "and", "args": ["released", "refunded"]},
+        false
+      ]
+    },
+    {
+      "op": "=>",
+      "args": [
+        {"op": "and", "args": ["funded", "refunded"]},
+        false
+      ]
+    },
+    {
+      "op": "=>",
+      "args": [
+        {"op": "and", "args": ["funded", "released"]},
+        false
+      ]
+    }
+  ]
+}

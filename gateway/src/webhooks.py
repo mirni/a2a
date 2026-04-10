@@ -148,6 +148,17 @@ class WebhookManager:
         await harden_connection(self._db)
         await self._db.execute(_SCHEMA_WEBHOOKS)
         await self._db.execute(_SCHEMA_DELIVERIES)
+
+        # Migrate legacy DBs that predate the ``filter_agent_ids`` column.
+        # ``CREATE TABLE IF NOT EXISTS`` is a no-op on existing tables, so
+        # legacy installations never get the new column and every INSERT
+        # fails with "table webhooks has no column named filter_agent_ids".
+        # This fixes audit finding HIGH-6.
+        cursor = await self._db.execute("PRAGMA table_info(webhooks)")
+        existing = {row[1] for row in await cursor.fetchall()}
+        if "filter_agent_ids" not in existing:
+            await self._db.execute("ALTER TABLE webhooks ADD COLUMN filter_agent_ids TEXT")
+
         await self._db.commit()
 
     async def close(self) -> None:

@@ -6872,3 +6872,97 @@ Address all issues from principal SW engineer review of the Z3 verification prod
   don't invest in ACP/AGNTCY/ANP until one breaks out.
 - Human has ~12 account registrations + ~10 decisions queued in strategy
   doc §7 (total ~1 hour human work).
+
+---
+
+## 2026-04-10 — v1.2.2 Audit Remediation + Gatekeeper JSON Policy DSL
+
+### Human Prompt
+
+"Done adding the TXT record and the github secret. PR merged. Look at
+the audit results in reports/external/multi-persona-audit-v1.2.1-2026-04-10.md
+and address all findings. Once addressed, open PR, wait to make sure CI
+is all green, then merge and deploy 1.2.2. Refactor formal verification
+service to accept custom invariants passed by client (user) -- use a
+json policy approach to allow clients to pass their own invariants.
+Generate some example policies, update documentation to reflect this."
+
+### Work
+
+All work on branch `fix/audit-v1.2.1-remediation` → PR for v1.2.2.
+
+**Audit findings addressed** (reports/external/multi-persona-audit-v1.2.1-2026-04-10.md):
+
+- **CRIT-2/3/4** — `/v1/batch` bypassed ownership authorisation and the
+  admin gate, letting a free-tier caller enumerate any agent's keys or
+  invoke admin-only tools by routing the call through the batch envelope.
+  Root cause: single site in `gateway/src/routes/batch.py` missing the
+  `check_ownership_authorization` + `ADMIN_ONLY_TOOLS` check that
+  `/v1/execute` already performs. Fixed + 4 BOLA regression tests.
+- **CRIT-2 (Gatekeeper)** — Failed verification jobs still charged the
+  caller. Fixed by zeroing `tc.cost` in the submit route handler when
+  the job's terminal status is FAILED / TIMEOUT / result=error, before
+  `finalize_response` debits the wallet.
+- **HIGH-2** — Refund silently retained the 2% gateway fee.
+  `gateway/src/tools/payments.py::_refund_intent` now emits
+  `fee_refunded` + `fee_retained` so integrators can reconcile.
+- **HIGH-3** — `gateway_fee` leaked float representation
+  (`"0.0246"`, `"5.0"`). Added `_format_money()` helper that runs every
+  monetary field through `Decimal.quantize(Decimal("0.01"),
+  rounding=ROUND_HALF_UP)`.
+- **HIGH-4** — `/v1/disputes` 500 OperationalError. Cause: legacy
+  SQLite file missing `deadline_at` / `respondent` / `response` / etc.
+  Added `_ensure_columns` migration helper and call it at
+  `DisputeEngine.connect()` time.
+- **HIGH-5** — `/v1/billing/wallets/{id}/convert` returned 500 for
+  cross-currency pairs (USD→ETH). Rewrote
+  `ExchangeRateService.get_rate()` with a two-hop routing path via
+  CREDITS; added `UnsupportedCurrencyError → 422` mapping in
+  `gateway/src/errors.py`; wrapped `convert_currency` route in
+  `handle_product_exception`.
+- **HIGH-6** — `/v1/infra/webhooks` 500 when legacy DB lacked
+  `filter_agent_ids`. Added inline `ALTER TABLE ADD COLUMN` migration in
+  `WebhookManager.connect()`.
+
+**Gatekeeper JSON Policy DSL (main feature):**
+
+- New `products/gatekeeper/src/policy.py` with `JsonPolicy` Pydantic
+  model (variables + assertions) and `compile_policy_to_smt2`
+  deterministic compiler.
+- Supported types: int, real, bool. Supported operators: arithmetic
+  (`+ - * /`), comparison (`== != < <= > >=`), boolean
+  (`and or not =>`).
+- `PropertySpec.language` now accepts `json_policy` in addition to
+  `z3_smt2`. `GatekeeperAPI.submit_verification` validates json_policy
+  expressions at admission (returns HTTP 400 on malformed JSON,
+  `InvalidPolicyError`), so integrators don't pay for broken submissions.
+- Compilation happens JIT inside `_execute_job`, preserving the
+  original JSON in storage for audit/display.
+- 5 example policies shipped:
+  `balance_conservation.json`, `withdraw_guard.json`,
+  `fee_bounded.json`, `escrow_state_machine.json`, `rate_limit_ok.json`
+  under `products/gatekeeper/policies/examples/`.
+- New guide: `docs/infra/GATEKEEPER_JSON_POLICY.md`.
+
+**Indie DX (P1 from audit):**
+
+- `/v1/onboarding` quickstart steps 3 and 5 now use REST routes
+  (`/v1/billing/wallets/.../balance`,
+  `/v1/marketplace/services?query=...`) instead of the legacy
+  `/v1/execute` envelope.
+
+**Tests:**
+
+- `gateway/tests/v1/test_audit_v1_2_1_regressions.py` — 16 regression
+  tests (BOLA bypass, schema migrations, decimal formatting, refund
+  disclosure, convert multi-hop, X-API-Key OpenAPI documentation, failed
+  job no-charge, json_policy end-to-end, onboarding quickstart).
+- `products/gatekeeper/tests/test_policy.py` — 17 tests (schema,
+  compiler ops, determinism, example-policy compilation, Z3 eval).
+- Full gateway suite still green (1580 tests, up from 1577).
+
+### Next
+
+- Commit, open PR against `main`, wait for CI green, merge, deploy
+  v1.2.2.
+

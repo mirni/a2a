@@ -187,6 +187,47 @@ class TestExchangeRateService:
         assert result.amount == Decimal("42.50")
         assert result.currency == Currency.EUR
 
+    async def test_get_rate_two_hop_pivot_via_credits(self, storage: StorageBackend):
+        """HIGH-5 regression: USD→ETH must resolve via CREDITS pivot.
+
+        When no direct USD→ETH rate exists but USD→CREDITS and CREDITS→ETH
+        do, ``get_rate`` must return the product (two-hop conversion).
+        """
+        svc = ExchangeRateService(storage=storage)
+        await svc.initialize_default_rates()
+
+        # Default rates seed USD<->CREDITS and ETH<->CREDITS but no direct
+        # USD<->ETH row. The service must therefore fall back to the
+        # two-hop pivot and return a non-zero product rate.
+        rate = await svc.get_rate(Currency.USD, Currency.ETH)
+        assert rate > Decimal("0")
+
+        # The rate must equal rate(USD→CREDITS) * rate(CREDITS→ETH).
+        usd_to_credits = await svc.get_rate(Currency.USD, Currency.CREDITS)
+        credits_to_eth = await svc.get_rate(Currency.CREDITS, Currency.ETH)
+        assert rate == usd_to_credits * credits_to_eth
+
+    async def test_get_rate_two_hop_unsupported_when_leg_missing(self, storage: StorageBackend):
+        """Two-hop fallback raises when one leg has no rate."""
+        svc = ExchangeRateService(storage=storage)
+        await svc.initialize_default_rates()
+
+        # Delete the CREDITS→ETH leg so the two-hop path fails.
+        await storage.db.execute(
+            "DELETE FROM exchange_rates WHERE from_currency = ? AND to_currency = ?",
+            (Currency.CREDITS.value, Currency.ETH.value),
+        )
+        # Also remove any direct USD→ETH row (there shouldn't be one, but
+        # be defensive so this test stays meaningful as rates evolve).
+        await storage.db.execute(
+            "DELETE FROM exchange_rates WHERE from_currency = ? AND to_currency = ?",
+            (Currency.USD.value, Currency.ETH.value),
+        )
+        await storage.db.commit()
+
+        with pytest.raises(UnsupportedCurrencyError):
+            await svc.get_rate(Currency.USD, Currency.ETH)
+
 
 # ---------------------------------------------------------------------------
 # Multi-currency wallet tests

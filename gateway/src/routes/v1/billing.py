@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from gateway.src.config import GatewayConfig
 from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
-from gateway.src.errors import error_response
+from gateway.src.errors import error_response, handle_product_exception
 from gateway.src.tools.billing import (
     _convert_currency,
     _create_wallet,
@@ -403,5 +403,8 @@ async def convert_currency(
         "_caller_tier": tc.agent_tier,
     }
     await check_ownership(tc, params)
-    result = await _convert_currency(tc.ctx, params)
+    try:
+        result = await _convert_currency(tc.ctx, params)
+    except Exception as exc:
+        return await handle_product_exception(tc.request, exc)
     return await finalize_response(tc, result)

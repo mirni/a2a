@@ -30,7 +30,10 @@ class PropertySpecRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str = Field(max_length=128)
     scope: str = "economic"
-    language: str = "z3_smt2"
+    # ``z3_smt2`` → raw SMT-LIB2 text; ``json_policy`` → JSON-encoded
+    # :class:`products.gatekeeper.src.policy.JsonPolicy` (compiled to
+    # SMT-LIB2 on the server).
+    language: str = Field(default="z3_smt2", pattern=r"^(z3_smt2|json_policy)$")
     expression: str = Field(max_length=1_000_000)
     description: str = Field(default="", max_length=1000)
 
@@ -112,6 +115,15 @@ async def submit_verification(
         result = await _submit_verification(tc.ctx, params)
     except Exception as exc:
         return await handle_product_exception(tc.request, exc)
+
+    # CRIT-2 (audit v1.2.1): failed verification jobs must not charge the
+    # caller.  When the verifier backend raises (or the job otherwise ends
+    # in a terminal FAILED/TIMEOUT/ERROR state before the response is
+    # returned) we waive the per-call cost so the integrator is not billed
+    # for infrastructure problems they cannot fix.
+    if result.get("status") in {"failed", "timeout"} or result.get("result") == "error":
+        tc.cost = 0.0
+
     location = f"/v1/gatekeeper/jobs/{result.get('job_id', '')}"
     return await finalize_response(tc, result, status_code=201, location=location)
 

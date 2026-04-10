@@ -67,9 +67,19 @@ class PropertySpec(BaseModel):
 
     name: str = Field(max_length=128)
     scope: VerificationScope = VerificationScope.ECONOMIC
-    language: str = "z3_smt2"  # Only z3_smt2 for Phase 1
+    # Supported languages:
+    #   z3_smt2     — raw SMT-LIB2 string passed straight to Z3
+    #   json_policy — structured JSON policy, compiled to SMT-LIB2 on submit
+    language: str = "z3_smt2"
     expression: str = Field(max_length=1_000_000)  # 1MB cap
     description: str = Field(default="", max_length=1000)
+
+    @field_validator("language")
+    @classmethod
+    def _validate_language(cls, v: str) -> str:
+        if v not in ("z3_smt2", "json_policy"):
+            raise ValueError(f"unsupported property language: {v!r} (expected z3_smt2 or json_policy)")
+        return v
 
 
 class VerificationJob(BaseModel):

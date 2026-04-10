@@ -22,6 +22,7 @@ from .models import (
     VerificationScope,
     VerificationStatus,
 )
+from .policy import JsonPolicy, PolicyCompileError, compile_policy_to_smt2
 from .storage import GatekeeperStorage
 
 
@@ -53,6 +54,40 @@ class IdempotencyConflictError(Exception):
     """Raised when an idempotency key collision is detected."""
 
     pass
+
+
+class InvalidPolicyError(ValueError):
+    """Raised when a submitted JSON policy fails to parse or compile."""
+
+    pass
+
+
+def _compile_json_policy_expression(expression: str) -> str:
+    """Parse and compile a JSON policy string to an SMT-LIB2 expression.
+
+    Wraps :func:`products.gatekeeper.src.policy.compile_policy_to_smt2`
+    with JSON-parse error handling so the caller only needs to handle one
+    exception type.
+
+    Raises :class:`InvalidPolicyError` on any parse / schema / compile
+    failure, with a caller-friendly message.
+    """
+    import json as _json
+
+    try:
+        data = _json.loads(expression)
+    except _json.JSONDecodeError as exc:
+        raise InvalidPolicyError(f"json_policy expression is not valid JSON: {exc.msg}") from exc
+
+    try:
+        policy = JsonPolicy.model_validate(data)
+    except Exception as exc:
+        raise InvalidPolicyError(f"json_policy failed schema validation: {exc}") from exc
+
+    try:
+        return compile_policy_to_smt2(policy)
+    except PolicyCompileError as exc:
+        raise InvalidPolicyError(f"json_policy failed to compile: {exc}") from exc
 
 
 # Cost: base + per-property
@@ -104,6 +139,15 @@ class GatekeeperAPI:
 
         # Parse properties
         parsed_props = [PropertySpec(**p) for p in properties]
+
+        # Eagerly validate json_policy expressions so integrators get a
+        # 4xx response at submission time instead of a deferred FAILED
+        # job. We only validate here; the compiled SMT2 is produced
+        # just-in-time in ``_execute_job`` so the original policy is
+        # preserved in storage for audit / display.
+        for prop in parsed_props:
+            if prop.language == "json_policy":
+                _compile_json_policy_expression(prop.expression)
 
         # Calculate cost
         cost = _BASE_COST + _PER_PROPERTY_COST * len(parsed_props)
@@ -207,17 +251,27 @@ class GatekeeperAPI:
         await self.storage.update_job_status(job.id, VerificationStatus.RUNNING)
 
         try:
-            # Build invocation payload
-            job_spec = {
-                "job_id": job.id,
-                "properties": [
+            # Build invocation payload. For ``json_policy`` properties we
+            # compile the stored JSON expression to SMT-LIB2 just-in-time
+            # so the verifier backend only ever sees a single language.
+            compiled_props: list[dict[str, Any]] = []
+            for p in job.properties:
+                expression = p.expression
+                language = p.language
+                if language == "json_policy":
+                    expression = _compile_json_policy_expression(p.expression)
+                    language = "z3_smt2"
+                compiled_props.append(
                     {
                         "name": p.name,
-                        "language": p.language,
-                        "expression": p.expression,
+                        "language": language,
+                        "expression": expression,
                     }
-                    for p in job.properties
-                ],
+                )
+
+            job_spec = {
+                "job_id": job.id,
+                "properties": compiled_props,
                 "timeout_seconds": job.timeout_seconds,
             }
 
