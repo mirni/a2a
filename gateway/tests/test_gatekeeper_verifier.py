@@ -26,7 +26,18 @@ _VALID_PROPERTY = {
     "expression": "(declare-const x Int)\n(assert (> x 0))",
 }
 
-pytestmark = pytest.mark.asyncio
+z3_available = False
+try:
+    import z3  # noqa: F401
+
+    z3_available = True
+except ImportError:
+    pass
+
+pytestmark = [
+    pytest.mark.asyncio,
+    pytest.mark.skipif(not z3_available, reason="z3-solver not installed"),
+]
 
 
 @pytest.fixture
