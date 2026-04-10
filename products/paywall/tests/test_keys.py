@@ -126,3 +126,39 @@ class TestKeyLookup:
         assert len(keys2) == 1
         assert keys1[0]["tier"] == "free"
         assert keys2[0]["tier"] == "pro"
+
+
+class TestOnKeyCreatedCallback:
+    """v1.2.2 audit HIGH-8: KeyManager fires on_key_created after store."""
+
+    async def test_callback_invoked_with_agent_id(self, key_manager: KeyManager):
+        """The hook should receive the agent_id of the newly-issued key."""
+        received: list[str] = []
+
+        async def hook(agent_id: str) -> None:
+            received.append(agent_id)
+
+        key_manager.on_key_created = hook
+        await key_manager.create_key(agent_id="bot-hook-ok", tier="pro")
+        assert received == ["bot-hook-ok"]
+
+    async def test_callback_failure_does_not_block_key_issuance(
+        self, key_manager: KeyManager, caplog
+    ):
+        """A raised exception inside the hook must be logged and swallowed
+        so the key is still returned to the caller. A downstream identity
+        outage cannot block new provisioning.
+        """
+        import logging
+
+        async def broken_hook(agent_id: str) -> None:
+            raise RuntimeError("identity-down")
+
+        key_manager.on_key_created = broken_hook
+
+        with caplog.at_level(logging.WARNING, logger="paywall.keys"):
+            result = await key_manager.create_key(agent_id="bot-hook-fail", tier="pro")
+
+        assert result["key"].startswith("a2a_pro_")
+        assert result["agent_id"] == "bot-hook-fail"
+        assert any("on_key_created" in r.message for r in caplog.records)
