@@ -6966,3 +6966,73 @@ All work on branch `fix/audit-v1.2.1-remediation` → PR for v1.2.2.
 - Commit, open PR against `main`, wait for CI green, merge, deploy
   v1.2.2.
 
+---
+
+## 2026-04-10 21:54 — v1.2.3 audit remediation (P0 + P1 shipped)
+
+**Prompt:** "Execute the plan." + "Once done, open a PR, make sure CI
+runs green and release/deploy"
+
+**Branch:** `fix/audit-v1.2.2-remediation`
+**Source audit:** `reports/external/v1.2.2/multi-persona-audit-v1.2.2-2026-04-10.md`
+
+Delivered T-1 through T-9 (all P0/P1 items from the
+`tasks/done/v1.2.3-audit-remediation.md` plan). T-10 through T-24
+(P2/P3) deferred to v1.3.0.
+
+**Source code:**
+
+- `gateway/src/lifespan.py` — auto-wire `MockVerifierClient` when
+  `VERIFIER_AUTH_MODE=mock`; wire `KeyManager.on_key_created` callback
+  that auto-registers identity + seeds baseline reputation.
+- `products/connectors/verifier/src/client.py` — new
+  `MockVerifierClient` (in-process Z3) for CI / local.
+- `products/paywall/src/keys.py` — new `on_key_created` dataclass
+  hook, invoked after `create_key` with error-swallowing wrapper.
+- `products/paywall/src/rotation.py` / `products/paywall/src/storage.py`
+  — 300 s grace window for rotated keys, `rotated_at` / `expires_at`
+  / `confirmation` fields in rotation response.
+- `products/billing/src/exchange.py` — CREDITS↔ETH, CREDITS↔BTC
+  default seed rates; 18-decimal `Decimal` quantization per asset.
+- `products/identity/src/api.py` — `register_agent` is idempotent
+  when no public_key (or matching key) supplied; conflicting key
+  still raises `AgentAlreadyExistsError`.
+- `gateway/src/tools/identity.py` — `_register_agent` tool rotates
+  the stored public_key when the caller supplies a *different* one
+  after the auto-bind path has already stored a placeholder key.
+- `gateway/src/tools/payments.py` — `_REFUND_FEE_POLICY` block
+  + `fee_policy` field in all three refund response paths (voided,
+  idempotent-replay, settled) citing ADR-011.
+- `gateway/src/tools/infrastructure.py` — `list_api_keys` returns
+  `agent_id` + `owner_agent_id`.
+- `gateway/src/tools/gatekeeper.py` + `products/gatekeeper/src/api.py`
+  — `submit_job` refuses to start when no verifier backend is wired;
+  failed/timeout/error jobs zero their cost *before* debiting.
+
+**New files:**
+
+- `docs/adr/011-refund-fee-policy.md` — "retain_gateway_fee" decision
+  record (2 % platform fee retained on refund, rationale +
+  alternatives).
+- `gateway/tests/v1/test_audit_v1_2_2_regressions.py` — 13 regression
+  tests covering T-1 through T-9.
+
+**Test impact:**
+
+- 1597 gateway tests green (1592 + 5 verifier)
+- 152 paywall, 216 identity, 252 payments tests green
+- 18 pre-existing tests updated for the new idempotent
+  `register_agent` contract + 300 s grace window + mock verifier
+  sync-job behaviour + seeded baseline reputation.
+
+**Version bump:**
+
+- `gateway/src/_version.py` → 1.2.3
+- `sdk/pyproject.toml` → 1.2.3
+- `CHANGELOG.md` v1.2.3 entry with upgrade notes.
+
+### Next
+
+- Commit, push `fix/audit-v1.2.2-remediation`, open PR to `main`,
+  monitor CI, release/deploy.
+

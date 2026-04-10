@@ -703,6 +703,18 @@ class TestEdgeCases:
         revoked = await ctx.key_manager.revoke_key(key)
         assert revoked is True
 
+        # v1.2.2 T-6: revoked keys honor a 300s grace window. Backdate
+        # revoked_at past the window so the hard-revoke path is tested.
+        import time as _time
+
+        from paywall_src.keys import KEY_ROTATION_GRACE_SECONDS
+
+        past = _time.time() - (KEY_ROTATION_GRACE_SECONDS + 1)
+        await ctx.key_manager.storage.db.execute(
+            "UPDATE api_keys SET revoked_at = ? WHERE revoked = 1", (past,)
+        )
+        await ctx.key_manager.storage.db.commit()
+
         # Now the key should be rejected
         resp = await _exec(client, "get_balance", {"agent_id": agent_id}, key)
         assert resp.status_code == 401

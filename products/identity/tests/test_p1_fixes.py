@@ -87,13 +87,26 @@ class TestIdentityConflictDetection:
     """store_identity should raise on duplicate agent_id."""
 
     @pytest.mark.asyncio
-    async def test_duplicate_agent_raises(self, api):
-        """Registering the same agent_id twice should raise AgentAlreadyExistsError."""
+    async def test_duplicate_agent_raises_on_conflicting_key(self, api):
+        """v1.2.2 audit HIGH-8: register_agent is idempotent when the
+        caller omits the public_key (the auto-bind path on API key
+        provisioning) or passes the already-stored key. A *different*
+        public_key still raises to prevent silent key overwrite.
+        """
         from products.identity.src.api import AgentAlreadyExistsError
 
-        await api.register_agent("bot-dup")
+        first = await api.register_agent("bot-dup")
+        # Idempotent: no public_key supplied → returns the existing record.
+        again = await api.register_agent("bot-dup")
+        assert again.identity.public_key == first.identity.public_key
+        # Same key explicitly supplied → also idempotent.
+        again2 = await api.register_agent(
+            "bot-dup", public_key=first.identity.public_key
+        )
+        assert again2.identity.public_key == first.identity.public_key
+        # Conflicting key → raises.
         with pytest.raises(AgentAlreadyExistsError):
-            await api.register_agent("bot-dup")
+            await api.register_agent("bot-dup", public_key="ff" * 32)
 
     @pytest.mark.asyncio
     async def test_different_agents_ok(self, api):

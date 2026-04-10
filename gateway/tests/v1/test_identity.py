@@ -83,12 +83,18 @@ async def test_verify_agent_via_rest(client, api_key):
 
 
 async def test_get_agent_reputation_via_rest(client, api_key):
+    """v1.2.2 audit HIGH-8: key provisioning auto-seeds a baseline
+    reputation, so a freshly-registered agent returns 200 + zeroed
+    confidence instead of 404.
+    """
     resp = await client.get(
         "/v1/identity/agents/test-agent/reputation",
         headers={"Authorization": f"Bearer {api_key}"},
     )
-    # Agent has no reputation record, so 404 is expected
-    assert resp.status_code == 404
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["agent_id"] == "test-agent"
+    assert body["confidence"] == 0.0
 
 
 # ---------------------------------------------------------------------------

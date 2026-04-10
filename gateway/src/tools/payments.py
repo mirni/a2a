@@ -165,19 +165,29 @@ def _compute_create_intent_gateway_fee(amount: float) -> float:
     return calculate_tool_cost(tool_def.get("pricing", {}), {"amount": float(amount)})
 
 
+# v1.2.2 audit HIGH-2: refund response must cite a stable policy URL
+# so integrator reconciliation docs can link to it. See ADR-011.
+_REFUND_FEE_POLICY: dict[str, str] = {
+    "name": "retain_gateway_fee",
+    "adr": "ADR-011",
+    "url": "https://docs.greenhelix.net/adr/011-refund-fee-policy",
+    "summary": "The 2% gateway fee is retained on refund. See ADR-011.",
+}
+
+
 async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     """Refund a payment intent.
 
     - If pending: void it (no funds moved).
     - If settled: create a reverse transfer from payee to payer.
 
-    Audit HIGH-2 (v1.2.1): the gateway fee charged at ``create_intent``
-    time is **retained** on refund — it is not credited back to the payer
-    — because gateway execution cost was already incurred. To keep
-    clients honest about reconciliation, the response must always expose
-    the ``fee_refunded`` / ``fee_retained`` flags so integrators can see
-    the payer is net-down by ``fee_retained`` credits after a full
-    refund.
+    Audit HIGH-2 (v1.2.1 → v1.2.2): the gateway fee charged at
+    ``create_intent`` time is **retained** on refund — it is not
+    credited back to the payer — because gateway execution cost was
+    already incurred. The response always exposes
+    ``fee_refunded`` / ``fee_retained`` (legacy, v1.2.1) alongside the
+    ``fee_policy`` object (v1.2.2) that points at ADR-011 so
+    integrators can cite a stable URL in their reconciliation docs.
     """
     caller = params.get("_caller_agent_id", "")
     tier = params.get("_caller_tier", "")
@@ -198,6 +208,7 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
             "gateway_fee": _format_money(gateway_fee),
             "fee_refunded": fee_refunded,
             "fee_retained": _format_money(fee_retained),
+            "fee_policy": dict(_REFUND_FEE_POLICY),
         }
 
     # Idempotency: if already voided and idempotency_key provided, return success
@@ -209,6 +220,7 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
             "gateway_fee": _format_money(gateway_fee),
             "fee_refunded": fee_refunded,
             "fee_retained": _format_money(fee_retained),
+            "fee_policy": dict(_REFUND_FEE_POLICY),
         }
 
     if intent.status.value == "settled":
@@ -232,6 +244,7 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
             "gateway_fee": _format_money(gateway_fee),
             "fee_refunded": fee_refunded,
             "fee_retained": _format_money(fee_retained),
+            "fee_policy": dict(_REFUND_FEE_POLICY),
         }
 
     from payments_src.engine import InvalidStateError

@@ -175,6 +175,33 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await identity_storage.connect()
     identity_api = IdentityAPI(storage=identity_storage)
 
+    # v1.2.2 audit HIGH-8: auto-create identity record on key
+    # provisioning so ``GET /v1/identity/agents/{id}/reputation``
+    # works immediately after a new key is issued. We also seed a
+    # baseline reputation row (zeroed, confidence=0) so the reputation
+    # endpoint returns 200 instead of 404 on first read.
+    async def _auto_bind_identity(new_agent_id: str) -> None:
+        try:
+            existing = await identity_api.get_identity(new_agent_id)
+            if existing is None:
+                await identity_api.register_agent(agent_id=new_agent_id)
+                logger.info(
+                    "identity.auto_created agent_id=%s source=key_provision",
+                    new_agent_id,
+                )
+            # Seed baseline reputation so GET .../reputation returns 200.
+            reputation = await identity_api.get_reputation(new_agent_id)
+            if reputation is None:
+                await identity_api.compute_reputation(new_agent_id)
+        except Exception:  # noqa: BLE001
+            logger.warning(
+                "identity auto-bind failed for %s — key still issued",
+                new_agent_id,
+                exc_info=True,
+            )
+
+    key_manager.on_key_created = _auto_bind_identity
+
     # --- Marketplace ---
     from gateway.src.trust_adapter import make_trust_provider
 
@@ -199,22 +226,47 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     gatekeeper_storage = GatekeeperStorage(gatekeeper_dsn)
     await gatekeeper_storage.connect()
 
+    # --- Verifier client ---
+    # v1.2.2 audit CRIT-1: production sandbox had VERIFIER_AUTH_MODE unset,
+    # which silently dropped to verifier=None and made every Gatekeeper job
+    # fail synchronously. Defensive default: fall back to an in-process mock
+    # (z3-solver) so the service is always functional. Log loudly so ops
+    # notices and configures the real IAM backend.
     verifier_client: object | None = None
-    verifier_auth_mode = os.environ.get("VERIFIER_AUTH_MODE", "")
-    if verifier_auth_mode:
+    verifier_auth_mode = os.environ.get("VERIFIER_AUTH_MODE", "").strip()
+    if not verifier_auth_mode:
+        logger.error(
+            "VERIFIER_AUTH_MODE is unset — falling back to in-process mock "
+            "verifier. Configure VERIFIER_AUTH_MODE=iam + VERIFIER_LAMBDA_FUNCTION "
+            "+ VERIFIER_LAMBDA_REGION for production."
+        )
+        verifier_auth_mode = "mock"
+    try:
+        if verifier_auth_mode == "mock":
+            from products.connectors.verifier.src.client import MockVerifierClient
+
+            verifier_client = MockVerifierClient()
+            logger.info("Gatekeeper verifier: mock (in-process Z3)")
+        else:
+            from products.connectors.verifier.src.client import VerifierClient
+
+            verifier_client = VerifierClient()
+            logger.info("Gatekeeper verifier: %s", verifier_auth_mode)
+    except Exception:
+        logger.warning(
+            "Failed to initialize verifier client — attempting mock fallback",
+            exc_info=True,
+        )
         try:
-            if verifier_auth_mode == "mock":
-                from products.connectors.verifier.src.client import MockVerifierClient
+            from products.connectors.verifier.src.client import MockVerifierClient
 
-                verifier_client = MockVerifierClient()
-                logger.info("Gatekeeper verifier: mock (in-process Z3)")
-            else:
-                from products.connectors.verifier.src.client import VerifierClient
-
-                verifier_client = VerifierClient()
-                logger.info("Gatekeeper verifier: %s", verifier_auth_mode)
+            verifier_client = MockVerifierClient()
+            logger.info("Gatekeeper verifier: mock (fallback after init failure)")
         except Exception:
-            logger.warning("Failed to initialize verifier client — jobs will stay pending", exc_info=True)
+            logger.error(
+                "Mock verifier fallback also failed — Gatekeeper jobs will not run",
+                exc_info=True,
+            )
 
     gatekeeper_api = GatekeeperAPI.from_env(gatekeeper_storage, verifier=verifier_client)
 

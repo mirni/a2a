@@ -52,11 +52,28 @@ def _generate_key(tier: str) -> str:
     return f"a2a_{tier}_{random_part}"
 
 
+KEY_ROTATION_GRACE_SECONDS = 300
+"""Seconds during which a freshly-revoked key still authenticates.
+
+v1.2.2 audit HIGH-7: key rotation used to immediately invalidate the old
+key, making schema probing dangerous. We now keep the old key live for
+a short window so clients have time to swap in the new key without an
+outage.
+"""
+
+
 @dataclass
 class KeyManager:
     """API key lifecycle management."""
 
     storage: PaywallStorage
+    # v1.2.2 audit HIGH-8: the gateway lifespan wires this callback to
+    # ``IdentityAPI.register_agent`` so every new key also gets an
+    # identity record. The callback must be idempotent — it is invoked
+    # with just the ``agent_id`` and is expected to swallow
+    # "already exists" errors silently. A raised exception here does
+    # not roll back the key creation.
+    on_key_created: Any = None
 
     async def create_key(
         self,
@@ -102,6 +119,21 @@ class KeyManager:
             expires_at=expires_at,
         )
 
+        # v1.2.2 audit HIGH-8: fire the auto-bind callback so the
+        # identity record is created alongside the API key. Failures
+        # are logged but never propagate — a downstream outage in
+        # identity must not block key issuance.
+        if self.on_key_created is not None:
+            try:
+                await self.on_key_created(agent_id)
+            except Exception:  # noqa: BLE001
+                import logging
+
+                logging.getLogger("paywall.keys").warning(
+                    "on_key_created hook failed for agent_id=%s", agent_id,
+                    exc_info=True,
+                )
+
         return {
             "key": raw_key,
             "key_hash": key_hash,
@@ -131,7 +163,21 @@ class KeyManager:
             raise InvalidKeyError("API key not found")
 
         if record["revoked"]:
-            raise InvalidKeyError("API key has been revoked")
+            # v1.2.2 audit HIGH-7: honor a short grace window after
+            # revocation so freshly-rotated clients have time to swap
+            # in the new key. The window is only applied if the
+            # storage layer recorded a ``revoked_at`` timestamp.
+            revoked_at = record.get("revoked_at")
+            if (
+                revoked_at is not None
+                and (time.time() - float(revoked_at)) < KEY_ROTATION_GRACE_SECONDS
+            ):
+                grace_remaining = KEY_ROTATION_GRACE_SECONDS - (
+                    time.time() - float(revoked_at)
+                )
+                record["_key_grace_seconds_remaining"] = int(grace_remaining)
+            else:
+                raise InvalidKeyError("API key has been revoked")
 
         # Check expiration
         if record.get("expires_at") is not None and record["expires_at"] < time.time():

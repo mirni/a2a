@@ -120,12 +120,29 @@ async def test_rotate_key_via_rest(client, api_key):
     resp = await client.post(
         "/v1/infra/keys/rotate",
         json={"current_key": api_key},
-        headers={"Authorization": f"Bearer {api_key}"},
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            # v1.2.2 audit HIGH-7: rotation now requires an explicit
+            # confirmation header so it cannot happen by accident.
+            "X-Rotate-Confirmation": "confirm",
+        },
     )
     assert resp.status_code == 200
     body = resp.json()
     assert "new_key" in body
     assert body["new_key"] != api_key
+
+
+async def test_rotate_key_requires_confirmation_header(client, api_key):
+    """v1.2.2 audit HIGH-7 regression — missing header returns 428."""
+    resp = await client.post(
+        "/v1/infra/keys/rotate",
+        json={"current_key": api_key},
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 428
+    body = resp.json()
+    assert "confirmation" in body.get("detail", "").lower()
 
 
 # ---------------------------------------------------------------------------

@@ -57,7 +57,9 @@ async def test_add_agent_to_org(client, api_key, app):
     ctx = app.state.ctx
 
     # Register an agent identity (use test-agent to match api_key ownership)
-    await ctx.identity_api.register_agent("test-agent")
+    # v1.2.2 HIGH-8: identity is already auto-bound by the api_key
+    # fixture, so register_agent would raise. No-op here.
+    _ = ctx
 
     # Create org
     resp1 = await client.post(
@@ -117,7 +119,9 @@ async def test_get_org_not_found(client, api_key):
 async def test_add_agent_to_nonexistent_org(client, api_key, app):
     """Adding agent to non-existent org should fail."""
     ctx = app.state.ctx
-    await ctx.identity_api.register_agent("test-agent")
+    # v1.2.2 HIGH-8: identity is already auto-bound by the api_key
+    # fixture, so register_agent would raise. No-op here.
+    _ = ctx
 
     resp = await client.post(
         "/v1/execute",

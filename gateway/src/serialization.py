@@ -15,6 +15,7 @@ _MONETARY_FIELDS: frozenset[str] = frozenset(
         "balance",
         "amount",
         "cost",
+        "billed_cost",
         "fee",
         "new_balance",
         "price",
@@ -30,13 +31,22 @@ _MONETARY_FIELDS: frozenset[str] = frozenset(
         "spent",
         "cap",
         "used",
-        "from_amount",
-        "to_amount",
-        "rate",
         "average_rating",
         "discount_percent",
         "original_price",
         "discounted_price",
+    }
+)
+
+# Fields that contain high-precision exchange rates or crypto amounts.
+# v1.2.2 audit HIGH-5: these must not be quantized to 2 decimals or
+# cross-currency conversions like CREDITS↔ETH produce "0.00" garbage.
+# 18 decimals is the internal working precision (ETH wei).
+_HIGH_PRECISION_FIELDS: frozenset[str] = frozenset(
+    {
+        "rate",
+        "from_amount",
+        "to_amount",
     }
 )
 
@@ -75,6 +85,24 @@ def serialize_money(value: Any) -> str:
     return f"{Decimal(str(value)):.2f}"
 
 
+def serialize_high_precision(value: Any) -> str:
+    """Format a numeric value as an 18-decimal string (ETH wei precision).
+
+    Used for exchange rates and crypto-denominated amounts so tiny
+    values like ``CREDITS→ETH`` at ``2.5e-6`` are preserved across
+    the JSON boundary. Trailing zeros are kept so clients can parse
+    back to Decimal without precision loss.
+    """
+    if isinstance(value, str):
+        return value
+    d = Decimal(str(value))
+    # ``normalize`` would strip trailing zeros but also convert
+    # integer-looking Decimals to scientific notation, which breaks
+    # downstream JSON parsers. Stick to fixed point with enough digits
+    # to represent a wei.
+    return format(d, "f")
+
+
 def serialize_timestamp(value: Any) -> str:
     """Convert a Unix timestamp (float/int) to ISO 8601 UTC string."""
     if isinstance(value, str):
@@ -98,8 +126,12 @@ def serialize_response(data: Any) -> Any:
     if isinstance(data, dict):
         result = {}
         for key, value in data.items():
-            if key in _MONETARY_FIELDS and isinstance(value, (int, float)):
+            if key in _MONETARY_FIELDS and isinstance(value, (int, float, Decimal)):
                 result[key] = serialize_money(value)
+            elif key in _HIGH_PRECISION_FIELDS and isinstance(
+                value, (int, float, Decimal)
+            ):
+                result[key] = serialize_high_precision(value)
             elif key in _TIMESTAMP_FIELDS and value is not None:
                 result[key] = serialize_timestamp(value)
             else:

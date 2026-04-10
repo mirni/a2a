@@ -40,10 +40,7 @@ pytestmark = [
 ]
 
 
-@pytest.fixture
-async def mock_verifier_app(tmp_path, monkeypatch):
-    """Create a FastAPI app with VERIFIER_AUTH_MODE=mock."""
-    data_dir = str(tmp_path)
+def _seed_env(monkeypatch, data_dir: str) -> None:
     monkeypatch.setenv("A2A_DATA_DIR", data_dir)
     monkeypatch.setenv("BILLING_DSN", f"sqlite:///{data_dir}/billing.db")
     monkeypatch.setenv("PAYWALL_DSN", f"sqlite:///{data_dir}/paywall.db")
@@ -55,7 +52,34 @@ async def mock_verifier_app(tmp_path, monkeypatch):
     monkeypatch.setenv("WEBHOOK_DSN", f"sqlite:///{data_dir}/webhooks.db")
     monkeypatch.setenv("DISPUTE_DSN", f"sqlite:///{data_dir}/disputes.db")
     monkeypatch.setenv("MESSAGING_DSN", f"sqlite:///{data_dir}/messaging.db")
+
+
+@pytest.fixture
+async def mock_verifier_app(tmp_path, monkeypatch):
+    """Create a FastAPI app with VERIFIER_AUTH_MODE=mock."""
+    data_dir = str(tmp_path)
+    _seed_env(monkeypatch, data_dir)
     monkeypatch.setenv("VERIFIER_AUTH_MODE", "mock")
+
+    application = create_app()
+    application.state.sse_config = SSEConfig(
+        poll_interval_seconds=0.05,
+        heartbeat_interval_seconds=60.0,
+        max_connection_seconds=0.3,
+    )
+
+    ctx_manager = lifespan(application)
+    await ctx_manager.__aenter__()
+    yield application
+    await ctx_manager.__aexit__(None, None, None)
+
+
+@pytest.fixture
+async def unset_verifier_app(tmp_path, monkeypatch):
+    """Create a FastAPI app with VERIFIER_AUTH_MODE unset — must default to mock."""
+    data_dir = str(tmp_path)
+    _seed_env(monkeypatch, data_dir)
+    monkeypatch.delenv("VERIFIER_AUTH_MODE", raising=False)
 
     application = create_app()
     application.state.sse_config = SSEConfig(
@@ -140,3 +164,49 @@ class TestVerifierWiring:
         ctx = mock_verifier_app.state.ctx
         assert ctx.gatekeeper_api is not None
         assert ctx.gatekeeper_api.verifier is not None
+
+
+class TestVerifierDefensiveDefault:
+    """Regression for v1.2.2 CRIT-1.
+
+    When VERIFIER_AUTH_MODE is unset, the gateway must fall back to an
+    in-process mock verifier rather than silently dropping verifier=None.
+    The v1.2.2 sandbox outage was caused by an empty env var on the host,
+    which left the Gatekeeper API without a backend and made every job
+    fail synchronously.
+    """
+
+    async def test_unset_auth_mode_defaults_to_mock(self, unset_verifier_app):
+        """GatekeeperAPI.verifier must never be None after lifespan startup."""
+        ctx = unset_verifier_app.state.ctx
+        assert ctx.gatekeeper_api is not None
+        assert ctx.gatekeeper_api.verifier is not None
+
+    async def test_unset_auth_mode_job_completes(self, unset_verifier_app):
+        """Job submitted with no VERIFIER_AUTH_MODE set must still complete."""
+        transport = httpx.ASGITransport(app=unset_verifier_app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+            ctx = unset_verifier_app.state.ctx
+            await ctx.tracker.wallet.create(
+                "pro-agent-default", initial_balance=5000.0, signup_bonus=False
+            )
+            key_info = await ctx.key_manager.create_key("pro-agent-default", tier="pro")
+            api_key = key_info["key"]
+
+            r = await c.post(
+                "/v1/gatekeeper/jobs",
+                json={"agent_id": "pro-agent-default", "properties": [_VALID_PROPERTY]},
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+            assert r.status_code == 201, r.text
+            job_id = r.json()["job_id"]
+
+            resp = await c.get(
+                f"/v1/gatekeeper/jobs/{job_id}",
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["status"] == "completed", (
+                f"Expected completed with defensive default, got {data}"
+            )

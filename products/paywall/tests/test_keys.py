@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 import pytest
 from src.keys import InvalidKeyError, KeyManager, _hash_key
 
@@ -57,11 +59,34 @@ class TestKeyValidation:
             await key_manager.validate_key("a2a_pro_0000000000000000000000ff")
 
     async def test_validate_revoked_key(self, key_manager: KeyManager):
+        """v1.2.2 audit HIGH-7: revoked keys honor a 300s grace window,
+        so the only way to check the hard-revoke path is to backdate
+        ``revoked_at`` past the grace window.
+        """
+        from src.keys import KEY_ROTATION_GRACE_SECONDS
+
         created = await key_manager.create_key(agent_id="agent-1", tier="pro")
         await key_manager.revoke_key(created["key"])
+        # Backdate revoked_at so the grace window has already elapsed.
+        past = time.time() - (KEY_ROTATION_GRACE_SECONDS + 1)
+        await key_manager.storage.db.execute(
+            "UPDATE api_keys SET revoked_at = ? WHERE revoked = 1", (past,)
+        )
+        await key_manager.storage.db.commit()
 
         with pytest.raises(InvalidKeyError, match="revoked"):
             await key_manager.validate_key(created["key"])
+
+    async def test_validate_revoked_key_in_grace_window(self, key_manager: KeyManager):
+        """v1.2.2 audit HIGH-7: freshly-revoked keys continue to
+        authenticate during the grace window so rotation is safe.
+        """
+        created = await key_manager.create_key(agent_id="agent-1", tier="pro")
+        await key_manager.revoke_key(created["key"])
+
+        record = await key_manager.validate_key(created["key"])
+        assert record["agent_id"] == "agent-1"
+        assert "_key_grace_seconds_remaining" in record
 
 
 class TestKeyRevocation:

@@ -22,10 +22,44 @@ def _check_caller_owns_agent_id(params: dict[str, Any]) -> None:
 
 
 async def _register_agent(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
-    identity = await ctx.identity_api.register_agent(
-        agent_id=params["agent_id"],
-        public_key=params.get("public_key"),
-    )
+    """Register an agent identity.
+
+    v1.2.2 audit HIGH-8: API key provisioning auto-creates the
+    identity record, so ``IdentityAPI.register_agent`` is idempotent
+    when the caller omits ``public_key`` or passes the already-stored
+    key. A caller that supplies a *different* public key after the
+    auto-bind still gets the old conflict (surfaced as 409), so we
+    rotate the stored key here so the integrator's signing keypair
+    becomes the active one.
+    """
+    from identity_src.api import AgentAlreadyExistsError
+    from identity_src.models import AgentIdentity
+
+    agent_id = params["agent_id"]
+    requested_public_key = params.get("public_key")
+    try:
+        identity = await ctx.identity_api.register_agent(
+            agent_id=agent_id,
+            public_key=requested_public_key,
+        )
+    except AgentAlreadyExistsError:
+        existing = await ctx.identity_api.get_identity(agent_id)
+        if existing is None or requested_public_key is None:
+            raise
+        # Rotate in the caller-supplied key so downstream signature
+        # verification succeeds.
+        updated = AgentIdentity(
+            agent_id=existing.agent_id,
+            public_key=requested_public_key,
+            created_at=existing.created_at,
+            org_id=existing.org_id,
+        )
+        await ctx.identity_api.storage.store_identity(updated)
+        return {
+            "agent_id": updated.agent_id,
+            "public_key": updated.public_key,
+            "created_at": updated.created_at,
+        }
     return {
         "agent_id": identity.agent_id,
         "public_key": identity.public_key,
