@@ -224,13 +224,22 @@ async def test_agent_card_no_auth_required(client):
 
 @pytest.mark.asyncio
 async def test_agent_card_skills_have_required_fields(client):
-    """Each skill in the agent card must have id, name, and description."""
+    """Each skill in the agent card must have id, name, description, and tags.
+
+    The `tags` field is required by the A2A Protocol skill schema (per
+    a2aregistry.org validator). Each skill must have at least one tag.
+    """
     resp = await client.get("/.well-known/agent-card.json")
     data = resp.json()
     for skill in data["skills"]:
         assert "id" in skill, f"Skill missing 'id': {skill}"
         assert "name" in skill, f"Skill missing 'name': {skill}"
         assert "description" in skill, f"Skill missing 'description': {skill}"
+        assert "tags" in skill, f"Skill missing 'tags': {skill}"
+        assert isinstance(skill["tags"], list), f"Skill 'tags' must be list: {skill}"
+        assert len(skill["tags"]) > 0, f"Skill 'tags' must be non-empty: {skill}"
+        for tag in skill["tags"]:
+            assert isinstance(tag, str), f"Skill tag must be str: {tag}"
 
 
 @pytest.mark.asyncio
