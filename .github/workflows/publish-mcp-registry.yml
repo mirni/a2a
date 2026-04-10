@@ -1,0 +1,71 @@
+# =============================================================================
+# Publish the A2A MCP server to the official MCP Registry
+# (https://registry.modelcontextprotocol.io).
+#
+# Authentication: DNS-based. The signing key is stored in the
+# MCP_REGISTRY_PRIVATE_KEY secret; the matching TXT record is hosted on
+# greenhelix.net (see docs/infra/MCP_REGISTRY_PUBLISHING.md for setup).
+#
+# Trigger:
+#   1. After the npm + PyPI MCP packages are live (publish-mcp.yml)
+#   2. Manually: gh workflow run "Publish MCP Registry"
+#
+# Required GitHub Secrets / Variables:
+#   secrets.MCP_REGISTRY_PRIVATE_KEY  — hex Ed25519 private key (see docs)
+#   vars.MCP_REGISTRY_DOMAIN          — greenhelix.net (default)
+# =============================================================================
+
+name: Publish MCP Registry
+
+on:
+  workflow_run:
+    workflows: ["Publish MCP"]
+    types:
+      - completed
+  workflow_dispatch:
+
+jobs:
+  publish-registry:
+    # Only run if the upstream publish succeeded (or if dispatched manually)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: mcp-registry
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install mcp-publisher
+        run: |
+          set -euo pipefail
+          OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          ARCH="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+          URL="https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_${OS}_${ARCH}.tar.gz"
+          curl -fsSL "$URL" | tar xz mcp-publisher
+          sudo mv mcp-publisher /usr/local/bin/mcp-publisher
+          mcp-publisher --help | head -20
+
+      - name: Authenticate to MCP Registry via DNS
+        env:
+          MCP_REGISTRY_DOMAIN: ${{ vars.MCP_REGISTRY_DOMAIN || 'greenhelix.net' }}
+          MCP_REGISTRY_PRIVATE_KEY: ${{ secrets.MCP_REGISTRY_PRIVATE_KEY }}
+        run: |
+          if [[ -z "$MCP_REGISTRY_PRIVATE_KEY" ]]; then
+            echo "::error::MCP_REGISTRY_PRIVATE_KEY secret is not set."
+            echo "Run scripts/mcp_registry/generate_dns_key.sh locally to provision."
+            exit 1
+          fi
+          mcp-publisher login dns \
+            --domain "$MCP_REGISTRY_DOMAIN" \
+            --private-key "$MCP_REGISTRY_PRIVATE_KEY"
+
+      - name: Publish server.json
+        working-directory: sdk-ts/mcp-server
+        run: |
+          mcp-publisher publish
+
+      - name: Verify published record
+        run: |
+          sleep 10
+          curl -sf "https://registry.modelcontextprotocol.io/v0.1/servers?search=net.greenhelix/mcp-server" \
+            | python3 -m json.tool

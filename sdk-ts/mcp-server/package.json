@@ -1,0 +1,56 @@
+{
+  "name": "@greenhelix/mcp-server",
+  "version": "0.1.0",
+  "mcpName": "net.greenhelix/mcp-server",
+  "description": "MCP server exposing the A2A Commerce Gateway's 141 tools — payments, escrow, identity, marketplace, trust — to any MCP-aware agent (Claude Desktop, Cursor, Claude Code, Windsurf, ...).",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "a2a-mcp-server": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "build:test": "tsc -p tsconfig.test.json",
+    "test": "npm run build:test && node --test dist-test/test/*.test.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "a2a",
+    "agent",
+    "commerce",
+    "payments",
+    "escrow",
+    "identity",
+    "marketplace",
+    "trust",
+    "claude",
+    "anthropic"
+  ],
+  "author": "Green Helix <dev@greenhelix.net>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mirni/a2a.git",
+    "directory": "sdk-ts/mcp-server"
+  },
+  "homepage": "https://greenhelix.net",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

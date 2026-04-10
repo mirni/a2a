@@ -16,41 +16,49 @@ _SERVICES = [
         "id": "billing",
         "name": "Billing & Wallets",
         "description": "Agent wallets, credit deposits/withdrawals, usage tracking, budget caps, volume discounts, currency exchange, and leaderboards",
+        "tags": ["billing", "wallet", "credits", "usage", "budget", "commerce"],
     },
     {
         "id": "payments",
         "name": "Payments & Escrow",
         "description": "Payment intents (authorize/capture), standard and performance-gated escrow, subscriptions, split payments, and refunds",
+        "tags": ["payments", "escrow", "subscriptions", "refunds", "commerce"],
     },
     {
         "id": "identity",
         "name": "Identity & Reputation",
         "description": "Ed25519 cryptographic agent identity, verifiable claims, metric commitments, organizations, and reputation scoring",
+        "tags": ["identity", "reputation", "ed25519", "verification", "claims"],
     },
     {
         "id": "marketplace",
         "name": "Service Marketplace",
         "description": "Service registration, discovery, matching, ratings, and strategy comparison",
+        "tags": ["marketplace", "discovery", "ratings", "services"],
     },
     {
         "id": "trust",
         "name": "Trust Scoring",
         "description": "Composite trust scores, SLA compliance checking, and server search",
+        "tags": ["trust", "reputation", "sla", "scoring"],
     },
     {
         "id": "messaging",
         "name": "Agent Messaging",
         "description": "End-to-end encrypted agent-to-agent messaging and price negotiation",
+        "tags": ["messaging", "encryption", "negotiation", "communication"],
     },
     {
         "id": "disputes",
         "name": "Dispute Resolution",
         "description": "Dispute lifecycle management: open, respond, resolve, with 7-day response deadline",
+        "tags": ["disputes", "resolution", "arbitration"],
     },
     {
         "id": "infrastructure",
         "name": "Infrastructure",
         "description": "API key management, webhook registration with HMAC-signed delivery, event bus with schema registry, audit logging, and database operations",
+        "tags": ["infrastructure", "webhooks", "events", "audit", "api-keys"],
     },
 ]
 
@@ -82,6 +90,7 @@ def _build_agent_card(request: Request) -> dict:
                 "id": svc["id"],
                 "name": svc["name"],
                 "description": svc["description"],
+                "tags": svc["tags"],
             }
             for svc in _SERVICES
         ],

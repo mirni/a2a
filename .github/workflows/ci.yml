@@ -180,6 +180,12 @@ jobs:
       - name: Test messaging
         run: scripts/run_tests.sh products/messaging --cov=products/messaging/src --cov-report=xml:coverage-messaging.xml --cov-report=term-missing
 
+      - name: Install mcp SDK for mcp_server tests
+        run: pip install 'mcp>=1.0'
+
+      - name: Test mcp_server
+        run: scripts/run_tests.sh products/mcp_server --cov=products/mcp_server/src --cov-report=xml:coverage-mcp_server.xml --cov-report=term-missing
+
       - name: Upload coverage XML
         if: always() && matrix.python-version == '3.12'
         uses: actions/upload-artifact@v6
@@ -187,6 +193,27 @@ jobs:
           name: coverage-xml-products
           path: coverage-*.xml
           retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # TypeScript MCP server: build + test @greenhelix/mcp-server
+  # ---------------------------------------------------------------------------
+  test-mcp-server-ts:
+    needs: [quality]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+      - name: Install TS MCP server deps
+        working-directory: sdk-ts/mcp-server
+        run: npm ci
+      - name: Build TS MCP server
+        working-directory: sdk-ts/mcp-server
+        run: npm run build
+      - name: Test TS MCP server
+        working-directory: sdk-ts/mcp-server
+        run: npm test
 
   # ---------------------------------------------------------------------------
   # Lambda handler: Z3 verifier unit tests (pure Python, no AWS)
