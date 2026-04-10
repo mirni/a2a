@@ -14,8 +14,10 @@ Convention: `[ ]` pending, `[~]` in progress, `[x]` done.
 
 ## Sprint 1 — High ROI (~4.5 engineer-days total)
 
-### [ ] A1. Build & publish the MCP server
+### [~] A1. Build & publish the MCP server
 **Reach:** ~500K agents/mo · **Effort:** 1.0d · **ROI:** High
+**Status:** Implementation complete, registry publish pending human
+DNS + secret setup (see `docs/infra/MCP_REGISTRY_PUBLISHING.md`).
 
 **Why:** MCP is the lingua franca for agent tool-calling. One server lights
 up Claude Desktop, Claude Code, Cursor, Windsurf, OpenAI Agents SDK, Google
