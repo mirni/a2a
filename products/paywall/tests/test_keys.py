@@ -142,9 +142,7 @@ class TestOnKeyCreatedCallback:
         await key_manager.create_key(agent_id="bot-hook-ok", tier="pro")
         assert received == ["bot-hook-ok"]
 
-    async def test_callback_failure_does_not_block_key_issuance(
-        self, key_manager: KeyManager, caplog
-    ):
+    async def test_callback_failure_does_not_block_key_issuance(self, key_manager: KeyManager, caplog):
         """A raised exception inside the hook must be logged and swallowed
         so the key is still returned to the caller. A downstream identity
         outage cannot block new provisioning.
