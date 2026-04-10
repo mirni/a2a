@@ -101,10 +101,22 @@ class IdentityAPI:
         Returns:
             RegistrationResult with identity and private_key (if auto-generated).
             Private key is returned one-time to the caller and never stored server-side.
+
+        Raises:
+            AgentAlreadyExistsError: Only when an agent already exists AND
+                the caller supplied a ``public_key`` that differs from the
+                stored one. This keeps the create-idempotent path open for
+                v1.2.2 HIGH-8 auto-bind on key provisioning (where the
+                caller omits ``public_key``) while still refusing to
+                silently overwrite a different keypair.
         """
-        # Check for duplicate
         existing = await self.storage.get_identity(agent_id)
         if existing is not None:
+            # Idempotent no-op when the caller didn't supply a key or
+            # supplied the same key that's already stored. A different
+            # key is a conflict and still raises.
+            if public_key is None or public_key == existing.public_key:
+                return RegistrationResult(identity=existing, private_key=None)
             raise AgentAlreadyExistsError(f"Agent already exists: {agent_id}")
 
         private_key: str | None = None

@@ -141,9 +141,22 @@ class TestIdentityMetricsOwnership:
 
     async def test_submit_metrics_ok_for_own_agent(self, client, app):
         key_a = await _create_agent(app, "alice-id-met2", tier="pro")
-        # Register identity first with a public key
+        # v1.2.2 HIGH-8: identity is auto-bound on key provisioning.
+        # Rotate the public key to the test-expected value directly
+        # through storage to avoid the conflict path.
         ctx = app.state.ctx
-        await ctx.identity_api.register_agent("alice-id-met2", public_key="deadbeef" * 8)
+        from identity_src.models import AgentIdentity
+
+        existing = await ctx.identity_api.get_identity("alice-id-met2")
+        assert existing is not None
+        await ctx.identity_api.storage.store_identity(
+            AgentIdentity(
+                agent_id=existing.agent_id,
+                public_key="deadbeef" * 8,
+                created_at=existing.created_at,
+                org_id=existing.org_id,
+            )
+        )
         resp = await client.post(
             "/v1/identity/agents/alice-id-met2/metrics",
             json={"metrics": {"aum": 99.5}},

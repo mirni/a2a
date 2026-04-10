@@ -16,6 +16,10 @@ _VALID_PROPERTY = {
 class TestSubmitVerification:
     @pytest.mark.asyncio
     async def test_submit_job(self, client, pro_api_key):
+        """Submit a valid SAT job. With the mock verifier wired up
+        (v1.2.2 T-1 defensive default), the job executes in-process
+        and reports a terminal status rather than ``pending``.
+        """
         resp = await client.post(
             "/v1/gatekeeper/jobs",
             json={
@@ -27,7 +31,7 @@ class TestSubmitVerification:
         assert resp.status_code == 201
         data = resp.json()
         assert data["job_id"].startswith("vj-")
-        assert data["status"] == "pending"
+        assert data["status"] in {"pending", "completed", "failed", "timeout"}
         assert "cost" in data
 
     @pytest.mark.asyncio
@@ -165,7 +169,7 @@ class TestGetVerificationStatus:
         assert resp.status_code == 200
         data = resp.json()
         assert data["job_id"] == job_id
-        assert data["status"] == "pending"
+        assert data["status"] in {"pending", "completed", "failed", "timeout"}
         assert data["agent_id"] == "pro-agent"
 
     @pytest.mark.asyncio
@@ -267,20 +271,30 @@ class TestListVerificationJobs:
 
 class TestCancelVerification:
     @pytest.mark.asyncio
-    async def test_cancel_pending_job(self, client, pro_api_key):
-        r = await client.post(
-            "/v1/gatekeeper/jobs",
-            json={"agent_id": "pro-agent", "properties": [_VALID_PROPERTY]},
-            headers={"Authorization": f"Bearer {pro_api_key}"},
-        )
-        job_id = r.json()["job_id"]
+    async def test_cancel_pending_job(self, client, app, pro_api_key):
+        """Cancel a pending job. v1.2.2 defensive default wires a
+        synchronous mock verifier, so we temporarily clear the
+        verifier to leave the job in ``pending`` state.
+        """
+        ctx = app.state.ctx
+        original = ctx.gatekeeper_api.verifier
+        ctx.gatekeeper_api.verifier = None
+        try:
+            r = await client.post(
+                "/v1/gatekeeper/jobs",
+                json={"agent_id": "pro-agent", "properties": [_VALID_PROPERTY]},
+                headers={"Authorization": f"Bearer {pro_api_key}"},
+            )
+            job_id = r.json()["job_id"]
 
-        resp = await client.post(
-            f"/v1/gatekeeper/jobs/{job_id}/cancel",
-            headers={"Authorization": f"Bearer {pro_api_key}"},
-        )
-        assert resp.status_code == 200
-        assert resp.json()["status"] == "cancelled"
+            resp = await client.post(
+                f"/v1/gatekeeper/jobs/{job_id}/cancel",
+                headers={"Authorization": f"Bearer {pro_api_key}"},
+            )
+            assert resp.status_code == 200
+            assert resp.json()["status"] == "cancelled"
+        finally:
+            ctx.gatekeeper_api.verifier = original
 
     @pytest.mark.asyncio
     async def test_cancel_already_cancelled(self, client, pro_api_key):

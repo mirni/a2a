@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
@@ -146,8 +147,29 @@ async def revoke_api_key(
 @router.post("/keys/rotate")
 async def rotate_key(
     body: RotateKeyRequest,
+    x_rotate_confirmation: str | None = Header(default=None, alias="X-Rotate-Confirmation"),
     tc: ToolContext = Depends(require_tool("rotate_key")),
 ):
+    # v1.2.2 audit HIGH-7: key rotation was dangerously easy to trigger.
+    # Two consecutive auditor agents accidentally rotated the production
+    # PRO key during schema probing. Require an explicit confirmation
+    # header so rotation cannot happen on a stray POST.
+    if x_rotate_confirmation != "confirm":
+        return JSONResponse(
+            status_code=428,
+            content={
+                "type": "https://api.greenhelix.net/errors/rotate-confirmation-required",
+                "title": "Rotate confirmation required",
+                "status": 428,
+                "detail": (
+                    "Key rotation is a destructive action. Include the "
+                    "header 'X-Rotate-Confirmation: confirm' to proceed. "
+                    "The old key remains valid for a 300s grace window "
+                    "after a successful rotation."
+                ),
+                "instance": "/v1/infra/keys/rotate",
+            },
+        )
     params = _inject_caller(tc, {"current_key": body.current_key})
     await check_ownership(tc, params)
     try:

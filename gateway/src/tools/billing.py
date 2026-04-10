@@ -442,7 +442,10 @@ async def _get_exchange_rate(ctx: AppContext, params: dict[str, Any]) -> dict[st
     return {
         "from_currency": from_currency.value,
         "to_currency": to_currency.value,
-        "rate": float(rate),
+        # v1.2.2 audit HIGH-5: return as string so the high-precision
+        # serializer preserves small values like ``CREDITS→ETH``
+        # (2.5e-6) without quantizing to 2 decimals.
+        "rate": format(rate, "f"),
     }
 
 

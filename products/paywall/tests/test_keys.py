@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 import pytest
 from src.keys import InvalidKeyError, KeyManager, _hash_key
 
@@ -57,11 +59,32 @@ class TestKeyValidation:
             await key_manager.validate_key("a2a_pro_0000000000000000000000ff")
 
     async def test_validate_revoked_key(self, key_manager: KeyManager):
+        """v1.2.2 audit HIGH-7: revoked keys honor a 300s grace window,
+        so the only way to check the hard-revoke path is to backdate
+        ``revoked_at`` past the grace window.
+        """
+        from src.keys import KEY_ROTATION_GRACE_SECONDS
+
         created = await key_manager.create_key(agent_id="agent-1", tier="pro")
         await key_manager.revoke_key(created["key"])
+        # Backdate revoked_at so the grace window has already elapsed.
+        past = time.time() - (KEY_ROTATION_GRACE_SECONDS + 1)
+        await key_manager.storage.db.execute("UPDATE api_keys SET revoked_at = ? WHERE revoked = 1", (past,))
+        await key_manager.storage.db.commit()
 
         with pytest.raises(InvalidKeyError, match="revoked"):
             await key_manager.validate_key(created["key"])
+
+    async def test_validate_revoked_key_in_grace_window(self, key_manager: KeyManager):
+        """v1.2.2 audit HIGH-7: freshly-revoked keys continue to
+        authenticate during the grace window so rotation is safe.
+        """
+        created = await key_manager.create_key(agent_id="agent-1", tier="pro")
+        await key_manager.revoke_key(created["key"])
+
+        record = await key_manager.validate_key(created["key"])
+        assert record["agent_id"] == "agent-1"
+        assert "_key_grace_seconds_remaining" in record
 
 
 class TestKeyRevocation:
@@ -103,3 +126,37 @@ class TestKeyLookup:
         assert len(keys2) == 1
         assert keys1[0]["tier"] == "free"
         assert keys2[0]["tier"] == "pro"
+
+
+class TestOnKeyCreatedCallback:
+    """v1.2.2 audit HIGH-8: KeyManager fires on_key_created after store."""
+
+    async def test_callback_invoked_with_agent_id(self, key_manager: KeyManager):
+        """The hook should receive the agent_id of the newly-issued key."""
+        received: list[str] = []
+
+        async def hook(agent_id: str) -> None:
+            received.append(agent_id)
+
+        key_manager.on_key_created = hook
+        await key_manager.create_key(agent_id="bot-hook-ok", tier="pro")
+        assert received == ["bot-hook-ok"]
+
+    async def test_callback_failure_does_not_block_key_issuance(self, key_manager: KeyManager, caplog):
+        """A raised exception inside the hook must be logged and swallowed
+        so the key is still returned to the caller. A downstream identity
+        outage cannot block new provisioning.
+        """
+        import logging
+
+        async def broken_hook(agent_id: str) -> None:
+            raise RuntimeError("identity-down")
+
+        key_manager.on_key_created = broken_hook
+
+        with caplog.at_level(logging.WARNING, logger="paywall.keys"):
+            result = await key_manager.create_key(agent_id="bot-hook-fail", tier="pro")
+
+        assert result["key"].startswith("a2a_pro_")
+        assert result["agent_id"] == "bot-hook-fail"
+        assert any("on_key_created" in r.message for r in caplog.records)

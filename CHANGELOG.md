@@ -1,5 +1,89 @@
 # Changelog
 
+# Release v1.2.3
+
+**Date:** 2026-04-10
+**Previous:** v1.2.2
+
+## Highlights
+
+Remediation of the v1.2.2 multi-persona black-box audit (4 CRIT + 8 HIGH
+findings). No schema migration required; the branch ships as a
+backwards-compatible patch release.
+
+- **Gatekeeper / Verifier (CRIT-1, T-1)** — `GatekeeperAPI.submit_job`
+  now refuses to start a job when no verifier backend is wired. The
+  gateway lifespan auto-selects `MockVerifierClient` when
+  `VERIFIER_AUTH_MODE=mock` (CI / local) and falls back cleanly with a
+  warning when Lambda credentials are missing, so `/v1/gatekeeper/jobs`
+  can no longer hand out "pending forever" job IDs.
+- **Gatekeeper billing (CRIT-2, T-2)** — jobs that end in a FAILED /
+  TIMEOUT / ERROR state no longer charge the caller. The per-call cost
+  is waived *before* the wallet is debited and reflected in the
+  `/jobs/{id}` response, so integrators can reconcile without a
+  disputes roundtrip.
+- **API-key management (HIGH-1, T-3)** — `list_api_keys` now returns
+  `agent_id` and `owner_agent_id` so admins can attribute keys to their
+  caller without a follow-up lookup.
+- **RBAC hardening (HIGH-2, T-4)** — enterprise-tier callers are no
+  longer silently promoted to `admin` for `admin_audit_log`; the tool
+  now requires an explicit admin tier. Regression test added.
+- **SDK release (HIGH-3, T-5)** — `a2a-greenhelix-sdk` 1.2.2 was
+  republished to PyPI with the CRIT-1/CRIT-2 client fixes and a new
+  `gatekeeper.submit_job(..., wait=True)` convenience helper.
+- **Key rotation UX (HIGH-4, T-6)** — `rotate_key` keeps the revoked
+  key valid for a 5-minute grace window and returns `rotated_at`,
+  `expires_at`, and a human-readable `confirmation` field so clients
+  can complete in-flight requests before cutting over.
+- **Exchange rate coverage (HIGH-5, T-7)** — `ExchangeRateService` now
+  seeds CREDITS↔ETH and CREDITS↔BTC rates on startup and converts
+  balances at 18-decimal precision (`Decimal` quantization per asset)
+  so `USD→ETH` / `USD→BTC` no longer truncates dust.
+- **Refund fee policy (HIGH-6, T-8)** — refund responses include a
+  structured `fee_policy` object citing **ADR-011** (`retain_gateway_fee`).
+  The 2% gateway fee is retained on refund; integrators can display the
+  policy URL to their end users.
+- **Identity auto-bind (HIGH-7, T-9)** — API-key provisioning now
+  invokes a `KeyManager.on_key_created` callback that auto-registers
+  the agent identity and seeds a baseline reputation. New integrators
+  no longer have to POST `/v1/identity/agents` before they can sign
+  their first request. `IdentityAPI.register_agent` is idempotent when
+  called with no key (or the already-stored key); a *conflicting*
+  public_key still raises to prevent silent key overwrite.
+
+## Files touched
+
+- `gateway/src/lifespan.py`, `gateway/src/tools/gatekeeper.py`,
+  `gateway/src/tools/infrastructure.py`, `gateway/src/tools/payments.py`,
+  `gateway/src/tools/identity.py`
+- `products/gatekeeper/src/api.py`, `products/gatekeeper/src/billing.py`
+- `products/connectors/verifier/src/client.py` (+ `MockVerifierClient`)
+- `products/paywall/src/keys.py` (KeyManager.on_key_created hook)
+- `products/paywall/src/rotation.py` (+ grace window)
+- `products/identity/src/api.py` (idempotent register_agent)
+- `products/billing/src/exchange.py` (CREDITS↔ETH/BTC seeding)
+- **new** `docs/adr/011-refund-fee-policy.md`
+- **new** `gateway/tests/v1/test_audit_v1_2_2_regressions.py` (13 tests)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-gateway | 1.2.3 |
+| a2a-greenhelix-sdk | 1.2.3 |
+
+## Upgrade notes
+
+- No DB migration required.
+- Set `VERIFIER_AUTH_MODE=mock` for CI / local dev if you don't have
+  Lambda credentials. Production deployments keep the default
+  (`iam`).
+- Integrators that used to swallow `409 AgentAlreadyExistsError` from
+  `POST /v1/identity/agents` can now drop that branch — the call is
+  idempotent when no public_key is supplied.
+
+---
+
 # Release v1.2.2
 
 **Date:** 2026-04-10

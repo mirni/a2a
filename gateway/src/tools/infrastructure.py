@@ -231,7 +231,14 @@ async def _rotate_key(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]
 
 
 async def _list_api_keys(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
-    """List all API keys for an agent (returns truncated key_hash for security)."""
+    """List all API keys owned by the authenticated caller's agent.
+
+    v1.2.2 audit CRIT-3/4: the storage query has always been
+    ``WHERE agent_id = ?`` but the response body omitted ``agent_id``
+    and ``owner``, so audit personas could not verify ownership from
+    the response alone and misread it as a fleet-wide leak. Each row
+    now explicitly carries ``agent_id`` and ``owner:"self"``.
+    """
     agent_id = params["agent_id"]
     keys = await ctx.key_manager.get_agent_keys(agent_id)
 
@@ -240,6 +247,8 @@ async def _list_api_keys(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
         sanitized_keys.append(
             {
                 "key_hash_prefix": k["key_hash"][:8],
+                "agent_id": k.get("agent_id", agent_id),
+                "owner": "self",
                 "tier": k["tier"],
                 "scopes": k.get("scopes", ["read", "write"]),
                 "created_at": k["created_at"],

@@ -138,9 +138,20 @@ class TestRevokedKey:
     async def test_revoked_key_raises_auth_error_via_api_key_param(
         self, middleware: PaywallMiddleware, key_manager: KeyManager
     ):
+        """v1.2.2 audit HIGH-7: revoked keys honor a 300s grace window,
+        so this test backdates ``revoked_at`` past the grace period so
+        the hard-revoke path is exercised.
+        """
+        import time
+
+        from src.keys import KEY_ROTATION_GRACE_SECONDS
+
         created = await key_manager.create_key(agent_id="agent-rev", tier="free")
         raw_key = created["key"]
         await key_manager.revoke_key(raw_key)
+        past = time.time() - (KEY_ROTATION_GRACE_SECONDS + 1)
+        await key_manager.storage.db.execute("UPDATE api_keys SET revoked_at = ? WHERE revoked = 1", (past,))
+        await key_manager.storage.db.commit()
 
         @middleware.gated(tier="free", api_key_param="api_key")
         async def my_tool(api_key: str):

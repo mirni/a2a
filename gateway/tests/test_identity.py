@@ -209,7 +209,14 @@ class TestGetReputation:
 
     @pytest.mark.asyncio
     async def test_get_reputation_via_gateway(self, app, client, api_key):
-        """get_agent_reputation should return 404 when no reputation exists."""
+        """get_agent_reputation returns a baseline record immediately.
+
+        v1.2.2 audit HIGH-8: API key provisioning now auto-creates the
+        identity record AND seeds a baseline reputation, so freshly
+        registered agents never 404 on their own reputation lookup.
+        The baseline is zeroed (confidence = 0.0) until real signals
+        arrive.
+        """
         resp = await client.post(
             "/v1/execute",
             json={
@@ -218,7 +225,10 @@ class TestGetReputation:
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
-        assert resp.status_code == 404
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["agent_id"] == "test-agent"
+        assert data["confidence"] == 0.0
 
     @pytest.mark.asyncio
     async def test_get_reputation_after_compute(self, app, client, pro_api_key):

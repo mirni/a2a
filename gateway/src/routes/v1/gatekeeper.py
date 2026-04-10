@@ -116,13 +116,22 @@ async def submit_verification(
     except Exception as exc:
         return await handle_product_exception(tc.request, exc)
 
-    # CRIT-2 (audit v1.2.1): failed verification jobs must not charge the
-    # caller.  When the verifier backend raises (or the job otherwise ends
-    # in a terminal FAILED/TIMEOUT/ERROR state before the response is
-    # returned) we waive the per-call cost so the integrator is not billed
-    # for infrastructure problems they cannot fix.
+    # CRIT-2 (audit v1.2.1 + v1.2.2): failed verification jobs must not
+    # charge the caller. When the verifier backend raises (or the job
+    # otherwise ends in a terminal FAILED/TIMEOUT/ERROR state before the
+    # response is returned) we waive the per-call cost and zero out the
+    # cost fields in the response so the integrator can see they were
+    # not billed. ``billed_cost`` is a new explicit alias introduced in
+    # v1.2.3 so the distinction between "catalog price" and "amount
+    # debited" is always visible.
     if result.get("status") in {"failed", "timeout"} or result.get("result") == "error":
         tc.cost = 0.0
+        result["cost"] = "0"
+        result["billed_cost"] = "0"
+    else:
+        # On success, surface the same number under ``billed_cost`` so
+        # the contract is consistent across success/failure responses.
+        result["billed_cost"] = result.get("cost", "0")
 
     location = f"/v1/gatekeeper/jobs/{result.get('job_id', '')}"
     return await finalize_response(tc, result, status_code=201, location=location)
