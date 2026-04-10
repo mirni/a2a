@@ -69,9 +69,7 @@ class TestKeyValidation:
         await key_manager.revoke_key(created["key"])
         # Backdate revoked_at so the grace window has already elapsed.
         past = time.time() - (KEY_ROTATION_GRACE_SECONDS + 1)
-        await key_manager.storage.db.execute(
-            "UPDATE api_keys SET revoked_at = ? WHERE revoked = 1", (past,)
-        )
+        await key_manager.storage.db.execute("UPDATE api_keys SET revoked_at = ? WHERE revoked = 1", (past,))
         await key_manager.storage.db.commit()
 
         with pytest.raises(InvalidKeyError, match="revoked"):

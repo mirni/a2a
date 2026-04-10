@@ -710,9 +710,7 @@ class TestEdgeCases:
         from paywall_src.keys import KEY_ROTATION_GRACE_SECONDS
 
         past = _time.time() - (KEY_ROTATION_GRACE_SECONDS + 1)
-        await ctx.key_manager.storage.db.execute(
-            "UPDATE api_keys SET revoked_at = ? WHERE revoked = 1", (past,)
-        )
+        await ctx.key_manager.storage.db.execute("UPDATE api_keys SET revoked_at = ? WHERE revoked = 1", (past,))
         await ctx.key_manager.storage.db.commit()
 
         # Now the key should be rejected

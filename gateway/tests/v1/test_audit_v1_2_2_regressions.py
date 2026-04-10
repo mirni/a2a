@@ -70,9 +70,7 @@ class TestGatekeeperCostZeroOnFailure:
     async def test_failed_submit_reports_cost_zero(self, client, app):
         """Submit → verifier raises → response has cost:"0" billed_cost:"0"."""
         ctx = app.state.ctx
-        await ctx.tracker.wallet.create(
-            "pro-cost-zero", initial_balance=100.0, signup_bonus=False
-        )
+        await ctx.tracker.wallet.create("pro-cost-zero", initial_balance=100.0, signup_bonus=False)
         key_info = await ctx.key_manager.create_key("pro-cost-zero", tier="pro")
         key = key_info["key"]
 
@@ -100,18 +98,14 @@ class TestGatekeeperCostZeroOnFailure:
             body = resp.json()
             assert body["status"] in {"failed", "timeout"}
             assert body["cost"] == "0", f"cost must be zeroed on failure: {body}"
-            assert body["billed_cost"] == "0", (
-                f"billed_cost field must be explicitly zero: {body}"
-            )
+            assert body["billed_cost"] == "0", f"billed_cost field must be explicitly zero: {body}"
         finally:
             ctx.gatekeeper_api.verifier = original
 
     async def test_failed_status_reports_cost_zero(self, client, app):
         """GET /v1/gatekeeper/jobs/{id} on a failed job also reports zeros."""
         ctx = app.state.ctx
-        await ctx.tracker.wallet.create(
-            "pro-cost-status", initial_balance=100.0, signup_bonus=False
-        )
+        await ctx.tracker.wallet.create("pro-cost-status", initial_balance=100.0, signup_bonus=False)
         key_info = await ctx.key_manager.create_key("pro-cost-status", tier="pro")
         key = key_info["key"]
 
@@ -166,34 +160,24 @@ class TestInfraKeysOwnershipAttribution:
 
     async def test_response_rows_include_agent_id_and_owner_self(self, client, app):
         ctx = app.state.ctx
-        await ctx.tracker.wallet.create(
-            "alice-owned-keys", initial_balance=100.0, signup_bonus=False
-        )
+        await ctx.tracker.wallet.create("alice-owned-keys", initial_balance=100.0, signup_bonus=False)
         key_info = await ctx.key_manager.create_key("alice-owned-keys", tier="free")
         key = key_info["key"]
 
-        resp = await client.get(
-            "/v1/infra/keys", headers={"Authorization": f"Bearer {key}"}
-        )
+        resp = await client.get("/v1/infra/keys", headers={"Authorization": f"Bearer {key}"})
         assert resp.status_code == 200
         body = resp.json()
         assert "keys" in body
         assert len(body["keys"]) >= 1
         for row in body["keys"]:
-            assert row["agent_id"] == "alice-owned-keys", (
-                f"every row must report its owning agent_id: {row}"
-            )
-            assert row["owner"] == "self", (
-                f"every row must be marked owner:self: {row}"
-            )
+            assert row["agent_id"] == "alice-owned-keys", f"every row must report its owning agent_id: {row}"
+            assert row["owner"] == "self", f"every row must be marked owner:self: {row}"
 
     async def test_cross_agent_isolation(self, client, app):
         """Two free-tier agents can only see their own keys."""
         ctx = app.state.ctx
         for aid in ("alice-iso", "bob-iso"):
-            await ctx.tracker.wallet.create(
-                aid, initial_balance=100.0, signup_bonus=False
-            )
+            await ctx.tracker.wallet.create(aid, initial_balance=100.0, signup_bonus=False)
         alice_key_info = await ctx.key_manager.create_key("alice-iso", tier="free")
         bob_key_info = await ctx.key_manager.create_key("bob-iso", tier="free")
 
@@ -230,9 +214,7 @@ class TestEnterpriseIsNotAdmin:
 
     async def test_enterprise_cannot_read_global_audit_log(self, client, app):
         ctx = app.state.ctx
-        await ctx.tracker.wallet.create(
-            "ent-not-admin", initial_balance=100.0, signup_bonus=False
-        )
+        await ctx.tracker.wallet.create("ent-not-admin", initial_balance=100.0, signup_bonus=False)
         key_info = await ctx.key_manager.create_key("ent-not-admin", tier="enterprise")
         key = key_info["key"]
 
@@ -258,9 +240,7 @@ class TestCreditsCryptoRoundTrip:
 
     async def _make_key(self, app):
         ctx = app.state.ctx
-        await ctx.tracker.wallet.create(
-            "fx-agent", initial_balance=100.0, signup_bonus=False
-        )
+        await ctx.tracker.wallet.create("fx-agent", initial_balance=100.0, signup_bonus=False)
         key_info = await ctx.key_manager.create_key("fx-agent", tier="free")
         return key_info["key"]
 
@@ -297,14 +277,11 @@ class TestCreditsCryptoRoundTrip:
 
         original = Decimal("100")
         eth = await svc.convert(original, Currency.CREDITS, Currency.ETH)
-        assert eth.amount > 0, (
-            f"100 CREDITS must convert to non-zero ETH, got {eth.amount}"
-        )
+        assert eth.amount > 0, f"100 CREDITS must convert to non-zero ETH, got {eth.amount}"
         back = await svc.convert(eth.amount, Currency.ETH, Currency.CREDITS)
         loss = abs(original - back.amount) / original
         assert loss < Decimal("0.01"), (
-            f"round-trip lost {loss:.4%} of value "
-            f"(100 CREDITS → {eth.amount} ETH → {back.amount} CREDITS)"
+            f"round-trip lost {loss:.4%} of value (100 CREDITS → {eth.amount} ETH → {back.amount} CREDITS)"
         )
 
 
@@ -322,9 +299,7 @@ class TestKeyRotationSafety:
 
     async def test_rotate_without_confirmation_header_returns_428(self, client, app):
         ctx = app.state.ctx
-        await ctx.tracker.wallet.create(
-            "pro-rotate-safe", initial_balance=100.0, signup_bonus=False
-        )
+        await ctx.tracker.wallet.create("pro-rotate-safe", initial_balance=100.0, signup_bonus=False)
         key_info = await ctx.key_manager.create_key("pro-rotate-safe", tier="pro")
         key = key_info["key"]
 
@@ -339,9 +314,7 @@ class TestKeyRotationSafety:
 
     async def test_rotate_with_confirmation_header_succeeds(self, client, app):
         ctx = app.state.ctx
-        await ctx.tracker.wallet.create(
-            "pro-rotate-confirm", initial_balance=100.0, signup_bonus=False
-        )
+        await ctx.tracker.wallet.create("pro-rotate-confirm", initial_balance=100.0, signup_bonus=False)
         key_info = await ctx.key_manager.create_key("pro-rotate-confirm", tier="pro")
         key = key_info["key"]
 
@@ -360,9 +333,7 @@ class TestKeyRotationSafety:
     async def test_old_key_remains_valid_during_grace_window(self, client, app):
         """After rotate, the old key must still authenticate for grace_seconds."""
         ctx = app.state.ctx
-        await ctx.tracker.wallet.create(
-            "pro-grace", initial_balance=100.0, signup_bonus=False
-        )
+        await ctx.tracker.wallet.create("pro-grace", initial_balance=100.0, signup_bonus=False)
         key_info = await ctx.key_manager.create_key("pro-grace", tier="pro")
         old_key = key_info["key"]
 
@@ -401,15 +372,9 @@ class TestRefundFeePolicyDisclosure:
 
     async def test_refund_response_includes_fee_policy(self, client, app):
         ctx = app.state.ctx
-        await ctx.tracker.wallet.create(
-            "refund-policy-payer", initial_balance=1000.0, signup_bonus=False
-        )
-        await ctx.tracker.wallet.create(
-            "refund-policy-payee", initial_balance=0.0, signup_bonus=False
-        )
-        key_info = await ctx.key_manager.create_key(
-            "refund-policy-payer", tier="pro"
-        )
+        await ctx.tracker.wallet.create("refund-policy-payer", initial_balance=1000.0, signup_bonus=False)
+        await ctx.tracker.wallet.create("refund-policy-payee", initial_balance=0.0, signup_bonus=False)
+        key_info = await ctx.key_manager.create_key("refund-policy-payer", tier="pro")
         key = key_info["key"]
 
         create = await client.post(
@@ -439,17 +404,11 @@ class TestRefundFeePolicyDisclosure:
         assert ref.status_code == 200, ref.text
         body = ref.json()
 
-        assert "fee_policy" in body, (
-            f"HIGH-2: refund response must include fee_policy; got {list(body.keys())}"
-        )
+        assert "fee_policy" in body, f"HIGH-2: refund response must include fee_policy; got {list(body.keys())}"
         policy = body["fee_policy"]
         assert isinstance(policy, dict), f"fee_policy must be an object: {policy}"
-        assert policy.get("name") == "retain_gateway_fee", (
-            f"fee_policy.name must be 'retain_gateway_fee': {policy}"
-        )
-        assert "adr" in policy and policy["adr"].startswith("ADR-"), (
-            f"fee_policy.adr must reference the ADR: {policy}"
-        )
+        assert policy.get("name") == "retain_gateway_fee", f"fee_policy.name must be 'retain_gateway_fee': {policy}"
+        assert "adr" in policy and policy["adr"].startswith("ADR-"), f"fee_policy.adr must reference the ADR: {policy}"
         assert policy.get("url"), f"fee_policy.url must be set: {policy}"
 
         # Backwards compatibility: legacy fields remain
@@ -473,9 +432,7 @@ class TestIdentityAutoBind:
         # Seed a pro key so we can call provision on another agent via the
         # REST API. Alternatively create the key directly and call the
         # reputation endpoint.
-        await ctx.tracker.wallet.create(
-            "auto-bind-owner", initial_balance=100.0, signup_bonus=False
-        )
+        await ctx.tracker.wallet.create("auto-bind-owner", initial_balance=100.0, signup_bonus=False)
         key_info = await ctx.key_manager.create_key("auto-bind-owner", tier="pro")
         key = key_info["key"]
 
@@ -484,6 +441,5 @@ class TestIdentityAutoBind:
             headers={"Authorization": f"Bearer {key}"},
         )
         assert rep.status_code == 200, (
-            f"newly-provisioned agent must have an identity record, "
-            f"got {rep.status_code}: {rep.text}"
+            f"newly-provisioned agent must have an identity record, got {rep.status_code}: {rep.text}"
         )

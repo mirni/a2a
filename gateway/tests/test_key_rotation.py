@@ -52,9 +52,7 @@ async def test_rotate_key(client, api_key, app):
     # Backdate revoked_at past the grace window → old key now rejected
     ctx = app.state.ctx
     past = _time.time() - (KEY_ROTATION_GRACE_SECONDS + 1)
-    await ctx.key_manager.storage.db.execute(
-        "UPDATE api_keys SET revoked_at = ? WHERE revoked = 1", (past,)
-    )
+    await ctx.key_manager.storage.db.execute("UPDATE api_keys SET revoked_at = ? WHERE revoked = 1", (past,))
     await ctx.key_manager.storage.db.commit()
 
     resp2 = await client.post(

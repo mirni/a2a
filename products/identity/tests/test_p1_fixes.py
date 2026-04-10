@@ -100,9 +100,7 @@ class TestIdentityConflictDetection:
         again = await api.register_agent("bot-dup")
         assert again.identity.public_key == first.identity.public_key
         # Same key explicitly supplied → also idempotent.
-        again2 = await api.register_agent(
-            "bot-dup", public_key=first.identity.public_key
-        )
+        again2 = await api.register_agent("bot-dup", public_key=first.identity.public_key)
         assert again2.identity.public_key == first.identity.public_key
         # Conflicting key → raises.
         with pytest.raises(AgentAlreadyExistsError):

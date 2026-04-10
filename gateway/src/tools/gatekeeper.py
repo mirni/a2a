@@ -57,9 +57,7 @@ async def _get_verification_status(ctx: AppContext, params: dict[str, Any]) -> d
     # so the caller can verify they were not billed without having to
     # cross-reference their wallet balance.
     status_value = job.status.value
-    if status_value in {"failed", "timeout"} or (
-        job.result and job.result.value == "error"
-    ):
+    if status_value in {"failed", "timeout"} or (job.result and job.result.value == "error"):
         cost_str = "0"
         billed_cost_str = "0"
     else:

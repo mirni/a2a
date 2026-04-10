@@ -187,9 +187,7 @@ class TestVerifierDefensiveDefault:
         transport = httpx.ASGITransport(app=unset_verifier_app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
             ctx = unset_verifier_app.state.ctx
-            await ctx.tracker.wallet.create(
-                "pro-agent-default", initial_balance=5000.0, signup_bonus=False
-            )
+            await ctx.tracker.wallet.create("pro-agent-default", initial_balance=5000.0, signup_bonus=False)
             key_info = await ctx.key_manager.create_key("pro-agent-default", tier="pro")
             api_key = key_info["key"]
 
@@ -207,6 +205,4 @@ class TestVerifierDefensiveDefault:
             )
             assert resp.status_code == 200
             data = resp.json()
-            assert data["status"] == "completed", (
-                f"Expected completed with defensive default, got {data}"
-            )
+            assert data["status"] == "completed", f"Expected completed with defensive default, got {data}"

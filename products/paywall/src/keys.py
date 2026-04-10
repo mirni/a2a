@@ -130,7 +130,8 @@ class KeyManager:
                 import logging
 
                 logging.getLogger("paywall.keys").warning(
-                    "on_key_created hook failed for agent_id=%s", agent_id,
+                    "on_key_created hook failed for agent_id=%s",
+                    agent_id,
                     exc_info=True,
                 )
 
@@ -168,13 +169,8 @@ class KeyManager:
             # in the new key. The window is only applied if the
             # storage layer recorded a ``revoked_at`` timestamp.
             revoked_at = record.get("revoked_at")
-            if (
-                revoked_at is not None
-                and (time.time() - float(revoked_at)) < KEY_ROTATION_GRACE_SECONDS
-            ):
-                grace_remaining = KEY_ROTATION_GRACE_SECONDS - (
-                    time.time() - float(revoked_at)
-                )
+            if revoked_at is not None and (time.time() - float(revoked_at)) < KEY_ROTATION_GRACE_SECONDS:
+                grace_remaining = KEY_ROTATION_GRACE_SECONDS - (time.time() - float(revoked_at))
                 record["_key_grace_seconds_remaining"] = int(grace_remaining)
             else:
                 raise InvalidKeyError("API key has been revoked")

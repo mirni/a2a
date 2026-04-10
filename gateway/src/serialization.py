@@ -128,9 +128,7 @@ def serialize_response(data: Any) -> Any:
         for key, value in data.items():
             if key in _MONETARY_FIELDS and isinstance(value, (int, float, Decimal)):
                 result[key] = serialize_money(value)
-            elif key in _HIGH_PRECISION_FIELDS and isinstance(
-                value, (int, float, Decimal)
-            ):
+            elif key in _HIGH_PRECISION_FIELDS and isinstance(value, (int, float, Decimal)):
                 result[key] = serialize_high_precision(value)
             elif key in _TIMESTAMP_FIELDS and value is not None:
                 result[key] = serialize_timestamp(value)
