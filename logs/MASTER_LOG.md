@@ -6826,3 +6826,49 @@ Address all issues from principal SW engineer review of the Z3 verification prod
 - PR: #76 merged
 - All CI green, all 134 tools registered, all 10 DBs healthy
 - Security posture: IDOR protection, tier gating, input validation, HTTPS enforcement, security headers all verified on production
+
+---
+
+## 2026-04-10 — Distribution Strategy (Growth Strategist Agent)
+
+### Prompt
+> Process `tasks/backlog/distribution-todo.md` — Growth Strategist task for
+> Green Helix A2A platform. Plan distribution to reach maximum AI agent
+> customers. Cover discovery protocols, infrastructure integrations,
+> Agent-SEO, ROI table, action plans for agent and human. Create feature
+> branch and commit output without opening a PR.
+
+### Actions
+1. Read existing `docs/infra/DISTRIBUTION.md` (v0.5.0) and verified current
+   product state (PyPI v1.2.1, npm v1.2.1, Docker Hub v1.2.1, agent card
+   live, AGENTS.md/SKILL.md present, integrations/langchain + crewai drafted
+   locally but unpublished).
+2. Created feature branch `feat/distribution-plan-2026-04`.
+3. Wrote strategy doc `docs/infra/AGENT_DISTRIBUTION_STRATEGY_2026-04.md`:
+   §1 State delta · §2 Discovery Protocols & Marketplaces · §3 Top-5
+   infrastructure integrations · §4 Agent-SEO strategy · §5 ROI ranking
+   table (25 channels) · §6 Agent action plan (Sprint 1-3) · §7 Human
+   action plan (accounts, decisions) · §8 Metrics + kill criteria ·
+   §9 Competitive moat · Appendices A/B.
+4. Wrote ROI-sorted execution queue
+   `tasks/backlog/distribution-execution-queue.md` (A1-A21 tasks).
+5. Updated `docs/infra/DISTRIBUTION.md` → v0.6.0 with current state.
+6. Moved `tasks/active/distribution-todo.md` → `tasks/done/` with
+   `## Completed` section.
+7. Committed to feature branch. **No PR opened** (per task instructions —
+   human will review locally).
+
+### Key recommendations
+- **MCP server is the #1 bet**: one implementation lights up Claude Desktop,
+  Claude Code, Cursor, Windsurf, CrewAI, LangChain MCP adapter, Google ADK,
+  OpenAI Agents SDK, LlamaIndex simultaneously.
+- Sprint 1 (A1-A7, ~4.5 engineer-days, all High ROI) captures 70%+ of
+  expected reach: MCP server + registry submissions + `.well-known/` bundle
+  + tool description rewrite (Agent-SEO) + LangChain/CrewAI PyPI publish
+  + IDE docs.
+- Z3 formal verification (Gatekeeper) is a unique moat — no competing A2A
+  platform ships this. Surface in every registry listing.
+- Skip AutoGen/AG2 (Microsoft merger churn), AutoGPT, SuperAGI. Track but
+  don't invest in ACP/AGNTCY/ANP until one breaks out.
+- Human has ~12 account registrations + ~10 decisions queued in strategy
+  doc §7 (total ~1 hour human work).

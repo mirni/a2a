@@ -1,9 +1,16 @@
 # Distribution & Marketing Plan: A2A Commerce Platform
 
-**Date:** 2026-04-02 (updated)
-**Author:** CMO Agent
-**Version:** 0.5.0
+**Date:** 2026-04-10 (updated)
+**Author:** CMO Agent → Growth Strategist Agent
+**Version:** 0.6.0
 **Status:** Actionable — prioritized task list for human and agent execution
+
+> **📌 See also:** `AGENT_DISTRIBUTION_STRATEGY_2026-04.md` — the 2026-2027
+> strategic plan with ROI-ranked integrations, Agent-SEO strategy, and
+> per-sprint action plans. This document is the v0.6.0 status snapshot;
+> the new strategy document supersedes the prioritised action items below.
+> The ROI-sorted execution queue lives at
+> `tasks/backlog/distribution-execution-queue.md`.
 
 ---
 
@@ -44,16 +51,21 @@ This document compares the CMO Marketing Report (2026-03-28) against the current
 
 | Gap | Impact | Priority |
 |-----|--------|----------|
-| ~~**No hosted sandbox**~~ | ~~Developers must run gateway locally to try the platform.~~ **DONE**: sandbox.greenhelix.net live | ~~P0~~ |
+| ~~**No hosted sandbox**~~ | ~~Developers must run gateway locally.~~ **DONE**: sandbox.greenhelix.net live | ~~P0~~ |
 | ~~**Website has no docs/guides**~~ | ~~greenhelix.net is a brochure site.~~ **DONE**: website/docs.html has full developer guide | ~~P0~~ |
-| **SDK not on PyPI or npm** | Cannot `pip install a2a-greenhelix-sdk` or `npm install @greenhelix/sdk`. Packages exist locally but have no publishing configuration. | P0 |
-| **No MCP registry listing** | Platform is invisible to the MCP ecosystem. Not registered on any MCP directory. | P0 |
+| ~~**SDK not on PyPI**~~ | ~~Cannot `pip install`.~~ **DONE**: `a2a-greenhelix-sdk` v1.2.1 live on PyPI | ~~P0~~ |
+| ~~**SDK not on npm**~~ | ~~Cannot `npm install`.~~ **DONE**: `@greenhelix/sdk` v1.2.1 live on npm | ~~P0~~ |
+| ~~**No Docker image published**~~ | ~~Cannot `docker run`.~~ **DONE**: `greenhelix/a2a-gateway:1.2.1` + `:latest` on Docker Hub | ~~P1~~ |
+| **No MCP registry listing** | Platform is invisible to the MCP ecosystem. Not registered on any MCP directory. Blocked on MCP server wrapper. | P0 |
+| **No MCP server wrapper** | Need `a2a-mcp-server` PyPI/npm package exposing gateway tools via MCP protocol. **Blocks MCP registry submissions.** | P0 |
 | **No GitHub topics/README optimization** | Repo is not discoverable via GitHub search. No topics, no badges. | P1 |
 | ~~**No `/.well-known/agent-card.json`**~~ | ~~Not registered on any A2A protocol registry.~~ **DONE** — deployed at api.greenhelix.net | ~~P1~~ |
+| **No `/.well-known/` bundle** | Missing `agents.json`, `ai-plugin.json`, `mcp.json`, `llms.txt`, `agent-commerce.json`, `agent-pricing.json` | P0 |
 | ~~**No AGENTS.md**~~ | ~~60,000+ repos adopted AGENTS.md.~~ **DONE** — AGENTS.md created | ~~P0~~ |
 | ~~**No SKILL.md**~~ | ~~skills.sh supports 41+ agents.~~ **DONE** — SKILL.md created | ~~P1~~ |
 | **5 products lack READMEs** | identity, messaging, paywall, trust, shared have no documentation. | P2 |
-| **No Docker image published** | Cannot `docker run` the gateway. Dockerfile exists but no registry push. | P1 |
+| **LangChain/CrewAI packages drafted but unpublished** | `integrations/langchain/` and `integrations/crewai/` exist locally. Need PyPI publish. | P0 |
+| **Tool descriptions not optimised for planner LLMs** | 141 tools with terse descriptions. Agent-SEO rewrite needed. | P0 |
 
 ### Missing from CMO Report
 
@@ -231,21 +243,30 @@ Priority search terms:
 
 ### P0 — Do First (Blocks Everything Else)
 
-| # | Task | Owner | Dependency |
-|---|------|-------|------------|
-| 1 | **Publish `a2a-greenhelix-sdk` to PyPI** | Engineering | None. Run `python -m build && twine upload`. Add classifiers and keywords. |
-| 2 | **Publish `@a2a/sdk` to npm** | Engineering | None. Run `npm publish --access public`. |
-| 3 | **Publish Docker image** to Docker Hub | Engineering | None. `docker build && docker push greenhelix/a2a-gateway`. |
-| 4 | **Add GitHub repository topics** | Human | None. Settings > Topics. Add: `ai-agents`, `mcp`, `mcp-servers`, `a2a`, `agent-commerce`, `agent-payments`, `developer-tools`. |
-| 5 | **Submit to mcp.so** | Human/Agent | Packages published. Submit via GitHub issue. |
-| 6 | **Submit to Glama** | Human/Agent | README quality check. Submit via "Add Server" button. |
-| 7 | **Submit to PulseMCP** | Human/Agent | Submit via web form. |
-| 8 | **Submit to Smithery.ai** | Human/Agent | `smithery mcp publish`. |
-| 9 | **Register on Official MCP Registry** | Engineering | Publish to PyPI/npm first. Use `mcp-publisher` CLI. |
-| 10 | ~~**Host sandbox at sandbox.greenhelix.net**~~ | ~~Engineering~~ | **DONE** — live at sandbox.greenhelix.net |
-| 11 | ~~**Add developer docs/guides to website**~~ | ~~Engineering~~ | **DONE** — website/docs.html with full developer guide |
-| 12 | ~~**Create AGENTS.md** in repo root~~ | ~~Engineering~~ | **DONE** |
-| 13 | ~~**Create SKILL.md** in repo root~~ | ~~Engineering~~ | **DONE** |
+> The authoritative execution queue now lives at
+> `tasks/backlog/distribution-execution-queue.md` and is sorted by ROI.
+> This table is kept for historical context.
+
+| # | Task | Owner | Status |
+|---|------|-------|--------|
+| 1 | ~~Publish `a2a-greenhelix-sdk` to PyPI~~ | Engineering | **DONE** — v1.2.1 live |
+| 2 | ~~Publish `@greenhelix/sdk` to npm~~ | Engineering | **DONE** — v1.2.1 live |
+| 3 | ~~Publish Docker image~~ | Engineering | **DONE** — `greenhelix/a2a-gateway:1.2.1` |
+| 4 | **Add GitHub repository topics** | Human | Pending. Settings > Topics. See strategy doc §7 H1.8 |
+| 5 | **Build `a2a-mcp-server` + publish (PyPI, npm, Docker)** | Engineering | Pending — see execution queue A1 |
+| 6 | **Submit to mcp.so** | Agent | Blocked on A1 |
+| 7 | **Submit to Glama** | Agent | Blocked on A1 |
+| 8 | **Submit to PulseMCP** | Agent | Blocked on A1 |
+| 9 | **Submit to Smithery.ai** (`smithery mcp publish`) | Agent | Blocked on A1 |
+| 10 | **Register on Official MCP Registry** (`mcp-publisher`) | Engineering | Blocked on A1 |
+| 11 | **Publish `.well-known/` bundle** (agents.json, ai-plugin.json, mcp.json, llms.txt, agent-commerce.json) | Engineering | Pending — see execution queue A3 |
+| 12 | **Agent-SEO rewrite of tool descriptions** | Engineering | Pending — see execution queue A4 |
+| 13 | **Publish `a2a-langchain`** | Engineering | Pending — see execution queue A5 |
+| 14 | **Publish `a2a-crewai`** | Engineering | Pending — see execution queue A6 |
+| 15 | ~~Host sandbox at sandbox.greenhelix.net~~ | Engineering | **DONE** |
+| 16 | ~~Developer docs on website~~ | Engineering | **DONE** |
+| 17 | ~~Create AGENTS.md / SKILL.md~~ | Engineering | **DONE** |
+| 18 | ~~Publish `/.well-known/agent-card.json`~~ | Engineering | **DONE** |
 
 ### P1 — Do Next (Developer Adoption)
 
