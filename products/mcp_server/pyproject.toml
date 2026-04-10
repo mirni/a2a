@@ -1,0 +1,66 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "a2a-mcp-server"
+version = "0.1.0"
+description = "MCP server exposing the A2A Commerce Gateway's 141 tools — payments, escrow, identity, marketplace, trust — to any MCP-aware agent (Claude Desktop, Cursor, Claude Code, Windsurf, ...)."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+authors = [{ name = "Green Helix", email = "dev@greenhelix.net" }]
+keywords = [
+    "mcp",
+    "model-context-protocol",
+    "a2a",
+    "agent",
+    "commerce",
+    "payments",
+    "escrow",
+    "identity",
+    "marketplace",
+    "trust",
+    "claude",
+    "anthropic",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+]
+dependencies = [
+    "mcp>=1.0",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+http = [
+    "uvicorn>=0.30",
+    "starlette>=0.40",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+a2a-mcp-server = "a2a_mcp_server.cli:main"
+
+[project.urls]
+Homepage = "https://greenhelix.net"
+Documentation = "https://api.greenhelix.net/docs"
+Repository = "https://github.com/mirni/a2a"
+Issues = "https://github.com/mirni/a2a/issues"
+"Agent Card" = "https://api.greenhelix.net/.well-known/agent.json"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+a2a_mcp_server = ["py.typed"]
