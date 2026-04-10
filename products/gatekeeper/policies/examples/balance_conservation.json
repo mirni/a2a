@@ -1,0 +1,22 @@
+{
+  "name": "balance_conservation",
+  "description": "All user balances are non-negative and sum to the fixed total supply (1000). A violation of this policy means funds were minted or burned without authorisation.",
+  "variables": [
+    {"name": "alice", "type": "int"},
+    {"name": "bob",   "type": "int"},
+    {"name": "carol", "type": "int"},
+    {"name": "total", "type": "int", "value": 1000}
+  ],
+  "assertions": [
+    {"op": ">=", "args": ["alice", 0]},
+    {"op": ">=", "args": ["bob",   0]},
+    {"op": ">=", "args": ["carol", 0]},
+    {
+      "op": "==",
+      "args": [
+        {"op": "+", "args": [{"op": "+", "args": ["alice", "bob"]}, "carol"]},
+        "total"
+      ]
+    }
+  ]
+}

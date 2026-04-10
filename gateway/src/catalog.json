@@ -5648,7 +5648,7 @@
   {
     "name": "submit_verification",
     "service": "gatekeeper",
-    "description": "Submit a formal verification job with Z3 SMT properties. Returns a job ID for tracking.",
+    "description": "Submit a formal verification job. Each property can be written as raw Z3 SMT-LIB2 (language='z3_smt2') or as a structured JSON policy (language='json_policy', compiled server-side to SMT-LIB2). Returns a job ID for tracking.",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -5658,14 +5658,14 @@
         },
         "properties": {
           "type": "array",
-          "description": "List of Z3 SMT-LIB2 property specifications to verify",
+          "description": "List of property specifications to verify. Each property carries a language tag; 'z3_smt2' expects raw SMT-LIB2 text, 'json_policy' expects a JSON-encoded JsonPolicy object (compiled to SMT-LIB2 server-side).",
           "items": {
             "type": "object",
             "properties": {
               "name": { "type": "string" },
               "scope": { "type": "string", "enum": ["economic", "workflow", "network", "contract"] },
-              "language": { "type": "string", "default": "z3_smt2" },
-              "expression": { "type": "string" },
+              "language": { "type": "string", "enum": ["z3_smt2", "json_policy"], "default": "z3_smt2" },
+              "expression": { "type": "string", "description": "SMT-LIB2 text or JSON-encoded JsonPolicy (matching 'language')" },
               "description": { "type": "string" }
             },
             "required": ["name", "expression"]

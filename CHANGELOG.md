@@ -1,5 +1,66 @@
 # Changelog
 
+# Release v1.2.2
+
+**Date:** 2026-04-10
+**Previous:** v1.2.1
+
+## Highlights
+
+- **Security (CRIT-2/3/4)** — `/v1/batch` now runs every sub-call through
+  the same ownership authorisation and admin-gate as `/v1/execute`. A
+  free-tier caller can no longer enumerate another agent's keys,
+  wallets, or admin tools via the batch envelope.
+- **Reliability (HIGH-4/6)** — `DisputeEngine.connect()` and
+  `WebhookManager.connect()` migrate legacy SQLite schemas in-place so
+  `/v1/disputes` and `/v1/infra/webhooks` no longer 500 on upgraded
+  deployments.
+- **Reliability (HIGH-5)** — `ExchangeRateService.get_rate()` routes
+  cross-currency pairs through CREDITS as a pivot, so
+  `/v1/billing/wallets/{id}/convert USD→ETH` returns a rate instead of
+  500. `UnsupportedCurrencyError` is now mapped to HTTP 422.
+- **Billing correctness (HIGH-2/3)** — payment intents serialise
+  `gateway_fee` via `Decimal.quantize(Decimal("0.01"))` (no more
+  `"0.0246"` float leakage); refund responses disclose `fee_refunded` /
+  `fee_retained` so integrators can reconcile fee retention.
+- **Gatekeeper billing (CRIT-2, gatekeeper domain)** — verification jobs
+  that end in a FAILED / TIMEOUT / ERROR state no longer charge the
+  caller: the per-call cost is waived before the wallet is debited.
+- **Gatekeeper JSON policy DSL** — `language="json_policy"` is now
+  accepted on `PropertySpec`. Integrators can submit structured
+  invariants (`{op, args, variables}`) that are compiled deterministically
+  to SMT-LIB2 on the server. Raw `z3_smt2` remains supported. Five
+  example policies ship in `products/gatekeeper/policies/examples/` and
+  a new guide lives in `docs/infra/GATEKEEPER_JSON_POLICY.md`.
+- **Indie DX** — `/v1/onboarding` quickstart steps 3 and 5 now point at
+  the REST routes (`/v1/billing/wallets/.../balance`,
+  `/v1/marketplace/services?query=...`) instead of the legacy
+  `/v1/execute` envelope.
+
+## Files touched
+
+- `gateway/src/routes/batch.py`, `gateway/src/routes/v1/billing.py`,
+  `gateway/src/routes/v1/gatekeeper.py`, `gateway/src/routes/onboarding.py`
+- `gateway/src/disputes.py`, `gateway/src/webhooks.py`,
+  `gateway/src/tools/payments.py`, `gateway/src/errors.py`
+- `products/billing/src/exchange.py`
+- `products/gatekeeper/src/api.py`, `products/gatekeeper/src/models.py`,
+  **new** `products/gatekeeper/src/policy.py`
+- **new** `products/gatekeeper/policies/examples/{balance_conservation,withdraw_guard,fee_bounded,escrow_state_machine,rate_limit_ok}.json`
+- **new** `docs/infra/GATEKEEPER_JSON_POLICY.md`
+- **new** `gateway/tests/v1/test_audit_v1_2_1_regressions.py` (16 regression tests)
+- **new** `products/gatekeeper/tests/test_policy.py` (17 tests)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-gateway | 1.2.2 |
+| a2a-greenhelix-sdk | 1.2.2 |
+
+---
+
+
 # Release v1.2.1
 
 **Date:** 2026-04-10

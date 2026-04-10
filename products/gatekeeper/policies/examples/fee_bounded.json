@@ -1,0 +1,11 @@
+{
+  "name": "fee_bounded",
+  "description": "The fee rate charged on any transaction must stay within contractual bounds: 0 <= rate <= 0.1 (10%). Useful as a sanity check before rolling out a new pricing tier.",
+  "variables": [
+    {"name": "rate", "type": "real"}
+  ],
+  "assertions": [
+    {"op": ">=", "args": ["rate", 0]},
+    {"op": "<=", "args": ["rate", 0.1]}
+  ]
+}

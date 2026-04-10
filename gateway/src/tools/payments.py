@@ -2,11 +2,25 @@
 
 from __future__ import annotations
 
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from gateway.src.authorization import ADMIN_TIER
 from gateway.src.lifespan import AppContext
 from gateway.src.tool_errors import ToolForbiddenError, ToolValidationError
+
+
+def _format_money(amount: float | Decimal | str) -> str:
+    """Render a monetary amount as a 2-decimal string.
+
+    Audit HIGH-3 (v1.2.1): the previous code used ``str(float)`` which
+    returned ``"0.0246"`` for a 2% fee on 1.23 and ``"5.0"`` for a 2%
+    fee on 250.00 — both broke client-side reconciliation. All money
+    returned to clients must go through this helper so we always emit
+    exactly two decimal places.
+    """
+    d = Decimal(str(amount)) if not isinstance(amount, Decimal) else amount
+    return str(d.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
 def _check_intent_ownership(caller: str, tier: str, intent, *, payer_only: bool = False) -> None:
@@ -106,23 +120,16 @@ async def _create_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
         metadata=params.get("metadata"),
         currency=currency,
     )
-    # Audit H3: disclose the gateway fee charged on this intent so clients
-    # can reconcile charges. The fee is deducted from the caller (not the
-    # intent amount) at tool-charge time.
-    from gateway.src.catalog import get_tool
-    from gateway.src.deps.billing import calculate_tool_cost
-
-    gateway_fee = 0.0
-    tool_def = get_tool("create_intent")
-    if tool_def:
-        gateway_fee = calculate_tool_cost(tool_def.get("pricing", {}), {"amount": float(params["amount"])})
-
+    # Audit H3 (v1.2.1): disclose the gateway fee charged on this intent
+    # so clients can reconcile charges. Must be rendered with 2 decimal
+    # places — `str(float)` leaks float representation (``0.0246``) and
+    # loses trailing zeros (``5.0``), breaking reconciliation.
     return {
         "id": intent.id,
         "status": intent.status.value,
         "amount": str(intent.amount),
         "currency": currency,
-        "gateway_fee": str(gateway_fee),
+        "gateway_fee": _format_money(_compute_create_intent_gateway_fee(float(params["amount"]))),
     }
 
 
@@ -164,8 +171,13 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
     - If pending: void it (no funds moved).
     - If settled: create a reverse transfer from payee to payer.
 
-    Audit H3: also credits back the gateway fee charged at create_intent time
-    so users aren't charged for cancelled workflows.
+    Audit HIGH-2 (v1.2.1): the gateway fee charged at ``create_intent``
+    time is **retained** on refund — it is not credited back to the payer
+    — because gateway execution cost was already incurred. To keep
+    clients honest about reconciliation, the response must always expose
+    the ``fee_refunded`` / ``fee_retained`` flags so integrators can see
+    the payer is net-down by ``fee_retained`` credits after a full
+    refund.
     """
     caller = params.get("_caller_agent_id", "")
     tier = params.get("_caller_tier", "")
@@ -173,6 +185,9 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
     _check_intent_ownership(caller, tier, intent)
 
     gateway_fee = _compute_create_intent_gateway_fee(float(intent.amount))
+    # Current policy: the gateway fee is retained (not refunded).
+    fee_refunded = False
+    fee_retained = gateway_fee if not fee_refunded else 0.0
 
     if intent.status.value == "pending":
         voided = await ctx.payment_engine.void(intent.id, idempotency_key=params.get("idempotency_key"))
@@ -180,7 +195,9 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
             "id": voided.id,
             "status": "voided",
             "amount": str(voided.amount),
-            "gateway_fee": str(gateway_fee),
+            "gateway_fee": _format_money(gateway_fee),
+            "fee_refunded": fee_refunded,
+            "fee_retained": _format_money(fee_retained),
         }
 
     # Idempotency: if already voided and idempotency_key provided, return success
@@ -189,7 +206,9 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
             "id": intent.id,
             "status": "voided",
             "amount": str(intent.amount),
-            "gateway_fee": str(gateway_fee),
+            "gateway_fee": _format_money(gateway_fee),
+            "fee_refunded": fee_refunded,
+            "fee_retained": _format_money(fee_retained),
         }
 
     if intent.status.value == "settled":
@@ -210,7 +229,9 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
             "id": intent.id,
             "status": "refunded",
             "amount": str(intent.amount),
-            "gateway_fee": str(gateway_fee),
+            "gateway_fee": _format_money(gateway_fee),
+            "fee_refunded": fee_refunded,
+            "fee_retained": _format_money(fee_retained),
         }
 
     from payments_src.engine import InvalidStateError

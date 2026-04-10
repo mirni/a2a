@@ -14,6 +14,20 @@ from typing import Any
 import aiosqlite
 
 
+async def _ensure_columns(
+    db: aiosqlite.Connection,
+    *,
+    table: str,
+    columns: tuple[tuple[str, str], ...],
+) -> None:
+    """Add ``columns`` to ``table`` if missing (idempotent migration helper)."""
+    cursor = await db.execute(f"PRAGMA table_info({table})")
+    existing = {row[1] for row in await cursor.fetchall()}
+    for name, ddl_type in columns:
+        if name not in existing:
+            await db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl_type}")
+
+
 class DisputeNotFoundError(Exception):
     """Raised when a dispute ID is not found."""
 
@@ -62,6 +76,29 @@ class DisputeEngine:
             CREATE INDEX IF NOT EXISTS idx_dispute_status ON disputes(status);
             """
         )
+
+        # Migrate legacy DBs that predate the v0.4/v1.0 schema additions.
+        # SQLite's ``CREATE TABLE IF NOT EXISTS`` is a no-op when the table
+        # already exists, so any column added after the original release
+        # (``respondent``, ``response``, ``resolution``, ``resolved_by``,
+        # ``notes``, ``responded_at``, ``resolved_at``, ``deadline_at``)
+        # must be added explicitly for existing installations. This fixes
+        # audit finding HIGH-4 (``POST /v1/disputes`` 500 OperationalError).
+        await _ensure_columns(
+            self.db,
+            table="disputes",
+            columns=(
+                ("respondent", "TEXT"),
+                ("response", "TEXT"),
+                ("resolution", "TEXT"),
+                ("resolved_by", "TEXT"),
+                ("notes", "TEXT"),
+                ("responded_at", "REAL"),
+                ("resolved_at", "REAL"),
+                ("deadline_at", "REAL"),
+            ),
+        )
+        await self.db.commit()
 
     async def close(self) -> None:
         if self.db:

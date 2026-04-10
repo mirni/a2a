@@ -51,21 +51,21 @@ def _build_onboarding_extension() -> dict:
                 "step": 3,
                 "title": "Check your balance",
                 "description": "Verify your credit balance before making tool calls.",
-                "example": 'curl -X POST /v1/execute -H "Authorization: Bearer YOUR_KEY" '
-                '-d \'{"tool": "get_balance", "params": {"agent_id": "my-agent"}}\'',
+                "example": 'curl -H "Authorization: Bearer YOUR_KEY" '
+                "https://api.greenhelix.net/v1/billing/wallets/my-agent/balance",
             },
             {
                 "step": 4,
                 "title": "Browse available tools",
                 "description": "List all available tools with pricing via the pricing endpoint.",
-                "example": "curl /v1/pricing",
+                "example": "curl https://api.greenhelix.net/v1/pricing",
             },
             {
                 "step": 5,
-                "title": "Execute a tool",
-                "description": "Call any tool using the execute endpoint with your API key.",
-                "example": 'curl -X POST /v1/execute -H "Authorization: Bearer YOUR_KEY" '
-                '-d \'{"tool": "search_services", "params": {"query": "code review"}}\'',
+                "title": "Call a REST endpoint",
+                "description": "Every tool is exposed as a REST route — use the one that matches your task. For example, search the marketplace:",
+                "example": 'curl -H "Authorization: Bearer YOUR_KEY" '
+                '"https://api.greenhelix.net/v1/marketplace/services?query=code+review"',
             },
         ],
         "authentication": {

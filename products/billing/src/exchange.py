@@ -89,21 +89,48 @@ class ExchangeRateService:
     async def get_rate(self, from_currency: Currency, to_currency: Currency) -> Decimal:
         """Look up the exchange rate from one currency to another.
 
-        Returns Decimal("1") for identity conversion (same currency).
-        Raises UnsupportedCurrencyError if no rate is found.
+        Returns ``Decimal("1")`` for identity conversion (same currency).
+
+        First tries a direct lookup in the ``exchange_rates`` table. If no
+        direct rate exists, falls back to a two-hop lookup via ``CREDITS``
+        as the pivot currency — ``from → CREDITS → to`` — so cross-currency
+        pairs like ``USD → ETH`` work without requiring a dedicated row.
+        This fixes audit finding HIGH-5 (``/v1/billing/wallets/{id}/convert``
+        USD→ETH 500).
+
+        Raises ``UnsupportedCurrencyError`` if neither the direct nor the
+        two-hop path yields a rate.
         """
         if from_currency == to_currency:
             return Decimal("1")
 
         await self._ensure_table()
+
+        # 1. Direct lookup.
         cursor = await self.storage.db.execute(
             "SELECT rate FROM exchange_rates WHERE from_currency = ? AND to_currency = ?",
             (from_currency.value, to_currency.value),
         )
         row = await cursor.fetchone()
-        if row is None:
-            raise UnsupportedCurrencyError(from_currency, to_currency)
-        return Decimal(row[0])
+        if row is not None:
+            return Decimal(row[0])
+
+        # 2. Two-hop pivot via CREDITS: from → CREDITS → to.
+        if from_currency != Currency.CREDITS and to_currency != Currency.CREDITS:
+            cursor_from = await self.storage.db.execute(
+                "SELECT rate FROM exchange_rates WHERE from_currency = ? AND to_currency = ?",
+                (from_currency.value, Currency.CREDITS.value),
+            )
+            from_row = await cursor_from.fetchone()
+            cursor_to = await self.storage.db.execute(
+                "SELECT rate FROM exchange_rates WHERE from_currency = ? AND to_currency = ?",
+                (Currency.CREDITS.value, to_currency.value),
+            )
+            to_row = await cursor_to.fetchone()
+            if from_row is not None and to_row is not None:
+                return Decimal(from_row[0]) * Decimal(to_row[0])
+
+        raise UnsupportedCurrencyError(from_currency, to_currency)
 
     async def convert(
         self,

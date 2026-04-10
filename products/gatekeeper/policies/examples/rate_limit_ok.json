@@ -1,0 +1,12 @@
+{
+  "name": "rate_limit_ok",
+  "description": "The number of requests issued in the current window (requests) must not exceed the tier allowance (limit). Run this against the agent's rate-limit counters before flipping them into production.",
+  "variables": [
+    {"name": "requests", "type": "int"},
+    {"name": "limit",    "type": "int", "value": 1000}
+  ],
+  "assertions": [
+    {"op": ">=", "args": ["requests", 0]},
+    {"op": "<=", "args": ["requests", "limit"]}
+  ]
+}

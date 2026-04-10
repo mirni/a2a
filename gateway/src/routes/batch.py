@@ -10,6 +10,11 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from gateway.src.auth import extract_api_key
+from gateway.src.authorization import (
+    ADMIN_ONLY_TOOLS,
+    ADMIN_TIER,
+    check_ownership_authorization,
+)
 from gateway.src.catalog import get_tool
 from gateway.src.errors import error_response, handle_product_exception
 from gateway.src.middleware import Metrics
@@ -193,6 +198,37 @@ async def batch(request: Request) -> JSONResponse:
             )
             continue
 
+        # --- Ownership authorization: caller must own the resource -----
+        # CRIT-2/3/4 (audit v1.2.1): without this, a free-tier caller can
+        # enumerate any other agent's keys, balance, webhooks, etc. by
+        # routing the tool call through ``/v1/batch`` instead of the REST
+        # endpoint that wires ``check_ownership``.
+        authz_result = check_ownership_authorization(
+            agent_id, agent_tier, params, tool_name=tool_name
+        )
+        if authz_result is not None:
+            _status, message, code = authz_result
+            results.append(
+                {
+                    "success": False,
+                    "error": {"code": code, "message": message},
+                }
+            )
+            continue
+
+        # --- Admin-only tools: block non-admin callers -----------------
+        if tool_name in ADMIN_ONLY_TOOLS and agent_tier != ADMIN_TIER:
+            results.append(
+                {
+                    "success": False,
+                    "error": {
+                        "code": "admin_only",
+                        "message": f"Tool '{tool_name}' requires admin privileges",
+                    },
+                }
+            )
+            continue
+
         # Check tier access (skip for x402)
         if not x402_agent_id:
             from paywall_src.tiers import tier_has_access as _tier_check
@@ -245,6 +281,10 @@ async def batch(request: Request) -> JSONResponse:
                     continue
 
         # Dispatch to tool function
+        # Inject caller identity so tools can perform their own checks.
+        params["_caller_agent_id"] = agent_id
+        params["_caller_tier"] = agent_tier
+
         _start = time.time()
         await Metrics.record_request(tool_name)
         tool_func = TOOL_REGISTRY[tool_name]

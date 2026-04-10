@@ -1,0 +1,19 @@
+{
+  "name": "withdraw_guard",
+  "description": "Every non-zero withdrawal must be backed by a sufficient balance. Formally: withdraw > 0 implies balance >= withdraw.",
+  "variables": [
+    {"name": "balance",  "type": "int"},
+    {"name": "withdraw", "type": "int"}
+  ],
+  "assertions": [
+    {"op": ">=", "args": ["balance", 0]},
+    {"op": ">=", "args": ["withdraw", 0]},
+    {
+      "op": "=>",
+      "args": [
+        {"op": ">",  "args": ["withdraw", 0]},
+        {"op": ">=", "args": ["balance", "withdraw"]}
+      ]
+    }
+  ]
+}
