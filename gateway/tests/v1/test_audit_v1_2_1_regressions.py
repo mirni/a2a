@@ -64,9 +64,7 @@ class TestBatchOwnershipBypass:
         assert resp.status_code == 200, resp.text  # batch always 200, per-call errors inline
         body = resp.json()
         first = body["results"][0]
-        assert first["success"] is False, (
-            "CRIT-2: cross-agent list_api_keys via /v1/batch must be rejected"
-        )
+        assert first["success"] is False, "CRIT-2: cross-agent list_api_keys via /v1/batch must be rejected"
         assert first["error"]["code"] in {"forbidden", "authorization_denied"}
 
     async def test_batch_rejects_cross_agent_get_balance(self, client, app):
@@ -219,9 +217,7 @@ class TestWebhookSchemaMigration:
         finally:
             await mgr.close()
 
-        assert "filter_agent_ids" in cols, (
-            "HIGH-6: legacy webhooks DB missing 'filter_agent_ids' after connect()"
-        )
+        assert "filter_agent_ids" in cols, "HIGH-6: legacy webhooks DB missing 'filter_agent_ids' after connect()"
 
 
 # ---------------------------------------------------------------------------
@@ -250,9 +246,7 @@ class TestCrossCurrencyConvertMultiHop:
 
         # USD→CREDITS = 100; ETH→CREDITS = 400000 → USD→ETH = 100/400000 = 0.00025
         assert rate > 0
-        assert abs(float(rate) - (100.0 / 400000.0)) < 1e-9, (
-            f"HIGH-5: expected USD→ETH ≈ 0.00025, got {rate}"
-        )
+        assert abs(float(rate) - (100.0 / 400000.0)) < 1e-9, f"HIGH-5: expected USD→ETH ≈ 0.00025, got {rate}"
 
 
 # ---------------------------------------------------------------------------
@@ -307,9 +301,7 @@ class TestGatewayFeeDecimalFormatting:
         assert isinstance(fee, str), f"HIGH-3: gateway_fee must be a string, got {type(fee).__name__}"
         # Must be parseable as Decimal with exactly 2 decimal places
         d = Decimal(fee)
-        assert d == d.quantize(Decimal("0.01")), (
-            f"HIGH-3: gateway_fee must have exactly 2 decimal places, got {fee!r}"
-        )
+        assert d == d.quantize(Decimal("0.01")), f"HIGH-3: gateway_fee must have exactly 2 decimal places, got {fee!r}"
         assert "." in fee and len(fee.split(".")[1]) == 2, (
             f"HIGH-3: gateway_fee must print with 2 decimal places, got {fee!r}"
         )
@@ -440,9 +432,7 @@ class TestGatekeeperFailedJobsNoCharge:
             # The mock verifier raised → job ended up FAILED.
             job = await ctx.gatekeeper_api.storage.get_job(job_id)
             assert job is not None
-            assert job.status == VerificationStatus.FAILED, (
-                f"test precondition: expected FAILED job, got {job.status}"
-            )
+            assert job.status == VerificationStatus.FAILED, f"test precondition: expected FAILED job, got {job.status}"
 
             balance_after = float(await ctx.tracker.get_balance("pro-fail-charge"))
             assert balance_after == balance_before, (
@@ -480,8 +470,7 @@ class TestGatekeeperJsonPolicyLanguage:
                     "status": "completed",
                     "result": "satisfied",
                     "property_results": [
-                        {"name": p["name"], "result": "satisfied", "model": "x=1"}
-                        for p in job_spec["properties"]
+                        {"name": p["name"], "result": "satisfied", "model": "x=1"} for p in job_spec["properties"]
                     ],
                     "proof_data": "",
                     "proof_hash": "",
@@ -573,9 +562,7 @@ class TestOnboardingQuickstartUsesRest:
         assert quickstart, "onboarding quickstart missing"
 
         combined = "\n".join(step.get("example", "") for step in quickstart)
-        assert "/v1/execute" not in combined, (
-            f"quickstart must not use /v1/execute; got: {combined}"
-        )
+        assert "/v1/execute" not in combined, f"quickstart must not use /v1/execute; got: {combined}"
         # Sanity: it should mention at least one real REST path.
         assert "/v1/billing/wallets/" in combined or "/v1/marketplace" in combined, (
             f"quickstart should reference REST routes; got: {combined}"

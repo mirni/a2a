@@ -203,9 +203,7 @@ async def batch(request: Request) -> JSONResponse:
         # enumerate any other agent's keys, balance, webhooks, etc. by
         # routing the tool call through ``/v1/batch`` instead of the REST
         # endpoint that wires ``check_ownership``.
-        authz_result = check_ownership_authorization(
-            agent_id, agent_tier, params, tool_name=tool_name
-        )
+        authz_result = check_ownership_authorization(agent_id, agent_tier, params, tool_name=tool_name)
         if authz_result is not None:
             _status, message, code = authz_result
             results.append(
