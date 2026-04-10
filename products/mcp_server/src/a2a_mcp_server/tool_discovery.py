@@ -57,13 +57,12 @@ def _build_description(entry: dict[str, Any]) -> str:
     extras: list[str] = []
     if service:
         extras.append(f"service={service}")
-    if per_call is not None:
-        # Format 0.0 as "0" and 0.5 as "0.5" — human-friendly, deterministic
-        if isinstance(per_call, (int, float)):
-            if float(per_call) == 0:
-                extras.append("cost=0 credits")
-            else:
-                extras.append(f"cost={per_call} credits/call")
+    # Format 0.0 as "0 credits" and 0.5 as "0.5 credits/call" — human-friendly
+    if per_call is not None and isinstance(per_call, (int, float)):
+        if float(per_call) == 0:
+            extras.append("cost=0 credits")
+        else:
+            extras.append(f"cost={per_call} credits/call")
     extras.append(f"tier={tier}")
 
     suffix = " [" + ", ".join(extras) + "]"

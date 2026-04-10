@@ -1,0 +1,58 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "net.greenhelix/mcp-server",
+  "description": "MCP server exposing the A2A Commerce Gateway's 141 tools — payments, escrow, identity, marketplace, trust, messaging — to any MCP-aware agent (Claude Desktop, Cursor, Claude Code, Windsurf).",
+  "repository": {
+    "url": "https://github.com/mirni/a2a",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@greenhelix/mcp-server",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "A2A_API_KEY",
+          "description": "A2A Commerce Gateway API key (free tier available at https://greenhelix.net)",
+          "isRequired": true,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "A2A_BASE_URL",
+          "description": "Override the gateway base URL (default: https://api.greenhelix.net)",
+          "isRequired": false,
+          "format": "string"
+        }
+      ]
+    },
+    {
+      "registryType": "pypi",
+      "identifier": "a2a-mcp-server",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "A2A_API_KEY",
+          "description": "A2A Commerce Gateway API key (free tier available at https://greenhelix.net)",
+          "isRequired": true,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "A2A_BASE_URL",
+          "description": "Override the gateway base URL (default: https://api.greenhelix.net)",
+          "isRequired": false,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

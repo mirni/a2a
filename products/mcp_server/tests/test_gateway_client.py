@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import httpx
 import pytest
-
 from a2a_mcp_server.gateway_client import (
+    GatewayAuthError,
     GatewayClient,
     GatewayError,
-    GatewayAuthError,
     GatewayRateLimitError,
 )
 

@@ -1,5 +1,7 @@
 # a2a-mcp-server
 
+<!-- mcp-name: net.greenhelix/mcp-server -->
+
 [![PyPI](https://img.shields.io/pypi/v/a2a-mcp-server.svg)](https://pypi.org/project/a2a-mcp-server/)
 [![MIT License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 

@@ -1,0 +1,47 @@
+{
+  "name": "@a2a/sdk",
+  "version": "1.2.1",
+  "description": "Agent-to-agent commerce SDK — alias for @greenhelix/sdk. Payments, escrow, marketplace, identity, and trust scoring for AI agents.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "a2a",
+    "agent",
+    "ai-agent",
+    "agent-payments",
+    "mcp",
+    "escrow",
+    "trust",
+    "marketplace",
+    "commerce",
+    "sdk"
+  ],
+  "author": "Green Helix <dev@greenhelix.net>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mirni/a2a.git",
+    "directory": "sdk-ts/alias-a2a"
+  },
+  "homepage": "https://greenhelix.net",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@greenhelix/sdk": "^1.2.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

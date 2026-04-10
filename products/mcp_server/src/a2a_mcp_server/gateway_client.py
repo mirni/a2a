@@ -42,7 +42,7 @@ class GatewayClient:
         base_url: str,
         api_key: str,
         timeout: httpx.Timeout | float | None = None,
-        transport: httpx.BaseTransport | None = None,
+        transport: httpx.AsyncBaseTransport | None = None,
         user_agent: str | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
@@ -61,7 +61,7 @@ class GatewayClient:
     async def close(self) -> None:
         await self._client.aclose()
 
-    async def __aenter__(self) -> "GatewayClient":
+    async def __aenter__(self) -> GatewayClient:
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
@@ -101,9 +101,7 @@ def _raise_for_status(resp: httpx.Response) -> None:
     if resp.status_code == 429:
         raise GatewayRateLimitError(_extract_message(resp) or "Gateway rate limit exceeded")
     if resp.status_code >= 400:
-        raise GatewayError(
-            f"Gateway returned {resp.status_code}: {_extract_message(resp) or resp.text}"
-        )
+        raise GatewayError(f"Gateway returned {resp.status_code}: {_extract_message(resp) or resp.text}")
 
 
 def _extract_message(resp: httpx.Response) -> str | None:

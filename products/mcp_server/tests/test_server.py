@@ -6,7 +6,6 @@ import json
 from unittest.mock import AsyncMock
 
 import pytest
-
 from a2a_mcp_server.server import build_server
 
 
@@ -42,8 +41,6 @@ async def test_server_build_returns_mcp_server(fake_gateway_client):
 @pytest.mark.asyncio
 async def test_server_list_tools_returns_gateway_catalog(fake_gateway_client):
     server = build_server(fake_gateway_client)
-    handler = server.request_handlers
-    # Look up ListToolsRequest handler via public API
     tools = await _call_list_tools(server)
     assert len(tools) == 1
     assert tools[0].name == "get_balance"

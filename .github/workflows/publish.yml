@@ -151,10 +151,56 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   # ---------------------------------------------------------------------------
+  # Publish @a2a/sdk alias to npm — thin shim re-exporting @greenhelix/sdk.
+  # Exists so agents searching the @a2a scope discover the canonical SDK.
+  # ---------------------------------------------------------------------------
+  publish-npm-alias:
+    needs: [validate, publish-npm]
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.validate.outputs.version }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Sync alias version to match @greenhelix/sdk
+        working-directory: sdk-ts/alias-a2a
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          node -e "
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
+          pkg.version = process.env.VERSION;
+          pkg.dependencies['@greenhelix/sdk'] = '^' + process.env.VERSION;
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+      - name: Install and build
+        working-directory: sdk-ts/alias-a2a
+        run: |
+          npm install --no-save
+          npm run build
+
+      - name: Publish with provenance
+        working-directory: sdk-ts/alias-a2a
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # ---------------------------------------------------------------------------
   # Verify: install published packages from registries
   # ---------------------------------------------------------------------------
   verify:
-    needs: [validate, publish-pypi, publish-npm]
+    needs: [validate, publish-pypi, publish-npm, publish-npm-alias]
     runs-on: ubuntu-latest
     steps:
       - name: Wait for registry propagation
@@ -184,3 +230,12 @@ jobs:
           npm init -y --silent
           npm install "@greenhelix/sdk@${VERSION}" --silent
           node -e "const { A2AClient } = require('@greenhelix/sdk'); console.log('npm: import OK')"
+
+      - name: Verify @a2a/sdk alias
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          mkdir /tmp/verify-alias && cd /tmp/verify-alias
+          npm init -y --silent
+          npm install "@a2a/sdk@${VERSION}" --silent
+          node -e "const { A2AClient } = require('@a2a/sdk'); console.log('alias: import OK')"

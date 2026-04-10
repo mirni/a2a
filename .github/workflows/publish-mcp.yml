@@ -1,0 +1,233 @@
+# =============================================================================
+# A2A Commerce Platform — Publish MCP server packages
+# =============================================================================
+# Publishes a2a-mcp-server (PyPI) and @greenhelix/mcp-server (npm) on a
+# release cadence independent of the main gateway/SDK release train.
+#
+# Trigger:
+#   1. Push a tag of the form `mcp-v<version>` (recommended)
+#   2. Manually: gh workflow run "Publish MCP" -f version=0.1.0
+#
+# Setup required (one-time, manual):
+#
+# PyPI Trusted Publishers:
+#   1. https://pypi.org/manage/account/publishing/
+#   2. Add pending publisher:
+#        PyPI project name: a2a-mcp-server
+#        Owner:             mirni
+#        Repository name:   a2a
+#        Workflow name:     publish-mcp.yml
+#        Environment name:  pypi
+#
+# npm token:
+#   The existing NPM_TOKEN in the `npm` GitHub environment must be scoped
+#   to the entire @greenhelix org (or at minimum include
+#   @greenhelix/mcp-server). If it was created for @greenhelix/sdk only,
+#   regenerate it as a Granular Access Token with read+write on the
+#   @greenhelix org.
+# =============================================================================
+
+name: Publish MCP
+
+on:
+  push:
+    tags:
+      - 'mcp-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'MCP package version to publish (e.g. 0.1.0)'
+        required: true
+        type: string
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Validate: extract version, verify pyproject.toml + package.json match
+  # ---------------------------------------------------------------------------
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract.outputs.version }}
+    steps:
+      - name: Extract version
+        id: extract
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            VERSION="$INPUT_VERSION"
+          else
+            VERSION="${GITHUB_REF#refs/tags/mcp-v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "MCP version: $VERSION"
+
+      - uses: actions/checkout@v5
+
+      - name: Verify products/mcp_server/pyproject.toml version
+        env:
+          EXPECTED: ${{ steps.extract.outputs.version }}
+        run: |
+          ACTUAL=$(python3 -c "
+          import re, pathlib
+          text = pathlib.Path('products/mcp_server/pyproject.toml').read_text()
+          m = re.search(r'^version\s*=\s*\"([^\"]+)\"', text, re.MULTILINE)
+          print(m.group(1) if m else 'NOT_FOUND')
+          ")
+          echo "pyproject version: $ACTUAL (expected: $EXPECTED)"
+          if [[ "$ACTUAL" != "$EXPECTED" ]]; then
+            echo "::error::Version mismatch: pyproject.toml has $ACTUAL, expected $EXPECTED"
+            exit 1
+          fi
+
+      - name: Verify sdk-ts/mcp-server/package.json version
+        env:
+          EXPECTED: ${{ steps.extract.outputs.version }}
+        run: |
+          ACTUAL=$(node -p "require('./sdk-ts/mcp-server/package.json').version")
+          echo "package.json version: $ACTUAL (expected: $EXPECTED)"
+          if [[ "$ACTUAL" != "$EXPECTED" ]]; then
+            echo "::error::Version mismatch: package.json has $ACTUAL, expected $EXPECTED"
+            exit 1
+          fi
+
+      - name: Verify _version.py matches
+        env:
+          EXPECTED: ${{ steps.extract.outputs.version }}
+        run: |
+          ACTUAL=$(python3 -c "
+          import re, pathlib
+          text = pathlib.Path('products/mcp_server/src/a2a_mcp_server/_version.py').read_text()
+          m = re.search(r'__version__\s*=\s*\"([^\"]+)\"', text)
+          print(m.group(1) if m else 'NOT_FOUND')
+          ")
+          echo "_version.py: $ACTUAL (expected: $EXPECTED)"
+          if [[ "$ACTUAL" != "$EXPECTED" ]]; then
+            echo "::error::Version mismatch: _version.py has $ACTUAL, expected $EXPECTED"
+            exit 1
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Test: run the MCP server test suites before publishing
+  # ---------------------------------------------------------------------------
+  test:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+
+      - name: Install Python deps
+        run: pip install --quiet 'mcp>=1.0' 'httpx>=0.27' pytest pytest-asyncio
+
+      - name: Run Python tests
+        env:
+          PYTHONPATH: products/mcp_server/src
+        run: pytest products/mcp_server/tests/ -q
+
+      - name: Install TypeScript deps
+        working-directory: sdk-ts/mcp-server
+        run: npm ci
+
+      - name: Run TypeScript tests
+        working-directory: sdk-ts/mcp-server
+        run: npm test
+
+  # ---------------------------------------------------------------------------
+  # Publish a2a-mcp-server to PyPI via Trusted Publishing (OIDC)
+  # ---------------------------------------------------------------------------
+  publish-pypi:
+    needs: [validate, test]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write   # OIDC for Trusted Publishing
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Build sdist and wheel
+        run: |
+          pip install --quiet build
+          cd products/mcp_server
+          python -m build --sdist --wheel --outdir ../../dist/pypi-mcp/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/pypi-mcp/
+
+  # ---------------------------------------------------------------------------
+  # Publish @greenhelix/mcp-server to npm with provenance
+  # ---------------------------------------------------------------------------
+  publish-npm:
+    needs: [validate, test]
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      id-token: write   # OIDC for npm provenance attestation
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install and build
+        working-directory: sdk-ts/mcp-server
+        run: |
+          npm ci
+          npm run build
+
+      - name: Publish with provenance
+        working-directory: sdk-ts/mcp-server
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  # Verify: install published packages from registries
+  # ---------------------------------------------------------------------------
+  verify:
+    needs: [validate, publish-pypi, publish-npm]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for registry propagation
+        run: sleep 30
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+
+      - name: Verify PyPI package installs
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          python3 -m venv /tmp/verify-venv
+          /tmp/verify-venv/bin/pip install --quiet "a2a-mcp-server==${VERSION}"
+          /tmp/verify-venv/bin/python -c "from a2a_mcp_server import build_server, GatewayClient; print('PyPI: import OK')"
+
+      - name: Verify npm package installs
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          mkdir /tmp/verify-npm && cd /tmp/verify-npm
+          npm init -y --silent
+          npm install "@greenhelix/mcp-server@${VERSION}" --silent
+          node -e "const mcp = require('@greenhelix/mcp-server'); console.log('npm: import OK', Object.keys(mcp))"
