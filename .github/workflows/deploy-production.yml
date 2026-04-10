@@ -170,7 +170,15 @@ jobs:
   deploy-gateway:
     runs-on: ubuntu-latest
     needs: [validate, package]
-    if: needs.validate.outputs.deploy_gateway == 'true'
+    # Use always() so transitive skip of release-gate (when deploying from
+    # main, not release/*) does not propagate a skipped status onto this
+    # job. We still gate explicitly on validate+package success and the
+    # deploy_gateway flag so failures/cancels are honored.
+    if: >-
+      always()
+      && needs.validate.result == 'success'
+      && needs.package.result == 'success'
+      && needs.validate.outputs.deploy_gateway == 'true'
     environment: production
     steps:
       - uses: actions/checkout@v5
@@ -230,7 +238,12 @@ jobs:
   deploy-website:
     runs-on: ubuntu-latest
     needs: [validate, package]
-    if: needs.validate.outputs.deploy_website == 'true'
+    # Same belt-and-suspenders fix as deploy-gateway — see comment above.
+    if: >-
+      always()
+      && needs.validate.result == 'success'
+      && needs.package.result == 'success'
+      && needs.validate.outputs.deploy_website == 'true'
     environment: production
     steps:
       - uses: actions/checkout@v5

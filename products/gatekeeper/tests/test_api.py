@@ -105,7 +105,7 @@ class TestSubmitVerification:
             properties=[{"name": "p1", "expression": "(assert true)"}],
         )
         assert job.status == VerificationStatus.PENDING
-        assert job.cost == Decimal("6")  # 5 base + 1 per property
+        assert job.cost == Decimal("12")  # v1.2.4: 10 base + 2 per property
         assert len(job.properties) == 1
 
     @pytest.mark.asyncio
@@ -198,12 +198,12 @@ class TestSubmitVerification:
 
     @pytest.mark.asyncio
     async def test_submit_cost_calculation(self, api):
-        """Cost is 5 base + 1 per property."""
+        """v1.2.4: Cost is 10 base + 2 per property (no verifier attached → no surcharge)."""
         job = await api.submit_verification(
             agent_id="agent-test",
             properties=[{"name": f"p{i}", "expression": "(assert true)"} for i in range(3)],
         )
-        assert job.cost == Decimal("8")  # 5 + 3
+        assert job.cost == Decimal("16")  # 10 + 2*3
 
     @pytest.mark.asyncio
     async def test_submit_with_metadata(self, api):
@@ -477,3 +477,244 @@ class TestExtractCounterexample:
     def test_no_matching_fields(self):
         results = [{"name": "p1", "result": "unknown"}]
         assert GatekeeperAPI._extract_counterexample(results) is None
+
+
+# ---------------------------------------------------------------------------
+# v1.2.4 repricing — heavy-tail solver-time surcharge
+# ---------------------------------------------------------------------------
+#
+# Pricing formula (see products/gatekeeper/src/api.py):
+#
+#   quoted_cost  = BASE (10) + PER_PROPERTY (2) * N
+#   final_cost   = quoted_cost + solver_time_surcharge(duration_ms)
+#   solver_time_surcharge(d) = ceil(max(0, d - 1000) / 500) credits
+#
+# Motivation: previously a 100-property, 60-second job cost only $1.05
+# while consuming ~120 GB-seconds of Lambda. The heavy-tail surcharge
+# scales price with solver work, aligning revenue with COGS and leaving
+# trivial proofs nearly as cheap as before.
+# ---------------------------------------------------------------------------
+
+
+def _make_sat_response_with_duration(job_id: str, duration_ms: int) -> dict[str, Any]:
+    """Variant of _make_satisfied_response that lets the caller set duration_ms."""
+    proof_blob = json.dumps(
+        {
+            "job_id": job_id,
+            "result": "satisfied",
+            "property_results": [{"name": "p1", "result": "satisfied", "model": "[x = 5]"}],
+        },
+        sort_keys=True,
+    )
+    return {
+        "job_id": job_id,
+        "status": "completed",
+        "result": "satisfied",
+        "property_results": [{"name": "p1", "result": "satisfied", "model": "[x = 5]"}],
+        "proof_data": proof_blob,
+        "proof_hash": hashlib.sha3_256(proof_blob.encode()).hexdigest(),
+        "duration_ms": duration_ms,
+    }
+
+
+class TestPricingV124:
+    """v1.2.4 repricing: new base/per-property + solver-time surcharge."""
+
+    @pytest.mark.asyncio
+    async def test_base_and_per_property_uplift_without_verifier(self, api):
+        """1 property, no verifier: base(10) + per_property(2) = 12 credits."""
+        job = await api.submit_verification(
+            agent_id="agent-price-a",
+            properties=[{"name": "p1", "expression": "(assert true)"}],
+        )
+        assert job.cost == Decimal("12")
+
+    @pytest.mark.asyncio
+    async def test_quoted_cost_five_properties_no_verifier(self, api):
+        """5 properties, no verifier: 10 + 5*2 = 20 credits."""
+        job = await api.submit_verification(
+            agent_id="agent-price-b",
+            properties=[{"name": f"p{i}", "expression": "(assert true)"} for i in range(5)],
+        )
+        assert job.cost == Decimal("20")
+
+    @pytest.mark.asyncio
+    async def test_surcharge_under_one_second_is_zero(self, storage):
+        """duration_ms < 1000 → no surcharge. 1 prop, 400ms → cost stays at 12."""
+        mock_verifier = AsyncMock()
+        mock_verifier.invoke.side_effect = lambda spec: _make_sat_response_with_duration(spec["job_id"], 400)
+        api = GatekeeperAPI(storage=storage, verifier=mock_verifier)
+
+        job = await api.submit_verification(
+            agent_id="agent-price-c",
+            properties=[{"name": "p1", "expression": "(assert true)"}],
+        )
+        assert job.cost == Decimal("12")  # 10 + 2 + 0
+
+    @pytest.mark.asyncio
+    async def test_surcharge_at_one_second_is_zero(self, storage):
+        """duration_ms == 1000 → still no surcharge (boundary is inclusive)."""
+        mock_verifier = AsyncMock()
+        mock_verifier.invoke.side_effect = lambda spec: _make_sat_response_with_duration(spec["job_id"], 1000)
+        api = GatekeeperAPI(storage=storage, verifier=mock_verifier)
+
+        job = await api.submit_verification(
+            agent_id="agent-price-d",
+            properties=[{"name": "p1", "expression": "(assert true)"}],
+        )
+        assert job.cost == Decimal("12")
+
+    @pytest.mark.asyncio
+    async def test_surcharge_just_over_threshold(self, storage):
+        """duration_ms == 1001 → ceil(1/500) = 1 credit surcharge."""
+        mock_verifier = AsyncMock()
+        mock_verifier.invoke.side_effect = lambda spec: _make_sat_response_with_duration(spec["job_id"], 1001)
+        api = GatekeeperAPI(storage=storage, verifier=mock_verifier)
+
+        job = await api.submit_verification(
+            agent_id="agent-price-e",
+            properties=[{"name": "p1", "expression": "(assert true)"}],
+        )
+        assert job.cost == Decimal("13")  # 12 + 1
+
+    @pytest.mark.asyncio
+    async def test_surcharge_two_seconds(self, storage):
+        """duration_ms == 2000 → ceil(1000/500) = 2 credits surcharge."""
+        mock_verifier = AsyncMock()
+        mock_verifier.invoke.side_effect = lambda spec: _make_sat_response_with_duration(spec["job_id"], 2000)
+        api = GatekeeperAPI(storage=storage, verifier=mock_verifier)
+
+        job = await api.submit_verification(
+            agent_id="agent-price-f",
+            properties=[{"name": "p1", "expression": "(assert true)"}],
+        )
+        assert job.cost == Decimal("14")  # 12 + 2
+
+    @pytest.mark.asyncio
+    async def test_surcharge_heavy_tail_sixty_seconds(self, storage):
+        """100-prop timeout (60s): 10 + 200 + ceil(59000/500)=118 → 328 credits."""
+        mock_verifier = AsyncMock()
+        mock_verifier.invoke.side_effect = lambda spec: _make_sat_response_with_duration(spec["job_id"], 60_000)
+        api = GatekeeperAPI(storage=storage, verifier=mock_verifier)
+
+        job = await api.submit_verification(
+            agent_id="agent-price-g",
+            properties=[{"name": f"p{i}", "expression": "(assert true)"} for i in range(100)],
+        )
+        # quoted = 10 + 2*100 = 210; surcharge = ceil((60000-1000)/500) = 118
+        assert job.cost == Decimal("328")
+
+    @pytest.mark.asyncio
+    async def test_surcharge_missing_duration_ms_is_zero(self, storage):
+        """If verifier response omits duration_ms, no surcharge is applied."""
+        mock_verifier = AsyncMock()
+
+        def _no_duration(spec: dict[str, Any]) -> dict[str, Any]:
+            resp = _make_satisfied_response(spec["job_id"])
+            resp.pop("duration_ms", None)
+            return resp
+
+        mock_verifier.invoke.side_effect = _no_duration
+        api = GatekeeperAPI(storage=storage, verifier=mock_verifier)
+
+        job = await api.submit_verification(
+            agent_id="agent-price-h",
+            properties=[{"name": "p1", "expression": "(assert true)"}],
+        )
+        assert job.cost == Decimal("12")  # quoted only, no surcharge
+
+    @pytest.mark.asyncio
+    async def test_failed_job_not_charged_even_with_surcharge(self, storage):
+        """CRIT-2 invariant preserved: failed jobs still charge 0 (via tool layer).
+        At the API layer cost reflects the computed amount, but the route
+        zeroes it out. Here we assert that a failed job's cost is whatever
+        was already quoted at submit time (no surcharge applied because
+        _execute_job never got duration_ms).
+        """
+        mock_verifier = AsyncMock()
+        mock_verifier.invoke.side_effect = RuntimeError("lambda down")
+        api = GatekeeperAPI(storage=storage, verifier=mock_verifier)
+
+        job = await api.submit_verification(
+            agent_id="agent-price-i",
+            properties=[{"name": "p1", "expression": "(assert true)"}],
+        )
+        assert job.status == VerificationStatus.FAILED
+        # No surcharge applied because verifier raised before duration_ms
+        # was observed. The tool layer will zero this out for billing.
+        assert job.cost == Decimal("12")
+
+    def test_solver_surcharge_helper_bounds(self):
+        """Direct unit test of _compute_solver_surcharge."""
+        from products.gatekeeper.src.api import _compute_solver_surcharge
+
+        assert _compute_solver_surcharge(0) == Decimal("0")
+        assert _compute_solver_surcharge(999) == Decimal("0")
+        assert _compute_solver_surcharge(1000) == Decimal("0")
+        assert _compute_solver_surcharge(1001) == Decimal("1")
+        assert _compute_solver_surcharge(1500) == Decimal("1")
+        assert _compute_solver_surcharge(1501) == Decimal("2")
+        assert _compute_solver_surcharge(2000) == Decimal("2")
+        assert _compute_solver_surcharge(60_000) == Decimal("118")
+
+
+# ---------------------------------------------------------------------------
+# v1.2.4 P1 — concurrent idempotency race
+# ---------------------------------------------------------------------------
+
+
+class TestConcurrentIdempotencyRace:
+    """Two concurrent submit_verification calls with the same idempotency_key
+    must converge on one job. This is the race condition the report flagged
+    as a P1 risk before v1.2.4.
+    """
+
+    @pytest.mark.asyncio
+    async def test_concurrent_submits_same_idem_key_yield_one_job(self, api):
+        """asyncio.gather(submit, submit) with identical idempotency_key.
+
+        Expectation: both callers receive the SAME job_id, and only ONE
+        row is present in storage.
+        """
+        import asyncio
+
+        key = "idem-race-001"
+        props = [{"name": "p1", "expression": "(assert true)"}]
+
+        async def _submit() -> str:
+            job = await api.submit_verification(
+                agent_id="agent-race",
+                properties=props,
+                idempotency_key=key,
+            )
+            return job.id
+
+        job_id_1, job_id_2 = await asyncio.gather(_submit(), _submit())
+        assert job_id_1 == job_id_2, (
+            f"Concurrent submits with same idem key must converge: {job_id_1} vs {job_id_2}"
+        )
+
+        # Storage must contain exactly one job under this agent
+        jobs = await api.list_verification_jobs("agent-race")
+        assert len(jobs) == 1, f"Expected 1 job in storage, found {len(jobs)}: {[j.id for j in jobs]}"
+
+    @pytest.mark.asyncio
+    async def test_concurrent_submits_ten_callers(self, api):
+        """10-way concurrent submit with same idem key → still one job."""
+        import asyncio
+
+        key = "idem-race-002"
+        props = [{"name": "p1", "expression": "(assert true)"}]
+
+        async def _submit() -> str:
+            job = await api.submit_verification(
+                agent_id="agent-race-10",
+                properties=props,
+                idempotency_key=key,
+            )
+            return job.id
+
+        ids = await asyncio.gather(*[_submit() for _ in range(10)])
+        assert len(set(ids)) == 1, f"All 10 concurrent submits must return same job_id: got {set(ids)}"
+        jobs = await api.list_verification_jobs("agent-race-10")
+        assert len(jobs) == 1

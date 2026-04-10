@@ -47,10 +47,13 @@ from .models import (
     SendMessageResponse,
     ServiceMatch,
     SubmitMetricsResponse,
+    SubmitVerificationResponse,
     SubscriptionResponse,
     ToolPricing,
     TrustScoreResponse,
+    VerificationJobResponse,
     VerifyAgentResponse,
+    VerifyProofResponse,
     VoidPaymentResponse,
 )
 
@@ -742,6 +745,83 @@ class A2AClient:
         """Add an agent to an organization."""
         data = await self._rest("POST", f"/v1/identity/orgs/{org_id}/members", json={"agent_id": agent_id})
         return AddAgentToOrgResponse.from_dict(data)
+
+    # =====================================================================
+    # Convenience methods — Gatekeeper (formal verifier)
+    # =====================================================================
+
+    async def submit_verification(
+        self,
+        agent_id: str,
+        properties: list[dict[str, Any]],
+        *,
+        scope: str = "economic",
+        timeout_seconds: int = 300,
+        webhook_url: str | None = None,
+        idempotency_key: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> SubmitVerificationResponse:
+        """POST /v1/gatekeeper/jobs — submit a formal verification job.
+
+        See :mod:`a2a_client.verifier` for the high-level one-liner.
+        """
+        body: dict[str, Any] = {
+            "agent_id": agent_id,
+            "properties": properties,
+            "scope": scope,
+            "timeout_seconds": timeout_seconds,
+        }
+        if webhook_url is not None:
+            body["webhook_url"] = webhook_url
+        if idempotency_key is not None:
+            body["idempotency_key"] = idempotency_key
+        if metadata is not None:
+            body["metadata"] = metadata
+        data = await self._rest("POST", "/v1/gatekeeper/jobs", json=body)
+        return SubmitVerificationResponse.from_dict(data)
+
+    async def get_verification_status(self, job_id: str) -> VerificationJobResponse:
+        """GET /v1/gatekeeper/jobs/{job_id} — job + result."""
+        data = await self._rest("GET", f"/v1/gatekeeper/jobs/{job_id}")
+        return VerificationJobResponse.from_dict(data)
+
+    async def cancel_verification(self, job_id: str) -> VerificationJobResponse:
+        """POST /v1/gatekeeper/jobs/{job_id}/cancel — cancel a pending job."""
+        data = await self._rest("POST", f"/v1/gatekeeper/jobs/{job_id}/cancel")
+        return VerificationJobResponse.from_dict(data)
+
+    async def list_verification_jobs(
+        self,
+        agent_id: str,
+        *,
+        status: str | None = None,
+        limit: int = 50,
+        cursor: str | None = None,
+    ) -> dict[str, Any]:
+        """GET /v1/gatekeeper/jobs — list jobs for an agent."""
+        params: dict[str, Any] = {"agent_id": agent_id, "limit": limit}
+        if status is not None:
+            params["status"] = status
+        if cursor is not None:
+            params["cursor"] = cursor
+        return await self._rest("GET", "/v1/gatekeeper/jobs", params=params)
+
+    async def verify_proof(self, proof_hash: str) -> VerifyProofResponse:
+        """POST /v1/gatekeeper/proofs/verify — check a proof by hash.
+
+        Free-tier endpoint; intended for third parties to verify a
+        proof without holding a pro key.
+        """
+        data = await self._rest(
+            "POST",
+            "/v1/gatekeeper/proofs/verify",
+            json={"proof_hash": proof_hash},
+        )
+        return VerifyProofResponse.from_dict(data)
+
+    async def get_proof(self, proof_id: str) -> dict[str, Any]:
+        """GET /v1/gatekeeper/proofs/{proof_id} — fetch full proof artifact."""
+        return await self._rest("GET", f"/v1/gatekeeper/proofs/{proof_id}")
 
     # ----- Batch execution -----
 

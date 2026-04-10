@@ -217,6 +217,21 @@ class GatekeeperStorage:
         await self.db.commit()
         return await self.get_job(job_id)
 
+    async def update_job_cost(self, job_id: str, cost: Decimal) -> VerificationJob | None:
+        """Update a job's cost field.
+
+        v1.2.4 repricing: used by GatekeeperAPI._execute_job to apply the
+        heavy-tail solver-time surcharge once the verifier returns the
+        observed duration_ms.
+        """
+        now = time.time()
+        await self.db.execute(
+            "UPDATE verification_jobs SET cost = ?, updated_at = ? WHERE id = ?",
+            (int(cost * SCALE), now, job_id),
+        )
+        await self.db.commit()
+        return await self.get_job(job_id)
+
     async def list_jobs(
         self,
         agent_id: str,

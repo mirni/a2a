@@ -567,7 +567,12 @@ async def test_no_link_header_when_no_more_pages(client, app, api_key):
 
     assert body["has_more"] is False
     assert "next_cursor" not in body
-    assert resp.headers.get("link") is None
+    # /v1/execute is deprecated in v1.2.4 and always emits a Sunset Link
+    # header (RFC 8594). The pagination contract is that there is no
+    # ``rel="next"`` link on the terminal page, not that the Link header
+    # is absent entirely.
+    link_header = resp.headers.get("link") or ""
+    assert 'rel="next"' not in link_header
 
 
 async def test_pricing_cursor_pagination(client, app, api_key):

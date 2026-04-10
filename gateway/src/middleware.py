@@ -292,8 +292,16 @@ class Metrics:
 
 async def metrics_handler(request: Request) -> Response:
     """Starlette route handler that serves Prometheus text exposition."""
+    # v1.2.4: gatekeeper telemetry (per-tier counters + duration / solver
+    # histograms) lives in its own module so route handlers can record
+    # observations without importing the gateway-wide middleware, but is
+    # stitched onto the same /v1/metrics document.
+    from gateway.src.gatekeeper_metrics import GatekeeperMetrics
+
+    body = await Metrics.to_prometheus()
+    body += await GatekeeperMetrics.to_prometheus()
     return Response(
-        content=await Metrics.to_prometheus(),
+        content=body,
         media_type="text/plain; version=0.0.4",
     )
 

@@ -43,11 +43,19 @@ def build_server(client: GatewayClient) -> Server:
         return tools
 
     @server.call_tool()
-    async def _call_tool(name: str, arguments: dict[str, Any] | None) -> list[TextContent]:
+    async def _call_tool(
+        name: str, arguments: dict[str, Any] | None
+    ) -> dict[str, Any] | list[TextContent]:
         try:
             result = await client.invoke_tool(name, arguments or {})
         except GatewayError as exc:
             return [TextContent(type="text", text=json.dumps({"error": str(exc)}))]
+        # Dict results become structured content — this satisfies MCP's
+        # output-schema validation and also gives the SDK a free text
+        # rendering. Non-dict results are returned as unstructured text.
+        if isinstance(result, dict):
+            # Ensure JSON-safe values (Decimal, datetime, ...).
+            return json.loads(json.dumps(result, default=str))
         payload = json.dumps(result, default=str)
         return [TextContent(type="text", text=payload)]
 

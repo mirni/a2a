@@ -37,12 +37,18 @@ class VerifierClient:
         auth_mode: str | None = None,
         function_url: str | None = None,
         shared_secret: str | None = None,
+        fallback_region: str | None = None,
     ):
         self.function_name = function_name or os.environ.get("VERIFIER_LAMBDA_FUNCTION", "z3-verifier")
         self.region = region or os.environ.get("VERIFIER_LAMBDA_REGION", "us-east-1")
         self.auth_mode = auth_mode or os.environ.get("VERIFIER_AUTH_MODE", "iam")
         self.function_url = function_url or os.environ.get("VERIFIER_FUNCTION_URL", "")
         self.shared_secret = shared_secret or os.environ.get("VERIFIER_SHARED_SECRET", "")
+        # v1.2.4 P1 (arch audit): opt-in regional failover for IAM mode.
+        # When set, a failed primary Lambda invoke triggers exactly one
+        # retry in the fallback region with a freshly created boto client.
+        # Ignored for shared_secret / HTTP mode.
+        self.fallback_region = fallback_region or os.environ.get("VERIFIER_LAMBDA_FALLBACK_REGION") or None
 
         if self.auth_mode not in _VALID_AUTH_MODES:
             raise ValueError(f"Invalid auth_mode '{self.auth_mode}'. Must be one of: {sorted(_VALID_AUTH_MODES)}")
@@ -50,7 +56,14 @@ class VerifierClient:
         if self.auth_mode == "shared_secret" and self.function_url and not self.function_url.startswith("https://"):
             raise ValueError("function_url must use HTTPS")
 
+        if self.fallback_region is not None and self.fallback_region == self.region:
+            raise ValueError(
+                f"fallback_region must differ from primary region "
+                f"(both set to '{self.region}')"
+            )
+
         self._boto_client: Any = None
+        self._fallback_boto_client: Any = None
         self._http_client: Any = None
 
     async def invoke(self, job_spec: dict[str, Any]) -> dict[str, Any]:
@@ -70,19 +83,32 @@ class VerifierClient:
 
             self._boto_client = boto3.client("lambda", region_name=self.region)
 
+    def _ensure_fallback_boto_client(self) -> None:
+        """Lazily create the fallback-region boto3 Lambda client."""
+        if self._fallback_boto_client is None:
+            import boto3
+
+            self._fallback_boto_client = boto3.client("lambda", region_name=self.fallback_region)
+
     async def _invoke_boto(self, job_spec: dict[str, Any]) -> dict[str, Any]:
-        """Invoke Lambda via boto3 (synchronous, wrapped in executor)."""
+        """Invoke Lambda via boto3 (synchronous, wrapped in executor).
+
+        v1.2.4 P1: if ``fallback_region`` is configured and the primary
+        invoke raises any exception, re-create the boto client in the
+        fallback region and retry exactly once. On a second failure the
+        fallback error is raised (primary error is logged).
+        """
         import asyncio
 
         self._ensure_boto_client()
-        boto_client = self._boto_client
         loop = asyncio.get_running_loop()
+        payload_bytes = json.dumps(job_spec).encode()
 
-        def _sync_invoke():
+        def _sync_invoke(boto_client: Any) -> dict[str, Any]:
             response = boto_client.invoke(
                 FunctionName=self.function_name,
                 InvocationType="RequestResponse",
-                Payload=json.dumps(job_spec),
+                Payload=payload_bytes,
             )
 
             payload = response["Payload"].read()
@@ -93,7 +119,19 @@ class VerifierClient:
             except json.JSONDecodeError as e:
                 raise VerifierError(f"Lambda returned invalid JSON: {e}") from e
 
-        return await loop.run_in_executor(None, _sync_invoke)
+        try:
+            return await loop.run_in_executor(None, _sync_invoke, self._boto_client)
+        except Exception as primary_exc:
+            if self.fallback_region is None:
+                raise
+            logger.warning(
+                "verifier primary region %s failed (%s); retrying in fallback region %s",
+                self.region,
+                primary_exc,
+                self.fallback_region,
+            )
+            self._ensure_fallback_boto_client()
+            return await loop.run_in_executor(None, _sync_invoke, self._fallback_boto_client)
 
     async def _invoke_http(self, job_spec: dict[str, Any]) -> dict[str, Any]:
         """Invoke Lambda via Function URL with shared secret."""
