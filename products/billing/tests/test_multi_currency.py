@@ -207,9 +207,7 @@ class TestExchangeRateService:
         credits_to_eth = await svc.get_rate(Currency.CREDITS, Currency.ETH)
         assert rate == usd_to_credits * credits_to_eth
 
-    async def test_get_rate_two_hop_unsupported_when_leg_missing(
-        self, storage: StorageBackend
-    ):
+    async def test_get_rate_two_hop_unsupported_when_leg_missing(self, storage: StorageBackend):
         """Two-hop fallback raises when one leg has no rate."""
         svc = ExchangeRateService(storage=storage)
         await svc.initialize_default_rates()
