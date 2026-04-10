@@ -21,11 +21,18 @@ async def _ensure_columns(
     columns: tuple[tuple[str, str], ...],
 ) -> None:
     """Add ``columns`` to ``table`` if missing (idempotent migration helper)."""
-    cursor = await db.execute(f"PRAGMA table_info({table})")
+    # Identifiers (table/column names and DDL types) are hardcoded at call
+    # sites — never user-controlled — so interpolating them into the DDL is
+    # safe. SQLite does not support parameterized identifiers.
+    cursor = await db.execute(  # nosemgrep: formatted-sql-query, sqlalchemy-execute-raw-query
+        f"PRAGMA table_info({table})"
+    )
     existing = {row[1] for row in await cursor.fetchall()}
     for name, ddl_type in columns:
         if name not in existing:
-            await db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl_type}")
+            await db.execute(  # nosemgrep: formatted-sql-query, sqlalchemy-execute-raw-query
+                f"ALTER TABLE {table} ADD COLUMN {name} {ddl_type}"
+            )
 
 
 class DisputeNotFoundError(Exception):
