@@ -523,11 +523,11 @@ of urgency.
 | H1.7 | Verify `greenhelix` org on npm (domain verification) | Lets us publish `@greenhelix/*` scoped packages reliably | Free | 10 min |
 | H1.8 | Add GitHub repo topics | Agent A2 can't do this via CLI | Free | 2 min |
 | H1.9 | Create Cursor MCP directory submission (form) | Required for directory inclusion | Free | 10 min |
-| H1.10 | Create `a2aregistry.org` account | Required to submit | Free | 5 min |
+| H1.10 | Create `a2aregistry.org ` account | Required to submit | Free | 5 min |
 | H1.11 | Create Hacker News account with karma ≥ 1 (if needed) | Launch post | Free | — |
 | H1.12 | Create Product Hunt account + hunter relationship | Launch requires a hunter ideally | Free | 30 min |
 
-**GitHub repo topics to add** (Settings → Topics):
+**GitHub repo topics to add** (Settings → Topics): -- DONE
 ```
 ai-agents, mcp, mcp-server, a2a, agent-commerce, agent-payments,
 agent-to-agent, escrow, trust-scoring, marketplace, stripe, fastapi,
@@ -658,3 +658,313 @@ A running spreadsheet of every submission. Should live at
 *End of document. Ready for human review. Execute Sprint 1 items (A1-A7) as
 the next work unit — they share a common feature branch and can land in a
 single PR.*
+
+
+---
+# Human responses to H* decisions:
+* H1.1 -- Can't you (claude) do it? Just do a local clone, follow official instructions https://modelcontextprotocol.io/registry/quickstart
+* H1.2 -- Done. API key added in .env.
+* H1.3 -- I connected with GH OAuth but don't see what I should do here. *Please elaborate*
+* H1.4 -- Can you not do this? (https://github.com/modelcontextprotocol/registry). *Detailed instructions please if human action is required*
+* H1.5 -- Provide detailed instructions
+* H1.6 -- Provide detailed instructions
+* H1.7 -- We have @greenhelix account. I see an option to convert this to org -- is that what you meant?
+* H1.8 -- Done
+* H1.9 -- Provide details or do it yourself
+* H1.10 -- "Failed to fetch agent card: Agent card endpoint returned HTTP 404" when I input `https://api.greenhelix.net/v1/.well-known/agent.json`
+* H1.11 -- I created account. Please generate content for me to post.
+* H1.12 -- I created account, now what? Detailed instructions and content to post please.
+
+
+* H2.1 -- add `@a2a` alias
+* H2.2 -- a)
+* H2.3 -- b)
+* H2.4 -- c)
+* H2.5 -- a)
+* H2.6 -- a)
+* H2.7 -- d)
+* H2.8 -- a)
+* H2.9 -- a)
+* H2.10 -- a)
+
+---
+
+## §10. Follow-up — Agent Response to H* (2026-04-10)
+
+H2 decisions are now **locked in**. The strategy doc has been updated
+accordingly. Detailed responses to each H1 item below.
+
+### Decision lock-in (H2)
+
+| # | Decision | Final |
+|---|----------|-------|
+| H2.1 | npm scope strategy | **Claim `@a2a` alias in addition to `@greenhelix`** — publish `@a2a/sdk` → shim re-exporting `@greenhelix/sdk` |
+| H2.2 | PyPI name strategy | Keep `a2a-greenhelix-sdk` as canonical |
+| H2.3 | MCP server auth default | **Require API key** — ties usage to billing |
+| H2.4 | HN launch angle | **"MCP server for 141 commerce tools"** — technical audience |
+| H2.5 | Product Hunt category | **AI Agents** |
+| H2.6 | Conference budget | Skip until MRR > $5K |
+| H2.7 | First-party branding | **MCP (framework-agnostic)** — hedge bet |
+| H2.8 | Publish `llms-full.txt`? | **Yes** — public API is public |
+| H2.9 | `@greenhelix/a2a-mcp` npm alias | **Yes** — name-squat insurance |
+| H2.10 | Distribution tracker visibility | Private |
+
+### H1.1 — Publishing to the Official MCP Registry
+
+**Short answer:** I can do ~90% of the setup, but publishing currently requires
+one of two things from you:
+
+**Option A — GitHub device flow (5-min human action, once)**
+I run `mcp-publisher login github`, and it prints a URL + one-time code
+(e.g. `ABCD-1234`). You visit `https://github.com/login/device`, paste the
+code, authorize. After that I can publish without further human action for
+~24h (the token is cached).
+
+**Option B — DNS authentication (better for a company)** *(recommended)*
+Use the `greenhelix.net` domain as the server namespace (`net.greenhelix/*`)
+instead of personal GitHub (`io.github.mirni/*`). Steps:
+1. Add a TXT record to `greenhelix.net` DNS:
+   `_mcp-publisher IN TXT "v=mcp1;owner=<proof>"` (the exact value is issued
+   by `mcp-publisher login dns net.greenhelix`)
+2. After DNS propagation, `mcp-publisher` can publish under `net.greenhelix/*`
+   without GitHub at all — purely env-var driven, CI-friendly.
+
+**Full blockers:** the registry hosts metadata only; the actual package
+must exist on PyPI or npm first. This is blocked on **A1 (build the
+`a2a-mcp-server` package)**. So the order is:
+  1. Ship A1 → publish `a2a-mcp-server` on PyPI + npm
+  2. Add DNS TXT record (one-time)
+  3. I run `mcp-publisher publish` and it becomes live on
+     `registry.modelcontextprotocol.io` under `net.greenhelix/a2a-mcp-server`
+
+**I can do now (without A1):**
+- Install `mcp-publisher` binary in this workspace
+- Create `server.json` manifest template at repo root
+- Add a CI job `mcp-publish` to `.github/workflows/release.yml` that runs
+  on tag push
+
+I'll keep these in the execution queue under **A1.1 DNS setup** and
+**A1.2 mcp-publisher CI job** (new sub-tasks).
+
+**Human action:**
+- Choose Option A or Option B (I recommend **B — DNS auth**)
+- If B: add the TXT record when I request it (one-time, ~5 min)
+
+### H1.2 — Smithery.ai
+
+Noted — `SMITHERY_API_KEY` is in `.env` (`@mirni-zbirni-az9q` account).
+Publishing is **blocked on A1** (need the MCP server package first).
+Once A1 ships, I will:
+1. Add `smithery.yaml` at repo root pointing to `a2a-mcp-server`
+2. Run `HOME=/tmp SMITHERY_TOKEN=$SMITHERY_API_KEY npx -y @smithery/cli publish`
+3. Verify listing at `smithery.ai/server/@a2a/mcp-server` (or similar)
+
+No further human action required for Smithery.
+
+### H1.3 — Glama.ai
+
+**What Glama actually is:** `glama.ai/mcp/servers` is a quality-reviewed
+directory. After GitHub OAuth login it doesn't immediately "ask you to do"
+anything — you need to explicitly submit a repo via the **Add Server** flow.
+
+**Detailed steps (for you, one-time, ~3 min):**
+1. Log into `https://glama.ai` (already done)
+2. Go to `https://glama.ai/mcp/servers/add`
+3. Paste repo URL: `https://github.com/mirni/a2a`
+4. When the form asks for the MCP server name/binary, use: `a2a-mcp-server`
+   (will only work **after A1 ships**)
+5. Pick categories: `Commerce`, `Payments`, `Developer Tools`
+6. Submit
+
+Glama will then:
+- Crawl the README
+- Check license (we have MIT ✓), docs quality, no vulns
+- Run their automated quality scan
+- List the server if it passes (usually within 24-48h)
+
+**Blocked on A1.** Create a ticket in your todo to revisit after A1 ships.
+
+### H1.4 — PulseMCP
+
+**Short answer:** I *cannot* do this directly — PulseMCP auto-ingests from
+the Official MCP Registry. **So you don't need an account at all!** Once we
+publish via `mcp-publisher` (H1.1), PulseMCP picks it up automatically within
+~24h.
+
+If we want to accelerate or get picked as an editorial "Top Pick":
+1. Web form: `https://www.pulsemcp.com/submit`
+2. Submit repo URL, description, and a short pitch (~200 words)
+3. Editorial review takes ~1 week
+
+**Your note:** the GitHub link you pasted (`modelcontextprotocol/registry`)
+is the registry repo — that's for H1.1, not H1.4. PulseMCP is downstream.
+
+**No human action required** — auto-ingest after H1.1.
+
+### H1.5 — LangChain Discord
+
+**Detailed steps (for you, ongoing, ~5 min/week):**
+
+1. **Join:** `https://discord.gg/langchain`
+2. **Verify:** accept rules, verify email
+3. **Introduce yourself** once in `#introductions`:
+   > Hi all — I'm building Green Helix, an open-source commerce layer for
+   > agents (payments, escrow, reputation). Excited to be here; will be
+   > lurking and learning.
+4. **Channels to watch:**
+   - `#langchain-general`
+   - `#langgraph`
+   - `#agents`
+   - `#show-and-tell` (where launches go)
+5. **Rule:** answer 3+ technical questions per week before any
+   self-promotion. Drive-by marketing gets banned. Target 2-3 weeks of
+   lurking + helping before any `#show-and-tell` post.
+6. **First `#show-and-tell` post** (after A5 ships):
+   > Shipped `a2a-langchain` (pip install a2a-langchain) — a LangGraph
+   > tool pack for agent-to-agent commerce. Adds `pay_agent`, `create_escrow`,
+   > `verify_claim`, and 138 other tools to any LangGraph agent. Free tier
+   > (500 credits), MIT license. Feedback welcome: <repo URL>
+
+### H1.6 — CrewAI Discord
+
+**Detailed steps (for you, ongoing, ~5 min/week):**
+
+1. **Join:** `https://discord.gg/X4JWnZnxPb` (official CrewAI Discord)
+2. **Channels to watch:**
+   - `#general`
+   - `#help`
+   - `#show-your-work`
+   - `#marketplace`
+3. **Rule:** same as LangChain — help before promoting.
+4. **First `#show-your-work` post** (after A6 ships):
+   > Published `a2a-crewai` (pip install a2a-crewai) — a CrewAI toolset
+   > adding agent-to-agent commerce (payments, escrow, marketplace) to any
+   > crew. Example: two-crew buyer/seller marketplace. Free 500 credits on
+   > signup. MIT license. <repo URL>
+
+### H1.7 — npm organization conversion
+
+**Yes, that is exactly what I meant.** Converting `@greenhelix` from a
+user-scope to an org-scope enables:
+- Multiple maintainers (add agent deploy key as a member)
+- Team-managed publishing policies
+- Domain verification (prevents typosquatting)
+- Org-level 2FA enforcement
+
+**Steps (for you, ~5 min):**
+1. Log into `https://www.npmjs.com` as `@greenhelix`
+2. Go to `https://www.npmjs.com/settings/greenhelix/convert-to-org`
+3. Choose plan — **Free** is fine for us (unlimited public packages)
+4. Org name: `greenhelix`
+5. After conversion, go to `Members` → add yourself as admin
+6. Generate a **Granular Access Token** (npm → Access Tokens → Generate New
+   Token → Granular) with `Read and write` permission for `@greenhelix/*`
+   packages
+7. Add to `.env` as `NPM_TOKEN=npm_...`
+8. Add the same as a GitHub Actions secret named `NPM_TOKEN`
+
+Once NPM_TOKEN is available, I can automate publishing of `@greenhelix/*`
+and claim the `@a2a` alias (H2.1).
+
+### H1.8 — GitHub topics
+
+Done — noted. I will reference the topics in future README updates.
+
+### H1.9 — Cursor MCP directory
+
+**I can do this.** The submission flow is `https://cursor.directory/plugins/new`
+(the old `cursor/mcp-servers` GitHub repo is deprecated).
+
+**Blocked on A1** (need the MCP server published). Once A1 ships I will:
+1. Fill the form at `cursor.directory/plugins/new` — this requires a
+   one-click OAuth login to Cursor. **You need to do this once** (~2 min);
+   then the token is cached and I can submit programmatically.
+2. Alternatively, if cursor.directory exposes an API, I will submit
+   directly with the API key.
+
+**Human action:** approve the one-time OAuth login when I prompt.
+
+### H1.10 — a2aregistry.org — URL fix
+
+**Bug on your side, not ours.** You entered:
+`https://api.greenhelix.net/v1/.well-known/agent.json` ❌
+
+The correct URLs are (both work):
+- `https://api.greenhelix.net/.well-known/agent.json` ✅
+- `https://api.greenhelix.net/.well-known/agent-card.json` ✅
+
+Note: **no `/v1/` prefix**. The `.well-known/` path is top-level per
+RFC 8615, not a versioned API endpoint. I verified both URLs return HTTP 200
+with valid A2A protocol JSON.
+
+**Action for you (~2 min):** re-submit at a2aregistry.org with the URL
+`https://api.greenhelix.net/.well-known/agent.json`. Should succeed
+immediately.
+
+### H1.11 — Hacker News launch content
+
+Full draft in **`docs/launch/hn-show-hn.md`** (see that file).
+
+**Summary:**
+- **Title (≤80 chars):** `Show HN: An MCP server for agent commerce – payments, escrow, reputation`
+- **Timing:** Post on a Tuesday or Wednesday at ~14:00 UTC (09:00 ET).
+  Avoid Fridays. Wait until A1-A7 ship so the post has working code to
+  demo.
+- **Body:** ~250 words, technical, no marketing adjectives. Link to repo,
+  sandbox, and a 60-second MCP install walkthrough.
+- **Response strategy:** be in the thread for the first 2 hours to answer
+  questions. Don't argue.
+
+### H1.12 — Product Hunt launch content
+
+Full draft in **`docs/launch/product-hunt.md`** (see that file).
+
+**Summary:**
+- **Category:** AI Agents
+- **Timing:** Launch on a Tuesday, ~00:01 PST (Pacific time). Notify hunter
+  and early supporters the day before.
+- **Tagline (≤60 chars):** `The commerce layer for AI agents — MCP-native`
+- **Description:** 260 chars
+- **First comment:** detailed technical overview with GIFs + code snippets
+- **Maker comment template:** included
+- **Pre-launch checklist:** 7 items
+
+---
+
+## §11. Updated execution order (after H* responses)
+
+With the H* responses locked in, the immediate execution order is:
+
+### Now (this session)
+- [x] Respond to H1 questions (this §10)
+- [x] Lock in H2 decisions (table above)
+- [x] Generate HN launch content (`docs/launch/hn-show-hn.md`)
+- [x] Generate PH launch content (`docs/launch/product-hunt.md`)
+- [x] Document correct agent-card URL (H1.10)
+
+### Blocked on human (no code blockers — pure account work, ~15 min total)
+- [ ] H1.7: convert `@greenhelix` npm user → org, generate NPM_TOKEN, add
+      to `.env` and GitHub secrets
+- [ ] H1.1: decide MCP publish auth — DNS (recommended) or GitHub device
+      flow
+- [ ] H1.10: re-submit to a2aregistry.org with correct URL
+- [ ] H1.5 + H1.6: join LangChain + CrewAI Discord (lurk for 2 weeks, then
+      engage)
+
+### Next session — Sprint 1 work (engineering agent)
+- [ ] A1: build `a2a-mcp-server` package (PyPI + npm + Docker)
+- [ ] A1.1 (NEW): DNS TXT record for `mcp-publisher` auth (or GitHub device
+      flow)
+- [ ] A1.2 (NEW): CI job to run `mcp-publisher publish` on release tags
+- [ ] A3: `.well-known/` artefact bundle in gateway
+- [ ] A4: Agent-SEO tool description rewrite
+- [ ] A2, A5, A6, A7: registry submissions + framework packages + IDE docs
+
+### A-side npm alias (quick wins once NPM_TOKEN exists)
+- [ ] Claim `@a2a` scope on npm (publish `@a2a/sdk` shim → `@greenhelix/sdk`)
+- [ ] Publish `@greenhelix/a2a-mcp` alias (name-squat insurance per H2.9)
+
+---
+
+*§10 + §11 added in response to human H* clarifications. Ready for next
+execution phase.*
