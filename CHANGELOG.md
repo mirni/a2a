@@ -1,5 +1,32 @@
 # Changelog
 
+# Release v1.2.1
+
+**Date:** 2026-04-10
+**Commit:** b24b9cb5
+**Previous:** v1.2.0
+
+## Changes
+
+### Other
+
+- Update master log with latest PR (merged already) (`b24b9cb`)
+- Wire VerifierClient + Lambda tests + audit fixes (#77) (`06c2c21`)
+- Merge release v1.2.0 into main (`3fe1b8f`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 1.2.1 |
+| a2a-db-backup | 1.2.1 |
+| a2a-gateway | 1.2.1 |
+| a2a-gateway-sandbox | 1.2.1 |
+| a2a-gateway-test | 1.2.1 |
+| a2a-website | 1.2.1 |
+---
+
+
 # Release v1.2.0
 
 **Date:** 2026-04-09
