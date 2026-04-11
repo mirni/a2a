@@ -44,6 +44,7 @@ from gateway.src.routes.v1.messaging import router as messaging_router
 from gateway.src.routes.v1.payments import router as payments_router
 from gateway.src.routes.v1.trust import router as trust_router
 from gateway.src.routes.websocket import router as ws_router
+from gateway.src.routes.well_known import router as well_known_router
 from gateway.src.signing import signing_key_handler
 from gateway.src.stripe_checkout import router as checkout_router
 
@@ -87,6 +88,7 @@ def create_app() -> FastAPI:
 
     # Include all routers
     app.include_router(agent_card_router)
+    app.include_router(well_known_router)
     app.include_router(health_router)
     app.include_router(pricing_router)
     app.include_router(execute_router)
