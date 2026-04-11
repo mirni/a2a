@@ -138,6 +138,60 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
+      # Pre-flight: fail fast with an actionable error BEFORE spending
+      # time on build + provenance signing if the NPM_TOKEN secret is
+      # missing, expired, or lacks publish scope on @greenhelix/sdk.
+      # Motivation: releases v1.2.4 and v1.2.5 both failed the
+      # ``npm publish`` step with npm's misleading
+      # ``E404 PUT @greenhelix/sdk — not in this registry`` error,
+      # which is almost always a token permission/expiry issue, not
+      # an actual 404. Surfacing the root cause here saves ~60s per
+      # retry and points the human operator at the exact secret.
+      - name: Pre-flight — verify NPM_TOKEN can publish @greenhelix/sdk
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -u
+          if [[ -z "${NODE_AUTH_TOKEN:-}" ]]; then
+            echo "::error::NPM_TOKEN secret is empty. Set it in the 'npm' GitHub environment with a granular access token that has read-write permission on @greenhelix/sdk."
+            exit 1
+          fi
+
+          WHOAMI_OUT=$(npm whoami --registry=https://registry.npmjs.org 2>&1)
+          WHOAMI_RC=$?
+          if [[ $WHOAMI_RC -ne 0 ]]; then
+            echo "::error::npm whoami failed — the NPM_TOKEN is invalid or expired."
+            echo "::error::Rotate the token at https://www.npmjs.com/settings/~/tokens (granular access token, 'read and write' on @greenhelix/sdk, 1 year expiry), then update the 'NPM_TOKEN' secret in the GitHub 'npm' environment."
+            echo "whoami output: $WHOAMI_OUT"
+            exit 1
+          fi
+          echo "Authenticated as: $WHOAMI_OUT"
+
+          # Confirm publish scope on the exact package. ``npm access list
+          # packages`` returns a JSON map of {pkg: permission}. We assert
+          # that @greenhelix/sdk is present with ``read-write``.
+          ACCESS_JSON=$(npm access list packages --json 2>/dev/null || echo '{}')
+          HAS_WRITE=$(printf '%s' "$ACCESS_JSON" | node -e '
+            let data = "";
+            process.stdin.on("data", c => data += c);
+            process.stdin.on("end", () => {
+              try {
+                const m = JSON.parse(data);
+                const perm = m["@greenhelix/sdk"] || "";
+                process.stdout.write(perm === "read-write" ? "yes" : "no:" + perm);
+              } catch (e) {
+                process.stdout.write("parse-error");
+              }
+            });
+          ' <<< "$ACCESS_JSON")
+
+          if [[ "$HAS_WRITE" != "yes" ]]; then
+            echo "::error::NPM_TOKEN does NOT have read-write on @greenhelix/sdk (got: $HAS_WRITE)."
+            echo "::error::Recreate the granular access token with 'Packages and scopes: @greenhelix' and 'Permissions: Read and write'."
+            exit 1
+          fi
+          echo "NPM_TOKEN has read-write on @greenhelix/sdk — proceeding."
+
       - name: Install and build
         working-directory: sdk-ts
         run: |
