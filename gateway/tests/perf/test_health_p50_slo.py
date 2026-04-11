@@ -72,7 +72,4 @@ class TestHealthP50Slo:
             f"p99={p99:.1f}ms max={p_max:.1f}ms. "
             f"Something is doing per-request work on /v1/health."
         )
-        assert p99 < 250.0, (
-            f"health p99 regressed: {p99:.1f}ms (limit 250ms). "
-            f"p50={p50:.1f}ms max={p_max:.1f}ms."
-        )
+        assert p99 < 250.0, f"health p99 regressed: {p99:.1f}ms (limit 250ms). p50={p50:.1f}ms max={p_max:.1f}ms."

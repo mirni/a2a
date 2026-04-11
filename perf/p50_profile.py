@@ -20,7 +20,6 @@ from __future__ import annotations
 import statistics
 import sys
 import time
-from typing import Any
 
 try:
     import httpx

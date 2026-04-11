@@ -139,9 +139,7 @@ class TestIdempotencyBodyHashCollision:
         Exactly one must win; the rest must get 409. This catches the
         check-then-insert race class of bug the plan calls out.
         """
-        payer_key = await _create_funded_pair(
-            app, "idem-payer-5", "idem-payee-5", payer_balance=5000.0
-        )
+        payer_key = await _create_funded_pair(app, "idem-payer-5", "idem-payee-5", payer_balance=5000.0)
         headers_base = {"Authorization": f"Bearer {payer_key}"}
         key = "idem-race-key"
 
@@ -162,8 +160,7 @@ class TestIdempotencyBodyHashCollision:
         successes = [r for r in responses if r.status_code in (200, 201)]
         conflicts = [r for r in responses if r.status_code == 409]
         assert len(successes) == 1, (
-            f"exactly one request must succeed, got {len(successes)} "
-            f"(statuses: {[r.status_code for r in responses]})"
+            f"exactly one request must succeed, got {len(successes)} (statuses: {[r.status_code for r in responses]})"
         )
         assert len(conflicts) == 19, (
             f"remaining 19 must all return 409, got {len(conflicts)} conflicts "

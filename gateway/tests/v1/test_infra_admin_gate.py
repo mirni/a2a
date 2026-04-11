@@ -58,9 +58,7 @@ async def multi_tenant_keys(app):
 
     admin_id = "audit-admin"
     await ctx.tracker.wallet.create(admin_id, initial_balance=10000.0, signup_bonus=False)
-    admin_first = await ctx.key_manager.create_key(
-        admin_id, tier="pro", scopes=["read", "write", "admin"]
-    )
+    admin_first = await ctx.key_manager.create_key(admin_id, tier="pro", scopes=["read", "write", "admin"])
     await ctx.key_manager.create_key(admin_id, tier="pro", scopes=["read", "write", "admin"])
     tenants["admin"] = (admin_id, admin_first["key"])
 

@@ -67,8 +67,7 @@ class TestBudgetCapEnforcement:
         # The daily_cap is 10.0 credits → we're way over.
         now = _time.time()
         await ctx.tracker.storage.db.execute(
-            "INSERT INTO usage_records (agent_id, function, cost, created_at, idempotency_key) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO usage_records (agent_id, function, cost, created_at, idempotency_key) VALUES (?, ?, ?, ?, ?)",
             ("budget-over", "create_intent", int(95.0 * 100_000_000), now, None),
         )
         await ctx.tracker.storage.db.commit()
@@ -106,8 +105,7 @@ class TestBudgetCapEnforcement:
         # Spend above the cap.
         now = _time.time()
         await ctx.tracker.storage.db.execute(
-            "INSERT INTO usage_records (agent_id, function, cost, created_at, idempotency_key) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO usage_records (agent_id, function, cost, created_at, idempotency_key) VALUES (?, ?, ?, ?, ?)",
             ("budget-notouch", "create_intent", int(10.0 * 100_000_000), now, None),
         )
         await ctx.tracker.storage.db.commit()
@@ -162,8 +160,7 @@ class TestBudgetCapEnforcement:
         )
         now = _time.time()
         await ctx.tracker.storage.db.execute(
-            "INSERT INTO usage_records (agent_id, function, cost, created_at, idempotency_key) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO usage_records (agent_id, function, cost, created_at, idempotency_key) VALUES (?, ?, ?, ?, ?)",
             ("admin-agent", "create_intent", int(100.0 * 100_000_000), now, None),
         )
         await ctx.tracker.storage.db.commit()

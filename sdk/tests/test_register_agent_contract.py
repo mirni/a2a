@@ -12,7 +12,7 @@ without further conversion.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import ValidationError
@@ -125,9 +125,7 @@ class TestTimestampRoundTrip:
         from a2a_client.models import RegisterAgentResponse
 
         ts = 1711612800.5
-        resp = RegisterAgentResponse.model_validate(
-            {"agent_id": "a", "public_key": "k", "created_at": ts}
-        )
+        resp = RegisterAgentResponse.model_validate({"agent_id": "a", "public_key": "k", "created_at": ts})
         if isinstance(resp.created_at, datetime):
             assert abs(resp.created_at.timestamp() - ts) < 1e-3
         elif isinstance(resp.created_at, (int, float)):
@@ -140,11 +138,9 @@ class TestTimestampRoundTrip:
     def test_iso_roundtrip_preserves_timestamp_value(self):
         from a2a_client.models import RegisterAgentResponse
 
-        dt = datetime(2026, 4, 11, 0, 0, 0, tzinfo=timezone.utc)
+        dt = datetime(2026, 4, 11, 0, 0, 0, tzinfo=UTC)
         iso = dt.isoformat()
-        resp = RegisterAgentResponse.model_validate(
-            {"agent_id": "a", "public_key": "k", "created_at": iso}
-        )
+        resp = RegisterAgentResponse.model_validate({"agent_id": "a", "public_key": "k", "created_at": iso})
         if isinstance(resp.created_at, datetime):
             assert resp.created_at == dt
         elif isinstance(resp.created_at, (int, float)):
