@@ -343,7 +343,11 @@ async def test_backup_database_via_rest(client, admin_api_key):
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert "path" in body
+    # v1.2.4 audit MED-7: responses expose ``filename`` (basename) and
+    # ``database`` instead of the absolute ``path``.
+    assert "filename" in body
+    assert "database" in body
+    assert "path" not in body
 
 
 # ---------------------------------------------------------------------------
@@ -386,11 +390,13 @@ async def test_restore_database_via_rest(client, admin_api_key):
         json={},
         headers={"Authorization": f"Bearer {admin_api_key}"},
     )
-    backup_path = backup_resp.json()["path"]
+    # v1.2.4 audit MED-7: restore now accepts a ``filename`` (basename)
+    # that is resolved server-side against the managed backup dir.
+    filename = backup_resp.json()["filename"]
 
     resp = await client.post(
         "/v1/infra/databases/billing/restore",
-        json={"backup_path": backup_path},
+        json={"filename": filename},
         headers={"Authorization": f"Bearer {admin_api_key}"},
     )
     assert resp.status_code == 200

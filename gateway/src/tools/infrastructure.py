@@ -195,8 +195,26 @@ async def _rotate_key(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]
 
     Uses BEGIN IMMEDIATE so revoke + create is atomic — no window where
     the old key is revoked but the new one doesn't exist yet.
+
+    Audit v1.2.3 MED-8: the old key keeps authenticating for
+    ``KEY_ROTATION_GRACE_SECONDS`` (300 s) after revocation so clients
+    have time to swap in the new key without downtime. This means the
+    response **must not** report ``revoked: true`` while the grace
+    window is still active — that would be a state-contract lie. We
+    expose:
+
+    * ``revoked`` — ``False`` while the grace window is active
+      (``grace_period_seconds`` > 0); flips to ``True`` only after the
+      grace window expires.
+    * ``grace_period_seconds`` — number of seconds the old key remains
+      valid after this call (``0`` if the grace window is disabled).
+    * ``grace_expires_at`` — Unix timestamp (seconds) when the old key
+      will stop authenticating.
     """
+    import time
+
     from gateway.src.tool_errors import ToolForbiddenError
+    from products.paywall.src.keys import KEY_ROTATION_GRACE_SECONDS
 
     current_key = params["current_key"]
     try:
@@ -210,18 +228,28 @@ async def _rotate_key(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]
     db = ctx.key_manager.storage.db
     await db.execute("BEGIN IMMEDIATE")
     try:
-        revoked = await ctx.key_manager.revoke_key(current_key)
+        await ctx.key_manager.revoke_key(current_key)
         new_key_info = await ctx.key_manager.create_key(agent_id, tier=tier)
         await db.commit()
     except Exception:
         await db.rollback()
         raise
 
+    now = time.time()
+    grace_period = int(KEY_ROTATION_GRACE_SECONDS)
+    grace_expires_at = int(now + grace_period)
+    # While the grace window is active the old key still authenticates,
+    # so we report ``revoked: False``. The caller can poll or wait for
+    # ``grace_expires_at`` to know when it actually flips.
+    effectively_revoked = grace_period <= 0
+
     return {
         "new_key": new_key_info["key"],
         "tier": tier,
         "agent_id": agent_id,
-        "revoked": revoked,
+        "revoked": effectively_revoked,
+        "grace_period_seconds": grace_period,
+        "grace_expires_at": grace_expires_at,
     }
 
 
@@ -337,6 +365,47 @@ _DB_DSN_MAP = {
 }
 
 
+_PATH_LEAK_FIELDS: frozenset[str] = frozenset(
+    {"path", "source", "source_backup", "target_path", "dest_path", "db_path"}
+)
+
+
+def _sanitize_infra_paths(meta: dict[str, Any], *, db_name: str | None = None) -> dict[str, Any]:
+    """Strip absolute filesystem paths from an infra tool response.
+
+    Audit v1.2.3 MED-7: backup/integrity responses must not leak
+    ``/var/lib/a2a/...`` (or any other server-side path) to API
+    callers. This helper:
+
+    * Drops any keys listed in ``_PATH_LEAK_FIELDS`` that contain an
+      absolute path (starts with ``/``).
+    * When a ``path`` key is stripped we attempt to preserve the
+      ``filename`` (basename) because integrators need a handle for
+      subsequent ``restore_database`` calls.
+    * When ``db_name`` is provided we set a ``database`` field so the
+      caller knows which logical database the response refers to.
+
+    The sanitised dict is returned as a **new** object; the original
+    is left untouched so operator tooling can keep the raw paths.
+    """
+    import os
+
+    out: dict[str, Any] = {}
+    original_path: str | None = None
+    for key, value in meta.items():
+        if key in _PATH_LEAK_FIELDS and isinstance(value, str) and value.startswith("/"):
+            if key == "path":
+                original_path = value
+            # skip — do not expose absolute paths
+            continue
+        out[key] = value
+    if original_path is not None and "filename" not in out:
+        out["filename"] = os.path.basename(original_path)
+    if db_name is not None:
+        out.setdefault("database", db_name)
+    return out
+
+
 def _resolve_db_path(db_name: str) -> str:
     """Resolve a logical database name to its file path."""
     import os
@@ -389,7 +458,11 @@ async def _backup_database(ctx: AppContext, params: dict[str, Any]) -> dict[str,
         os.chmod(key_path, 0o600)
         meta["key_id"] = key_id
 
-    return meta
+    # v1.2.4 audit v1.2.3 MED-7: never leak absolute filesystem paths
+    # to API callers. Replace ``path`` with ``filename`` (basename) and
+    # drop ``source`` entirely. The server still knows how to locate
+    # the backup by filename via ``_list_backups`` / ``_restore_database``.
+    return _sanitize_infra_paths(meta, db_name=db_name)
 
 
 async def _restore_database(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
@@ -401,11 +474,24 @@ async def _restore_database(ctx: AppContext, params: dict[str, Any]) -> dict[str
 
     db_name = params["database"]
     db_path = _resolve_db_path(db_name)
-    backup_path = params["backup_path"]
 
-    # Security: prevent path traversal attacks
     data_dir = os.environ.get("A2A_DATA_DIR", "/tmp/a2a_gateway")
     backup_dir = os.path.realpath(os.path.join(data_dir, "backups"))
+
+    # Prefer ``filename`` (v1.2.4, audit MED-7): resolve against the
+    # managed backup directory so the caller never has to know the
+    # absolute path. Fall back to legacy ``backup_path``.
+    filename = params.get("filename")
+    if filename:
+        if "/" in filename or filename.startswith("."):
+            raise ToolValidationError("Invalid filename: must be a plain basename inside the backups directory.")
+        backup_path = os.path.join(backup_dir, filename)
+    else:
+        backup_path = params.get("backup_path")
+        if not backup_path:
+            raise ToolValidationError("Missing backup file reference: provide either 'filename' or 'backup_path'.")
+
+    # Security: prevent path traversal attacks
     real_backup = os.path.realpath(backup_path)
     if not real_backup.startswith(backup_dir + os.sep) and real_backup != backup_dir:
         raise ToolValidationError(
@@ -434,7 +520,8 @@ async def _restore_database(ctx: AppContext, params: dict[str, Any]) -> dict[str
     if source != backup_path and os.path.exists(source):
         os.unlink(source)
 
-    return meta
+    # v1.2.4 audit v1.2.3 MED-7: sanitize absolute paths before return.
+    return _sanitize_infra_paths(meta, db_name=db_name)
 
 
 async def _check_db_integrity(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
@@ -442,7 +529,11 @@ async def _check_db_integrity(ctx: AppContext, params: dict[str, Any]) -> dict[s
 
     db_name = params["database"]
     db_path = _resolve_db_path(db_name)
-    return await integrity_check(db_path)
+    result = await integrity_check(db_path)
+    # v1.2.4 audit v1.2.3 MED-7: strip absolute filesystem path before
+    # returning to the API caller. The db name is sufficient for the
+    # integrator; the real path is an operator concern.
+    return _sanitize_infra_paths(result, db_name=db_name)
 
 
 async def _list_backups(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
@@ -458,10 +549,11 @@ async def _list_backups(ctx: AppContext, params: dict[str, Any]) -> dict[str, An
     for fname in sorted(os.listdir(backup_dir)):
         fpath = os.path.join(backup_dir, fname)
         if os.path.isfile(fpath):
+            # v1.2.4 audit v1.2.3 MED-7: expose only the basename; the
+            # full filesystem path must not cross the API boundary.
             backups.append(
                 {
                     "filename": fname,
-                    "path": fpath,
                     "size_bytes": os.path.getsize(fpath),
                 }
             )

@@ -7036,3 +7036,54 @@ Delivered T-1 through T-9 (all P0/P1 items from the
 - Commit, push `fix/audit-v1.2.2-remediation`, open PR to `main`,
   monitor CI, release/deploy.
 
+
+---
+
+## 2026-04-11 — v1.2.3 audit remediation + mcp_server coverage
+
+**Prompt**: mcp_server coverage <60%; address v1.2.3 audit findings first
+(autonomously), finish mcp_server tests, push to existing feature branch,
+CI green. Do not deploy.
+
+**v1.2.3 audit remediation (6 findings)**:
+- NEW-CRIT-1/2 — RFC 9110 §11.1 auth header: case-insensitive scheme,
+  linear-whitespace strip around credential. `gateway/src/auth.py`.
+- NEW-CRIT-3 — reject URL-encoded path separators (%2F/%5C/%2f/%5c) on
+  `/v1/*` via `EncodedPathRejectionMiddleware`.
+- HIGH-1 — `X-Forwarded-For` trust now gated on
+  `A2A_TRUSTED_PROXIES` env allowlist (empty by default). New
+  `ClientIpResolutionMiddleware` resolves the client IP once per
+  request and emits an `X-Client-IP-Resolved` response header.
+- HIGH-2 — full refund now **returns the customer whole**: the
+  gateway fee charged at `create_intent` is credited back on void
+  and on settled refund. ADR-012 supersedes ADR-011. Response still
+  exposes `gateway_fee` + new `fee_refunded: true`, `fee_retained:
+  "0.00"`.
+- MED-8 — honest key rotation contract: `revoked: false` while the
+  300 s grace window is active; response adds `grace_period_seconds`
+  and `grace_expires_at`.
+- MED-7 — sanitize filesystem paths in infra tool responses
+  (`backup_database`, `restore_database`, `list_backups`,
+  `check_db_integrity`). Expose `filename` (basename) + `database`
+  instead of absolute `path`. Restore now accepts a `filename` that
+  is resolved server-side against the managed backup directory.
+
+**mcp_server coverage**: 60% → **99%**. Added `_run_stdio` / `_run_http`
+happy-path tests (mock `GatewayClient` + stdio transport + uvicorn +
+Starlette) and a `runpy.run_module("a2a_mcp_server.cli",
+run_name="__main__")` test for the `if __name__` guard. 52/52 pass.
+
+**Test impact**:
+- gateway: **1677 passed** (was 1614 before this session, +63 new)
+- mcp_server: 52 passed (14 new tests in test_cli.py)
+- No regressions; 8 pre-existing refund/backup tests flipped to reflect
+  the new ADR-012 / MED-7 contracts.
+
+**Files touched**:
+- `gateway/src/auth.py`, `gateway/src/middleware.py`, `gateway/src/app.py`
+- `gateway/src/tools/payments.py`, `gateway/src/tools/infrastructure.py`
+- `gateway/src/routes/v1/infra.py`, `gateway/src/catalog.json`
+- `gateway/tests/v1/test_audit_v1_2_3_regressions.py` (new)
+- `products/mcp_server/tests/test_cli.py` (new)
+- 8 pre-existing gateway test files updated for new contracts
+

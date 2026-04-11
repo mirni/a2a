@@ -404,31 +404,54 @@ class TestStripeMetadataValidation:
 
 
 class TestApiKeyWhitespace:
-    """Keys with trailing/leading whitespace must be rejected, not silently stripped."""
+    """Keys with surrounding whitespace are now stripped and accepted.
 
-    async def test_key_with_trailing_spaces_returns_401(self, client, app):
+    v1.2.4 (audit v1.2.3 NEW-CRIT-1/2): the original decision was to
+    reject whitespace-padded keys outright. That turned out to be a
+    smuggling vector — a valid key with a trailing space would pass an
+    upstream WAF rule matching on the exact key string but fail at
+    the gateway, and vice versa. The auditor-mandated behaviour is:
+    strip linear whitespace around the credential and authenticate
+    normally. Only empty / whitespace-only credentials are rejected.
+    See gateway/src/auth.py for the hardened extractor.
+    """
+
+    async def test_key_with_trailing_spaces_authenticates(self, client, app):
         key = await _create_agent(app, "ws-agent")
         resp = await client.get(
             "/v1/billing/wallets/ws-agent/balance",
             headers={"Authorization": f"Bearer {key}   "},
         )
-        assert resp.status_code == 401, f"Key with trailing spaces should be rejected, got {resp.status_code}"
+        assert resp.status_code == 200, (
+            f"v1.2.4: Bearer key with trailing spaces must authenticate after strip, got {resp.status_code}"
+        )
 
-    async def test_key_with_leading_spaces_returns_401(self, client, app):
+    async def test_key_with_leading_spaces_authenticates(self, client, app):
         key = await _create_agent(app, "ws-agent2")
         resp = await client.get(
             "/v1/billing/wallets/ws-agent2/balance",
             headers={"Authorization": f"Bearer    {key}"},
         )
-        assert resp.status_code == 401, f"Key with leading spaces should be rejected, got {resp.status_code}"
+        assert resp.status_code == 200, (
+            f"v1.2.4: Bearer key with multiple spaces after scheme must authenticate, got {resp.status_code}"
+        )
 
-    async def test_xapikey_with_trailing_spaces_returns_401(self, client, app):
+    async def test_xapikey_with_trailing_spaces_authenticates(self, client, app):
         key = await _create_agent(app, "ws-agent3")
         resp = await client.get(
             "/v1/billing/wallets/ws-agent3/balance",
             headers={"X-API-Key": f"{key}   "},
         )
-        assert resp.status_code == 401, f"X-API-Key with trailing spaces should be rejected, got {resp.status_code}"
+        assert resp.status_code == 200, (
+            f"v1.2.4: X-API-Key with trailing spaces must authenticate after strip, got {resp.status_code}"
+        )
+
+    async def test_empty_bearer_still_rejected(self, client):
+        resp = await client.get(
+            "/v1/billing/wallets/ws-agent/balance",
+            headers={"Authorization": "Bearer    "},
+        )
+        assert resp.status_code == 401
 
 
 class TestBackupPathTraversal:

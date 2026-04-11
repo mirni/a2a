@@ -103,23 +103,98 @@ _PUBLIC_PATHS: frozenset[str] = frozenset(
 )
 
 
-def _extract_client_ip(scope: dict) -> str:
-    """Extract client IP from the ASGI scope.
+def _trusted_proxies() -> frozenset[str]:
+    """Return the set of ASGI peer IPs that are authorised to set XFF.
 
-    Checks X-Forwarded-For first (for reverse-proxy setups), then falls
-    back to the ASGI client tuple.
+    Read from ``A2A_TRUSTED_PROXIES`` (comma-separated) at request time
+    so ops can toggle without a restart. Default: empty set — meaning
+    XFF is never trusted. This is the secure default per audit v1.2.3
+    CRIT-4: without explicit opt-in, the gateway MUST ignore forwarded
+    headers entirely and rely solely on the ASGI client tuple.
     """
+    raw = os.environ.get("A2A_TRUSTED_PROXIES", "").strip()
+    if not raw:
+        return frozenset()
+    return frozenset(p.strip() for p in raw.split(",") if p.strip())
+
+
+def _peer_ip(scope: dict) -> str:
+    """Return the ASGI peer IP (the socket-level remote address)."""
+    client = scope.get("client")
+    if client:
+        return client[0]
+    return "unknown"
+
+
+def _extract_client_ip(scope: dict) -> str:
+    """Extract the resolved client IP from the ASGI scope.
+
+    Audit v1.2.3 CRIT-4 hardening:
+    * If the ASGI peer (socket remote address) is in ``A2A_TRUSTED_PROXIES``
+      we may trust the leftmost entry of ``X-Forwarded-For`` (and fall back
+      to ``X-Real-IP``) as the real client.
+    * Otherwise forwarded headers are IGNORED entirely — the peer IP is
+      returned so spoofed headers cannot poison rate limiting or logs.
+
+    This function is the single source of truth for client IP resolution
+    across the gateway. Call it from any middleware that needs the IP.
+    """
+    peer = _peer_ip(scope)
+    trusted = _trusted_proxies()
+    if peer not in trusted:
+        # Untrusted (or direct) peer — forwarded headers are lies.
+        return peer
+
     headers = dict(scope.get("headers", []))
     forwarded = headers.get(b"x-forwarded-for", b"").decode("latin-1").strip()
     if forwarded:
         # X-Forwarded-For: client, proxy1, proxy2 — take the leftmost
-        return forwarded.split(",")[0].strip()
+        return forwarded.split(",")[0].strip() or peer
 
-    client = scope.get("client")
-    if client:
-        return client[0]
+    real_ip = headers.get(b"x-real-ip", b"").decode("latin-1").strip()
+    if real_ip:
+        return real_ip
 
-    return "unknown"
+    return peer
+
+
+class ClientIpResolutionMiddleware:
+    """ASGI middleware that resolves the client IP once per request.
+
+    The resolved IP is stored on ``scope["state"]["client_ip"]`` so
+    downstream middleware (rate limiting, logging) and route handlers
+    can read it without re-running the trusted-proxy logic.
+
+    Also emits ``X-Client-IP-Resolved`` as a response header so callers
+    — and the audit v1.2.3 CRIT-4 regression tests — can observe which
+    IP the gateway actually attributed the request to. This header is
+    intentionally advisory and safe to expose: it's always either the
+    socket peer or a proxy-attested value the operator opted into.
+    """
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: dict, receive: Callable, send: Callable) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        client_ip = _extract_client_ip(scope)
+        if "state" not in scope:
+            scope["state"] = {}
+        scope["state"]["client_ip"] = client_ip
+
+        header_value = client_ip.encode("latin-1")
+
+        async def send_with_client_ip(message: dict) -> None:
+            if message["type"] == "http.response.start":
+                headers_list: list[tuple[bytes, bytes]] = list(message.get("headers", []))
+                headers_list.append((b"x-client-ip-resolved", header_value))
+                message["headers"] = headers_list
+            await send(message)
+
+        await self.app(scope, receive, send_with_client_ip)
 
 
 def _is_public_path(path: str) -> bool:
@@ -163,7 +238,10 @@ class PublicRateLimitMiddleware:
             await self.app(scope, receive, send)
             return
 
-        client_ip = _extract_client_ip(scope)
+        # Prefer the IP already resolved by ClientIpResolutionMiddleware
+        # (which honours A2A_TRUSTED_PROXIES). Fall back to re-resolving
+        # if the upstream middleware is not installed.
+        client_ip = (scope.get("state") or {}).get("client_ip") or _extract_client_ip(scope)
         allowed, remaining, retry_after = limiter.record(client_ip)
 
         if not allowed:
@@ -652,4 +730,66 @@ class AgentIdLengthMiddleware:
                         )
                         await send({"type": "http.response.body", "body": body})
                         return
+        await self.app(scope, receive, send)
+
+
+# ---------------------------------------------------------------------------
+# v1.2.4 audit NEW-CRIT-3: URL-encoded path separator rejection
+# ---------------------------------------------------------------------------
+
+# Encoded forms of "/" and "\" that must never appear inside a path.
+# Upstream WAF / proxy rules typically match on literal ``/v1/infra/...``;
+# letting ``%2F`` through would allow an attacker to spell the same path
+# in a way those rules don't recognise. We read ``raw_path`` from the
+# ASGI scope because ``scope["path"]`` is already %-decoded by uvicorn.
+_ENCODED_PATH_SEPARATORS: tuple[bytes, ...] = (
+    b"%2f",
+    b"%2F",
+    b"%5c",
+    b"%5C",
+)
+
+
+class EncodedPathRejectionMiddleware:
+    """Reject ``/v1/`` requests whose raw path contains an encoded ``/`` or ``\\``.
+
+    Legitimate API paths never need to encode the separators. Rejecting
+    them prevents upstream filter bypasses (audit v1.2.3 NEW-CRIT-3).
+    """
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: dict, receive: Callable, send: Callable) -> None:
+        if scope["type"] == "http":
+            path: str = scope.get("path", "")
+            raw_path: bytes = scope.get("raw_path") or path.encode()
+            if (path.startswith("/v1") or raw_path.startswith(b"/v1")) and any(
+                enc in raw_path for enc in _ENCODED_PATH_SEPARATORS
+            ):
+                    body = json.dumps(
+                        {
+                            "type": "https://api.greenhelix.net/errors/encoded-path-separator",
+                            "title": "Bad Request",
+                            "status": 400,
+                            "detail": (
+                                "Encoded path separator (%2F, %2f, %5C, %5c) is "
+                                "not allowed in /v1/ routes. Use literal '/' "
+                                "in the request path."
+                            ),
+                            "instance": path,
+                        }
+                    ).encode()
+                    await send(
+                        {
+                            "type": "http.response.start",
+                            "status": 400,
+                            "headers": [
+                                (b"content-type", b"application/problem+json"),
+                                (b"content-length", str(len(body)).encode()),
+                            ],
+                        }
+                    )
+                    await send({"type": "http.response.body", "body": body})
+                    return
         await self.app(scope, receive, send)

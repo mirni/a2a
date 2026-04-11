@@ -165,29 +165,37 @@ def _compute_create_intent_gateway_fee(amount: float) -> float:
     return calculate_tool_cost(tool_def.get("pricing", {}), {"amount": float(amount)})
 
 
-# v1.2.2 audit HIGH-2: refund response must cite a stable policy URL
-# so integrator reconciliation docs can link to it. See ADR-011.
+# v1.2.4 audit HIGH-2 (v1.2.3): a full refund must return the customer
+# whole. The 2% gateway fee charged at create_intent is credited back
+# on refund so the payer wallet delta is exactly zero. The response
+# still exposes ``fee_policy`` for integrator reconciliation docs, now
+# pointing at ADR-012 (supersedes ADR-011).
 _REFUND_FEE_POLICY: dict[str, str] = {
-    "name": "retain_gateway_fee",
-    "adr": "ADR-011",
-    "url": "https://docs.greenhelix.net/adr/011-refund-fee-policy",
-    "summary": "The 2% gateway fee is retained on refund. See ADR-011.",
+    "name": "refund_full_amount",
+    "adr": "ADR-012",
+    "url": "https://docs.greenhelix.net/adr/012-refund-fee-policy",
+    "summary": (
+        "Full refunds return the customer whole: the 2% gateway fee is "
+        "reversed alongside the principal. Supersedes ADR-011."
+    ),
+    "supersedes": "ADR-011",
 }
 
 
 async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     """Refund a payment intent.
 
-    - If pending: void it (no funds moved).
-    - If settled: create a reverse transfer from payee to payer.
+    - If pending: void it (no funds moved). Gateway fee charged at
+      ``create_intent`` is reversed to the payer.
+    - If settled: create a reverse transfer from payee to payer AND
+      credit the gateway fee back to the payer wallet.
 
-    Audit HIGH-2 (v1.2.1 → v1.2.2): the gateway fee charged at
-    ``create_intent`` time is **retained** on refund — it is not
-    credited back to the payer — because gateway execution cost was
-    already incurred. The response always exposes
-    ``fee_refunded`` / ``fee_retained`` (legacy, v1.2.1) alongside the
-    ``fee_policy`` object (v1.2.2) that points at ADR-011 so
-    integrators can cite a stable URL in their reconciliation docs.
+    Audit v1.2.3 HIGH-2: a full refund of a 50.00 intent must restore
+    the payer's wallet by exactly 50.00 — including the 2% gateway fee
+    that was charged at ``create_intent`` time. The response exposes
+    ``fee_refunded=True`` / ``fee_retained="0.00"`` (legacy shape) and
+    a ``fee_policy`` object pointing at ADR-012 so integrators can cite
+    a stable URL in their reconciliation docs.
     """
     caller = params.get("_caller_agent_id", "")
     tier = params.get("_caller_tier", "")
@@ -195,12 +203,40 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
     _check_intent_ownership(caller, tier, intent)
 
     gateway_fee = _compute_create_intent_gateway_fee(float(intent.amount))
-    # Current policy: the gateway fee is retained (not refunded).
-    fee_refunded = False
-    fee_retained = gateway_fee if not fee_refunded else 0.0
+    # New policy (v1.2.4): the fee charged at create_intent is refunded.
+    fee_refunded = True
+    fee_retained = 0.0
+    currency = (intent.metadata or {}).get("currency", "CREDITS")
+
+    async def _credit_fee_back() -> None:
+        """Credit the create_intent gateway fee back to the payer wallet.
+
+        Guarded so a missing wallet (e.g. test fixture deleted the
+        payer mid-flow) does not turn the refund into a 500. Any
+        error here is logged via the wallet layer.
+        """
+        if gateway_fee <= 0:
+            return
+        try:
+            await ctx.tracker.wallet.deposit(
+                intent.payer,
+                float(gateway_fee),
+                description=f"refund-fee:{intent.id}",
+                currency=currency,
+            )
+        except Exception:  # pragma: no cover - defensive
+            # Log via the standard gateway logger and fall through; the
+            # principal refund still happened and will be reconciled.
+            import logging as _logging
+
+            _logging.getLogger("a2a.gateway").exception(
+                "refund_intent: failed to credit gateway_fee back to %s",
+                intent.payer,
+            )
 
     if intent.status.value == "pending":
         voided = await ctx.payment_engine.void(intent.id, idempotency_key=params.get("idempotency_key"))
+        await _credit_fee_back()
         return {
             "id": voided.id,
             "status": "voided",
@@ -224,7 +260,6 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
         }
 
     if intent.status.value == "settled":
-        currency = (intent.metadata or {}).get("currency", "CREDITS")
         await ctx.tracker.wallet.withdraw(
             intent.payee,
             float(intent.amount),
@@ -237,6 +272,7 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
             description=f"refund:{intent.id}",
             currency=currency,
         )
+        await _credit_fee_back()
         return {
             "id": intent.id,
             "status": "refunded",
