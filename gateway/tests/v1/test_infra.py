@@ -25,13 +25,15 @@ async def _register_webhook(client, key, agent_id="pro-agent"):
 
 
 # ---------------------------------------------------------------------------
-# POST /v1/infra/keys  (create_api_key)
+# POST /v1/infra/keys  (DEPRECATED → 410; moved to POST /v1/billing/keys)
+# v1.2.4 audit P0-1
 # ---------------------------------------------------------------------------
 
 
 async def test_create_api_key_via_rest(client, api_key):
+    """Self-service moved to POST /v1/billing/keys."""
     resp = await client.post(
-        "/v1/infra/keys",
+        "/v1/billing/keys",
         json={"tier": "free"},
         headers={"Authorization": f"Bearer {api_key}"},
     )
@@ -41,27 +43,67 @@ async def test_create_api_key_via_rest(client, api_key):
 
 
 async def test_create_api_key_no_auth(client):
-    resp = await client.post("/v1/infra/keys", json={"tier": "free"})
+    """Deprecated /v1/infra/keys still requires auth before it 410s."""
+    resp = await client.post("/v1/billing/keys", json={"tier": "free"})
     assert resp.status_code == 401
 
 
 async def test_create_api_key_extra_fields(client, api_key):
     resp = await client.post(
-        "/v1/infra/keys",
+        "/v1/billing/keys",
         json={"tier": "free", "extra": 1},
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 422
 
 
+async def test_legacy_infra_keys_post_returns_410(client, api_key):
+    """v1.2.4 audit P0-1: old self-service path returns 410 with
+    Deprecation/Sunset/Link headers pointing to the successor.
+    """
+    resp = await client.post(
+        "/v1/infra/keys",
+        json={"tier": "free"},
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 410
+    assert resp.headers.get("Deprecation") == "true"
+    assert "Sunset" in resp.headers
+    assert "/v1/billing/keys" in resp.headers.get("Link", "")
+
+
 # ---------------------------------------------------------------------------
-# GET /v1/infra/keys  (list_api_keys)
+# GET /v1/infra/keys  (list_api_keys — ADMIN-ONLY as of v1.2.4 audit P0-1)
 # ---------------------------------------------------------------------------
 
 
-async def test_list_api_keys_via_rest(client, api_key):
+async def test_list_api_keys_via_rest_admin(client, admin_api_key):
+    """Admin can see the fleet view."""
     resp = await client.get(
         "/v1/infra/keys",
+        headers={"Authorization": f"Bearer {admin_api_key}"},
+    )
+    assert resp.status_code == 200
+    assert "keys" in resp.json()
+
+
+async def test_list_api_keys_via_rest_non_admin_denied(client, api_key):
+    """v1.2.4 audit P0-1: free tier cannot reach the fleet view."""
+    resp = await client.get(
+        "/v1/infra/keys",
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/billing/keys  (self-service list — replaces old /v1/infra/keys)
+# ---------------------------------------------------------------------------
+
+
+async def test_list_own_keys_via_billing(client, api_key):
+    resp = await client.get(
+        "/v1/billing/keys",
         headers={"Authorization": f"Bearer {api_key}"},
     )
     assert resp.status_code == 200
@@ -116,13 +158,14 @@ async def test_revoke_api_key_non_admin_denied(client, api_key):
 # ---------------------------------------------------------------------------
 
 
-async def test_rotate_key_via_rest(client, api_key):
+async def test_rotate_key_via_rest(client, admin_api_key):
+    """v1.2.4 audit P0-1: rotate_key is now admin-only."""
     resp = await client.post(
         "/v1/infra/keys/rotate",
-        json={"current_key": api_key},
+        json={"current_key": admin_api_key},
         headers={
-            "Authorization": f"Bearer {api_key}",
-            # v1.2.2 audit HIGH-7: rotation now requires an explicit
+            "Authorization": f"Bearer {admin_api_key}",
+            # v1.2.2 audit HIGH-7: rotation still requires an explicit
             # confirmation header so it cannot happen by accident.
             "X-Rotate-Confirmation": "confirm",
         },
@@ -130,19 +173,32 @@ async def test_rotate_key_via_rest(client, api_key):
     assert resp.status_code == 200
     body = resp.json()
     assert "new_key" in body
-    assert body["new_key"] != api_key
+    assert body["new_key"] != admin_api_key
 
 
-async def test_rotate_key_requires_confirmation_header(client, api_key):
+async def test_rotate_key_requires_confirmation_header(client, admin_api_key):
     """v1.2.2 audit HIGH-7 regression — missing header returns 428."""
     resp = await client.post(
         "/v1/infra/keys/rotate",
-        json={"current_key": api_key},
-        headers={"Authorization": f"Bearer {api_key}"},
+        json={"current_key": admin_api_key},
+        headers={"Authorization": f"Bearer {admin_api_key}"},
     )
     assert resp.status_code == 428
     body = resp.json()
     assert "confirmation" in body.get("detail", "").lower()
+
+
+async def test_rotate_key_non_admin_denied(client, api_key):
+    """v1.2.4 audit P0-1: rotate_key admin-only."""
+    resp = await client.post(
+        "/v1/infra/keys/rotate",
+        json={"current_key": api_key},
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "X-Rotate-Confirmation": "confirm",
+        },
+    )
+    assert resp.status_code == 403
 
 
 # ---------------------------------------------------------------------------
@@ -407,10 +463,11 @@ async def test_restore_database_via_rest(client, admin_api_key):
 # ---------------------------------------------------------------------------
 
 
-async def test_infra_response_headers(client, api_key):
+async def test_infra_response_headers(client, admin_api_key):
+    """v1.2.4 audit P0-1: GET /v1/infra/keys is admin-only."""
     resp = await client.get(
         "/v1/infra/keys",
-        headers={"Authorization": f"Bearer {api_key}"},
+        headers={"Authorization": f"Bearer {admin_api_key}"},
     )
     assert "X-Charged" in resp.headers
     assert "X-Request-ID" in resp.headers

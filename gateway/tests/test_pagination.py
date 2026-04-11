@@ -103,19 +103,23 @@ async def _exec(client, api_key, tool: str, params: dict):
 # ---------------------------------------------------------------------------
 
 
-async def test_list_api_keys_paginate_first_page(client, app, api_key):
-    """list_api_keys with paginate=true, offset=0, limit=2 returns first 2 keys."""
+async def test_list_api_keys_paginate_first_page(client, app, admin_api_key):
+    """list_api_keys with paginate=true, offset=0, limit=2 returns first 2 keys.
+
+    v1.2.4 audit P0-1: ``list_api_keys`` is now admin-only so all
+    pagination tests use ``admin_api_key`` / ``admin-agent``.
+    """
     ctx = app.state.ctx
     # Create additional keys so we have at least 4 (1 already created by fixture)
     for _ in range(3):
-        await ctx.key_manager.create_key("test-agent", tier="free")
+        await ctx.key_manager.create_key("admin-agent", tier="pro", scopes=["read", "write", "admin"])
 
     body = await _exec(
         client,
-        api_key,
+        admin_api_key,
         "list_api_keys",
         {
-            "agent_id": "test-agent",
+            "agent_id": "admin-agent",
             "offset": 0,
             "limit": 2,
             "paginate": True,
@@ -135,18 +139,18 @@ async def test_list_api_keys_paginate_first_page(client, app, api_key):
     assert body["has_more"] is True
 
 
-async def test_list_api_keys_paginate_second_page(client, app, api_key):
+async def test_list_api_keys_paginate_second_page(client, app, admin_api_key):
     """list_api_keys with offset=2, limit=2 returns next 2 keys."""
     ctx = app.state.ctx
     for _ in range(3):
-        await ctx.key_manager.create_key("test-agent", tier="free")
+        await ctx.key_manager.create_key("admin-agent", tier="pro", scopes=["read", "write", "admin"])
 
     body = await _exec(
         client,
-        api_key,
+        admin_api_key,
         "list_api_keys",
         {
-            "agent_id": "test-agent",
+            "agent_id": "admin-agent",
             "offset": 2,
             "limit": 2,
             "paginate": True,
@@ -159,14 +163,14 @@ async def test_list_api_keys_paginate_second_page(client, app, api_key):
     assert float(body["total"]) >= 4
 
 
-async def test_list_api_keys_without_paginate_returns_flat(client, app, api_key):
+async def test_list_api_keys_without_paginate_returns_flat(client, app, admin_api_key):
     """Without paginate=true, list_api_keys returns legacy flat format."""
     body = await _exec(
         client,
-        api_key,
+        admin_api_key,
         "list_api_keys",
         {
-            "agent_id": "test-agent",
+            "agent_id": "admin-agent",
         },
     )
 
@@ -175,19 +179,19 @@ async def test_list_api_keys_without_paginate_returns_flat(client, app, api_key)
     assert "items" not in body
 
 
-async def test_list_api_keys_paginate_metadata_total(client, app, api_key):
+async def test_list_api_keys_paginate_metadata_total(client, app, admin_api_key):
     """Pagination metadata 'total' accurately reflects the total key count."""
     ctx = app.state.ctx
     # We start with 1 key from fixture, add 4 more = 5 total
     for _ in range(4):
-        await ctx.key_manager.create_key("test-agent", tier="free")
+        await ctx.key_manager.create_key("admin-agent", tier="pro", scopes=["read", "write", "admin"])
 
     body = await _exec(
         client,
-        api_key,
+        admin_api_key,
         "list_api_keys",
         {
-            "agent_id": "test-agent",
+            "agent_id": "admin-agent",
             "offset": 0,
             "limit": 100,
             "paginate": True,
@@ -411,14 +415,14 @@ async def test_list_webhooks_without_paginate_returns_flat(client, app, pro_api_
 # ---------------------------------------------------------------------------
 
 
-async def test_paginate_with_negative_offset_returns_error_or_empty(client, app, api_key):
+async def test_paginate_with_negative_offset_returns_error_or_empty(client, app, admin_api_key):
     """Negative offset should be treated as 0."""
     body = await _exec(
         client,
-        api_key,
+        admin_api_key,
         "list_api_keys",
         {
-            "agent_id": "test-agent",
+            "agent_id": "admin-agent",
             "offset": -1,
             "limit": 10,
             "paginate": True,
@@ -428,14 +432,14 @@ async def test_paginate_with_negative_offset_returns_error_or_empty(client, app,
     assert body["offset"] == 0
 
 
-async def test_paginate_with_zero_limit(client, app, api_key):
+async def test_paginate_with_zero_limit(client, app, admin_api_key):
     """limit=0 with paginate should return empty items but correct total."""
     body = await _exec(
         client,
-        api_key,
+        admin_api_key,
         "list_api_keys",
         {
-            "agent_id": "test-agent",
+            "agent_id": "admin-agent",
             "offset": 0,
             "limit": 0,
             "paginate": True,
@@ -462,18 +466,18 @@ async def _exec_with_resp(client, api_key, tool: str, params: dict):
     return resp.json(), resp
 
 
-async def test_cursor_pagination_returns_next_cursor(client, app, api_key):
+async def test_cursor_pagination_returns_next_cursor(client, app, admin_api_key):
     """When has_more=True, response includes next_cursor."""
     ctx = app.state.ctx
     for _ in range(4):
-        await ctx.key_manager.create_key("test-agent", tier="free")
+        await ctx.key_manager.create_key("admin-agent", tier="pro", scopes=["read", "write", "admin"])
 
     body, resp = await _exec_with_resp(
         client,
-        api_key,
+        admin_api_key,
         "list_api_keys",
         {
-            "agent_id": "test-agent",
+            "agent_id": "admin-agent",
             "offset": 0,
             "limit": 2,
             "paginate": True,
@@ -486,18 +490,18 @@ async def test_cursor_pagination_returns_next_cursor(client, app, api_key):
     assert len(body["next_cursor"]) > 0
 
 
-async def test_cursor_pagination_link_header(client, app, api_key):
+async def test_cursor_pagination_link_header(client, app, admin_api_key):
     """When has_more=True, Link header with rel=next is present."""
     ctx = app.state.ctx
     for _ in range(4):
-        await ctx.key_manager.create_key("test-agent", tier="free")
+        await ctx.key_manager.create_key("admin-agent", tier="pro", scopes=["read", "write", "admin"])
 
     body, resp = await _exec_with_resp(
         client,
-        api_key,
+        admin_api_key,
         "list_api_keys",
         {
-            "agent_id": "test-agent",
+            "agent_id": "admin-agent",
             "offset": 0,
             "limit": 2,
             "paginate": True,
@@ -510,19 +514,19 @@ async def test_cursor_pagination_link_header(client, app, api_key):
     assert 'rel="next"' in link
 
 
-async def test_cursor_pagination_using_cursor_param(client, app, api_key):
+async def test_cursor_pagination_using_cursor_param(client, app, admin_api_key):
     """Using cursor param from page 1 returns page 2 items."""
     ctx = app.state.ctx
     for _ in range(4):
-        await ctx.key_manager.create_key("test-agent", tier="free")
+        await ctx.key_manager.create_key("admin-agent", tier="pro", scopes=["read", "write", "admin"])
 
     # First page
     body1 = await _exec(
         client,
-        api_key,
+        admin_api_key,
         "list_api_keys",
         {
-            "agent_id": "test-agent",
+            "agent_id": "admin-agent",
             "offset": 0,
             "limit": 2,
             "paginate": True,
@@ -534,10 +538,10 @@ async def test_cursor_pagination_using_cursor_param(client, app, api_key):
     # Second page using cursor
     body2 = await _exec(
         client,
-        api_key,
+        admin_api_key,
         "list_api_keys",
         {
-            "agent_id": "test-agent",
+            "agent_id": "admin-agent",
             "cursor": cursor,
             "limit": 2,
             "paginate": True,
@@ -551,14 +555,14 @@ async def test_cursor_pagination_using_cursor_param(client, app, api_key):
     assert prefixes1.isdisjoint(prefixes2), "Cursor-based page 2 should not overlap page 1"
 
 
-async def test_no_link_header_when_no_more_pages(client, app, api_key):
+async def test_no_link_header_when_no_more_pages(client, app, admin_api_key):
     """When has_more=False, no Link header and no next_cursor."""
     body, resp = await _exec_with_resp(
         client,
-        api_key,
+        admin_api_key,
         "list_api_keys",
         {
-            "agent_id": "test-agent",
+            "agent_id": "admin-agent",
             "offset": 0,
             "limit": 100,
             "paginate": True,

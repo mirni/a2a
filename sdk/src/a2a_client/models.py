@@ -12,10 +12,57 @@ Tool-specific response models use Pydantic v2 with:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, BeforeValidator, ConfigDict
+
+
+def _parse_timestamp(value: Any) -> Any:
+    """Accept ISO-8601 strings and POSIX floats/ints; emit ``datetime``.
+
+    v1.2.4 audit P0-3: the gateway's serialisation layer emits
+    timestamp fields as ISO-8601 strings, but older servers and local
+    fixtures still emit POSIX floats. SDK models accept both shapes
+    so the audit team's Python probes parse live server payloads
+    without hand-rolling fallback logic on every model.
+
+    ``None`` passes through untouched so the validator composes with
+    ``Optional[...]`` fields.
+    """
+    if value is None:
+        return value
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, (int, float)):
+        return datetime.fromtimestamp(float(value), tz=UTC)
+    if isinstance(value, str):
+        candidate = value.strip()
+        if not candidate:
+            raise ValueError("timestamp string is empty")
+        # Try numeric string first (back-compat for servers that JSON-
+        # encoded a float as a quoted number).
+        try:
+            as_float = float(candidate)
+        except ValueError:
+            pass
+        else:
+            return datetime.fromtimestamp(as_float, tz=UTC)
+        # Handle the ``Z`` suffix that isoformat() does not produce but
+        # the audit's live sandbox sometimes emits.
+        iso_candidate = candidate.replace("Z", "+00:00")
+        try:
+            return datetime.fromisoformat(iso_candidate)
+        except ValueError as exc:
+            raise ValueError(f"invalid timestamp: {value!r}") from exc
+    raise ValueError(f"unsupported timestamp type: {type(value).__name__}")
+
+
+#: Shared timestamp type accepting ISO-8601 strings and POSIX floats.
+#: Always materialises as :class:`datetime.datetime` once validated.
+Timestamp = Annotated[datetime, BeforeValidator(_parse_timestamp)]
+OptionalTimestamp = Annotated[datetime | None, BeforeValidator(_parse_timestamp)]
 
 # ===========================================================================
 # Infrastructure dataclass models (unchanged wire-format)
@@ -264,7 +311,7 @@ class GetSubscriptionResponse(_ToolResponse):
     status: str
     next_charge_at: float
     charge_count: int
-    created_at: float
+    created_at: Timestamp
 
     model_config = ConfigDict(
         extra="ignore",
@@ -432,11 +479,15 @@ class SearchServersResponse(_ToolResponse):
 
 
 class RegisterAgentResponse(_ToolResponse):
-    """Response from register_agent tool."""
+    """Response from register_agent tool.
+
+    v1.2.4 audit P0-3: ``created_at`` accepts either an ISO-8601
+    string (server default) or a POSIX float (legacy back-compat).
+    """
 
     agent_id: str
     public_key: str
-    created_at: float
+    created_at: Timestamp
 
     model_config = ConfigDict(
         extra="ignore",
@@ -451,7 +502,7 @@ class GetAgentIdentityResponse(_ToolResponse):
 
     agent_id: str
     public_key: str | None = None
-    created_at: float | None = None
+    created_at: OptionalTimestamp = None
     org_id: str | None = None
     found: bool = True
 
@@ -590,7 +641,7 @@ class RegisterWebhookResponse(_ToolResponse):
     url: str
     event_types: list[str]
     filter_agent_ids: list[str] | None = None
-    created_at: float
+    created_at: Timestamp
     active: bool
 
     model_config = ConfigDict(
@@ -644,7 +695,7 @@ class CreateApiKeyResponse(_ToolResponse):
     key: str
     agent_id: str
     tier: str
-    created_at: float
+    created_at: Timestamp
 
     model_config = ConfigDict(
         extra="ignore",
@@ -707,7 +758,7 @@ class CreateOrgResponse(_ToolResponse):
 
     org_id: str
     name: str
-    created_at: float
+    created_at: Timestamp
 
     model_config = ConfigDict(
         extra="ignore",
@@ -720,7 +771,7 @@ class GetOrgResponse(_ToolResponse):
 
     org_id: str
     name: str
-    created_at: float
+    created_at: Timestamp
     members: list[Any]
 
     model_config = ConfigDict(

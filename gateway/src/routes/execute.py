@@ -245,17 +245,69 @@ async def execute(request: Request) -> JSONResponse:
     return _apply_deprecation_headers(response)
 
 
+async def _legacy_execute_gone(request: Request) -> JSONResponse:
+    """v1.2.4 audit P0-2: unconditional 410 Gone for ``/v1/execute``.
+
+    External auditors hitting ``/v1/execute`` with garbage, missing,
+    or extra-field bodies previously got ``400``/``422`` errors that
+    leaked schema details and masked the fact that the route is dead.
+    This helper returns a fixed ``410`` regardless of body content.
+    RFC 8594 deprecation headers are attached by the outer wrapper.
+    """
+    resp = await error_response(
+        410,
+        "POST /v1/execute has been removed. Use the dedicated REST endpoints "
+        "under /v1/<domain>/<operation> instead. See /docs for the migration guide.",
+        "endpoint_removed",
+        request=request,
+    )
+    resp.headers.update(_deprecation_headers())
+    return resp
+
+
 async def _execute_impl(request: Request) -> JSONResponse:
-    """Actual /v1/execute implementation."""
+    """Actual /v1/execute implementation.
+
+    v1.2.4 audit P0-2: when legacy execute is disabled (production),
+    *dispatch on route-hit first*. The route is dead — body validation
+    and auth are irrelevant — return a fixed 410 immediately.
+
+    When legacy execute is enabled (test/staging with
+    ``A2A_LEGACY_EXECUTE=1``) or the tool is an MCP connector tool,
+    fall through to the full implementation.
+    """
     _start_time = time.time()
 
-    # --- Parse body ---
+    # --- 0. Fast-path: legacy route is dead in production ---
+    # Parse body just enough to check whether this is a connector tool
+    # that still has a legitimate claim on /v1/execute. Every other
+    # shape — garbage JSON, missing tool, extra fields, unknown tool —
+    # gets a fixed 410 Gone.
     try:
-        raw_body: dict[str, Any] = await request.json()
+        raw_body_early: Any = await request.json()
     except (ValueError, TypeError):
-        return await error_response(400, "Invalid JSON body", "bad_request", request=request)
+        raw_body_early = None
 
-    if not isinstance(raw_body, dict):
+    _early_tool_name: str | None = None
+    if isinstance(raw_body_early, dict):
+        _early_tool_raw = raw_body_early.get("tool")
+        if isinstance(_early_tool_raw, str):
+            _early_tool_name = _sanitize_tool_name(_early_tool_raw)
+
+    # In production, only MCP connector tools with a well-formed
+    # tool name are still routed through /v1/execute. Everything
+    # else — including auth failures, extra fields, and unknown
+    # tools — collapses to a single 410.
+    if not _LEGACY_EXECUTE_ENABLED and (_early_tool_name is None or _early_tool_name not in _CONNECTOR_TOOLS):
+        return await _legacy_execute_gone(request)
+
+    # --- Parse body ---
+    raw_body: dict[str, Any]
+    if isinstance(raw_body_early, dict):
+        raw_body = raw_body_early
+    else:
+        if raw_body_early is None:
+            return await error_response(400, "Invalid JSON body", "bad_request", request=request)
         return await error_response(400, "Request body must be a JSON object", "bad_request", request=request)
 
     try:
@@ -292,15 +344,7 @@ async def _execute_impl(request: Request) -> JSONResponse:
 
     # --- 1b. Restrict to connector tools only (core tools → REST routers) ---
     if tool_name not in _CONNECTOR_TOOLS and not _LEGACY_EXECUTE_ENABLED:
-        resp = await error_response(
-            410,
-            f"Tool '{tool_name}' has moved to a dedicated REST endpoint. See API docs at /docs for the new routes.",
-            "tool_moved",
-            request=request,
-        )
-        # RFC 8594 deprecation headers (Sunset + Link + Deprecation).
-        resp.headers.update(_deprecation_headers())
-        return resp
+        return await _legacy_execute_gone(request)
 
     # --- 2. Extract + validate API key (with x402 fallback) ---
     # Auth MUST run before param validation to avoid leaking schema info

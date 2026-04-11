@@ -259,24 +259,46 @@ async def _rotate_key(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]
 
 
 async def _list_api_keys(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
-    """List all API keys owned by the authenticated caller's agent.
+    """List API keys.
 
     v1.2.2 audit CRIT-3/4: the storage query has always been
     ``WHERE agent_id = ?`` but the response body omitted ``agent_id``
     and ``owner``, so audit personas could not verify ownership from
     the response alone and misread it as a fleet-wide leak. Each row
-    now explicitly carries ``agent_id`` and ``owner:"self"``.
+    now explicitly carries ``agent_id`` and ``owner``.
+
+    v1.2.4 audit P0-1: ``list_api_keys`` is now in
+    ``ADMIN_ONLY_TOOLS`` at the catalog level. Admin callers receive
+    the whole fleet (every agent's keys). Non-admin callers go
+    through ``GET /v1/billing/keys`` which still invokes this tool
+    via the billing router but constrains ``agent_id`` to the
+    caller's own agent_id.
     """
-    agent_id = params["agent_id"]
-    keys = await ctx.key_manager.get_agent_keys(agent_id)
+    caller_tier = params.get("_caller_tier", "free")
+    caller_agent_id = params.get("_caller_agent_id")
+    requested_agent_id = params.get("agent_id")
+
+    # Admin fleet view: no agent_id filter → list everything.
+    if caller_tier == "admin" and (requested_agent_id is None or requested_agent_id == caller_agent_id):
+        keys = await ctx.key_manager.get_all_keys()
+        owner_label = "admin"
+    elif caller_tier == "admin" and requested_agent_id:
+        keys = await ctx.key_manager.get_agent_keys(requested_agent_id)
+        owner_label = "admin"
+    else:
+        # Non-admin: always restricted to caller's own agent_id.
+        # Ownership was already verified by the route; belt-and-braces.
+        agent_id = caller_agent_id or requested_agent_id
+        keys = await ctx.key_manager.get_agent_keys(agent_id)
+        owner_label = "self"
 
     sanitized_keys = []
     for k in keys:
         sanitized_keys.append(
             {
                 "key_hash_prefix": k["key_hash"][:8],
-                "agent_id": k.get("agent_id", agent_id),
-                "owner": "self",
+                "agent_id": k.get("agent_id", requested_agent_id),
+                "owner": owner_label,
                 "tier": k["tier"],
                 "scopes": k.get("scopes", ["read", "write"]),
                 "created_at": k["created_at"],

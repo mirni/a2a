@@ -27,6 +27,9 @@ dev = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+markers = [
+    "slo: latency SLO gates (skipped by default locally, run in CI)",
+]
 
 [tool.mypy]
 python_version = "3.12"

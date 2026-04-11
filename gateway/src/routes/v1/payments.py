@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict, Field
 
+from gateway.src.deps.idempotency import check_idempotency, record_idempotent_response
 from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
 from gateway.src.errors import handle_product_exception
 from gateway.src.tools.payments import (
@@ -215,6 +216,17 @@ async def create_intent(
     body: CreateIntentRequest,
     tc: ToolContext = Depends(require_tool("create_intent")),
 ):
+    # v1.2.4 audit P0-4: route-level idempotency body-hash gate.
+    # A same-key / different-body replay returns 409 instead of
+    # silently producing a second intent.
+    idem_response = await check_idempotency(
+        tc.request,
+        tc.agent_id,
+        body.model_dump(mode="json"),
+    )
+    if idem_response is not None:
+        return idem_response
+
     params = _inject_caller(
         tc,
         {
@@ -232,7 +244,12 @@ async def create_intent(
     except Exception as exc:
         return await handle_product_exception(tc.request, exc)
     location = f"/v1/payments/intents/{result.get('id', '')}"
-    return await finalize_response(tc, result, status_code=201, location=location)
+    response = await finalize_response(tc, result, status_code=201, location=location)
+
+    # Cache the successful response for future replays with the same
+    # idempotency key + body hash.
+    await record_idempotent_response(tc.request, tc.agent_id, 201, result)
+    return response
 
 
 @router.get("/intents")

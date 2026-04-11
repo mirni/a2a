@@ -234,6 +234,22 @@ class PaywallStorage:
         rows = await cursor.fetchall()
         return [self._deserialize_key_row(r) for r in rows]
 
+    async def get_all_keys(self) -> list[dict[str, Any]]:
+        """Get all API keys across all agents (admin fleet view).
+
+        v1.2.4 audit P0-1: used by ``list_api_keys`` when called by an
+        admin-tier caller via ``GET /v1/infra/keys`` so the response
+        contains every agent's keys. Non-admin callers never reach
+        this method because the route is in ``ADMIN_ONLY_TOOLS``.
+        """
+        cursor = await self.db.execute(
+            "SELECT key_hash, agent_id, tier, connector, org_id, created_at, revoked, "
+            "allowed_tools, allowed_agent_ids, scopes, expires_at, revoked_at "
+            "FROM api_keys ORDER BY agent_id ASC, created_at DESC"
+        )
+        rows = await cursor.fetchall()
+        return [self._deserialize_key_row(r) for r in rows]
+
     # -----------------------------------------------------------------------
     # Rate window operations (hourly sliding window)
     # -----------------------------------------------------------------------

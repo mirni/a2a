@@ -179,29 +179,32 @@ class TestMultiCurrencyPaymentTools:
 class TestListApiKeys:
     """Tests for the list_api_keys tool."""
 
-    async def test_list_api_keys_exists_in_registry(self, client, api_key):
-        """list_api_keys should be recognized as a valid tool."""
+    async def test_list_api_keys_exists_in_registry(self, client, admin_api_key):
+        """list_api_keys should be recognized as a valid tool.
+
+        v1.2.4 audit P0-1: list_api_keys is now admin-only.
+        """
         resp = await client.post(
             "/v1/execute",
             json={
                 "tool": "list_api_keys",
-                "params": {"agent_id": "test-agent"},
+                "params": {"agent_id": "admin-agent"},
             },
-            headers={"Authorization": f"Bearer {api_key}"},
+            headers={"Authorization": f"Bearer {admin_api_key}"},
         )
         data = resp.json()
         # Should not be "unknown_tool"
         assert data.get("error", {}).get("code") != "unknown_tool"
 
-    async def test_list_api_keys_returns_keys(self, client, api_key):
-        """list_api_keys should return keys for the agent."""
+    async def test_list_api_keys_returns_keys(self, client, admin_api_key):
+        """list_api_keys should return keys for the agent (admin-only)."""
         resp = await client.post(
             "/v1/execute",
             json={
                 "tool": "list_api_keys",
-                "params": {"agent_id": "test-agent"},
+                "params": {"agent_id": "admin-agent"},
             },
-            headers={"Authorization": f"Bearer {api_key}"},
+            headers={"Authorization": f"Bearer {admin_api_key}"},
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -215,13 +218,17 @@ class TestListApiKeys:
             # Should not expose full key_hash
             assert len(key_entry["key_hash_prefix"]) <= 12
 
-    async def test_list_api_keys_ownership_enforced(self, client, api_key):
-        """list_api_keys for a different agent should be forbidden."""
+    async def test_list_api_keys_non_admin_denied(self, client, api_key):
+        """list_api_keys is admin-only (v1.2.4 audit P0-1).
+
+        A free-tier caller must be denied with 403 / forbidden_admin_only
+        regardless of the requested agent_id.
+        """
         resp = await client.post(
             "/v1/execute",
             json={
                 "tool": "list_api_keys",
-                "params": {"agent_id": "other-agent"},
+                "params": {"agent_id": "test-agent"},
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )

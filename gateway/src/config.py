@@ -61,12 +61,16 @@ class GatewayConfig:
     x402_supported_networks: str = "base,polygon"
 
     # --- Per-tier deposit limits (credits) ---
+    # v1.2.4 audit P0-6: enterprise tier had no cap in the dict before
+    # (``.get()`` returned ``None``, bypassing the check). Added an
+    # explicit ceiling of 10,000,000 credits as a policy placeholder —
+    # review expected in PR.
     deposit_limits: dict[str, int] = field(
         default_factory=lambda: {
             "free": 1_000,
             "starter": 10_000,
             "pro": 100_000,
-            "enterprise": 1_000_000_000,
+            "enterprise": 10_000_000,
         }
     )
 

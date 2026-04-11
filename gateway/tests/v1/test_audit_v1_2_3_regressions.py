@@ -280,14 +280,15 @@ class TestRotationStateContract:
     key keeps authenticating for 300 s. That is a contract lie.
     """
 
-    async def test_rotate_response_does_not_claim_revoked_while_grace_active(self, client, api_key):
+    async def test_rotate_response_does_not_claim_revoked_while_grace_active(self, client, admin_api_key):
+        # v1.2.4 audit P0-1: rotate_key is now admin-only.
         resp = await client.post(
             "/v1/infra/keys/rotate",
             headers={
-                "Authorization": f"Bearer {api_key}",
+                "Authorization": f"Bearer {admin_api_key}",
                 "X-Rotate-Confirmation": "confirm",
             },
-            json={"current_key": api_key},
+            json={"current_key": admin_api_key},
         )
         assert resp.status_code in (200, 201), resp.text
         body = resp.json()
@@ -301,8 +302,8 @@ class TestRotationStateContract:
         )
         # The old key must still authenticate during the grace window.
         verify = await client.get(
-            "/v1/billing/wallets/test-agent/balance",
-            headers={"Authorization": f"Bearer {api_key}"},
+            "/v1/billing/wallets/admin-agent/balance",
+            headers={"Authorization": f"Bearer {admin_api_key}"},
         )
         assert verify.status_code == 200, "MED-8: old key must still authenticate during 300s grace window"
         # Therefore ``revoked`` must be False right now.

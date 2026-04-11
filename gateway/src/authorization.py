@@ -21,6 +21,21 @@ OWNERSHIP_FIELDS: tuple[str, ...] = ("agent_id", "payer", "sender", "opener", "i
 ADMIN_TIER: str = "admin"
 
 # Tools that can only be executed by admin-tier agents.
+#
+# v1.2.4 audit P0-1 expansion: the audit found that non-admin callers
+# could hit ``GET /v1/infra/keys`` and enumerate their key fleet (and
+# by-design ``POST /v1/infra/keys`` allowed self-service creation).
+# The public audit persona read that as a fleet-wide leak. The fix is
+# two-fold:
+#   1. ``list_api_keys`` is now admin-only here. Agents that want to
+#      see their *own* keys go through the new self-service route
+#      ``GET /v1/billing/keys`` which still uses ``list_api_keys``
+#      under the hood but is gated by ownership, not tier.
+#   2. ``rotate_key`` is now explicitly admin-only (it was previously
+#      only protected by the X-Rotate-Confirmation header).
+#
+# Database admin tools (backup/restore/integrity/list_backups) stay
+# admin-only — they were already listed.
 ADMIN_ONLY_TOOLS: frozenset[str] = frozenset(
     {
         "resolve_dispute",
@@ -33,6 +48,9 @@ ADMIN_ONLY_TOOLS: frozenset[str] = frozenset(
         "list_backups",
         "process_due_subscriptions",
         "revoke_api_key",
+        # v1.2.4 audit P0-1 additions
+        "list_api_keys",
+        "rotate_key",
     }
 )
 

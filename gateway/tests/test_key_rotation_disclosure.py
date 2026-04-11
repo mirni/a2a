@@ -18,12 +18,26 @@ async def _create_agent(app, agent_id: str, tier: str = "free", balance: float =
     return key_info["key"]
 
 
+async def _create_admin_agent(app, agent_id: str, balance: float = 1000.0) -> str:
+    ctx = app.state.ctx
+    await ctx.tracker.wallet.create(agent_id, initial_balance=balance, signup_bonus=False)
+    key_info = await ctx.key_manager.create_key(
+        agent_id, tier="pro", scopes=["read", "write", "admin"]
+    )
+    return key_info["key"]
+
+
 class TestKeyRotationDisclosure:
-    """Key rotation must not disclose key state details."""
+    """Key rotation must not disclose key state details.
+
+    v1.2.4 audit P0-1: rotate_key is now admin-only; these tests use
+    admin-scoped keys so they exercise the success path rather than
+    getting rejected at the admin gate.
+    """
 
     async def test_rotate_invalid_key_generic_error(self, client, app):
         """Rotating a completely invalid key should return generic error."""
-        key = await _create_agent(app, "rot-agent")
+        key = await _create_admin_agent(app, "rot-agent-admin")
         resp = await client.post(
             "/v1/execute",
             json={"tool": "rotate_key", "params": {"current_key": "a2a_totally_invalid_key"}},
@@ -40,7 +54,7 @@ class TestKeyRotationDisclosure:
 
     async def test_rotate_valid_key_succeeds(self, client, app):
         """Rotating a valid key should work and return new key."""
-        key = await _create_agent(app, "rot-good")
+        key = await _create_admin_agent(app, "rot-good-admin")
         resp = await client.post(
             "/v1/execute",
             json={"tool": "rotate_key", "params": {"current_key": key}},

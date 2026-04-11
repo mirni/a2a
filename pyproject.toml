@@ -35,3 +35,6 @@ asyncio_mode = "auto"
 filterwarnings = [
     "ignore::DeprecationWarning:pkg_resources.*",
 ]
+markers = [
+    "slo: latency SLO gates (skipped by default locally, run in CI)",
+]
