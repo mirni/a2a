@@ -95,6 +95,7 @@ DEPLOY_TIMEOUT=600  # Max seconds to wait for deploy
 POLL_INTERVAL=15    # Seconds between status checks
 SKIP_CI=false
 SKIP_DEPLOY=false
+SKIP_PUBLISH=false
 PUBLISH=false
 PUBLISH_PYPI=false
 PUBLISH_NPM=false
@@ -117,6 +118,14 @@ Optional:
   --dry-run                Prepare release branch but don't push or deploy
   --skip-ci                Skip waiting for CI (deploy immediately)
   --skip-deploy            Create release branch but don't trigger deploy
+  --skip-publish           Do NOT create or push the v<version> tag at the
+                            end of the release. The deploy still happens and
+                            main still gets the release commit, but the
+                            publish.yml workflow is not triggered. Use this
+                            for the "deploy → external audit → publish"
+                            flow. After the audit passes, run
+                            scripts/publish.sh --version <x.y.z> to tag
+                            and publish.
   --publish                (deprecated — Docker Hub publish now runs in
                             .github/workflows/publish.yml on tag push; pass
                             --publish-docker for an emergency local override)
@@ -143,6 +152,7 @@ while [[ $# -gt 0 ]]; do
         --dry-run)      DRY_RUN=true;        shift   ;;
         --skip-ci)      SKIP_CI=true;        shift   ;;
         --skip-deploy)  SKIP_DEPLOY=true;    shift   ;;
+        --skip-publish) SKIP_PUBLISH=true;   shift   ;;
         --publish)      PUBLISH=true;        shift   ;;
         --publish-pypi) PUBLISH_PYPI=true;   shift   ;;
         --publish-npm)  PUBLISH_NPM=true;    shift   ;;
@@ -650,16 +660,23 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Step 10: Tag release
+# Step 10: Tag release (skipped when --skip-publish is set)
 # ---------------------------------------------------------------------------
 
-header "Step 10: Tag release"
+if [[ "$SKIP_PUBLISH" == true ]]; then
+    header "Step 10: Tag release — SKIPPED"
+    warn "--skip-publish set — not creating v${VERSION} tag."
+    warn "Publish workflow will NOT run. After external audit passes, run:"
+    warn "    scripts/publish.sh --version ${VERSION}"
+else
+    header "Step 10: Tag release"
 
-git -C "$REPO_ROOT" tag -a "v${VERSION}" -m "Release v${VERSION}" "$RELEASE_SHA"
-git -C "$REPO_ROOT" push origin "v${VERSION}"
-log "Created and pushed tag v${VERSION}"
-info "Tag v${VERSION} pushed — PyPI + npm publish triggered via GitHub Actions"
-info "Monitor: gh run list --workflow Publish --limit 1"
+    git -C "$REPO_ROOT" tag -a "v${VERSION}" -m "Release v${VERSION}" "$RELEASE_SHA"
+    git -C "$REPO_ROOT" push origin "v${VERSION}"
+    log "Created and pushed tag v${VERSION}"
+    info "Tag v${VERSION} pushed — PyPI + npm publish triggered via GitHub Actions"
+    info "Monitor: gh run list --workflow Publish --limit 1"
+fi
 
 # ---------------------------------------------------------------------------
 # Step 11: Update main with release
@@ -782,8 +799,13 @@ log "Component:  ${COMPONENT}"
 if [[ "$WANT_PUBLISH" == true ]]; then
     [[ "$PUBLISH_DOCKER" == true ]] && log "Published:  docker"
 fi
-log "SDK publish: PyPI + npm triggered via GitHub Actions (publish.yml)"
-log "Monitor:     gh run list --workflow Publish --limit 1"
+if [[ "$SKIP_PUBLISH" == true ]]; then
+    warn "SDK publish:  DEFERRED (--skip-publish) — no v${VERSION} tag created"
+    warn "              Run scripts/publish.sh --version ${VERSION} after audit"
+else
+    log "SDK publish: PyPI + npm + Docker triggered via GitHub Actions (publish.yml)"
+    log "Monitor:     gh run list --workflow Publish --limit 1"
+fi
 if (( ${PUBLISH_FAILURES:-0} > 0 )); then
     warn "Some publish targets failed — re-run with --skip-ci --skip-deploy --publish-docker"
 fi
@@ -793,5 +815,10 @@ fi
 echo ""
 info "Next steps:"
 info "  - Verify production: curl -sf https://api.greenhelix.net/v1/health"
-info "  - Verify SDK publish: gh run list --workflow Publish --limit 1"
+if [[ "$SKIP_PUBLISH" == true ]]; then
+    info "  - Run external audit against the deployed sandbox"
+    info "  - After audit passes: scripts/publish.sh --version ${VERSION}"
+else
+    info "  - Verify SDK publish: gh run list --workflow Publish --limit 1"
+fi
 echo ""
