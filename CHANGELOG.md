@@ -1,5 +1,39 @@
 # Changelog
 
+# Release v1.2.5
+
+**Date:** 2026-04-11
+**Commit:** 36f0083f
+**Previous:** v1.2.4
+
+## Changes
+
+### Bug Fixes
+
+- fix(audit-v1.2.4): P0 remediation — admin gate, 410, idempotency, budget, deposits, health SLO (#84) (`727ce85`)
+
+### Tests
+
+- test(audit-v1.2.4): P1 meta-tests — multi-tenant, route enum, sandbox parity, OpenAPI diff (#85) (`36f0083`)
+
+### Other
+
+- Merge release v1.2.4 into main (`99a0d78`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 1.2.5 |
+| a2a-db-backup | 1.2.5 |
+| a2a-gateway | 1.2.5 |
+| a2a-gateway-sandbox | 1.2.5 |
+| a2a-gateway-test | 1.2.5 |
+| a2a-litestream | 1.2.5 |
+| a2a-website | 1.2.5 |
+---
+
+
 # Release v1.2.4
 
 **Date:** 2026-04-11
