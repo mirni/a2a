@@ -38,6 +38,8 @@ from gateway.src.routes.v1.billing import router as billing_router
 from gateway.src.routes.v1.disputes import router as disputes_router
 from gateway.src.routes.v1.gatekeeper import router as gatekeeper_router
 from gateway.src.routes.v1.identity import router as identity_router
+from gateway.src.routes.v1.infra import _admin_router as infra_admin_router
+from gateway.src.routes.v1.infra import _legacy_router as infra_legacy_router
 from gateway.src.routes.v1.infra import router as infra_router
 from gateway.src.routes.v1.marketplace import router as marketplace_router
 from gateway.src.routes.v1.messaging import router as messaging_router
@@ -102,6 +104,13 @@ def create_app() -> FastAPI:
     app.include_router(disputes_router)
     app.include_router(payments_router)
     app.include_router(identity_router)
+    # Legacy 410 shims (no admin guard) must be included BEFORE any
+    # other /v1/infra router so FastAPI matches the exact deprecated
+    # path first and returns 410 Gone for any caller, regardless of
+    # tier. The admin router then guards key/backup/db/audit routes,
+    # and the public infra_router carries webhooks + events.
+    app.include_router(infra_legacy_router)
+    app.include_router(infra_admin_router)
     app.include_router(infra_router)
     app.include_router(marketplace_router)
     app.include_router(messaging_router)
