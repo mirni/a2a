@@ -1,5 +1,39 @@
 # Changelog
 
+# Release v1.2.7
+
+**Date:** 2026-04-11
+**Commit:** 4998530d
+**Previous:** v1.2.6
+
+## Changes
+
+### Bug Fixes
+
+- fix(ci): use per-package collaborators for NPM_TOKEN preflight (`01824f3`)
+
+### Chores
+
+- chore(sdk): drop @a2a/sdk alias — scope never registered (#88) (`4998530`)
+
+### Other
+
+- Merge release v1.2.6 into main (`e9cfcce`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 1.2.7 |
+| a2a-db-backup | 1.2.7 |
+| a2a-gateway | 1.2.7 |
+| a2a-gateway-sandbox | 1.2.7 |
+| a2a-gateway-test | 1.2.7 |
+| a2a-litestream | 1.2.7 |
+| a2a-website | 1.2.7 |
+---
+
+
 # Release v1.2.6
 
 **Date:** 2026-04-11
