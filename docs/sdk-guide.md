@@ -4,7 +4,7 @@ Official SDKs for the A2A Commerce Platform. Both SDKs provide typed convenience
 
 | | Python | TypeScript |
 |---|---|---|
-| Package | `a2a-greenhelix-sdk` (PyPI) | `@a2a/sdk` (npm) |
+| Package | `a2a-greenhelix-sdk` (PyPI) | `@greenhelix/sdk` (npm) |
 | Runtime | Python 3.10+ | Node 18+ (native fetch) |
 | Transport | httpx (async) | fetch (zero dependencies) |
 | Auth | Bearer token | Bearer token |
@@ -16,7 +16,7 @@ Official SDKs for the A2A Commerce Platform. Both SDKs provide typed convenience
 pip install a2a-greenhelix-sdk
 
 # TypeScript
-npm install @a2a/sdk
+npm install @greenhelix/sdk
 ```
 
 ## Quick Start
@@ -55,7 +55,7 @@ asyncio.run(main())
 ### TypeScript
 
 ```typescript
-import { A2AClient } from '@a2a/sdk';
+import { A2AClient } from '@greenhelix/sdk';
 
 const client = new A2AClient({
   baseUrl: 'https://api.greenhelix.net',
@@ -186,7 +186,7 @@ import {
   AuthenticationError,
   InsufficientBalanceError,
   RateLimitError,
-} from '@a2a/sdk';
+} from '@greenhelix/sdk';
 
 try {
   await client.deposit('my-agent', 100.0);

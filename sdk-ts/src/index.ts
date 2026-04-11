@@ -1,4 +1,4 @@
-/** @a2a/sdk — TypeScript SDK for the A2A Commerce Gateway. */
+/** @greenhelix/sdk — TypeScript SDK for the A2A Commerce Gateway. */
 
 export { A2AClient } from "./client";
 export {
