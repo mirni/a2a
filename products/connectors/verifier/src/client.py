@@ -57,10 +57,7 @@ class VerifierClient:
             raise ValueError("function_url must use HTTPS")
 
         if self.fallback_region is not None and self.fallback_region == self.region:
-            raise ValueError(
-                f"fallback_region must differ from primary region "
-                f"(both set to '{self.region}')"
-            )
+            raise ValueError(f"fallback_region must differ from primary region (both set to '{self.region}')")
 
         self._boto_client: Any = None
         self._fallback_boto_client: Any = None

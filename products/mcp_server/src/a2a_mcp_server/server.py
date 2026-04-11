@@ -43,9 +43,7 @@ def build_server(client: GatewayClient) -> Server:
         return tools
 
     @server.call_tool()
-    async def _call_tool(
-        name: str, arguments: dict[str, Any] | None
-    ) -> dict[str, Any] | list[TextContent]:
+    async def _call_tool(name: str, arguments: dict[str, Any] | None) -> dict[str, Any] | list[TextContent]:
         try:
             result = await client.invoke_tool(name, arguments or {})
         except GatewayError as exc:

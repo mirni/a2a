@@ -65,6 +65,7 @@ def _apply_deprecation_headers(response: JSONResponse) -> JSONResponse:
         response.headers["Link"] = f"{existing_link}, {_SUNSET_LINK}" if existing_link else _SUNSET_LINK
     return response
 
+
 # Allow tests to bypass the connector-only gate via env var.
 # Production does NOT set this. Will be removed once all tests migrate
 # to the dedicated REST endpoints.

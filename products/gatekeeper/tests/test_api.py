@@ -690,9 +690,7 @@ class TestConcurrentIdempotencyRace:
             return job.id
 
         job_id_1, job_id_2 = await asyncio.gather(_submit(), _submit())
-        assert job_id_1 == job_id_2, (
-            f"Concurrent submits with same idem key must converge: {job_id_1} vs {job_id_2}"
-        )
+        assert job_id_1 == job_id_2, f"Concurrent submits with same idem key must converge: {job_id_1} vs {job_id_2}"
 
         # Storage must contain exactly one job under this agent
         jobs = await api.list_verification_jobs("agent-race")

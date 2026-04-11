@@ -104,9 +104,7 @@ async def test_mcp_gatekeeper_tools_surface_pro_tier(mcp_gateway_client):
     paid = [t for t in tools if t.name in {"submit_verification", "get_verification_status"}]
     assert paid, "expected pro-tier gatekeeper tools in catalog"
     for tool in paid:
-        assert "pro" in tool.description.lower(), (
-            f"{tool.name} description missing pro tier hint: {tool.description!r}"
-        )
+        assert "pro" in tool.description.lower(), f"{tool.name} description missing pro tier hint: {tool.description!r}"
 
 
 @pytest.mark.asyncio

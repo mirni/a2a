@@ -67,12 +67,8 @@ async def test_observe_job_counts_by_tier_and_result():
 
 @pytest.mark.asyncio
 async def test_cost_credits_sum_per_tier_and_result():
-    await GatekeeperMetrics.observe_job(
-        tier="pro", result="satisfied", cost_credits=12.0, duration_ms=1, solver_ms=1
-    )
-    await GatekeeperMetrics.observe_job(
-        tier="pro", result="satisfied", cost_credits=18.0, duration_ms=1, solver_ms=1
-    )
+    await GatekeeperMetrics.observe_job(tier="pro", result="satisfied", cost_credits=12.0, duration_ms=1, solver_ms=1)
+    await GatekeeperMetrics.observe_job(tier="pro", result="satisfied", cost_credits=18.0, duration_ms=1, solver_ms=1)
     text = await GatekeeperMetrics.to_prometheus()
     # Sums are reported as floats, so string-match the full line.
     assert 'a2a_gatekeeper_cost_credits_sum{tier="pro",result="satisfied"} 30' in text
@@ -101,9 +97,7 @@ async def test_duration_histogram_exposes_buckets():
     # Bucket cumulative monotonicity sanity check: the +Inf bucket for
     # the pro/satisfied series must include both samples.
     for line in text.splitlines():
-        if line.startswith(
-            'a2a_gatekeeper_duration_ms_bucket{tier="pro",result="satisfied",le="+Inf"}'
-        ):
+        if line.startswith('a2a_gatekeeper_duration_ms_bucket{tier="pro",result="satisfied",le="+Inf"}'):
             value = int(line.split()[-1])
             assert value == 2, line
             break
@@ -114,9 +108,7 @@ async def test_duration_histogram_exposes_buckets():
 @pytest.mark.asyncio
 async def test_metrics_exposition_type_headers():
     """Every metric emits the required # HELP / # TYPE preamble."""
-    await GatekeeperMetrics.observe_job(
-        tier="free", result="error", cost_credits=0.0, duration_ms=10, solver_ms=0
-    )
+    await GatekeeperMetrics.observe_job(tier="free", result="error", cost_credits=0.0, duration_ms=10, solver_ms=0)
     text = await GatekeeperMetrics.to_prometheus()
     for metric in (
         "a2a_gatekeeper_jobs_total",
@@ -166,8 +158,7 @@ async def test_unknown_tier_falls_back_to_unknown_label():
 
 
 _JSON_POLICY_SAT = (
-    '{"name":"positive","variables":[{"name":"x","type":"int","value":5}],'
-    '"assertions":[{"op":">","args":["x",0]}]}'
+    '{"name":"positive","variables":[{"name":"x","type":"int","value":5}],"assertions":[{"op":">","args":["x",0]}]}'
 )
 
 
@@ -180,9 +171,7 @@ async def test_submit_verification_records_gatekeeper_metrics(client, pro_api_ke
         headers={"Authorization": f"Bearer {pro_api_key}"},
         json={
             "agent_id": "pro-agent",
-            "properties": [
-                {"name": "positive", "language": "json_policy", "expression": _JSON_POLICY_SAT}
-            ],
+            "properties": [{"name": "positive", "language": "json_policy", "expression": _JSON_POLICY_SAT}],
         },
     )
     assert resp.status_code in (200, 201), resp.text
@@ -200,9 +189,7 @@ async def test_gatekeeper_metrics_surface_in_metrics_endpoint(client, pro_api_ke
         headers={"Authorization": f"Bearer {pro_api_key}"},
         json={
             "agent_id": "pro-agent",
-            "properties": [
-                {"name": "positive", "language": "json_policy", "expression": _JSON_POLICY_SAT}
-            ],
+            "properties": [{"name": "positive", "language": "json_policy", "expression": _JSON_POLICY_SAT}],
         },
     )
     metrics_resp = await client.get("/v1/metrics")

@@ -130,15 +130,10 @@ class GatekeeperMetrics:
         for (tier, result), count in sorted(jobs_total.items()):
             lines.append(f'a2a_gatekeeper_jobs_total{{tier="{tier}",result="{result}"}} {count}')
 
-        lines.append(
-            "# HELP a2a_gatekeeper_cost_credits_sum Cumulative credits billed for gatekeeper jobs"
-        )
+        lines.append("# HELP a2a_gatekeeper_cost_credits_sum Cumulative credits billed for gatekeeper jobs")
         lines.append("# TYPE a2a_gatekeeper_cost_credits_sum counter")
         for (tier, result), total in sorted(cost_sum.items()):
-            lines.append(
-                f'a2a_gatekeeper_cost_credits_sum{{tier="{tier}",result="{result}"}} '
-                f"{_format_number(total)}"
-            )
+            lines.append(f'a2a_gatekeeper_cost_credits_sum{{tier="{tier}",result="{result}"}} {_format_number(total)}')
 
         # -- Histograms -----------------------------------------------------
         _emit_histogram(
@@ -207,19 +202,11 @@ def _emit_histogram(
         for bucket in _DURATION_BUCKETS_MS:
             lines.append(
                 f'{metric}_bucket{{tier="{tier}",result="{result}",le="{_format_bucket(bucket)}"}} '
-                f'{hist["buckets"][bucket]}'
+                f"{hist['buckets'][bucket]}"
             )
-        lines.append(
-            f'{metric}_bucket{{tier="{tier}",result="{result}",le="+Inf"}} '
-            f'{hist["inf"]}'
-        )
-        lines.append(
-            f'{metric}_count{{tier="{tier}",result="{result}"}} {hist["count"]}'
-        )
-        lines.append(
-            f'{metric}_sum{{tier="{tier}",result="{result}"}} '
-            f'{_format_number(hist["sum"])}'
-        )
+        lines.append(f'{metric}_bucket{{tier="{tier}",result="{result}",le="+Inf"}} {hist["inf"]}')
+        lines.append(f'{metric}_count{{tier="{tier}",result="{result}"}} {hist["count"]}')
+        lines.append(f'{metric}_sum{{tier="{tier}",result="{result}"}} {_format_number(hist["sum"])}')
 
 
 def _format_bucket(value: float) -> str:
