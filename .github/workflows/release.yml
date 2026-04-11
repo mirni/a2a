@@ -100,6 +100,14 @@ jobs:
       - name: Install dependencies
         run: scripts/ci/install_deps.sh --with-test
 
+      - name: Install z3-solver for gatekeeper metrics tests
+        # Gateway integration tests exercise MockVerifierClient → in-process
+        # Z3 when VERIFIER_AUTH_MODE is unset (default fallback). Without
+        # z3-solver the gatekeeper metrics route records "error" instead of
+        # "satisfied" and the histogram assertions fail. Must mirror the
+        # equivalent step in ci.yml so release and CI have the same deps.
+        run: pip install 'z3-solver==4.13.4.0'
+
       - name: Test server health
         run: ./check_server.sh
         continue-on-error: true
