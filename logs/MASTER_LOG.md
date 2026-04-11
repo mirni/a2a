@@ -7087,3 +7087,40 @@ run_name="__main__")` test for the `if __name__` guard. 52/52 pass.
 - `products/mcp_server/tests/test_cli.py` (new)
 - 8 pre-existing gateway test files updated for new contracts
 
+
+## 2026-04-11 — v1.2.4 audit P0+P1 + distribution + internal review (resumed session)
+
+Continued from compacted context. Scope: fix CI on PR #84 until green,
+land P1 meta-tests as daisy-chained PR #85, implement Sprint-1 distribution
+channels, do an internal audit review, and queue P2 follow-up items.
+
+**PR #84 (fix/v1.2.4-audit-p0)** — CI green after:
+- `01f5f31` sync website/docs.html 1.2.4→1.2.5
+- `65cdd16` cover `get_all_keys` admin fleet view to restore paywall coverage 99%
+CI run `24277522538` all jobs green; staging deploy completed OK.
+
+**PR #85 (fix/v1.2.4-audit-p1)** — daisy-chained off #84:
+- `bcf726e` T-1/T-2/T-3/T-5 meta-tests (multi-tenant fixture, route
+  enumeration contract, sandbox parity scaffolding, OpenAPI diff gate)
+- `027e295` distribution: /.well-known/* routes (llms.txt, llms-full.txt,
+  mcp.json, ai-plugin.json, agent-pricing.json, agents.json) +
+  docs/integrations/ MCP install recipes for 5 IDEs + ClawMart channel
+  entry in distribution-execution-queue.md under HOLD publishing gate
+- `6ba2d5e` internal-audit H1 remediation: split /v1/infra router into
+  _legacy (410 shim), _admin (keys/backups/db/audit with router-level
+  require_admin_tier dep), and public (webhooks/events). All 1681
+  gateway tests pass.
+- `5ebb89a` reports/internal-audit-v1.2.5.md + tasks/backlog/v1.2.4-audit-p2.md
+
+**Internal audit verdict**: GO. 4 MEDIUM + 3 LOW items deferred to a
+future fix/v1.2.5-audit-p2 PR (queued in tasks/backlog/v1.2.4-audit-p2.md).
+HIGH finding H1 resolved in-branch. No CRITICALs.
+
+**Human action queue**:
+- `tasks/backlog/sandbox-audit-keys.md` — provision 3 sandbox API keys
+  and 3 GitHub secrets so the sandbox-parity CI job can be flipped
+  from `continue-on-error: true` to required.
+- Review + merge PR #84 then PR #85.
+- Tag v1.2.5 after both merges land.
+- Do NOT publish to ClawMart / PyPI / npm until sandbox-parity is green.
+

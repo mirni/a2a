@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Header, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from gateway.src.deps.auth import require_admin_tier
 from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
 from gateway.src.errors import handle_product_exception
 from gateway.src.tools.infrastructure import (
@@ -30,6 +31,26 @@ from gateway.src.tools.infrastructure import (
     _test_webhook,
 )
 
+# v1.2.4 audit P0-1: three routers all mounted under ``/v1/infra``:
+#
+# * ``_legacy_router`` — 410 Gone deprecation shims (no auth guard,
+#   must be reachable by any caller so the audit personas see the
+#   deprecation banner instead of a misleading 403).
+# * ``_admin_router`` — key/backup/restore/audit-log surface with a
+#   router-level ``require_admin_tier`` belt-and-braces guard.
+#   ``require_tool()`` already enforces ``ADMIN_ONLY_TOOLS`` per
+#   handler, but wiring the dependency here guarantees every route
+#   under this router is admin-only even if a future author forgets
+#   the per-tool check.
+# * ``router`` — webhooks + events surface. These are pro-accessible
+#   by design (agents register their own webhooks / publish their
+#   own events), so per-tool enforcement is the only guard.
+_legacy_router = APIRouter(prefix="/v1/infra", tags=["infra"])
+_admin_router = APIRouter(
+    prefix="/v1/infra",
+    tags=["infra"],
+    dependencies=[Depends(require_admin_tier)],
+)
 router = APIRouter(prefix="/v1/infra", tags=["infra"])
 
 
@@ -120,7 +141,7 @@ _KEYS_SUNSET_DATE = "Sun, 01 Mar 2026 00:00:00 GMT"
 _KEYS_SUCCESSOR = '</v1/billing/keys>; rel="successor-version"'
 
 
-@router.post("/keys")
+@_legacy_router.post("/keys")
 async def create_api_key_deprecated(request: Request) -> JSONResponse:
     """Deprecated: self-service key creation moved to /v1/billing/keys."""
     from gateway.src.errors import error_response
@@ -138,7 +159,7 @@ async def create_api_key_deprecated(request: Request) -> JSONResponse:
     return resp
 
 
-@router.get("/keys")
+@_admin_router.get("/keys")
 async def list_api_keys(
     tc: ToolContext = Depends(require_tool("list_api_keys")),
 ):
@@ -160,7 +181,7 @@ async def list_api_keys(
     return await finalize_response(tc, result)
 
 
-@router.post("/keys/revoke")
+@_admin_router.post("/keys/revoke")
 async def revoke_api_key(
     body: RevokeApiKeyRequest,
     tc: ToolContext = Depends(require_tool("revoke_api_key")),
@@ -174,7 +195,7 @@ async def revoke_api_key(
     return await finalize_response(tc, result)
 
 
-@router.post("/keys/rotate")
+@_admin_router.post("/keys/rotate")
 async def rotate_key(
     body: RotateKeyRequest,
     x_rotate_confirmation: str | None = Header(default=None, alias="X-Rotate-Confirmation"),
@@ -370,7 +391,7 @@ async def get_events(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/audit-log")
+@_admin_router.get("/audit-log")
 async def get_global_audit_log(
     since: float | None = None,
     limit: int = 100,
@@ -387,7 +408,7 @@ async def get_global_audit_log(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/databases/backups")
+@_admin_router.get("/databases/backups")
 async def list_backups(
     tc: ToolContext = Depends(require_tool("list_backups")),
 ):
@@ -397,7 +418,7 @@ async def list_backups(
     return await finalize_response(tc, result)
 
 
-@router.post("/databases/{database}/backup")
+@_admin_router.post("/databases/{database}/backup")
 async def backup_database(
     database: str,
     body: BackupDatabaseRequest | None = None,
@@ -415,7 +436,7 @@ async def backup_database(
     return await finalize_response(tc, result)
 
 
-@router.post("/databases/{database}/restore")
+@_admin_router.post("/databases/{database}/restore")
 async def restore_database(
     database: str,
     body: RestoreDatabaseRequest,
@@ -439,7 +460,7 @@ async def restore_database(
     return await finalize_response(tc, result)
 
 
-@router.get("/databases/{database}/integrity")
+@_admin_router.get("/databases/{database}/integrity")
 async def check_db_integrity(
     database: str,
     tc: ToolContext = Depends(require_tool("check_db_integrity")),

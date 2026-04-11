@@ -112,3 +112,66 @@ async def admin_api_key(app, client):
     await ctx.tracker.wallet.create("admin-agent", initial_balance=5000.0, signup_bonus=False)
     key_info = await ctx.key_manager.create_key("admin-agent", tier="pro", scopes=["read", "write", "admin"])
     return key_info["key"]
+
+
+@pytest.fixture
+async def multi_tenant_keys(app, client):
+    """v1.2.4 audit P1 T-1: multi-tenant test fixture.
+
+    Provisions five distinct agents across three tiers with two
+    keys each to catch cross-tenant data bleed that a
+    single-agent-reused fixture silently allows. Security-adjacent
+    tests should prefer this fixture over ``api_key`` / ``pro_api_key``
+    when they exercise list/read endpoints that return per-agent
+    data, so an accidental missing ``WHERE agent_id = ?`` clause
+    fails loudly.
+
+    Returns a dict::
+
+        {
+            "free_a":  ("tenant-free-a", "<api-key>", "<api-key-2>"),
+            "free_b":  ("tenant-free-b", ...),
+            "pro_a":   ("tenant-pro-a",  ...),
+            "pro_b":   ("tenant-pro-b",  ...),
+            "admin":   ("tenant-admin",  ...),
+        }
+
+    Each agent gets a funded wallet (1000 credits) so that paid
+    tool paths don't false-negative on insufficient balance. The
+    admin agent's keys carry the ``admin`` scope so
+    ``authenticate()`` promotes their effective tier accordingly.
+    """
+    ctx = app.state.ctx
+    out: dict[str, tuple[str, str, str]] = {}
+
+    layout = [
+        ("free_a", "tenant-free-a", "free", None),
+        ("free_b", "tenant-free-b", "free", None),
+        ("pro_a", "tenant-pro-a", "pro", None),
+        ("pro_b", "tenant-pro-b", "pro", None),
+        ("admin", "tenant-admin", "pro", ["read", "write", "admin"]),
+    ]
+    for label, agent_id, tier, scopes in layout:
+        await ctx.tracker.wallet.create(agent_id, initial_balance=1000.0, signup_bonus=False)
+        k1 = await ctx.key_manager.create_key(agent_id, tier=tier, scopes=scopes)
+        k2 = await ctx.key_manager.create_key(agent_id, tier=tier, scopes=scopes)
+        out[label] = (agent_id, k1["key"], k2["key"])
+    return out
+
+
+def pytest_configure(config):
+    """Register project-local markers.
+
+    Without this, ``@pytest.mark.requires_multi_tenant`` raises a
+    ``PytestUnknownMarkWarning`` in strict mode. The marker is
+    purely documentary today — the sandbox-parity CI job can filter
+    on it later to run multi-tenant probes against the deploy.
+    """
+    config.addinivalue_line(
+        "markers",
+        "requires_multi_tenant: test needs the multi_tenant_keys fixture (not the single-agent api_key fixture)",
+    )
+    config.addinivalue_line(
+        "markers",
+        "slo: latency SLO gate (skipped locally, run in CI perf job)",
+    )

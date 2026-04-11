@@ -239,3 +239,47 @@ Cut any Sprint-2 or Sprint-3 integration whose 6-week install count is
 < 50. Reallocate effort to whatever is actually producing traffic.
 
 Track results in `reports/distribution-tracker.md` weekly.
+
+
+---
+
+# Prompt by human
+
+
+## New channels
+Add these distribution channels to the list:
+* https://www.shopclawmart.com/  (see docs/clawmart_how_to.txt)
+*
+
+---
+
+## Sprint 4 — New channels (2026-04-11)
+
+### [ ] A22. Publish to ClawMart (OpenClaw creator marketplace)
+**Reach:** unknown (new marketplace) · **Effort:** 0.5d · **ROI:** Medium
+
+**Setup reference:** `docs/clawmart_how_to.txt`
+
+**Deliverables:**
+- Author a `SKILL.md` at `integrations/clawmart/a2a-commerce-skill/SKILL.md`
+  teaching OpenClaw agents how to call the A2A Commerce Gateway
+  (payments, escrow, marketplace, identity). Use the template in
+  `docs/clawmart_how_to.txt` as the golden standard.
+- Add a `PERSONA.md` for a "Commerce Concierge" persona:
+  - `SOUL.md` — personality + tone
+  - `MEMORY.md` — the A2A Commerce API knowledge base
+- Publish via ClawMart API (`POST /listings` → `POST /listings/{id}/versions`)
+  using `CLAWMART_API_KEY` from `.env`. See the workflow section of
+  `clawmart_how_to.txt`.
+- Track in `reports/distribution-tracker.md` with listing URL and
+  download counts.
+
+**Acceptance:**
+- Skill is listed on ClawMart with a non-trivial description.
+- Persona package downloads cleanly via `GET /downloads/{slug}`.
+- Cross-tested from a fresh OpenClaw install: "Show my ClawMart
+  listings" returns the newly-published A2A Commerce skill.
+
+**Publishing gate:** HOLD — do not publish until the go/no-go
+decision from the open internal audit review. Once cleared, one
+PR implementing this task.
