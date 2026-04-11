@@ -141,12 +141,19 @@ def main(argv: list[str] | None = None) -> int:
         except FileNotFoundError as e:
             print(f"ERROR: {e}", file=sys.stderr)
             return 2
+        # Pretty-print relative to REPO_ROOT when the HTML lives inside
+        # the repo, fall back to the absolute path for staged copies
+        # (scripts/create_package.sh substitutes into /tmp staging dirs).
+        try:
+            display = html_path.relative_to(REPO_ROOT)
+        except ValueError:
+            display = html_path
         if changed:
             drift = True
             verb = "UPDATED" if args.write else "OUT OF SYNC"
-            print(f"  {verb}: {html_path.relative_to(REPO_ROOT)}")
+            print(f"  {verb}: {display}")
         else:
-            print(f"  OK:      {html_path.relative_to(REPO_ROOT)}")
+            print(f"  OK:      {display}")
 
     if args.check and drift:
         print(

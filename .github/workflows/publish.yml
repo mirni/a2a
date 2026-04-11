@@ -218,10 +218,56 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   # ---------------------------------------------------------------------------
+  # Publish Docker image to Docker Hub
+  #
+  # Until v1.2.6 the Docker image was pushed from the release engineer's
+  # laptop via ``scripts/release.sh --publish-docker`` because the token
+  # only existed in their ``.env``. That coupled releases to one
+  # machine and meant a tag landing on GitHub did not produce a Docker
+  # image unless someone remembered to run the local script. Moving the
+  # publish into CI uses the ``dockerhub`` environment (secret:
+  # ``DOCKER_DEPLOYMENT_TOKEN`` — a Docker Hub access token scoped to
+  # user ``greenhelix`` with read/write on ``greenhelix/a2a-gateway``)
+  # so every tag on ``v*`` ships an image automatically.
+  # ---------------------------------------------------------------------------
+  publish-docker:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: dockerhub
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.validate.outputs.version }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: greenhelix
+          password: ${{ secrets.DOCKER_DEPLOYMENT_TOKEN }}
+
+      - name: Build and push (linux/amd64 + linux/arm64)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            greenhelix/a2a-gateway:${{ needs.validate.outputs.version }}
+            greenhelix/a2a-gateway:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------------
   # Verify: install published packages from registries
   # ---------------------------------------------------------------------------
   verify:
-    needs: [validate, publish-pypi, publish-npm]
+    needs: [validate, publish-pypi, publish-npm, publish-docker]
     runs-on: ubuntu-latest
     steps:
       - name: Wait for registry propagation
@@ -251,3 +297,10 @@ jobs:
           npm init -y --silent
           npm install "@greenhelix/sdk@${VERSION}" --silent
           node -e "const { A2AClient } = require('@greenhelix/sdk'); console.log('npm: import OK')"
+
+      - name: Verify Docker image
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          docker pull "greenhelix/a2a-gateway:${VERSION}"
+          docker image inspect "greenhelix/a2a-gateway:${VERSION}" --format 'Docker: {{.Id}} OK'

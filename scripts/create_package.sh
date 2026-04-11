@@ -91,15 +91,6 @@ build_deb() {
 
     log "Building ${deb_name}.deb..."
 
-    # Website-specific: sync stats from catalog.json into HTML before packaging
-    if [[ "$pkg_name" == "a2a-website" ]]; then
-        if [[ -f "$REPO_ROOT/scripts/update_website_stats.py" ]]; then
-            log "  Syncing website stats from catalog.json..."
-            python3 "$REPO_ROOT/scripts/update_website_stats.py" --write || \
-                err "Failed to update website stats"
-        fi
-    fi
-
     # Create temporary staging directory
     local staging
     staging=$(mktemp -d)
@@ -114,6 +105,34 @@ build_deb() {
     # Copy opt/ with symlink dereferencing — resolves repo content symlinks
     if [[ -d "$pkg_src/opt" ]]; then
         cp -rL "$pkg_src/opt" "$dest/opt"
+    fi
+
+    # Website-specific: substitute catalog stats into the STAGED HTML.
+    #
+    # The source HTML files in website/*.html ship literal placeholders
+    # ({{TOTAL_TOOLS}}, {{NUM_SERVICES}}, {{VERSION}}) between the
+    # <!-- a2a:stats:KEY --> / <!-- /a2a:stats --> markers so that the
+    # tracked source never drifts when catalog.json or the gateway
+    # version bumps. update_website_stats.py --write performs the
+    # substitution at build time — pointed at the staging copy only —
+    # so the packaged .deb contains real values while the repo working
+    # tree stays untouched.
+    if [[ "$pkg_name" == "a2a-website" ]]; then
+        local staged_www="$dest/opt/a2a/website"
+        if [[ -f "$REPO_ROOT/scripts/update_website_stats.py" && -d "$staged_www" ]]; then
+            log "  Substituting website stats into staged HTML..."
+            local staged_html=()
+            while IFS= read -r -d '' f; do
+                staged_html+=("$f")
+            done < <(find "$staged_www" -maxdepth 1 -name '*.html' -type f -print0)
+
+            if (( ${#staged_html[@]} > 0 )); then
+                python3 "$REPO_ROOT/scripts/update_website_stats.py" \
+                    --write \
+                    --html "${staged_html[@]}" || \
+                    err "Failed to substitute website stats in staged HTML"
+            fi
+        fi
     fi
 
     # Copy etc/ (nginx configs, systemd units) preserving structure

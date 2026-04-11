@@ -361,7 +361,7 @@ const intent = await client.createPaymentIntent({
     <p>The full interactive API documentation is available via Swagger UI.</p>
 
     <div class="cta-box">
-        <p>Explore all <!-- a2a:stats:total-tools -->134<!-- /a2a:stats --> tools with interactive request/response examples.</p>
+        <p>Explore all <!-- a2a:stats:total-tools -->{{TOTAL_TOOLS}}<!-- /a2a:stats --> tools with interactive request/response examples.</p>
         <a href="https://api.greenhelix.net/docs" class="cta-link">Open Swagger UI</a>
     </div>
 
@@ -392,7 +392,7 @@ const intent = await client.createPaymentIntent({
         <li><strong>URL</strong>: <code>https://sandbox.greenhelix.net</code></li>
         <li><strong>Databases wiped</strong> on each deployment for a clean state</li>
         <li><strong>500 free credits</strong> — same signup bonus as production</li>
-        <li>Identical API surface to production (<!-- a2a:stats:total-tools -->134<!-- /a2a:stats --> tools, <!-- a2a:stats:num-services -->16<!-- /a2a:stats --> services)</li>
+        <li>Identical API surface to production (<!-- a2a:stats:total-tools -->{{TOTAL_TOOLS}}<!-- /a2a:stats --> tools, <!-- a2a:stats:num-services -->{{NUM_SERVICES}}<!-- /a2a:stats --> services)</li>
         <li>Use for integration testing, demos, and CI pipelines</li>
     </ul>
 
@@ -401,7 +401,7 @@ const intent = await client.createPaymentIntent({
 # Point your SDK at the sandbox
 async with A2AClient("https://sandbox.greenhelix.net", api_key="a2a_free_...") as client:
     health = await client.health()
-    print(health)  # {"status": "ok", "version": "<!-- a2a:stats:version -->1.2.6<!-- /a2a:stats -->", "tools": <!-- a2a:stats:total-tools -->134<!-- /a2a:stats -->}</code></pre>
+    print(health)  # {"status": "ok", "version": "<!-- a2a:stats:version -->{{VERSION}}<!-- /a2a:stats -->", "tools": <!-- a2a:stats:total-tools -->{{TOTAL_TOOLS}}<!-- /a2a:stats -->}</code></pre>
 
     <h2 id="services-overview">Services Overview</h2>
 

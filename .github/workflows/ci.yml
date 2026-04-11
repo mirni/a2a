@@ -72,8 +72,14 @@ jobs:
       - name: Dependency audit
         run: pip-audit -r requirements.txt
 
-      - name: Website stats in sync with catalog
-        run: python scripts/update_website_stats.py --check
+      # NOTE: the old "Website stats in sync with catalog" check was
+      # removed. website/*.html now ship literal placeholders
+      # ({{TOTAL_TOOLS}}, {{NUM_SERVICES}}, {{VERSION}}) between the
+      # <!-- a2a:stats:... --> markers and scripts/create_package.sh
+      # substitutes real values into a staged copy at package-build
+      # time — the source tree can't drift so there's nothing to
+      # check here. See the placeholder guardrail test in
+      # scripts/tests/test_update_website_stats.py.
 
   # ---------------------------------------------------------------------------
   # Test: gateway sharded across 3 parallel jobs × Python versions

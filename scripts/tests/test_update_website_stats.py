@@ -129,3 +129,61 @@ def test_update_html_file_missing_file_raises(tmp_path: Path) -> None:
     stats = mod.Stats(total_tools=128, num_services=15, per_service={})
     with pytest.raises(FileNotFoundError):
         mod.update_html_file(tmp_path / "missing.html", stats, write=False)
+
+
+# ---------------------------------------------------------------------------
+# Placeholder guardrail: website/*.html must ONLY contain literal placeholder
+# tokens between the <!-- a2a:stats:KEY --> markers. Real values are baked
+# in at package-build time by scripts/create_package.sh — if someone commits
+# a bare number back into the source the old drift problem returns.
+# ---------------------------------------------------------------------------
+
+import re  # noqa: E402
+
+_MARKER_RE = re.compile(
+    r"<!--\s*a2a:stats:([a-z-]+)\s*-->(.*?)<!--\s*/a2a:stats\s*-->",
+    re.DOTALL,
+)
+
+_EXPECTED_PLACEHOLDERS = {
+    "total-tools": "{{TOTAL_TOOLS}}",
+    "num-services": "{{NUM_SERVICES}}",
+    "version": "{{VERSION}}",
+}
+
+
+@pytest.mark.parametrize(
+    "html_path",
+    [
+        Path(__file__).parent.parent.parent / "website" / "index.html",
+        Path(__file__).parent.parent.parent / "website" / "docs.html",
+    ],
+    ids=["index.html", "docs.html"],
+)
+def test_source_html_contains_only_placeholders(html_path: Path) -> None:
+    """Committed website HTML must use placeholders, not real catalog values.
+
+    Enforces the build-time substitution contract: create_package.sh
+    swaps these placeholders for real catalog stats when building the
+    a2a-website .deb. If a stale commit lands a bare number here, the
+    package will still build correctly but we lose the "can't drift"
+    guarantee.
+    """
+    if not html_path.exists():
+        pytest.skip(f"{html_path} does not exist in this checkout")
+
+    text = html_path.read_text()
+    matches = _MARKER_RE.findall(text)
+    assert matches, f"No a2a:stats markers found in {html_path} — did the template change?"
+
+    for key, value in matches:
+        expected = _EXPECTED_PLACEHOLDERS.get(key)
+        assert expected is not None, (
+            f"{html_path}: unknown stats marker '{key}'. Add it to _EXPECTED_PLACEHOLDERS or fix the HTML."
+        )
+        assert value == expected, (
+            f"{html_path}: marker '{key}' must contain the literal "
+            f"placeholder {expected!r}, found {value!r}. "
+            f"Real values are substituted at package-build time — "
+            f"do not hand-edit the HTML."
+        )
