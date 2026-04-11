@@ -13,27 +13,46 @@ import pytest
 pytestmark = pytest.mark.asyncio
 
 
+# The request schema for ``POST /v1/payments/intents`` is defined in
+# ``gateway/src/routes/v1/payments.py::CreateIntentRequest`` with
+# ``extra="forbid"``. Required fields: ``payer``, ``payee``, ``amount``.
+# Anything else (e.g. ``destination_agent_id``) gets rejected with 422
+# *before* the idempotency dep runs, so we have to send a valid body
+# for the collision assertion to be meaningful.
+_ADMIN_PAYER = "audit-admin"
+_PAYEE_A = "audit-free"
+_PAYEE_B = "audit-pro"
+
+
 class TestSandboxIdempotencyCollision:
-    async def test_same_body_replays_same_response(self, sandbox_client, pro_key):
+    async def test_same_body_replays_same_response(self, sandbox_client, admin_key):
+        # Uses admin_key so the request reaches the idempotency layer
+        # regardless of wallet balance (pro-tier audit wallet is
+        # intentionally low-balance; see conftest).
         key = f"sandbox-audit-{uuid.uuid4()}"
-        body = {"amount": "0.01", "currency": "USD", "destination_agent_id": "sandbox-sink"}
+        body = {
+            "payer": _ADMIN_PAYER,
+            "payee": _PAYEE_A,
+            "amount": "0.01",
+            "description": "sandbox-parity same-body replay",
+        }
 
         first = await sandbox_client.post(
             "/v1/payments/intents",
             json=body,
             headers={
-                "Authorization": f"Bearer {pro_key}",
+                "Authorization": f"Bearer {admin_key}",
                 "Idempotency-Key": key,
             },
         )
-        # First call may succeed (200/201) or fail (402 etc) depending
-        # on sandbox wallet state — we don't care, only that the
-        # SECOND call returns the same status.
+        # First call may succeed (200/201) or fail (402/403) depending
+        # on sandbox state — we don't care, only that the SECOND call
+        # returns the same status (body-hash matches → cached response).
         second = await sandbox_client.post(
             "/v1/payments/intents",
             json=body,
             headers={
-                "Authorization": f"Bearer {pro_key}",
+                "Authorization": f"Bearer {admin_key}",
                 "Idempotency-Key": key,
             },
         )
@@ -41,14 +60,25 @@ class TestSandboxIdempotencyCollision:
             f"idempotent replay changed status: first={first.status_code}, second={second.status_code}"
         )
 
-    async def test_different_body_returns_409(self, sandbox_client, pro_key):
+    async def test_different_body_returns_409(self, sandbox_client, admin_key):
+        # Uses admin_key (enterprise tier, 999,999 credit balance)
+        # rather than pro_key because the pro-tier audit wallet is
+        # intentionally low-balance and returns 402 before reaching
+        # the idempotency check. Admin bypasses balance so we actually
+        # exercise the body-hash collision path (P0-4). The behaviour
+        # under test is gateway-wide and tier-independent.
         key = f"sandbox-audit-{uuid.uuid4()}"
 
         first = await sandbox_client.post(
             "/v1/payments/intents",
-            json={"amount": "0.01", "currency": "USD", "destination_agent_id": "sink-a"},
+            json={
+                "payer": _ADMIN_PAYER,
+                "payee": _PAYEE_A,
+                "amount": "0.01",
+                "description": "sandbox-parity collision A",
+            },
             headers={
-                "Authorization": f"Bearer {pro_key}",
+                "Authorization": f"Bearer {admin_key}",
                 "Idempotency-Key": key,
             },
         )
@@ -57,9 +87,14 @@ class TestSandboxIdempotencyCollision:
 
         collision = await sandbox_client.post(
             "/v1/payments/intents",
-            json={"amount": "99.99", "currency": "USD", "destination_agent_id": "sink-b"},
+            json={
+                "payer": _ADMIN_PAYER,
+                "payee": _PAYEE_B,
+                "amount": "99.99",
+                "description": "sandbox-parity collision B",
+            },
             headers={
-                "Authorization": f"Bearer {pro_key}",
+                "Authorization": f"Bearer {admin_key}",
                 "Idempotency-Key": key,
             },
         )
