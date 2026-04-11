@@ -30,9 +30,10 @@ _project_root = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-import gateway.src.bootstrap  # noqa: F401
 from a2a_mcp_server.gateway_client import GatewayClient
 from a2a_mcp_server.server import build_server
+
+import gateway.src.bootstrap  # noqa: F401
 from gateway.src.app import create_app
 from gateway.src.lifespan import lifespan
 
