@@ -1,5 +1,46 @@
 # Changelog
 
+# Release v1.2.4
+
+**Date:** 2026-04-11
+**Commit:** f8335335
+**Previous:** v1.2.1
+
+## Changes
+
+### Features
+
+- feat: P0/P1 arch remediation + CMO W1-2 + gatekeeper repricing (v1.2.4) (#82) (`f833533`)
+- feat(distribution): A1 — ship MCP server (Python + TS) + registry infra (#78) (`7c1795c`)
+
+### Bug Fixes
+
+- fix(audit-v1.2.2): remediate CRIT-1..4 + HIGH-1..8 for v1.2.3 (#81) (`78950a9`)
+- fix(gateway): annotate disputes schema migration for semgrep (#80) (`7fbcda8`)
+
+### Tests
+
+- fix(audit-v1.2.2): remediate CRIT-1..4 + HIGH-1..8 for v1.2.3 (#81) (`78950a9`)
+
+### Other
+
+- v1.2.2: audit remediation + Gatekeeper JSON policy DSL (#79) (`f3902fd`)
+- Merge release v1.2.1 into main (`1c59086`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 1.2.4 |
+| a2a-db-backup | 1.2.4 |
+| a2a-gateway | 1.2.4 |
+| a2a-gateway-sandbox | 1.2.4 |
+| a2a-gateway-test | 1.2.4 |
+| a2a-litestream | 1.2.4 |
+| a2a-website | 1.2.4 |
+---
+
+
 # Release v1.2.3
 
 **Date:** 2026-04-10
