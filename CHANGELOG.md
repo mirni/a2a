@@ -1,5 +1,35 @@
 # Changelog
 
+# Release v1.2.8
+
+**Date:** 2026-04-11
+**Commit:** baf387e7
+**Previous:** v1.2.7
+
+## Changes
+
+### Features
+
+- feat(release): CI Docker publish + decouple deploy/publish + website stats placeholders (#89) (`baf387e`)
+
+### Other
+
+- Merge release v1.2.7 into main (`6018a19`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 1.2.8 |
+| a2a-db-backup | 1.2.8 |
+| a2a-gateway | 1.2.8 |
+| a2a-gateway-sandbox | 1.2.8 |
+| a2a-gateway-test | 1.2.8 |
+| a2a-litestream | 1.2.8 |
+| a2a-website | 1.2.8 |
+---
+
+
 # Release v1.2.7
 
 **Date:** 2026-04-11
