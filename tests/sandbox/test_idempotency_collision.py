@@ -41,14 +41,20 @@ class TestSandboxIdempotencyCollision:
             f"idempotent replay changed status: first={first.status_code}, second={second.status_code}"
         )
 
-    async def test_different_body_returns_409(self, sandbox_client, pro_key):
+    async def test_different_body_returns_409(self, sandbox_client, admin_key):
+        # Uses admin_key (enterprise tier, 999,999 credit balance) rather
+        # than pro_key because the pro-tier audit wallet is intentionally
+        # low-balance and returns 402 before reaching the idempotency
+        # check. Admin bypasses balance so we actually exercise the
+        # body-hash collision path (P0-4). The *behaviour* we're
+        # verifying is gateway-wide and tier-independent.
         key = f"sandbox-audit-{uuid.uuid4()}"
 
         first = await sandbox_client.post(
             "/v1/payments/intents",
             json={"amount": "0.01", "currency": "USD", "destination_agent_id": "sink-a"},
             headers={
-                "Authorization": f"Bearer {pro_key}",
+                "Authorization": f"Bearer {admin_key}",
                 "Idempotency-Key": key,
             },
         )
@@ -59,7 +65,7 @@ class TestSandboxIdempotencyCollision:
             "/v1/payments/intents",
             json={"amount": "99.99", "currency": "USD", "destination_agent_id": "sink-b"},
             headers={
-                "Authorization": f"Bearer {pro_key}",
+                "Authorization": f"Bearer {admin_key}",
                 "Idempotency-Key": key,
             },
         )
