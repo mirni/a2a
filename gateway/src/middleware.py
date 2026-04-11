@@ -767,29 +767,29 @@ class EncodedPathRejectionMiddleware:
             if (path.startswith("/v1") or raw_path.startswith(b"/v1")) and any(
                 enc in raw_path for enc in _ENCODED_PATH_SEPARATORS
             ):
-                    body = json.dumps(
-                        {
-                            "type": "https://api.greenhelix.net/errors/encoded-path-separator",
-                            "title": "Bad Request",
-                            "status": 400,
-                            "detail": (
-                                "Encoded path separator (%2F, %2f, %5C, %5c) is "
-                                "not allowed in /v1/ routes. Use literal '/' "
-                                "in the request path."
-                            ),
-                            "instance": path,
-                        }
-                    ).encode()
-                    await send(
-                        {
-                            "type": "http.response.start",
-                            "status": 400,
-                            "headers": [
-                                (b"content-type", b"application/problem+json"),
-                                (b"content-length", str(len(body)).encode()),
-                            ],
-                        }
-                    )
-                    await send({"type": "http.response.body", "body": body})
-                    return
+                body = json.dumps(
+                    {
+                        "type": "https://api.greenhelix.net/errors/encoded-path-separator",
+                        "title": "Bad Request",
+                        "status": 400,
+                        "detail": (
+                            "Encoded path separator (%2F, %2f, %5C, %5c) is "
+                            "not allowed in /v1/ routes. Use literal '/' "
+                            "in the request path."
+                        ),
+                        "instance": path,
+                    }
+                ).encode()
+                await send(
+                    {
+                        "type": "http.response.start",
+                        "status": 400,
+                        "headers": [
+                            (b"content-type", b"application/problem+json"),
+                            (b"content-length", str(len(body)).encode()),
+                        ],
+                    }
+                )
+                await send({"type": "http.response.body", "body": body})
+                return
         await self.app(scope, receive, send)
