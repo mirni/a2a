@@ -92,3 +92,58 @@ async def test_410_rfc9457_format(client, api_key):
     assert body["status"] == 410
     assert "type" in body
     assert "tool-moved" in body["type"]
+
+
+# ---------------------------------------------------------------------------
+# RFC 8594 Sunset header (v1.2.4 P1: arch audit)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_410_includes_sunset_header(client, api_key):
+    """RFC 8594: Sunset header on deprecated endpoint (IMF-fixdate format)."""
+    from email.utils import parsedate_to_datetime
+
+    resp = await client.post(
+        "/v1/execute",
+        json={"tool": "get_balance", "params": {"agent_id": "test-agent"}},
+        headers={"X-API-Key": api_key},
+    )
+    assert resp.status_code == 410
+    sunset = resp.headers.get("sunset")
+    assert sunset is not None, "Sunset header must be set per RFC 8594"
+    # IMF-fixdate: "Thu, 01 Oct 2026 00:00:00 GMT"
+    parsed = parsedate_to_datetime(sunset)
+    assert parsed is not None
+    assert sunset.endswith("GMT"), f"Sunset must be IMF-fixdate GMT, got: {sunset}"
+
+
+@pytest.mark.asyncio
+async def test_410_includes_sunset_link_header(client, api_key):
+    """RFC 8594 §3: Link header with rel=sunset pointing to deprecation doc."""
+    resp = await client.post(
+        "/v1/execute",
+        json={"tool": "get_balance", "params": {"agent_id": "test-agent"}},
+        headers={"X-API-Key": api_key},
+    )
+    assert resp.status_code == 410
+    link = resp.headers.get("link", "")
+    assert 'rel="sunset"' in link, f"Link header must include rel=sunset, got: {link}"
+
+
+@pytest.mark.asyncio
+async def test_connector_success_includes_sunset_header(client, api_key):
+    """Sunset header is also set on the 200/error path for connector tools."""
+    from email.utils import parsedate_to_datetime
+
+    resp = await client.post(
+        "/v1/execute",
+        json={"tool": "stripe_list_customers", "params": {}},
+        headers={"X-API-Key": api_key},
+    )
+    # Connector tools pass the gate — status may be anything except 410.
+    assert resp.status_code != 410
+    sunset = resp.headers.get("sunset")
+    assert sunset is not None, "Sunset header must be set on all /v1/execute responses"
+    parsed = parsedate_to_datetime(sunset)
+    assert parsed is not None

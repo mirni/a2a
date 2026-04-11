@@ -393,11 +393,11 @@ class TestRefundBalanceConservation:
     """H-NEW: create→capture→refund via REST must conserve balance exactly."""
 
     async def test_rest_refund_no_balance_drift(self, client, app):
-        """After create→capture→refund, payer loses only the gateway fee.
+        """After create→capture→refund, payer ends up exactly where it started.
 
-        H-REF: The gateway fee (2% of intent amount, clamped [0.01, 5.0]) is a
-        non-refundable one-time service charge.  Refund restores the intent
-        amount only — the payer ends up at (start - gateway_fee).
+        v1.2.4 (audit v1.2.3 HIGH-2 / ADR-012, supersedes ADR-011): a full
+        refund restores the intent amount **and** credits the gateway fee
+        back to the payer. A round-trip is balance-neutral.
         """
         payer_key = await _create_agent_key(app, "drift-payer", balance=1000.0)
         await _create_agent_key(app, "drift-payee", balance=0.0)
@@ -413,7 +413,6 @@ class TestRefundBalanceConservation:
         )
         assert resp.status_code == 201
         intent_id = resp.json()["id"]
-        gateway_fee = float(resp.json().get("gateway_fee", "0"))
 
         # Capture
         resp = await client.post(
@@ -428,13 +427,15 @@ class TestRefundBalanceConservation:
             headers={"Authorization": f"Bearer {payer_key}"},
         )
         assert resp.status_code == 200
+        refund_body = resp.json()
+        assert refund_body.get("fee_refunded") is True
 
         balance_after = await ctx.tracker.get_balance("drift-payer")
 
-        # Payer should be down by exactly the non-refundable gateway fee
-        assert balance_after == balance_before - gateway_fee, (
+        # v1.2.4: full refund returns the customer whole — no drift at all.
+        assert balance_after == balance_before, (
             f"Balance drift: started at {balance_before}, ended at {balance_after} "
-            f"(delta={balance_after - balance_before}, gateway_fee={gateway_fee})"
+            f"(delta={balance_after - balance_before})"
         )
 
     async def test_x_charged_header_matches_percentage_fee(self, client, app):

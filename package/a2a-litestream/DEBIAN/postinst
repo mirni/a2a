@@ -1,0 +1,33 @@
+#!/bin/sh
+# Post-install: enable litestream systemd unit, validate config.
+set -e
+
+case "$1" in
+    configure)
+        # Reload systemd units and enable the service.
+        systemctl daemon-reload || true
+        systemctl enable litestream-a2a.service >/dev/null 2>&1 || true
+
+        # Do NOT start automatically — operator must configure
+        # AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / LITESTREAM_BUCKET
+        # in /etc/default/litestream-a2a before starting.
+        if [ ! -f /etc/default/litestream-a2a ]; then
+            cat > /etc/default/litestream-a2a <<'EOF'
+# Litestream A2A replication config.
+# Populate before starting: systemctl start litestream-a2a
+# Never check this file into git.
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_REGION=us-east-1
+LITESTREAM_BUCKET=a2a-litestream-prod
+EOF
+            chmod 600 /etc/default/litestream-a2a
+            chown root:root /etc/default/litestream-a2a
+        fi
+
+        echo "a2a-litestream installed."
+        echo "Next: edit /etc/default/litestream-a2a, then: systemctl start litestream-a2a"
+        ;;
+esac
+
+exit 0

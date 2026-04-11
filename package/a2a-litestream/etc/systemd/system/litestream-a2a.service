@@ -1,0 +1,28 @@
+[Unit]
+Description=Litestream continuous replication for A2A databases
+Documentation=file:///usr/share/doc/a2a-litestream/LITESTREAM_SETUP.md
+After=network-online.target a2a-gateway.service
+Wants=network-online.target
+# If the gateway dies, keep replicating — we still want WAL drained to S3.
+
+[Service]
+Type=exec
+User=a2a
+Group=a2a
+EnvironmentFile=/etc/default/litestream-a2a
+ExecStart=/usr/bin/litestream replicate -config /etc/litestream/litestream-a2a.yml
+Restart=always
+RestartSec=5
+# Allow the process to read /var/lib/a2a and write the internal
+# .litestream shadow dirs. ProtectSystem=strict leaves /var writable.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadOnlyPaths=/etc/litestream
+ReadWritePaths=/var/lib/a2a
+PrivateTmp=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

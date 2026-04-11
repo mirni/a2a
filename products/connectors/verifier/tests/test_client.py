@@ -277,6 +277,8 @@ class TestDefaults:
         assert client.function_name == "z3-verifier"
         assert client.region == "us-east-1"
         assert client.auth_mode == "iam"
+        # v1.2.4 P1: fallback region is opt-in; default is no fallback.
+        assert client.fallback_region is None
 
     def test_env_override(self, monkeypatch):
         monkeypatch.setenv("VERIFIER_LAMBDA_FUNCTION", "custom-fn")
@@ -287,3 +289,174 @@ class TestDefaults:
         assert client.function_name == "custom-fn"
         assert client.region == "eu-west-1"
         assert client.auth_mode == "shared_secret"
+
+
+# ---------------------------------------------------------------------------
+# Multi-region failover (v1.2.4 P1: arch audit)
+# ---------------------------------------------------------------------------
+
+
+class TestMultiRegionFailover:
+    """Multi-region failover for IAM-mode Lambda invoke.
+
+    When ``VERIFIER_LAMBDA_FALLBACK_REGION`` is set (or ``fallback_region`` is
+    passed to the constructor), a failed primary invoke triggers a single
+    retry in the fallback region with a freshly created boto3 client. This
+    hedges against regional Lambda outages without requiring client-side
+    orchestration.
+    """
+
+    def test_fallback_region_from_env(self, monkeypatch):
+        monkeypatch.setenv("VERIFIER_LAMBDA_FALLBACK_REGION", "us-west-2")
+        client = VerifierClient(auth_mode="iam", region="us-east-1")
+        assert client.fallback_region == "us-west-2"
+
+    def test_fallback_region_from_constructor(self):
+        client = VerifierClient(
+            auth_mode="iam",
+            region="us-east-1",
+            fallback_region="us-west-2",
+        )
+        assert client.fallback_region == "us-west-2"
+
+    def test_fallback_same_as_primary_rejected(self):
+        """Defensive: fallback region equal to primary is a config error."""
+        with pytest.raises(ValueError, match="fallback_region must differ"):
+            VerifierClient(
+                auth_mode="iam",
+                region="us-east-1",
+                fallback_region="us-east-1",
+            )
+
+    @pytest.mark.asyncio
+    async def test_no_fallback_propagates_primary_error(self):
+        """Without fallback config, primary errors propagate unchanged."""
+        client = VerifierClient(auth_mode="iam", region="us-east-1")
+
+        mock_boto = MagicMock()
+        mock_boto.invoke.side_effect = RuntimeError("boom")
+        client._boto_client = mock_boto
+
+        with pytest.raises(RuntimeError, match="boom"):
+            await client.invoke({"job_id": "vj-test", "properties": []})
+        assert mock_boto.invoke.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_fallback_not_used_when_primary_succeeds(self):
+        """Fallback client is never constructed on primary success."""
+        client = VerifierClient(
+            auth_mode="iam",
+            region="us-east-1",
+            fallback_region="us-west-2",
+        )
+
+        payload = MagicMock()
+        payload.read.return_value = json.dumps({"result": "satisfied"}).encode()
+        mock_primary = MagicMock()
+        mock_primary.invoke.return_value = {"Payload": payload, "StatusCode": 200}
+        client._boto_client = mock_primary
+
+        # Stub ensure_fallback so any lazy construction raises loudly.
+        def _fail():
+            raise AssertionError("fallback client must not be constructed on primary success")
+
+        client._ensure_fallback_boto_client = _fail  # type: ignore[method-assign]
+
+        result = await client.invoke({"job_id": "vj-test", "properties": []})
+        assert result["result"] == "satisfied"
+        assert mock_primary.invoke.call_count == 1
+        assert client._fallback_boto_client is None
+
+    @pytest.mark.asyncio
+    async def test_fallback_region_invoked_on_primary_error(self):
+        """Primary raises → fallback region retried → success returned."""
+        client = VerifierClient(
+            auth_mode="iam",
+            region="us-east-1",
+            fallback_region="us-west-2",
+        )
+
+        mock_primary = MagicMock()
+        mock_primary.invoke.side_effect = RuntimeError("primary region down")
+        client._boto_client = mock_primary
+
+        # Pre-seed fallback client (equivalent to what _ensure_fallback_boto_client
+        # would lazily create via boto3.client("lambda", region_name="us-west-2")).
+        payload = MagicMock()
+        payload.read.return_value = json.dumps({"result": "satisfied"}).encode()
+        mock_fallback = MagicMock()
+        mock_fallback.invoke.return_value = {"Payload": payload, "StatusCode": 200}
+        client._fallback_boto_client = mock_fallback
+
+        result = await client.invoke({"job_id": "vj-test", "properties": []})
+        assert result["result"] == "satisfied"
+        assert mock_primary.invoke.call_count == 1
+        assert mock_fallback.invoke.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_fallback_region_failure_raises_fallback_error(self):
+        """Both regions fail → error from fallback region is raised."""
+        client = VerifierClient(
+            auth_mode="iam",
+            region="us-east-1",
+            fallback_region="us-west-2",
+        )
+
+        mock_primary = MagicMock()
+        mock_primary.invoke.side_effect = RuntimeError("primary region down")
+        client._boto_client = mock_primary
+
+        mock_fallback = MagicMock()
+        mock_fallback.invoke.side_effect = RuntimeError("fallback region also down")
+        client._fallback_boto_client = mock_fallback
+
+        with pytest.raises(RuntimeError, match="fallback region also down"):
+            await client.invoke({"job_id": "vj-test", "properties": []})
+        assert mock_primary.invoke.call_count == 1
+        assert mock_fallback.invoke.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_fallback_retries_only_once(self):
+        """Fallback region is retried at most once (no infinite loop)."""
+        client = VerifierClient(
+            auth_mode="iam",
+            region="us-east-1",
+            fallback_region="us-west-2",
+        )
+
+        mock_primary = MagicMock()
+        mock_primary.invoke.side_effect = RuntimeError("down")
+        client._boto_client = mock_primary
+
+        mock_fallback = MagicMock()
+        mock_fallback.invoke.side_effect = RuntimeError("also down")
+        client._fallback_boto_client = mock_fallback
+
+        with pytest.raises(RuntimeError):
+            await client.invoke({"job_id": "vj-test", "properties": []})
+        assert mock_primary.invoke.call_count == 1
+        assert mock_fallback.invoke.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_fallback_ignored_in_shared_secret_mode(self):
+        """Fallback only applies to IAM mode; HTTP path is unchanged."""
+        client = VerifierClient(
+            auth_mode="shared_secret",
+            function_url="https://test.lambda-url.on.aws/",
+            fallback_region="us-west-2",
+        )
+        # Fallback is stored but HTTP invoke path never consults it.
+        assert client.fallback_region == "us-west-2"
+
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        mock_response.text = "boom"
+
+        mock_http = AsyncMock()
+        mock_http.post = AsyncMock(return_value=mock_response)
+        client._http_client = mock_http
+
+        with pytest.raises(VerifierError, match="Verifier returned 500"):
+            await client.invoke({"job_id": "vj-test"})
+        # No retry — HTTP path does exactly one POST.
+        assert mock_http.post.call_count == 1

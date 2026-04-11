@@ -33,23 +33,23 @@ async def _create_intent(client, api_key, payer: str, payee: str, amount: float)
 
 
 async def test_capture_refund_round_trip_restores_payer_balance(client, api_key, app):
-    """Audit C4 + H-REF: capture then refund returns the intent amount only.
+    """Audit C4 + v1.2.4 HIGH-2: capture then refund returns customer whole.
 
-    The gateway fee (charged at create_intent time) is non-refundable — it is
-    a one-time service charge.  Refund restores only the captured amount.
+    v1.2.4 (audit v1.2.3 HIGH-2 / ADR-012, supersedes ADR-011): a full refund
+    restores the intent amount **and** credits the gateway fee back to the
+    payer. A round-trip create→capture→refund is balance-neutral.
 
     Prior bug (C4): refund returned 200 voided without moving funds.
-    Prior bug (H-REF): refund double-credited the gateway fee, causing drift.
+    Prior bug (H-REF): refund double-credited the gateway fee.
     """
     ctx = app.state.ctx
     await _ensure_wallet(ctx, "c4-payee", 0.0)
 
-    intent_id = await _create_intent(client, api_key, "test-agent", "c4-payee", 25.0)
-
-    # Measure balances AFTER create_intent (gateway fee already deducted)
-    # and BEFORE capture.
+    # Measure balance BEFORE create_intent — a full refund must restore it.
     payer_before = await ctx.tracker.get_balance("test-agent")
     payee_before = await ctx.tracker.get_balance("c4-payee")
+
+    intent_id = await _create_intent(client, api_key, "test-agent", "c4-payee", 25.0)
 
     capture_resp = await client.post(
         "/v1/execute",
@@ -69,7 +69,7 @@ async def test_capture_refund_round_trip_restores_payer_balance(client, api_key,
     payer_after = await ctx.tracker.get_balance("test-agent")
     payee_after = await ctx.tracker.get_balance("c4-payee")
 
-    # Payer is restored to pre-capture balance (gateway fee is non-refundable)
+    # v1.2.4: full refund returns the customer whole — including the fee.
     assert payer_after == payer_before
     assert payee_after == payee_before
 

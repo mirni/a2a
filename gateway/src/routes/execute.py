@@ -34,6 +34,38 @@ logger = logging.getLogger("a2a.execute")
 # Connector tools that still require /v1/execute (no REST equivalent yet)
 _CONNECTOR_TOOLS: frozenset[str] = frozenset(STRIPE_MCP_TOOLS + GITHUB_MCP_TOOLS + POSTGRES_MCP_TOOLS)
 
+# RFC 8594: /v1/execute is deprecated in favor of dedicated REST routers.
+# The Sunset date is the scheduled removal date (IMF-fixdate / RFC 7231).
+# The Link header points to the deprecation notice. Both are attached to
+# every response from this router — success, error, and the 410 moved path.
+_SUNSET_DATE = "Thu, 01 Oct 2026 00:00:00 GMT"
+_SUNSET_LINK = '</docs/api-reference.md#deprecation-v1-execute>; rel="sunset"; type="text/markdown"'
+
+
+def _deprecation_headers() -> dict[str, str]:
+    """Return RFC 8594 deprecation headers attached to every /v1/execute response."""
+    return {
+        "Deprecation": "true",
+        "Sunset": _SUNSET_DATE,
+        "Link": _SUNSET_LINK,
+    }
+
+
+def _apply_deprecation_headers(response: JSONResponse) -> JSONResponse:
+    """Attach RFC 8594 deprecation headers to any response leaving /v1/execute.
+
+    Idempotent: re-applying does not duplicate Link entries because
+    dict-style assignment replaces rather than appends. Preserves any
+    existing Link value by concatenating per RFC 8288.
+    """
+    response.headers["Deprecation"] = "true"
+    response.headers["Sunset"] = _SUNSET_DATE
+    existing_link = response.headers.get("link", "")
+    if _SUNSET_LINK not in existing_link:
+        response.headers["Link"] = f"{existing_link}, {_SUNSET_LINK}" if existing_link else _SUNSET_LINK
+    return response
+
+
 # Allow tests to bypass the connector-only gate via env var.
 # Production does NOT set this. Will be removed once all tests migrate
 # to the dedicated REST endpoints.
@@ -205,7 +237,16 @@ async def _try_x402_payment(
 
 @router.post("/v1/execute")
 async def execute(request: Request) -> JSONResponse:
-    """Execute a tool with authentication, tier checks, rate limiting, and billing."""
+    """Execute a tool. Wraps the real implementation so EVERY response
+    — success, 410 moved, 4xx, 5xx — carries RFC 8594 deprecation
+    headers (Deprecation + Sunset + Link rel=sunset).
+    """
+    response = await _execute_impl(request)
+    return _apply_deprecation_headers(response)
+
+
+async def _execute_impl(request: Request) -> JSONResponse:
+    """Actual /v1/execute implementation."""
     _start_time = time.time()
 
     # --- Parse body ---
@@ -257,7 +298,8 @@ async def execute(request: Request) -> JSONResponse:
             "tool_moved",
             request=request,
         )
-        resp.headers["Deprecation"] = "true"
+        # RFC 8594 deprecation headers (Sunset + Link + Deprecation).
+        resp.headers.update(_deprecation_headers())
         return resp
 
     # --- 2. Extract + validate API key (with x402 fallback) ---
@@ -532,7 +574,11 @@ async def execute(request: Request) -> JSONResponse:
     await Metrics.record_latency(elapsed_ms)
 
     # --- 9. Return result ---
-    headers: dict[str, str] = {"Deprecation": "true"}
+    # RFC 8594 deprecation headers (Deprecation + Sunset + Link) on every
+    # successful response. Note: the Link header is appended to below when
+    # cursor-based pagination is in effect; multiple rel values are fine
+    # on a single Link header per RFC 8288.
+    headers: dict[str, str] = dict(_deprecation_headers())
     if correlation_id:
         headers["X-Request-ID"] = correlation_id
 
@@ -588,12 +634,16 @@ async def execute(request: Request) -> JSONResponse:
         if resource_id:
             headers["Location"] = tpl.format(id=resource_id, escrow_id=resource_id, org_id=resource_id)
 
-    # Add Link header for cursor-based pagination when has_more is true
+    # Add Link header for cursor-based pagination when has_more is true.
+    # Appended to the existing sunset Link entry (RFC 8288: multiple
+    # rel values separated by commas).
     if isinstance(result, dict) and result.get("has_more") and result.get("next_cursor"):
         cursor = result["next_cursor"]
         limit = result.get("limit", 50)
         link_url = f"/v1/execute?cursor={cursor}&limit={limit}"
-        headers["Link"] = f'<{link_url}>; rel="next"'
+        pagination_link = f'<{link_url}>; rel="next"'
+        existing_link = headers.get("Link", "")
+        headers["Link"] = f"{existing_link}, {pagination_link}" if existing_link else pagination_link
 
     # Sign response if signing manager available
     signing_manager = getattr(request.app.state, "signing_manager", None)

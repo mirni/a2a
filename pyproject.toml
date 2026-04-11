@@ -1,0 +1,37 @@
+# Root pytest configuration for the monorepo.
+#
+# Why this file exists:
+#   Each product (billing, paywall, payments, identity, ...) has its own
+#   `tests/conftest.py`. When pytest is invoked at the monorepo root to
+#   collect tests from multiple products in one run (e.g.
+#   `pytest products/paywall/tests products/payments/tests`), the default
+#   "prepend" import mode causes an ImportPathMismatchError because both
+#   conftest files register under the module name `tests.conftest`.
+#
+#   Switching to `importlib` mode gives each test file a unique dotted
+#   module name based on its full path, so multiple products can share
+#   the `tests/conftest.py` name without colliding.
+#
+#   Reference: https://docs.pytest.org/en/stable/explanation/goodpractices.html
+#
+# This file intentionally does NOT declare a `[project]` table — the
+# monorepo has no top-level package; each product has its own
+# pyproject.toml.
+#
+# Known remaining limitation:
+#   Each product's `tests/conftest.py` bootstraps `src.*` imports assuming
+#   pytest is invoked from that product's directory. Running a
+#   truly-cross-product single pytest invocation still fails on the second
+#   product because `sys.modules['src']` is already bound to the first
+#   product's `src/`. The importlib mode below removes the conftest-path
+#   collision but does not rewrite product bootstraps. CI continues to run
+#   each product as its own job, which is the correct long-term isolation.
+
+[tool.pytest.ini_options]
+# `importlib` makes each test module import under its unique path.
+# Required for the monorepo layout — see header comment above.
+addopts = "-ra --import-mode=importlib"
+asyncio_mode = "auto"
+filterwarnings = [
+    "ignore::DeprecationWarning:pkg_resources.*",
+]

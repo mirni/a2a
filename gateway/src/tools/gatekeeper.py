@@ -42,9 +42,14 @@ async def _submit_verification(ctx: AppContext, params: dict[str, Any]) -> dict[
         idempotency_key=params.get("idempotency_key"),
         metadata=params.get("metadata"),
     )
+    # ``result`` is surfaced alongside the job metadata so observability
+    # (per-tier histograms, dashboards) and SDK convenience wrappers
+    # (``prove_policy``) do not need a second round trip when the mock
+    # or synchronous verifier has already produced a terminal outcome.
     return {
         "job_id": job.id,
         "status": job.status.value,
+        "result": job.result.value if job.result else None,
         "cost": str(job.cost),
         "created_at": job.created_at,
     }

@@ -8,7 +8,12 @@ pytestmark = pytest.mark.asyncio
 
 
 async def test_backup_database_tool(client, admin_api_key):
-    """Backup a database and verify response has path/size."""
+    """Backup a database and verify response has filename/size.
+
+    v1.2.4 (audit v1.2.3 MED-7): responses expose ``filename`` (basename)
+    and ``database`` instead of absolute ``path`` to avoid leaking the
+    server filesystem layout.
+    """
     resp = await client.post(
         "/v1/execute",
         json={
@@ -21,7 +26,9 @@ async def test_backup_database_tool(client, admin_api_key):
     result = resp.json()
     assert result["size_bytes"] > 0
     assert "created_at" in result
-    assert result["path"].endswith(".db")
+    assert "path" not in result
+    assert result["filename"].endswith(".db")
+    assert result["database"] == "billing"
 
 
 async def test_backup_with_encryption(client, admin_api_key):
@@ -43,7 +50,11 @@ async def test_backup_with_encryption(client, admin_api_key):
 
 
 async def test_restore_database_tool(client, admin_api_key):
-    """Backup then restore, verify data intact."""
+    """Backup then restore, verify data intact.
+
+    v1.2.4 (audit v1.2.3 MED-7): restore accepts a ``filename`` (basename)
+    that is resolved server-side against the managed backup dir.
+    """
     # First create a backup
     backup_resp = await client.post(
         "/v1/execute",
@@ -54,14 +65,14 @@ async def test_restore_database_tool(client, admin_api_key):
         headers={"Authorization": f"Bearer {admin_api_key}"},
     )
     assert backup_resp.status_code == 200
-    backup_path = backup_resp.json()["path"]
+    filename = backup_resp.json()["filename"]
 
     # Restore it
     resp = await client.post(
         "/v1/execute",
         json={
             "tool": "restore_database",
-            "params": {"database": "billing", "backup_path": backup_path},
+            "params": {"database": "billing", "filename": filename},
         },
         headers={"Authorization": f"Bearer {admin_api_key}"},
     )
@@ -69,6 +80,8 @@ async def test_restore_database_tool(client, admin_api_key):
     result = resp.json()
     assert result["size_bytes"] > 0
     assert "restored_at" in result
+    # Response must not leak absolute paths
+    assert "path" not in result
 
 
 async def test_integrity_check_tool(client, admin_api_key):

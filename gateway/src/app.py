@@ -15,7 +15,9 @@ from gateway.src.lifespan import lifespan
 from gateway.src.middleware import (
     AgentIdLengthMiddleware,
     BodySizeLimitMiddleware,
+    ClientIpResolutionMiddleware,
     CorrelationIDMiddleware,
+    EncodedPathRejectionMiddleware,
     HttpsEnforcementMiddleware,
     MetricsMiddleware,
     PublicRateLimitMiddleware,
@@ -256,8 +258,15 @@ def create_app() -> FastAPI:
     # plaintext rejection happens before any app logic — but still below the
     # outermost CorrelationIDMiddleware so redirects carry a request id.
     app.add_middleware(HttpsEnforcementMiddleware)
+    # v1.2.4 audit NEW-CRIT-3: reject %2F/%5C in /v1/ paths before routing.
+    app.add_middleware(EncodedPathRejectionMiddleware)
     app.add_middleware(AgentIdLengthMiddleware)
     app.add_middleware(PublicRateLimitMiddleware)
+    # v1.2.4 audit CRIT-4: resolve client IP honouring A2A_TRUSTED_PROXIES
+    # before PublicRateLimitMiddleware reads it. Added *after* PRLM so it
+    # ends up outer in the middleware stack and runs first on the request
+    # path (FastAPI wraps add_middleware calls in reverse order).
+    app.add_middleware(ClientIpResolutionMiddleware)
     app.add_middleware(RequestTimeoutMiddleware)
     app.add_middleware(BodySizeLimitMiddleware)
     app.add_middleware(MetricsMiddleware)

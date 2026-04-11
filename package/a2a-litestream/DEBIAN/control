@@ -1,0 +1,13 @@
+Package: a2a-litestream
+Version: 1.2.4
+Architecture: all
+Depends: litestream
+Maintainer: A2A Team <team@greenhelix.net>
+Section: admin
+Priority: optional
+Description: Litestream continuous replication for A2A SQLite databases
+ Ships a litestream.yml config and systemd unit that stream every
+ A2A product database (paywall, payments, gatekeeper, trust, etc.)
+ to S3 with 5-minute snapshot cadence and 24-hour WAL retention.
+ See /usr/share/doc/a2a-litestream/LITESTREAM_SETUP.md for the
+ recovery runbook (RPO ~minute, RTO ~15 minutes).

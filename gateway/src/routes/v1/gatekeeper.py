@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
@@ -9,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
 from gateway.src.errors import handle_product_exception
+from gateway.src.gatekeeper_metrics import GatekeeperMetrics
 from gateway.src.tools.gatekeeper import (
     _cancel_verification,
     _get_proof,
@@ -85,6 +87,13 @@ class VerifyProofRequest(BaseModel):
 def _inject_caller(tc: ToolContext, params: dict[str, Any]) -> dict[str, Any]:
     params["_caller_agent_id"] = tc.agent_id
     params["_caller_tier"] = tc.agent_tier
+    # v1.2.4: accept Idempotency-Key HTTP header on POST /v1/gatekeeper/jobs
+    # for consistency with /v1/payments/*. Body field still works; header
+    # is only consulted when the body did not provide one so explicit body
+    # values win (deterministic contract).
+    idem = tc.request.headers.get("idempotency-key")
+    if idem and not params.get("idempotency_key"):
+        params["idempotency_key"] = idem
     return params
 
 
@@ -111,10 +120,12 @@ async def submit_verification(
         },
     )
     await check_ownership(tc, params)
+    t0 = time.perf_counter()
     try:
         result = await _submit_verification(tc.ctx, params)
     except Exception as exc:
         return await handle_product_exception(tc.request, exc)
+    duration_ms = (time.perf_counter() - t0) * 1000.0
 
     # CRIT-2 (audit v1.2.1 + v1.2.2): failed verification jobs must not
     # charge the caller. When the verifier backend raises (or the job
@@ -132,6 +143,24 @@ async def submit_verification(
         # On success, surface the same number under ``billed_cost`` so
         # the contract is consistent across success/failure responses.
         result["billed_cost"] = result.get("cost", "0")
+
+    # v1.2.4: emit per-tier/per-result telemetry (histogram of wall-clock
+    # duration, histogram of solver time, counter of jobs, summed cost).
+    # We only have the end-to-end route latency here because the
+    # verifier's own solver_ms is not plumbed through the tool layer; the
+    # histogram still differentiates tiers and outcomes, which is the
+    # primary SRE and CMO dashboard ask.
+    try:
+        cost_float = float(result.get("cost") or 0)
+    except (TypeError, ValueError):
+        cost_float = 0.0
+    await GatekeeperMetrics.observe_job(
+        tier=tc.agent_tier,
+        result=result.get("result") or result.get("status") or "unknown",
+        cost_credits=cost_float,
+        duration_ms=duration_ms,
+        solver_ms=duration_ms,
+    )
 
     location = f"/v1/gatekeeper/jobs/{result.get('job_id', '')}"
     return await finalize_response(tc, result, status_code=201, location=location)

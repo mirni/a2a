@@ -107,6 +107,66 @@ class TestSubmitVerification:
         assert r2.json()["job_id"] == job_id
 
     @pytest.mark.asyncio
+    async def test_submit_idempotency_via_header(self, client, pro_api_key):
+        """v1.2.4: Idempotency-Key header is honored (parity with /v1/payments)."""
+        body = {"agent_id": "pro-agent", "properties": [_VALID_PROPERTY]}
+        r1 = await client.post(
+            "/v1/gatekeeper/jobs",
+            json=body,
+            headers={
+                "Authorization": f"Bearer {pro_api_key}",
+                "Idempotency-Key": "idem-hdr-001",
+            },
+        )
+        assert r1.status_code == 201
+        job_id = r1.json()["job_id"]
+
+        r2 = await client.post(
+            "/v1/gatekeeper/jobs",
+            json=body,
+            headers={
+                "Authorization": f"Bearer {pro_api_key}",
+                "Idempotency-Key": "idem-hdr-001",
+            },
+        )
+        assert r2.status_code == 201
+        assert r2.json()["job_id"] == job_id, "Idempotency-Key header should return the same job"
+
+    @pytest.mark.asyncio
+    async def test_submit_idempotency_body_takes_precedence_over_header(self, client, pro_api_key):
+        """Explicit body idempotency_key wins over the header."""
+        body = {
+            "agent_id": "pro-agent",
+            "properties": [_VALID_PROPERTY],
+            "idempotency_key": "idem-body-wins",
+        }
+        r1 = await client.post(
+            "/v1/gatekeeper/jobs",
+            json=body,
+            headers={
+                "Authorization": f"Bearer {pro_api_key}",
+                "Idempotency-Key": "idem-header-loses",
+            },
+        )
+        assert r1.status_code == 201
+        first_id = r1.json()["job_id"]
+
+        # Submitting again with ONLY the body key should still return the
+        # first job — proving the first call was stored under the body key.
+        body2 = {
+            "agent_id": "pro-agent",
+            "properties": [_VALID_PROPERTY],
+            "idempotency_key": "idem-body-wins",
+        }
+        r2 = await client.post(
+            "/v1/gatekeeper/jobs",
+            json=body2,
+            headers={"Authorization": f"Bearer {pro_api_key}"},
+        )
+        assert r2.status_code == 201
+        assert r2.json()["job_id"] == first_id
+
+    @pytest.mark.asyncio
     async def test_submit_with_webhook(self, client, pro_api_key):
         resp = await client.post(
             "/v1/gatekeeper/jobs",

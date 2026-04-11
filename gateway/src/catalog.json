@@ -3440,8 +3440,13 @@
     "output_schema": {
       "type": "object",
       "properties": {
-        "path": {
-          "type": "string"
+        "filename": {
+          "type": "string",
+          "description": "Basename of the backup file inside the managed backups directory"
+        },
+        "database": {
+          "type": "string",
+          "description": "Logical database name that was backed up"
         },
         "size_bytes": {
           "type": "integer"
@@ -3474,9 +3479,13 @@
           "type": "string",
           "description": "Logical database name to restore into"
         },
+        "filename": {
+          "type": "string",
+          "description": "Basename of the backup file inside the managed backups directory (preferred — from list_backups / backup_database)"
+        },
         "backup_path": {
           "type": "string",
-          "description": "Path to the backup file"
+          "description": "Legacy: absolute path to the backup file (use 'filename' instead)"
         },
         "key": {
           "type": "string",
@@ -3488,14 +3497,16 @@
         }
       },
       "required": [
-        "database",
-        "backup_path"
+        "database"
       ]
     },
     "output_schema": {
       "type": "object",
       "properties": {
-        "path": {
+        "filename": {
+          "type": "string"
+        },
+        "database": {
           "type": "string"
         },
         "size_bytes": {
@@ -3572,9 +3583,6 @@
             "type": "object",
             "properties": {
               "filename": {
-                "type": "string"
-              },
-              "path": {
                 "type": "string"
               },
               "size_bytes": {

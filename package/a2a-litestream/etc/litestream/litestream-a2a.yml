@@ -1,0 +1,72 @@
+# Litestream continuous replication for the A2A Commerce Platform.
+#
+# Each db is streamed to s3://${LITESTREAM_BUCKET}/<product>/ with:
+#   - snapshot-interval 5m       → rebuildable restore point every 5 minutes
+#   - retention 24h              → 24 hours of WAL segments kept in S3
+#   - retention-check-interval 1h → cleanup pass every hour
+#
+# RPO target: < 1 minute (WAL shipped continuously)
+# RTO target: < 15 minutes (`litestream restore` for each db)
+#
+# All credentials / bucket come from /etc/default/litestream-a2a.
+
+dbs:
+  - path: /var/lib/a2a/paywall.db
+    replicas:
+      - type: s3
+        bucket: ${LITESTREAM_BUCKET}
+        path: paywall
+        region: ${AWS_REGION}
+        snapshot-interval: 5m
+        retention: 24h
+        retention-check-interval: 1h
+
+  - path: /var/lib/a2a/payments.db
+    replicas:
+      - type: s3
+        bucket: ${LITESTREAM_BUCKET}
+        path: payments
+        region: ${AWS_REGION}
+        snapshot-interval: 5m
+        retention: 24h
+        retention-check-interval: 1h
+
+  - path: /var/lib/a2a/gatekeeper.db
+    replicas:
+      - type: s3
+        bucket: ${LITESTREAM_BUCKET}
+        path: gatekeeper
+        region: ${AWS_REGION}
+        snapshot-interval: 5m
+        retention: 24h
+        retention-check-interval: 1h
+
+  - path: /var/lib/a2a/trust.db
+    replicas:
+      - type: s3
+        bucket: ${LITESTREAM_BUCKET}
+        path: trust
+        region: ${AWS_REGION}
+        snapshot-interval: 5m
+        retention: 24h
+        retention-check-interval: 1h
+
+  - path: /var/lib/a2a/identity.db
+    replicas:
+      - type: s3
+        bucket: ${LITESTREAM_BUCKET}
+        path: identity
+        region: ${AWS_REGION}
+        snapshot-interval: 5m
+        retention: 24h
+        retention-check-interval: 1h
+
+  - path: /var/lib/a2a/audit.db
+    replicas:
+      - type: s3
+        bucket: ${LITESTREAM_BUCKET}
+        path: audit
+        region: ${AWS_REGION}
+        snapshot-interval: 5m
+        retention: 24h
+        retention-check-interval: 1h

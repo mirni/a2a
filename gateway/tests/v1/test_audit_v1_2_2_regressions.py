@@ -364,10 +364,16 @@ class TestKeyRotationSafety:
 
 class TestRefundFeePolicyDisclosure:
     """HIGH-2 (v1.2.2): refund response must include a ``fee_policy``
-    field that names the policy (``retain_gateway_fee``) and links to
-    the ADR so integrators can reference a stable URL in their
+    field with a stable URL that integrators can reference in their
     reconciliation docs. The ``fee_refunded`` / ``fee_retained`` fields
     remain in place for backwards compatibility.
+
+    .. note::
+       v1.2.4 (audit v1.2.3) superseded the ``retain_gateway_fee``
+       policy with ``refund_full_amount`` (ADR-012). This test now
+       checks the *shape* of the response — that ``fee_policy`` is
+       present and the legacy fields still exist — without pinning a
+       specific policy name.
     """
 
     async def test_refund_response_includes_fee_policy(self, client, app):
@@ -407,13 +413,15 @@ class TestRefundFeePolicyDisclosure:
         assert "fee_policy" in body, f"HIGH-2: refund response must include fee_policy; got {list(body.keys())}"
         policy = body["fee_policy"]
         assert isinstance(policy, dict), f"fee_policy must be an object: {policy}"
-        assert policy.get("name") == "retain_gateway_fee", f"fee_policy.name must be 'retain_gateway_fee': {policy}"
+        assert policy.get("name"), f"fee_policy.name must be set: {policy}"
         assert "adr" in policy and policy["adr"].startswith("ADR-"), f"fee_policy.adr must reference the ADR: {policy}"
         assert policy.get("url"), f"fee_policy.url must be set: {policy}"
 
-        # Backwards compatibility: legacy fields remain
-        assert body.get("fee_refunded") is False
-        assert body.get("fee_retained") is not None
+        # Backwards compatibility: legacy fields remain (may be either
+        # True/False depending on current policy — v1.2.4 refunds the
+        # fee on full refund, see ADR-012).
+        assert "fee_refunded" in body
+        assert "fee_retained" in body
 
 
 # ---------------------------------------------------------------------------

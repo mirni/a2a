@@ -741,3 +741,89 @@ class AddAgentToOrgResponse(_ToolResponse):
         extra="ignore",
         json_schema_extra={"examples": [{"agent_id": "agent-a", "org_id": "org_abc123"}]},
     )
+
+
+# ===========================================================================
+# Gatekeeper (formal verifier) tool responses
+# ===========================================================================
+
+
+class _GatekeeperResponse(_ToolResponse):
+    """Base for gatekeeper responses that echoes the raw dict on demand.
+
+    Gatekeeper responses carry many optional fields (proof_hash,
+    property_results, counterexample, …) that only show up for certain
+    outcomes. Rather than enumerating every combination we keep the
+    minimal typed surface and expose the full payload via ``to_raw_dict``
+    so helpers like :func:`sdk.src.a2a_client.verifier.prove_policy` can
+    fold the details into a :class:`ProofResult`.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    def to_raw_dict(self) -> dict[str, Any]:
+        """Return the full payload as a plain dict."""
+        return self.model_dump()
+
+
+class SubmitVerificationResponse(_GatekeeperResponse):
+    """Response from POST /v1/gatekeeper/jobs."""
+
+    job_id: str
+    status: str
+    agent_id: str | None = None
+    cost: str | Decimal | float | None = None
+
+    model_config = ConfigDict(
+        extra="allow",
+        json_schema_extra={
+            "examples": [
+                {
+                    "job_id": "vj-abc123",
+                    "status": "completed",
+                    "agent_id": "agent-alice",
+                    "cost": "12",
+                    "result": "satisfied",
+                }
+            ]
+        },
+    )
+
+
+class VerificationJobResponse(_GatekeeperResponse):
+    """Response from GET /v1/gatekeeper/jobs/{job_id}."""
+
+    job_id: str
+    status: str
+    agent_id: str | None = None
+
+    model_config = ConfigDict(
+        extra="allow",
+        json_schema_extra={
+            "examples": [
+                {
+                    "job_id": "vj-abc123",
+                    "status": "completed",
+                    "agent_id": "agent-alice",
+                    "result": "satisfied",
+                }
+            ]
+        },
+    )
+
+
+class VerifyProofResponse(_GatekeeperResponse):
+    """Response from POST /v1/gatekeeper/proofs/verify."""
+
+    valid: bool
+    reason: str | None = None
+
+    model_config = ConfigDict(
+        extra="allow",
+        json_schema_extra={
+            "examples": [
+                {"valid": True, "proof_id": "pf-abc123", "result": "satisfied"},
+                {"valid": False, "reason": "proof_expired"},
+            ]
+        },
+    )

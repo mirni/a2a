@@ -81,8 +81,18 @@ class BackupDatabaseRequest(BaseModel):
 
 
 class RestoreDatabaseRequest(BaseModel):
+    """Restore from a previous backup.
+
+    Either ``filename`` (preferred — matches what ``list_backups`` /
+    ``backup_database`` now return) or ``backup_path`` (legacy — full
+    path inside the backup dir) may be provided. ``filename`` is
+    resolved server-side against ``A2A_DATA_DIR/backups`` so callers
+    never need to know the absolute path.
+    """
+
     model_config = ConfigDict(extra="forbid")
-    backup_path: str
+    backup_path: str | None = None
+    filename: str | None = None
     key: str | None = None
     key_id: str | None = None
 
@@ -396,6 +406,7 @@ async def restore_database(
         {
             "database": database,
             "backup_path": body.backup_path,
+            "filename": body.filename,
             "key": body.key,
             "key_id": body.key_id,
         },

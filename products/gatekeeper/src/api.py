@@ -90,9 +90,49 @@ def _compile_json_policy_expression(expression: str) -> str:
         raise InvalidPolicyError(f"json_policy failed to compile: {exc}") from exc
 
 
-# Cost: base + per-property
-_BASE_COST = Decimal("5")
-_PER_PROPERTY_COST = Decimal("1")
+# ---------------------------------------------------------------------------
+# Pricing (v1.2.4 repricing)
+# ---------------------------------------------------------------------------
+#
+# Formula:
+#   quoted_cost = _BASE_COST + _PER_PROPERTY_COST * len(properties)
+#   final_cost  = quoted_cost + _compute_solver_surcharge(duration_ms)
+#
+# Rationale:
+#   v1.2.3 and earlier charged a flat 5 + N credits. That left complex
+#   proofs heavily underpriced relative to their AWS Lambda cost and
+#   opportunity cost (a 60s / 100-property job charged only $1.05).
+#   v1.2.4 doubles the base and per-property floor and adds a heavy-tail
+#   surcharge tied to solver wall-time so price tracks solver work.
+#
+#   For trivial proofs (<1s warm) the user still pays a low floor; for
+#   heavy proofs the bill grows proportionally. Free tier is intentionally
+#   absent — every proof is a billable event.
+_BASE_COST = Decimal("10")
+_PER_PROPERTY_COST = Decimal("2")
+
+# Heavy-tail solver-time surcharge.
+#   - No surcharge for the first 1000 ms of solver time.
+#   - Above that, 1 credit per 500 ms (rounded up).
+#   - Example: 1001 ms → 1 credit; 1500 ms → 1; 1501 ms → 2; 60000 ms → 118.
+_SOLVER_TIME_FREE_MS = 1000
+_SOLVER_TIME_INCREMENT_MS = 500
+_SOLVER_TIME_COST_PER_INCREMENT = Decimal("1")
+
+
+def _compute_solver_surcharge(duration_ms: int) -> Decimal:
+    """Return the heavy-tail surcharge in credits for a given solver duration.
+
+    Pure function — no state, no I/O. Covered by
+    ``tests/test_api.py::TestPricingV124::test_solver_surcharge_helper_bounds``.
+    """
+    if duration_ms is None or duration_ms <= _SOLVER_TIME_FREE_MS:
+        return Decimal("0")
+    overflow_ms = duration_ms - _SOLVER_TIME_FREE_MS
+    # Ceiling division: (a + b - 1) // b
+    increments = (overflow_ms + _SOLVER_TIME_INCREMENT_MS - 1) // _SOLVER_TIME_INCREMENT_MS
+    return _SOLVER_TIME_COST_PER_INCREMENT * Decimal(increments)
+
 
 # Proof validity: 30 days
 _PROOF_VALIDITY_SECONDS = 30 * 86400
@@ -163,7 +203,29 @@ class GatekeeperAPI:
             metadata=metadata or {},
         )
 
-        job = await self.storage.create_job(job)
+        # v1.2.4 P1: concurrent idempotency race — two callers with the
+        # same idem key can both pass the get_job_by_idempotency_key
+        # check above and race to INSERT. The DB UNIQUE constraint on
+        # ``idempotency_key`` protects the invariant; we catch the
+        # IntegrityError here and re-lookup so both callers observe the
+        # winning job instead of one seeing an exception.
+        try:
+            job = await self.storage.create_job(job)
+        except Exception as exc:  # noqa: BLE001
+            if idempotency_key is None:
+                raise
+            # Only swallow integrity-style errors for idempotency races.
+            error_text = str(exc).lower()
+            if "unique" not in error_text and "constraint" not in error_text:
+                raise
+            existing = await self.storage.get_job_by_idempotency_key(idempotency_key)
+            if existing is None:
+                raise
+            if existing.agent_id != agent_id:
+                raise IdempotencyConflictError(
+                    f"Idempotency key '{idempotency_key}' belongs to a different agent"
+                ) from exc
+            return existing
 
         # If we have a verifier backend, run the job immediately
         if self.verifier is not None:
@@ -282,9 +344,20 @@ class GatekeeperAPI:
             property_results = result.get("property_results", [])
             proof_data = result.get("proof_data", "")
             proof_hash = result.get("proof_hash", "")
+            duration_ms = result.get("duration_ms") or 0
 
             if not proof_hash and proof_data:
                 proof_hash = hashlib.sha3_256(proof_data.encode()).hexdigest()
+
+            # v1.2.4 repricing: apply heavy-tail solver-time surcharge to
+            # the quoted cost now that we know how long Z3 actually took.
+            # ``job.cost`` was set to the minimum (base + per-property) at
+            # submit time; we add the surcharge and persist the updated
+            # value before marking the job completed.
+            surcharge = _compute_solver_surcharge(int(duration_ms))
+            if surcharge > 0:
+                job.cost = job.cost + surcharge
+                await self.storage.update_job_cost(job.id, job.cost)
 
             # Create proof artifact
             proof = ProofArtifact(
