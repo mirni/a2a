@@ -200,6 +200,15 @@ class KeyManager:
         """List all keys (active and revoked) for an agent."""
         return await self.storage.get_keys_for_agent(agent_id)
 
+    async def get_all_keys(self) -> list[dict[str, Any]]:
+        """List all keys across every agent (admin-only fleet view).
+
+        v1.2.4 audit P0-1: used by ``list_api_keys`` when the caller
+        is admin-tier. The route is gated by ``ADMIN_ONLY_TOOLS`` so
+        non-admin callers never reach here.
+        """
+        return await self.storage.get_all_keys()
+
     async def lookup_agent(self, raw_key: str) -> tuple[str, str]:
         """Convenience: validate a key and return (agent_id, tier).
 

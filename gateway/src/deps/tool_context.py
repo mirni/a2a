@@ -138,6 +138,37 @@ def require_tool(tool_name: str):
                 resp = await handle_product_exception(request, exc)
                 raise _ResponseError(resp) from exc
 
+        # 6b. v1.2.4 audit P0-5: budget cap enforcement.
+        # If the caller has configured a daily or monthly cap via
+        # ``set_budget_cap``, block paid calls once the window spend
+        # would exceed the cap. Admin tier bypasses; free tools
+        # (``cost == 0``) are not checked because they do not
+        # contribute to the cap and blocking them would break the
+        # dashboard's ability to read the budget while over-limit.
+        # Additionally, percentage-priced tools like ``create_intent``
+        # may compute ``cost == 0`` when the caller omits ``amount``
+        # from the GET-side body; check those too by consulting the
+        # request body for a non-zero ``amount``.
+        if agent_tier != ADMIN_TIER:
+            should_check = cost > 0
+            if not should_check:
+                try:
+                    _body_peek = await request.json()
+                    if isinstance(_body_peek, dict) and _body_peek.get("amount"):
+                        should_check = True
+                except Exception:
+                    pass
+            if should_check:
+                try:
+                    budget_resp = await _check_budget_caps(request, ctx, agent_id, cost)
+                except _ResponseError:
+                    raise
+                except Exception:  # pragma: no cover - defensive
+                    logger.warning("budget cap check failed for agent %s", agent_id, exc_info=True)
+                    budget_resp = None
+                if budget_resp is not None:
+                    raise _ResponseError(budget_resp)
+
         correlation_id = getattr(request.state, "correlation_id", None) or ""
 
         return ToolContext(
@@ -154,6 +185,81 @@ def require_tool(tool_name: str):
         )
 
     return _dependency
+
+
+async def _check_budget_caps(
+    request: Request,
+    ctx: Any,
+    agent_id: str,
+    pending_cost: float,
+) -> JSONResponse | None:
+    """Check daily/monthly budget caps for an agent.
+
+    v1.2.4 audit P0-5: if the caller configured a ``budget_caps`` row
+    via ``set_budget_cap`` and the current rolling window spend plus
+    the pending cost would exceed the cap, return a 402
+    ``budget_exceeded`` RFC 9457 response (as a prepared
+    ``JSONResponse`` — the caller raises ``_ResponseError``).
+
+    Returns ``None`` when the call is permitted (no cap configured,
+    not yet over the cap, etc.).
+    """
+    import time as _time
+
+    db = ctx.tracker.storage.db
+    try:
+        cursor = await db.execute(
+            "SELECT daily_cap, monthly_cap FROM budget_caps WHERE agent_id = ?",
+            (agent_id,),
+        )
+        row = await cursor.fetchone()
+        await cursor.close()
+    except Exception:
+        # The budget_caps table might not exist on older databases.
+        return None
+    if row is None:
+        return None
+
+    daily_cap = row["daily_cap"]
+    monthly_cap = row["monthly_cap"]
+    # Atomic-unit columns (SCALE=1e8) — convert to credits when present.
+    if daily_cap is not None:
+        daily_cap = float(daily_cap) / 100_000_000
+    if monthly_cap is not None:
+        monthly_cap = float(monthly_cap) / 100_000_000
+
+    if daily_cap is None and monthly_cap is None:
+        return None
+
+    now = _time.time()
+    if daily_cap is not None:
+        daily_since = now - 86400
+        daily_spend = float(await ctx.tracker.storage.sum_cost_since(agent_id, daily_since))
+        if daily_spend + pending_cost > daily_cap:
+            return await error_response(
+                402,
+                (
+                    f"Daily budget cap exceeded: spent {daily_spend:.2f} + pending "
+                    f"{pending_cost:.2f} > cap {daily_cap:.2f} credits."
+                ),
+                "budget_exceeded",
+                request=request,
+            )
+
+    if monthly_cap is not None:
+        monthly_since = now - (30 * 86400)
+        monthly_spend = float(await ctx.tracker.storage.sum_cost_since(agent_id, monthly_since))
+        if monthly_spend + pending_cost > monthly_cap:
+            return await error_response(
+                402,
+                (
+                    f"Monthly budget cap exceeded: spent {monthly_spend:.2f} + "
+                    f"pending {pending_cost:.2f} > cap {monthly_cap:.2f} credits."
+                ),
+                "budget_exceeded",
+                request=request,
+            )
+    return None
 
 
 async def _log_api_call(tc: ToolContext, status_code: int) -> None:

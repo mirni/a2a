@@ -20,7 +20,11 @@ def _disable_legacy_execute(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_core_tool_returns_410(client, api_key):
-    """Core business tools that have REST endpoints must return 410 Gone."""
+    """Core business tools that have REST endpoints must return 410 Gone.
+
+    v1.2.4 audit P0-2: the 410 body shape was standardised — the
+    response is now RFC 9457 problem+json with code ``endpoint_removed``.
+    """
     resp = await client.post(
         "/v1/execute",
         json={"tool": "get_balance", "params": {"agent_id": "test-agent"}},
@@ -28,8 +32,8 @@ async def test_core_tool_returns_410(client, api_key):
     )
     assert resp.status_code == 410
     body = resp.json()
-    assert "dedicated REST endpoint" in body["detail"]
-    assert "tool-moved" in body.get("type", "")
+    assert "dedicated REST endpoint" in body["detail"] or "REST endpoint" in body["detail"]
+    assert "endpoint-removed" in body.get("type", "") or "endpoint_removed" in body.get("type", "")
 
 
 @pytest.mark.asyncio
@@ -91,7 +95,8 @@ async def test_410_rfc9457_format(client, api_key):
     assert "status" in body
     assert body["status"] == 410
     assert "type" in body
-    assert "tool-moved" in body["type"]
+    # v1.2.4 audit P0-2: code is now endpoint_removed (kebab-case in type URI)
+    assert "endpoint-removed" in body["type"] or "endpoint_removed" in body["type"]
 
 
 # ---------------------------------------------------------------------------

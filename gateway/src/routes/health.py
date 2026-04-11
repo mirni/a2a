@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -83,8 +84,17 @@ async def health(request: Request) -> JSONResponse:
         logger.warning("Failed to retrieve DB connections", exc_info=True)
         connections = {}
 
-    for db_name, conn in connections.items():
-        databases[db_name] = await _probe_db(db_name, conn)
+    # v1.2.4 audit P0-7: probe all DBs concurrently rather than
+    # serialising 10 round-trips. Each `SELECT 1` is cheap but on a
+    # slow-I/O deploy (sandbox) the serial version was a major
+    # contributor to the 5.2s p50 the audit measured.
+    if connections:
+        names = list(connections.keys())
+        results = await asyncio.gather(
+            *(_probe_db(name, connections[name]) for name in names),
+            return_exceptions=False,
+        )
+        databases = dict(zip(names, results, strict=True))
 
     # If any database reports an error, the overall status is degraded
     has_errors = any(s == "error" for s in databases.values())

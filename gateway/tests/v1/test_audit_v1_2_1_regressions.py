@@ -65,7 +65,10 @@ class TestBatchOwnershipBypass:
         body = resp.json()
         first = body["results"][0]
         assert first["success"] is False, "CRIT-2: cross-agent list_api_keys via /v1/batch must be rejected"
-        assert first["error"]["code"] in {"forbidden", "authorization_denied"}
+        # v1.2.4 audit P0-1: ``list_api_keys`` is now admin-only so the
+        # batch layer rejects non-admin callers at the admin gate
+        # *before* the ownership check fires.
+        assert first["error"]["code"] in {"forbidden", "authorization_denied", "admin_only"}
 
     async def test_batch_rejects_cross_agent_get_balance(self, client, app):
         """BOLA: caller=alice, params.agent_id=bob → must fail."""

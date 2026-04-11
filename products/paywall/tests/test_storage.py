@@ -64,6 +64,22 @@ class TestApiKeyStorage:
         keys = await paywall_storage.get_keys_for_agent("unknown")
         assert keys == []
 
+    async def test_get_all_keys_admin_fleet(self, paywall_storage: PaywallStorage):
+        """v1.2.4 audit P0-1: admin-only fleet view across all agents."""
+        await paywall_storage.store_key("hash-a1", "agent-1", "free")
+        await paywall_storage.store_key("hash-a2", "agent-1", "pro")
+        await paywall_storage.store_key("hash-b1", "agent-2", "enterprise")
+        await paywall_storage.store_key("hash-c1", "agent-3", "free")
+
+        keys = await paywall_storage.get_all_keys()
+        assert len(keys) == 4
+        agent_ids = {k["agent_id"] for k in keys}
+        assert agent_ids == {"agent-1", "agent-2", "agent-3"}
+
+    async def test_get_all_keys_empty(self, paywall_storage: PaywallStorage):
+        keys = await paywall_storage.get_all_keys()
+        assert keys == []
+
 
 class TestRateWindows:
     async def test_get_rate_count_empty(self, paywall_storage: PaywallStorage):

@@ -82,3 +82,49 @@ class TestPerTierDepositLimits:
             headers={"Authorization": f"Bearer {key}"},
         )
         assert resp.status_code == 403
+
+    async def test_enterprise_tier_deposit_within_limit(self, client, app):
+        """Enterprise-tier agent can deposit up to the enterprise cap."""
+        key = await _create_agent(app, "ent-dep", "enterprise", balance=0)
+        resp = await client.post(
+            "/v1/billing/wallets/ent-dep/deposit",
+            json={"amount": "10000000.00"},
+            headers={"Authorization": f"Bearer {key}"},
+        )
+        assert resp.status_code == 200, resp.text
+
+    async def test_enterprise_tier_deposit_exceeds_limit(self, client, app):
+        """Enterprise-tier agent cannot deposit above the enterprise cap.
+
+        v1.2.4 audit P0-6: before this fix, ``deposit_limits`` had no
+        enterprise entry so ``.get("enterprise")`` returned ``None``
+        and the cap check was silently skipped for enterprise callers.
+        The default is now 10,000,000 credits (policy placeholder —
+        subject to human review in PR).
+        """
+        key = await _create_agent(app, "ent-over", "enterprise", balance=0)
+        resp = await client.post(
+            "/v1/billing/wallets/ent-over/deposit",
+            json={"amount": "10000001.00"},
+            headers={"Authorization": f"Bearer {key}"},
+        )
+        assert resp.status_code == 403, resp.text
+        data = resp.json()
+        assert "limit" in str(data).lower()
+
+    async def test_admin_bypasses_deposit_limits(self, client, app, admin_api_key):
+        """Admin-scoped keys bypass the per-tier deposit cap entirely.
+
+        The ``admin_api_key`` fixture creates a pro-tier key with the
+        ``admin`` scope. ``authenticate()`` promotes this to
+        ``agent_tier == "admin"`` and the deposit_limits lookup
+        returns ``None`` (no ``admin`` key in the dict), so the cap
+        check is bypassed. Depositing 100M (10× the enterprise cap)
+        must still succeed.
+        """
+        resp = await client.post(
+            "/v1/billing/wallets/admin-agent/deposit",
+            json={"amount": "100000000.00"},
+            headers={"Authorization": f"Bearer {admin_api_key}"},
+        )
+        assert resp.status_code == 200, resp.text

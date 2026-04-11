@@ -151,11 +151,15 @@ class TestGatekeeperCostZeroOnFailure:
 
 
 class TestInfraKeysOwnershipAttribution:
-    """Each row of ``GET /v1/infra/keys`` must carry ``agent_id`` and
-    ``owner:"self"`` so callers can verify ownership from the response
-    alone. The auditors in v1.2.2 flagged a "fleet leak" based on the
-    absence of this field — the endpoint was actually correctly scoped
-    at the SQL layer, but the response was ambiguous.
+    """Each row of the self-service key listing endpoint must carry
+    ``agent_id`` and ``owner:"self"`` so callers can verify ownership
+    from the response alone. The auditors in v1.2.2 flagged a "fleet
+    leak" based on the absence of this field — the endpoint was
+    actually correctly scoped at the SQL layer, but the response was
+    ambiguous.
+
+    v1.2.4 audit P0-1: self-service moved from ``/v1/infra/keys`` to
+    ``/v1/billing/keys``; these tests now target the new path.
     """
 
     async def test_response_rows_include_agent_id_and_owner_self(self, client, app):
@@ -164,7 +168,7 @@ class TestInfraKeysOwnershipAttribution:
         key_info = await ctx.key_manager.create_key("alice-owned-keys", tier="free")
         key = key_info["key"]
 
-        resp = await client.get("/v1/infra/keys", headers={"Authorization": f"Bearer {key}"})
+        resp = await client.get("/v1/billing/keys", headers={"Authorization": f"Bearer {key}"})
         assert resp.status_code == 200
         body = resp.json()
         assert "keys" in body
@@ -182,11 +186,11 @@ class TestInfraKeysOwnershipAttribution:
         bob_key_info = await ctx.key_manager.create_key("bob-iso", tier="free")
 
         alice_resp = await client.get(
-            "/v1/infra/keys",
+            "/v1/billing/keys",
             headers={"Authorization": f"Bearer {alice_key_info['key']}"},
         )
         bob_resp = await client.get(
-            "/v1/infra/keys",
+            "/v1/billing/keys",
             headers={"Authorization": f"Bearer {bob_key_info['key']}"},
         )
         assert alice_resp.status_code == 200
@@ -297,11 +301,15 @@ class TestKeyRotationSafety:
     *twice* during schema probing. The endpoint was too reachable.
     """
 
-    async def test_rotate_without_confirmation_header_returns_428(self, client, app):
+    async def _make_admin_key(self, app, agent_id: str) -> str:
         ctx = app.state.ctx
-        await ctx.tracker.wallet.create("pro-rotate-safe", initial_balance=100.0, signup_bonus=False)
-        key_info = await ctx.key_manager.create_key("pro-rotate-safe", tier="pro")
-        key = key_info["key"]
+        await ctx.tracker.wallet.create(agent_id, initial_balance=100.0, signup_bonus=False)
+        key_info = await ctx.key_manager.create_key(agent_id, tier="pro", scopes=["read", "write", "admin"])
+        return key_info["key"]
+
+    async def test_rotate_without_confirmation_header_returns_428(self, client, app):
+        # v1.2.4 audit P0-1: rotate_key now admin-only.
+        key = await self._make_admin_key(app, "admin-rotate-safe")
 
         resp = await client.post(
             "/v1/infra/keys/rotate",
@@ -313,10 +321,7 @@ class TestKeyRotationSafety:
         )
 
     async def test_rotate_with_confirmation_header_succeeds(self, client, app):
-        ctx = app.state.ctx
-        await ctx.tracker.wallet.create("pro-rotate-confirm", initial_balance=100.0, signup_bonus=False)
-        key_info = await ctx.key_manager.create_key("pro-rotate-confirm", tier="pro")
-        key = key_info["key"]
+        key = await self._make_admin_key(app, "admin-rotate-confirm")
 
         resp = await client.post(
             "/v1/infra/keys/rotate",
@@ -332,10 +337,7 @@ class TestKeyRotationSafety:
 
     async def test_old_key_remains_valid_during_grace_window(self, client, app):
         """After rotate, the old key must still authenticate for grace_seconds."""
-        ctx = app.state.ctx
-        await ctx.tracker.wallet.create("pro-grace", initial_balance=100.0, signup_bonus=False)
-        key_info = await ctx.key_manager.create_key("pro-grace", tier="pro")
-        old_key = key_info["key"]
+        old_key = await self._make_admin_key(app, "admin-grace")
 
         rotate = await client.post(
             "/v1/infra/keys/rotate",

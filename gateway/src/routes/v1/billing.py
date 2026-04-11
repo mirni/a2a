@@ -31,6 +31,7 @@ from gateway.src.tools.billing import (
     _unfreeze_wallet,
     _withdraw,
 )
+from gateway.src.tools.infrastructure import _create_api_key, _list_api_keys
 
 router = APIRouter(prefix="/v1/billing", tags=["billing"])
 
@@ -80,6 +81,18 @@ class BudgetCapRequest(BaseModel):
     daily_cap: Decimal | None = None
     monthly_cap: Decimal | None = None
     alert_threshold: float = 0.8
+
+
+class CreateBillingApiKeyRequest(BaseModel):
+    """Self-service API key creation — v1.2.4 audit P0-1 successor
+    of the former ``POST /v1/infra/keys``.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"example": {"tier": "free"}},
+    )
+    tier: str = "free"
 
 
 class ConvertCurrencyRequest(BaseModel):
@@ -385,6 +398,60 @@ async def get_exchange_rate(
             "_caller_tier": tc.agent_tier,
         },
     )
+    return await finalize_response(tc, result)
+
+
+# ---------------------------------------------------------------------------
+# Self-service API key management — successor of POST /v1/infra/keys.
+# v1.2.4 audit P0-1: non-admin agents create and list their own keys
+# here. The route uses the same ``create_api_key`` / ``list_api_keys``
+# tools but is always scoped to the authenticated caller's agent_id.
+# ---------------------------------------------------------------------------
+
+
+@router.post("/keys")
+async def create_billing_api_key(
+    body: CreateBillingApiKeyRequest,
+    tc: ToolContext = Depends(require_tool("create_api_key")),
+):
+    params: dict[str, Any] = {
+        "agent_id": tc.agent_id,
+        "tier": body.tier,
+        "_caller_agent_id": tc.agent_id,
+        "_caller_tier": tc.agent_tier,
+    }
+    await check_ownership(tc, params)
+    try:
+        result = await _create_api_key(tc.ctx, params)
+    except Exception as exc:
+        return await handle_product_exception(tc.request, exc)
+    return await finalize_response(tc, result, status_code=201)
+
+
+@router.get("/keys")
+async def list_billing_api_keys(
+    agent_id: str | None = None,
+    tc: ToolContext = Depends(require_tool("create_api_key")),
+):
+    """List API keys owned by the authenticated caller.
+
+    v1.2.4 audit P0-1: this is the non-admin self-service path.
+    ``create_api_key`` is reused as the ``require_tool`` anchor
+    (it is NOT in ``ADMIN_ONLY_TOOLS``) so free/pro tiers reach
+    this handler without hitting the admin gate. The handler then
+    calls the ``_list_api_keys`` implementation directly, always
+    scoped to the authenticated caller's ``agent_id`` via ownership.
+    """
+    target = agent_id or tc.agent_id
+    params: dict[str, Any] = {
+        "agent_id": target,
+        "_caller_agent_id": tc.agent_id,
+        # Force non-admin labelling so ``_list_api_keys`` never
+        # returns the fleet view through this route.
+        "_caller_tier": "free" if tc.agent_tier == "admin" else tc.agent_tier,
+    }
+    await check_ownership(tc, params)
+    result = await _list_api_keys(tc.ctx, params)
     return await finalize_response(tc, result)
 
 

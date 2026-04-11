@@ -74,3 +74,37 @@ class AuthError(Exception):
         self.status = status
         self.message = message
         self.code = code
+
+
+async def require_admin_tier(request: Request) -> tuple[str, str, dict[str, Any] | None]:
+    """FastAPI dependency: require the caller to be admin-tier.
+
+    v1.2.4 audit P0-1: belt-and-braces guard for routes like
+    ``/v1/infra/*`` that must never reach a non-admin caller.
+    ``require_tool()`` already enforces ``ADMIN_ONLY_TOOLS`` per-tool,
+    but attaching this at the router level guarantees that *every*
+    handler under the router is protected even if a future developer
+    adds a new route and forgets to wire it to an admin-listed tool.
+
+    Raises ``_ResponseError`` (short-circuited to a 403 RFC 9457
+    response) on any non-admin caller.
+    """
+    from gateway.src.deps.tool_context import _ResponseError
+    from gateway.src.errors import error_response
+
+    try:
+        agent_id, agent_tier, key_info = await authenticate(request)
+    except AuthError as exc:
+        resp = await error_response(exc.status, exc.message, exc.code, request=request)
+        raise _ResponseError(resp) from exc
+
+    if agent_tier != ADMIN_TIER:
+        resp = await error_response(
+            403,
+            "This route requires admin privileges",
+            "forbidden_admin_only",
+            request=request,
+        )
+        raise _ResponseError(resp)
+
+    return agent_id, agent_tier, key_info

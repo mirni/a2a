@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -13,7 +13,6 @@ from gateway.src.errors import handle_product_exception
 from gateway.src.tools.infrastructure import (
     _backup_database,
     _check_db_integrity,
-    _create_api_key,
     _delete_webhook,
     _get_event_schema,
     _get_events,
@@ -113,29 +112,50 @@ def _inject_caller(tc: ToolContext, params: dict[str, Any]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+# RFC 8594: self-service ``POST /v1/infra/keys`` has moved to the
+# billing router (``POST /v1/billing/keys``). The old path returns
+# 410 Gone with Deprecation/Sunset/Link headers pointing at the
+# successor. This is tracked by the v1.2.4 audit P0-1 fix.
+_KEYS_SUNSET_DATE = "Sun, 01 Mar 2026 00:00:00 GMT"
+_KEYS_SUCCESSOR = '</v1/billing/keys>; rel="successor-version"'
+
+
 @router.post("/keys")
-async def create_api_key(
-    body: CreateApiKeyRequest,
-    tc: ToolContext = Depends(require_tool("create_api_key")),
-):
-    params = _inject_caller(
-        tc,
-        {"agent_id": tc.agent_id, "tier": body.tier},
+async def create_api_key_deprecated(request: Request) -> JSONResponse:
+    """Deprecated: self-service key creation moved to /v1/billing/keys."""
+    from gateway.src.errors import error_response
+
+    resp = await error_response(
+        410,
+        "Self-service API key creation has moved to POST /v1/billing/keys.",
+        "endpoint_moved",
+        request=request,
     )
-    await check_ownership(tc, params)
-    try:
-        result = await _create_api_key(tc.ctx, params)
-    except Exception as exc:
-        return await handle_product_exception(tc.request, exc)
-    return await finalize_response(tc, result, status_code=201)
+    resp.headers["Deprecation"] = "true"
+    resp.headers["Sunset"] = _KEYS_SUNSET_DATE
+    existing_link = resp.headers.get("link", "")
+    resp.headers["Link"] = f"{existing_link}, {_KEYS_SUCCESSOR}" if existing_link else _KEYS_SUCCESSOR
+    return resp
 
 
 @router.get("/keys")
 async def list_api_keys(
     tc: ToolContext = Depends(require_tool("list_api_keys")),
 ):
-    params = _inject_caller(tc, {"agent_id": tc.agent_id})
-    await check_ownership(tc, params)
+    """List API keys — admin only (fleet view).
+
+    v1.2.4 audit P0-1: ``list_api_keys`` is now in
+    ``ADMIN_ONLY_TOOLS`` so non-admin callers are rejected by
+    ``require_tool`` with 403 ``admin_only``. Non-admin callers
+    should use ``GET /v1/billing/keys`` for their own fleet.
+
+    When called by an admin, returns keys for ALL agents (fleet
+    view) because ownership is bypassed for admin tier.
+    """
+    # Admin tier bypasses ownership; omit agent_id so the tool
+    # returns the whole fleet.
+    agent_id = tc.request.query_params.get("agent_id") or tc.agent_id
+    params = _inject_caller(tc, {"agent_id": agent_id})
     result = await _list_api_keys(tc.ctx, params)
     return await finalize_response(tc, result)
 
