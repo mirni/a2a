@@ -127,6 +127,21 @@ class TestKeyLookup:
         assert keys1[0]["tier"] == "free"
         assert keys2[0]["tier"] == "pro"
 
+    async def test_get_all_keys_admin_fleet(self, key_manager: KeyManager):
+        """v1.2.4 audit P0-1: admin fleet view across every agent."""
+        await key_manager.create_key(agent_id="agent-1", tier="free")
+        await key_manager.create_key(agent_id="agent-2", tier="pro")
+        await key_manager.create_key(agent_id="agent-3", tier="enterprise")
+
+        all_keys = await key_manager.get_all_keys()
+        assert len(all_keys) == 3
+        agent_ids = {k["agent_id"] for k in all_keys}
+        assert agent_ids == {"agent-1", "agent-2", "agent-3"}
+
+    async def test_get_all_keys_empty(self, key_manager: KeyManager):
+        all_keys = await key_manager.get_all_keys()
+        assert all_keys == []
+
 
 class TestOnKeyCreatedCallback:
     """v1.2.2 audit HIGH-8: KeyManager fires on_key_created after store."""
