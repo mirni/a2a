@@ -1,5 +1,39 @@
 # Changelog
 
+# Release v1.2.6
+
+**Date:** 2026-04-11
+**Commit:** 3b4a9e65
+**Previous:** v1.2.5
+
+## Changes
+
+### Bug Fixes
+
+- fix(ci): pre-flight NPM_TOKEN check + verify sandbox-parity gate (#87) (`3b4a9e6`)
+
+### Tests
+
+- fix(ci): pre-flight NPM_TOKEN check + verify sandbox-parity gate (#87) (`3b4a9e6`)
+
+### Other
+
+- Merge release v1.2.5 into main (`b9178fc`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | 1.2.6 |
+| a2a-db-backup | 1.2.6 |
+| a2a-gateway | 1.2.6 |
+| a2a-gateway-sandbox | 1.2.6 |
+| a2a-gateway-test | 1.2.6 |
+| a2a-litestream | 1.2.6 |
+| a2a-website | 1.2.6 |
+---
+
+
 # Release v1.2.5
 
 **Date:** 2026-04-11

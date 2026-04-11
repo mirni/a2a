@@ -1,5 +1,5 @@
 Package: a2a-website
-Version: 1.2.5
+Version: 1.2.6
 Architecture: all
 Depends: a2a-common (>= 0.4.9), nginx
 Maintainer: A2A Team <team@greenhelix.net>
