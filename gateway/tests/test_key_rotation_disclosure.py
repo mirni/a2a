@@ -21,9 +21,7 @@ async def _create_agent(app, agent_id: str, tier: str = "free", balance: float =
 async def _create_admin_agent(app, agent_id: str, balance: float = 1000.0) -> str:
     ctx = app.state.ctx
     await ctx.tracker.wallet.create(agent_id, initial_balance=balance, signup_bonus=False)
-    key_info = await ctx.key_manager.create_key(
-        agent_id, tier="pro", scopes=["read", "write", "admin"]
-    )
+    key_info = await ctx.key_manager.create_key(agent_id, tier="pro", scopes=["read", "write", "admin"])
     return key_info["key"]
 
 
