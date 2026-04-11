@@ -167,17 +167,29 @@ jobs:
           fi
           echo "Authenticated as: $WHOAMI_OUT"
 
-          # Confirm publish scope on the exact package. ``npm access list
-          # packages`` returns a JSON map of {pkg: permission}. We assert
-          # that @greenhelix/sdk is present with ``read-write``.
-          ACCESS_JSON=$(npm access list packages --json 2>/dev/null || echo '{}')
-          HAS_WRITE=$(printf '%s' "$ACCESS_JSON" | node -e '
+          # Confirm publish scope on the exact package.
+          #
+          # IMPORTANT: do NOT use ``npm access list packages --json`` here.
+          # Granular access tokens do not receive the "list all org
+          # packages" permission and npm returns E403 for that call, so
+          # the JSON we'd parse is an error object, not a package map.
+          # The per-package ``list collaborators`` command, by contrast,
+          # IS allowed for granular tokens and returns exactly the
+          # user→permission map we need:
+          #
+          #   { "greenhelix-mirni": "read-write" }
+          #
+          # We then assert that the authenticated user appears with
+          # ``read-write`` on @greenhelix/sdk.
+          ACCESS_JSON=$(npm access list collaborators @greenhelix/sdk --json 2>/dev/null || echo '{}')
+          HAS_WRITE=$(printf '%s' "$ACCESS_JSON" | WHOAMI="$WHOAMI_OUT" node -e '
             let data = "";
             process.stdin.on("data", c => data += c);
             process.stdin.on("end", () => {
               try {
                 const m = JSON.parse(data);
-                const perm = m["@greenhelix/sdk"] || "";
+                const user = process.env.WHOAMI;
+                const perm = m[user] || "";
                 process.stdout.write(perm === "read-write" ? "yes" : "no:" + perm);
               } catch (e) {
                 process.stdout.write("parse-error");
@@ -188,6 +200,7 @@ jobs:
           if [[ "$HAS_WRITE" != "yes" ]]; then
             echo "::error::NPM_TOKEN does NOT have read-write on @greenhelix/sdk (got: $HAS_WRITE)."
             echo "::error::Recreate the granular access token with 'Packages and scopes: @greenhelix' and 'Permissions: Read and write'."
+            echo "collaborators output: $ACCESS_JSON"
             exit 1
           fi
           echo "NPM_TOKEN has read-write on @greenhelix/sdk — proceeding."
