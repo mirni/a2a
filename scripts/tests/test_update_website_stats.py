@@ -179,8 +179,7 @@ def test_source_html_contains_only_placeholders(html_path: Path) -> None:
     for key, value in matches:
         expected = _EXPECTED_PLACEHOLDERS.get(key)
         assert expected is not None, (
-            f"{html_path}: unknown stats marker '{key}'. "
-            f"Add it to _EXPECTED_PLACEHOLDERS or fix the HTML."
+            f"{html_path}: unknown stats marker '{key}'. Add it to _EXPECTED_PLACEHOLDERS or fix the HTML."
         )
         assert value == expected, (
             f"{html_path}: marker '{key}' must contain the literal "
