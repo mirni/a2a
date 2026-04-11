@@ -482,14 +482,16 @@ async def _restore_database(ctx: AppContext, params: dict[str, Any]) -> dict[str
     # managed backup directory so the caller never has to know the
     # absolute path. Fall back to legacy ``backup_path``.
     filename = params.get("filename")
+    backup_path: str
     if filename:
         if "/" in filename or filename.startswith("."):
             raise ToolValidationError("Invalid filename: must be a plain basename inside the backups directory.")
         backup_path = os.path.join(backup_dir, filename)
     else:
-        backup_path = params.get("backup_path")
-        if not backup_path:
+        legacy_path = params.get("backup_path")
+        if not legacy_path:
             raise ToolValidationError("Missing backup file reference: provide either 'filename' or 'backup_path'.")
+        backup_path = legacy_path
 
     # Security: prevent path traversal attacks
     real_backup = os.path.realpath(backup_path)
