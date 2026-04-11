@@ -104,6 +104,13 @@ jobs:
       - name: Install dependencies
         run: scripts/ci/install_deps.sh --with-test
 
+      - name: Install z3-solver for gatekeeper metrics tests
+        # Gateway integration tests exercise MockVerifierClient → in-process
+        # Z3 when VERIFIER_AUTH_MODE is unset (default fallback). Without
+        # z3-solver the gatekeeper metrics route records "error" instead of
+        # "satisfied" and the histogram assertions fail.
+        run: pip install 'z3-solver==4.13.4.0'
+
       - name: Test server health
         run: ./check_server.sh
         continue-on-error: true
@@ -180,8 +187,11 @@ jobs:
       - name: Test messaging
         run: scripts/run_tests.sh products/messaging --cov=products/messaging/src --cov-report=xml:coverage-messaging.xml --cov-report=term-missing
 
-      - name: Install mcp SDK for mcp_server tests
-        run: pip install 'mcp>=1.0'
+      - name: Install mcp SDK + z3-solver for mcp_server tests
+        # z3-solver is needed because the MCP gatekeeper integration tests
+        # spin up the full gateway, which now uses MockVerifierClient by
+        # default (VERIFIER_AUTH_MODE unset → in-process Z3 fallback).
+        run: pip install 'mcp>=1.0' 'z3-solver==4.13.4.0'
 
       - name: Test mcp_server
         run: scripts/run_tests.sh products/mcp_server --cov=products/mcp_server/src --cov-report=xml:coverage-mcp_server.xml --cov-report=term-missing
