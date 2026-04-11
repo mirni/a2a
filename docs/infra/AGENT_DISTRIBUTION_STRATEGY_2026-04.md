@@ -698,7 +698,7 @@ accordingly. Detailed responses to each H1 item below.
 
 | # | Decision | Final |
 |---|----------|-------|
-| H2.1 | npm scope strategy | **Claim `@a2a` alias in addition to `@greenhelix`** — publish `@a2a/sdk` → shim re-exporting `@greenhelix/sdk` |
+| H2.1 | npm scope strategy | **Ship only `@greenhelix/sdk`** — the `@a2a` alias shim was dropped in v1.2.5 because the `@a2a` scope was never registered and the publish-npm-alias CI job kept failing. Re-evaluate if we can claim the org and want the discoverability. |
 | H2.2 | PyPI name strategy | Keep `a2a-greenhelix-sdk` as canonical |
 | H2.3 | MCP server auth default | **Require API key** — ties usage to billing |
 | H2.4 | HN launch angle | **"MCP server for 141 commerce tools"** — technical audience |
@@ -960,8 +960,11 @@ With the H* responses locked in, the immediate execution order is:
 - [ ] A4: Agent-SEO tool description rewrite
 - [ ] A2, A5, A6, A7: registry submissions + framework packages + IDE docs
 
-### A-side npm alias (quick wins once NPM_TOKEN exists)
-- [ ] Claim `@a2a` scope on npm (publish `@a2a/sdk` shim → `@greenhelix/sdk`)
+### A-side npm alias (deferred — H2.1 revised)
+- [ ] ~~Claim `@a2a` scope on npm (publish `@a2a/sdk` shim → `@greenhelix/sdk`)~~
+      Dropped v1.2.5 — the `@a2a` scope was never registered and the
+      publish-npm-alias CI job kept failing with E404 on PUT. Revisit
+      if/when we can claim the org.
 - [ ] Publish `@greenhelix/a2a-mcp` alias (name-squat insurance per H2.9)
 
 ---

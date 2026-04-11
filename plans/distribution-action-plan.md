@@ -33,7 +33,7 @@ Items from the existing P0 list and their current status:
 | # | P0 Item | Status | Notes |
 |---|---------|--------|-------|
 | 1 | Publish a2a-sdk to PyPI | **Blocked** | pyproject.toml missing author, classifiers, README |
-| 2 | Publish @a2a/sdk to npm | **Blocked** | Missing README, publishConfig, repo URL |
+| 2 | Publish @greenhelix/sdk to npm | **Done (v1.2.5)** | The @a2a/sdk alias was dropped — scope never registered |
 | 3 | Publish Docker image | **Blocked** | Dockerfile fixed (reputation removed), needs registry push |
 | 4 | Add GitHub topics | **Not done** | Human action (Settings > Topics) |
 | 5-9 | Submit to MCP registries | **Blocked** | Packages must be published first |
@@ -223,7 +223,7 @@ or establish trust:
 | A3 | **Fix Python SDK pyproject.toml** | Add: author, homepage, repository, classifiers, license, readme="README.md" | A2 |
 | A4 | **Fix TypeScript SDK package.json** | Add: author, repository, homepage, publishConfig, files | A2 |
 | A5 | **Build and publish a2a-sdk to PyPI** | `python -m build && twine upload dist/*` | A3 |
-| A6 | **Build and publish @a2a/sdk to npm** | `npm publish --access public` | A4 |
+| A6 | **Build and publish @greenhelix/sdk to npm** | `npm publish --access public` | A4 |
 | A7 | **Publish Docker image** to Docker Hub | `docker build -t greenhelix/a2a-gateway:0.9.1 . && docker push` | Nothing |
 | A8 | **Create SKILL.md** in repo root | Describe agent payment skills, marketplace discovery, escrow | A5 |
 

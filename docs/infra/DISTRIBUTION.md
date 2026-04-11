@@ -108,7 +108,7 @@ The platform's connectors (Stripe, GitHub, PostgreSQL) and the gateway itself sh
 |----------|---------|--------|
 | **PyPI** | `a2a-greenhelix-sdk` | `python -m build && twine upload dist/*`. Add classifiers: `Framework :: AI`, `Topic :: Scientific/Engineering :: Artificial Intelligence`. Keywords: `mcp`, `ai-agent`, `a2a`, `payments`, `escrow`, `trust`. |
 | **PyPI** | `a2a-gateway` | Publish the gateway as an installable package. |
-| **npm** | `@a2a/sdk` | `npm publish --access public`. Keywords: `mcp`, `ai-agent`, `a2a-commerce`, `agent-payments`. |
+| **npm** | `@greenhelix/sdk` | `npm publish --access public`. Keywords: `mcp`, `ai-agent`, `a2a-commerce`, `agent-payments`. |
 | **Docker Hub** | `greenhelix/a2a-gateway` | Publish Docker image. One-command start: `docker run -p 8000:8000 greenhelix/a2a-gateway`. |
 
 #### 2.3 GitHub Discoverability
@@ -315,7 +315,7 @@ Priority search terms:
 | Metric | Target (Month 3) | Target (Month 6) | Target (Month 12) |
 |--------|-------------------|-------------------|---------------------|
 | PyPI downloads (a2a-greenhelix-sdk) | 500/mo | 5,000/mo | 20,000/mo |
-| npm downloads (@a2a/sdk) | 200/mo | 2,000/mo | 10,000/mo |
+| npm downloads (@greenhelix/sdk) | 200/mo | 2,000/mo | 10,000/mo |
 | MCP registry views | 100/mo | 1,000/mo | 5,000/mo |
 | Registered agents (with wallet) | 50 | 200 | 500 |
 | Monthly active agents | 20 | 80 | 200 |
