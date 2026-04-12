@@ -4,21 +4,21 @@ from __future__ import annotations
 
 import os
 import sys
-import types
 
 import pytest
 
-# Register shared_src so cross-product imports (db_security) resolve
-_shared_src_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "src"))
-if "shared_src" not in sys.modules:
-    _pkg = types.ModuleType("shared_src")
-    _pkg.__path__ = [_shared_src_dir]
-    _pkg.__package__ = "shared_src"
-    sys.modules["shared_src"] = _pkg
+# Route shared_src registration through the single base module.
+_BASE = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "tests"))
+if _BASE not in sys.path:
+    sys.path.insert(0, _BASE)
 
-from src.marketplace import Marketplace
-from src.models import SLA, PricingModel, PricingModelType, ServiceCreate
-from src.storage import MarketplaceStorage
+from _conftest_base import register_shared_src  # noqa: E402
+
+register_shared_src(__file__)
+
+from src.marketplace import Marketplace  # noqa: E402
+from src.models import SLA, PricingModel, PricingModelType, ServiceCreate  # noqa: E402
+from src.storage import MarketplaceStorage  # noqa: E402
 
 
 @pytest.fixture

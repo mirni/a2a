@@ -4,26 +4,25 @@ from __future__ import annotations
 
 import os
 import sys
-import types
 
 import pytest_asyncio
 
-# Register shared_src so cross-product imports (db_security) resolve
-_shared_src_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "src"))
-if "shared_src" not in sys.modules:
-    _pkg = types.ModuleType("shared_src")
-    _pkg.__path__ = [_shared_src_dir]
-    _pkg.__package__ = "shared_src"
-    sys.modules["shared_src"] = _pkg
+# Route shared_src registration through the single base module.
+_BASE = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "tests"))
+if _BASE not in sys.path:
+    sys.path.insert(0, _BASE)
 
-# Ensure project root is importable
+from _conftest_base import register_shared_src  # noqa: E402
+
+register_shared_src(__file__)
+
+# Ensure project root is importable so ``products.*`` imports resolve.
 _project_root = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-for p in [_project_root]:
-    if p not in sys.path:
-        sys.path.insert(0, p)
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
 
-from products.messaging.src.api import MessagingAPI
-from products.messaging.src.storage import MessageStorage
+from products.messaging.src.api import MessagingAPI  # noqa: E402
+from products.messaging.src.storage import MessageStorage  # noqa: E402
 
 
 @pytest_asyncio.fixture

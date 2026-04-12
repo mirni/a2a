@@ -151,6 +151,7 @@ async def submit_verification(
     # histogram still differentiates tiers and outcomes, which is the
     # primary SRE and CMO dashboard ask.
     try:
+        # lint-no-float-money: allow (Prometheus histogram exposition — see GatekeeperMetrics.observe_job)
         cost_float = float(result.get("cost") or 0)
     except (TypeError, ValueError):
         cost_float = 0.0

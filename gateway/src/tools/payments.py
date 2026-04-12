@@ -162,6 +162,7 @@ def _compute_create_intent_gateway_fee(amount: float) -> float:
     tool_def = get_tool("create_intent")
     if not tool_def:
         return 0.0
+    # lint-no-float-money: allow (calculate_tool_cost legacy float signature, v1.2.9 ratchet)
     return calculate_tool_cost(tool_def.get("pricing", {}), {"amount": float(amount)})
 
 
@@ -202,6 +203,7 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
     intent = await ctx.payment_engine.get_intent(params["intent_id"])
     _check_intent_ownership(caller, tier, intent)
 
+    # lint-no-float-money: allow (_compute_create_intent_gateway_fee legacy float signature, v1.2.9 ratchet)
     gateway_fee = _compute_create_intent_gateway_fee(float(intent.amount))
     # New policy (v1.2.4): the fee charged at create_intent is refunded.
     fee_refunded = True
@@ -220,6 +222,7 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
         try:
             await ctx.tracker.wallet.deposit(
                 intent.payer,
+                # lint-no-float-money: allow (wallet.deposit legacy float API, v1.2.9 ratchet)
                 float(gateway_fee),
                 description=f"refund-fee:{intent.id}",
                 currency=currency,
@@ -262,12 +265,14 @@ async def _refund_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
     if intent.status.value == "settled":
         await ctx.tracker.wallet.withdraw(
             intent.payee,
+            # lint-no-float-money: allow (wallet.withdraw legacy float API, v1.2.9 ratchet)
             float(intent.amount),
             description=f"refund:{intent.id}",
             currency=currency,
         )
         await ctx.tracker.wallet.deposit(
             intent.payer,
+            # lint-no-float-money: allow (wallet.deposit legacy float API, v1.2.9 ratchet)
             float(intent.amount),
             description=f"refund:{intent.id}",
             currency=currency,
@@ -544,6 +549,7 @@ async def _create_split_intent(ctx: AppContext, params: dict[str, Any]) -> dict[
     from decimal import Decimal
 
     payer = params["payer"]
+    # lint-no-float-money: allow (wallet legacy float API, v1.2.9 ratchet)
     amount = float(params["amount"])
     splits = params["splits"]
     description = params.get("description", "")

@@ -308,6 +308,7 @@ class Wallet:
         from_cur = Currency(from_currency)
         to_cur = Currency(to_currency)
         converted = await exchange_service.convert(_Decimal(str(amount)), from_cur, to_cur)
+        # lint-no-float-money: allow (_to_atomic legacy float API, v1.2.9 ratchet)
         to_amount = float(converted.amount)
 
         # --- Atomic transaction: withdraw + deposit ---

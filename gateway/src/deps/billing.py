@@ -20,11 +20,14 @@ def calculate_tool_cost(pricing: dict[str, Any], params: dict[str, Any]) -> floa
     model = pricing.get("model")
     if model == "percentage":
         try:
+            # lint-no-float-money: allow (pricing-config boundary, v1.2.9 ratchet)
             amount = float(params.get("amount", 0))
         except (ValueError, TypeError):
             amount = 0.0
         pct = float(pricing.get("percentage", 0))
+        # lint-no-float-money: allow (pricing-config boundary, v1.2.9 ratchet)
         min_fee = float(pricing.get("min_fee", 0))
+        # lint-no-float-money: allow (pricing-config boundary, v1.2.9 ratchet)
         max_fee = float(pricing.get("max_fee", float("inf")))
         raw_fee = amount * pct / 100.0
         cost = max(min_fee, min(max_fee, raw_fee))

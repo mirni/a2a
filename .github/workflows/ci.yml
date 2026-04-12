@@ -78,6 +78,9 @@ jobs:
       - name: Pydantic forbid-extras lint (request models)
         run: python scripts/lint_pydantic_forbid.py --quiet
 
+      - name: Float-money lint (Decimal-only money paths)
+        run: python scripts/lint_no_float_money.py --quiet
+
       # NOTE: the old "Website stats in sync with catalog" check was
       # removed. website/*.html now ship literal placeholders
       # ({{TOTAL_TOOLS}}, {{NUM_SERVICES}}, {{VERSION}}) between the

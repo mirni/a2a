@@ -5,11 +5,14 @@ from __future__ import annotations
 from decimal import Decimal
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 from src.money import (
     SCALE,
     atomic_to_credits,
     atomic_to_float,
     credits_to_atomic,
+    split_amount,
     validate_non_negative,
 )
 
@@ -91,6 +94,75 @@ class TestAtomicToFloat:
 
     def test_returns_float(self):
         assert isinstance(atomic_to_float(1), float)
+
+
+class TestSplitAmount:
+    """Per P1-3: ``split_amount`` guarantees ``sum(slices) == total``.
+
+    The last slice absorbs any rounding remainder so no cents ever
+    disappear or materialise out of thin air.
+    """
+
+    def test_two_way_even(self) -> None:
+        slices = split_amount(Decimal("10"), [Decimal("0.5"), Decimal("0.5")])
+        assert slices == [Decimal("5"), Decimal("5")]
+        assert sum(slices) == Decimal("10")
+
+    def test_three_way_uneven_absorbs_remainder(self) -> None:
+        # 0.3333… × 3 would lose a cent on 1.00. split_amount absorbs it
+        # into the final slice so the sum is exact.
+        ratios = [Decimal("1") / Decimal("3")] * 3
+        slices = split_amount(Decimal("1.00"), ratios)
+        assert sum(slices) == Decimal("1.00")
+        assert len(slices) == 3
+
+    def test_returns_decimal_list(self) -> None:
+        slices = split_amount(Decimal("9.99"), [Decimal("0.5"), Decimal("0.5")])
+        assert all(isinstance(s, Decimal) for s in slices)
+
+    def test_zero_total(self) -> None:
+        slices = split_amount(Decimal("0"), [Decimal("0.3"), Decimal("0.7")])
+        assert slices == [Decimal("0"), Decimal("0")]
+
+    def test_single_slice(self) -> None:
+        slices = split_amount(Decimal("42.00"), [Decimal("1")])
+        assert slices == [Decimal("42.00")]
+
+    def test_rejects_negative_total(self) -> None:
+        with pytest.raises(ValueError, match="[Nn]egative"):
+            split_amount(Decimal("-1"), [Decimal("1")])
+
+    def test_rejects_negative_ratio(self) -> None:
+        with pytest.raises(ValueError, match="[Nn]egative"):
+            split_amount(Decimal("1"), [Decimal("-0.5"), Decimal("1.5")])
+
+    def test_rejects_ratios_not_summing_to_one(self) -> None:
+        with pytest.raises(ValueError, match="ratios"):
+            split_amount(Decimal("1"), [Decimal("0.3"), Decimal("0.3")])
+
+    def test_rejects_empty_ratios(self) -> None:
+        with pytest.raises(ValueError, match="empty"):
+            split_amount(Decimal("1"), [])
+
+    def test_rejects_float_ratio(self) -> None:
+        # Type guard: splitting on float is the exact bug we are avoiding.
+        with pytest.raises(TypeError):
+            split_amount(Decimal("1"), [0.5, 0.5])  # type: ignore[list-item]
+
+    @settings(max_examples=200)
+    @given(
+        total_atomic=st.integers(min_value=0, max_value=10**14),
+        weights=st.lists(st.integers(min_value=1, max_value=10**6), min_size=1, max_size=8),
+    )
+    def test_hypothesis_sum_invariant(self, total_atomic: int, weights: list[int]) -> None:
+        """Property: Σ slices == total for any valid ratio partition."""
+        total = Decimal(total_atomic) / Decimal(SCALE)
+        weight_sum = Decimal(sum(weights))
+        ratios = [Decimal(w) / weight_sum for w in weights]
+        slices = split_amount(total, ratios)
+        assert sum(slices) == total
+        assert len(slices) == len(ratios)
+        assert all(s >= Decimal("0") for s in slices)
 
 
 class TestValidateNonNegative:

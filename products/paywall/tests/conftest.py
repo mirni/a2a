@@ -2,21 +2,22 @@
 
 from __future__ import annotations
 
+import importlib
 import importlib.util
 import os
 import sys
 import tempfile
-import types
 
 import pytest
 
-# Register shared_src so cross-product imports (db_security) resolve
-_shared_src_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "src"))
-if "shared_src" not in sys.modules:
-    _pkg = types.ModuleType("shared_src")
-    _pkg.__path__ = [_shared_src_dir]
-    _pkg.__package__ = "shared_src"
-    sys.modules["shared_src"] = _pkg
+# Route shared_src registration through the single base module.
+_BASE = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "tests"))
+if _BASE not in sys.path:
+    sys.path.insert(0, _BASE)
+
+from _conftest_base import register_shared_src  # noqa: E402
+
+register_shared_src(__file__)
 
 # ---------------------------------------------------------------------------
 # Bootstrap: import the billing layer without polluting the "src" namespace.
@@ -42,8 +43,6 @@ _billing_root = os.path.normpath(os.path.join(_BILLING_SRC, ".."))
 sys.path.insert(0, _billing_root)
 
 # Import billing's src package under an alias to avoid clash
-import importlib
-
 _billing_pkg = importlib.import_module("src")
 # Stash it so subsequent paywall "import src" can replace it
 _billing_src_module = _billing_pkg

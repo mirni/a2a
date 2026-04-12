@@ -238,4 +238,5 @@ class PlanManager:
 
     async def _grant_credits(self, agent_id: str, amount: float, description: str) -> float:
         """Deposit credits to the subscriber's wallet."""
+        # lint-no-float-money: allow (wallet.deposit legacy float API, v1.2.9 ratchet)
         return await self.wallet.deposit(agent_id, float(amount), description)
