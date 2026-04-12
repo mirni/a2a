@@ -27,14 +27,15 @@ if _billing_root not in sys.path:
     sys.path.insert(0, _billing_root)
 
 # ---------------------------------------------------------------------------
-# Register shared_src so cross-product imports (db_security) resolve
+# Route shared_src registration through the single base module.
 # ---------------------------------------------------------------------------
-_shared_src_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "src"))
-if "shared_src" not in sys.modules:
-    _shared_pkg = types.ModuleType("shared_src")
-    _shared_pkg.__path__ = [_shared_src_dir]
-    _shared_pkg.__package__ = "shared_src"
-    sys.modules["shared_src"] = _shared_pkg
+_BASE = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "tests"))
+if _BASE not in sys.path:
+    sys.path.insert(0, _BASE)
+
+from _conftest_base import register_shared_src  # noqa: E402
+
+register_shared_src(__file__)
 
 # ---------------------------------------------------------------------------
 # Register 'payments' as a virtual package pointing to payments/src/
@@ -52,12 +53,12 @@ if "payments" not in sys.modules:
 # - 'src.xxx' resolves to billing
 # - 'payments.xxx' resolves to payments
 # ---------------------------------------------------------------------------
-import pytest
-from payments.engine import PaymentEngine
-from payments.scheduler import SubscriptionScheduler
-from payments.storage import PaymentStorage
-from src.storage import StorageBackend as BillingStorageBackend
-from src.wallet import Wallet as BillingWallet
+import pytest  # noqa: E402
+from payments.engine import PaymentEngine  # noqa: E402
+from payments.scheduler import SubscriptionScheduler  # noqa: E402
+from payments.storage import PaymentStorage  # noqa: E402
+from src.storage import StorageBackend as BillingStorageBackend  # noqa: E402
+from src.wallet import Wallet as BillingWallet  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Fixtures
