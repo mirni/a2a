@@ -25,6 +25,7 @@ TEST_DEPS=(
     "pytest-asyncio>=0.23"
     "pytest-cov>=5.0"
     "jsonschema>=4.0"
+    "hypothesis>=6.0"
 )
 
 WITH_TEST=0
