@@ -175,6 +175,58 @@ class TestBillingEventStorage:
         assert events[0]["event_type"] == "e1"
 
 
+class TestAtomicCreditRetry:
+    """v1.2.9 audit RACE1.1: atomic_credit retries on SQLITE_BUSY."""
+
+    async def test_atomic_credit_retries_on_locked(self, storage: StorageBackend):
+        """Simulate 'database is locked' on first attempt, succeed on retry."""
+        import sqlite3
+        from unittest.mock import AsyncMock, patch
+
+        await storage.create_wallet("retry-agent", 100.0)
+
+        call_count = 0
+        original_execute = storage.db.execute
+
+        async def _flaky_execute(sql, *args, **kwargs):
+            nonlocal call_count
+            if "BEGIN IMMEDIATE" in str(sql):
+                call_count += 1
+                if call_count == 1:
+                    raise sqlite3.OperationalError("database is locked")
+            return await original_execute(sql, *args, **kwargs)
+
+        with patch.object(storage.db, "execute", side_effect=_flaky_execute):
+            success, balance = await storage.atomic_credit("retry-agent", 50.0)
+
+        assert success is True
+        assert balance == 150.0
+        assert call_count >= 2  # at least 1 retry
+
+    async def test_atomic_credit_non_locked_error_not_retried(self, storage: StorageBackend):
+        """Non-'database is locked' errors should propagate immediately."""
+        import sqlite3
+        from unittest.mock import patch
+
+        await storage.create_wallet("err-agent", 100.0)
+
+        async def _error_execute(sql, *args, **kwargs):
+            if "BEGIN IMMEDIATE" in str(sql):
+                raise sqlite3.OperationalError("disk I/O error")
+            return await storage.db.execute(sql, *args, **kwargs)
+
+        with patch.object(storage.db, "execute", side_effect=_error_execute):
+            with pytest.raises(sqlite3.OperationalError, match="disk I/O"):
+                await storage.atomic_credit("err-agent", 10.0)
+
+    async def test_atomic_credit_succeeds_without_retry(self, storage: StorageBackend):
+        """Normal atomic_credit succeeds without needing retry."""
+        await storage.create_wallet("normal-agent", 200.0)
+        success, balance = await storage.atomic_credit("normal-agent", 30.0)
+        assert success is True
+        assert balance == 230.0
+
+
 class TestStorageNotConnected:
     async def test_db_raises_when_not_connected(self):
         s = StorageBackend(dsn="sqlite:///test.db")
