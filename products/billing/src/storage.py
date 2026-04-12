@@ -395,26 +395,42 @@ CREATE INDEX IF NOT EXISTS idx_api_audit_ts ON api_audit_log(timestamp);
         Uses BEGIN IMMEDIATE to acquire a write lock, then UPDATE + SELECT
         within the same transaction before commit.
         Returns (success, new_balance) where success=True if agent exists.
+
+        Retries up to 3 times on ``OperationalError`` (SQLITE_BUSY) with
+        exponential backoff to handle concurrent deposit contention
+        (v1.2.9 audit RACE1.1).
         """
-        now = time.time()
-        amt_atomic = self._to_atomic(amount)
-        async with self._txn_lock:
-            await self.db.execute("BEGIN IMMEDIATE")
+        import sqlite3
+
+        last_exc: Exception | None = None
+        for attempt in range(1, 4):
+            now = time.time()
+            amt_atomic = self._to_atomic(amount)
             try:
-                cursor = await self.db.execute(
-                    "UPDATE wallets SET balance = balance + ?, updated_at = ? WHERE agent_id = ?",
-                    (amt_atomic, now, agent_id),
-                )
-                affected = cursor.rowcount
-                cur2 = await self.db.execute("SELECT balance FROM wallets WHERE agent_id = ?", (agent_id,))
-                row = await cur2.fetchone()
-                await self.db.commit()
-            except Exception:
-                await self.db.rollback()
+                async with self._txn_lock:
+                    await self.db.execute("BEGIN IMMEDIATE")
+                    try:
+                        cursor = await self.db.execute(
+                            "UPDATE wallets SET balance = balance + ?, updated_at = ? WHERE agent_id = ?",
+                            (amt_atomic, now, agent_id),
+                        )
+                        affected = cursor.rowcount
+                        cur2 = await self.db.execute("SELECT balance FROM wallets WHERE agent_id = ?", (agent_id,))
+                        row = await cur2.fetchone()
+                        await self.db.commit()
+                    except Exception:
+                        await self.db.rollback()
+                        raise
+                if row is None:
+                    return (False, 0.0)
+                return (affected > 0, self._from_atomic(row[0]))
+            except (sqlite3.OperationalError, Exception) as exc:
+                if "database is locked" in str(exc):
+                    last_exc = exc
+                    await asyncio.sleep(0.1 * attempt)
+                    continue
                 raise
-        if row is None:
-            return (False, 0.0)
-        return (affected > 0, self._from_atomic(row[0]))
+        raise last_exc  # type: ignore[misc]
 
     # -----------------------------------------------------------------------
     # Transaction log
