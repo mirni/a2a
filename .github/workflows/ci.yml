@@ -81,6 +81,9 @@ jobs:
       - name: Float-money lint (Decimal-only money paths)
         run: python scripts/lint_no_float_money.py --quiet
 
+      - name: Bootstrap import-order smoke test
+        run: python scripts/test_bootstrap.py
+
       # NOTE: the old "Website stats in sync with catalog" check was
       # removed. website/*.html now ship literal placeholders
       # ({{TOTAL_TOOLS}}, {{NUM_SERVICES}}, {{VERSION}}) between the
