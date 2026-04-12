@@ -238,17 +238,27 @@ class IdentityStorage:
             raise ValueError(f"Unsupported DSN scheme: '{scheme}'. Only 'sqlite://' and bare paths are supported.")
         return dsn
 
+    # Register ``(table, column, col_type)`` triples here when a column is
+    # added to an existing table. Entries are applied BEFORE
+    # executescript(_SCHEMA) runs, so CREATE INDEX statements that
+    # reference the new column won't abort on pre-existing DBs.
+    # See audit finding C2 and ``shared_src.storage_migrations``.
+    _COLUMN_MIGRATIONS: tuple[tuple[str, str, str], ...] = ()
+
     async def connect(self) -> None:
         """Open the database connection and ensure schema exists."""
         try:
             from shared_src.db_security import harden_connection
+            from shared_src.storage_migrations import apply_column_migrations
         except ImportError:
             from src.db_security import harden_connection
+            from src.storage_migrations import apply_column_migrations
 
         db_path = self._parse_dsn(self.dsn)
         self._db = await aiosqlite.connect(db_path)
         self._db.row_factory = aiosqlite.Row
         await harden_connection(self._db)
+        await apply_column_migrations(self._db, self._COLUMN_MIGRATIONS)
         await self._db.executescript(_SCHEMA)
         await self._db.commit()
 

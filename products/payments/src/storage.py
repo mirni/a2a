@@ -153,56 +153,48 @@ class PaymentStorage:
         await self._db.executescript(_SCHEMA)
         await self._db.commit()
 
+    # Column migrations: entries added when a column is introduced after the
+    # initial schema. Run BEFORE executescript(_SCHEMA) via
+    # shared_src.storage_migrations.apply_column_migrations so that
+    # CREATE INDEX statements in _SCHEMA don't abort with
+    # ``OperationalError: no such column: …`` on DBs created by an older
+    # code version. Audit finding C2 (v1.0.1 external audit, PR #61).
+    _COLUMN_MIGRATIONS: tuple[tuple[str, str, str], ...] = (
+        # --- payment_intents ---
+        ("payment_intents", "idempotency_key", "TEXT"),
+        ("payment_intents", "settlement_id", "TEXT"),
+        ("payment_intents", "metadata", "TEXT NOT NULL DEFAULT '{}'"),
+        # --- escrows ---
+        ("escrows", "idempotency_key", "TEXT"),
+        ("escrows", "settlement_id", "TEXT"),
+        ("escrows", "timeout_at", "REAL"),
+        ("escrows", "metadata", "TEXT NOT NULL DEFAULT '{}'"),
+        # --- subscriptions ---
+        ("subscriptions", "idempotency_key", "TEXT"),
+        ("subscriptions", "cancelled_by", "TEXT"),
+        ("subscriptions", "metadata", "TEXT NOT NULL DEFAULT '{}'"),
+        # --- settlements ---
+        ("settlements", "idempotency_key", "TEXT"),
+        ("settlements", "source_type", "TEXT NOT NULL DEFAULT ''"),
+        ("settlements", "source_id", "TEXT NOT NULL DEFAULT ''"),
+        ("settlements", "description", "TEXT NOT NULL DEFAULT ''"),
+        ("settlements", "status", "TEXT NOT NULL DEFAULT 'settled'"),
+        # --- refunds ---
+        ("refunds", "idempotency_key", "TEXT"),
+        ("refunds", "reason", "TEXT NOT NULL DEFAULT ''"),
+        ("refunds", "status", "TEXT NOT NULL DEFAULT 'completed'"),
+    )
+
     async def _apply_column_migrations(self) -> None:
-        """Add columns introduced after the initial schema to existing tables.
-
-        SQLite's CREATE TABLE IF NOT EXISTS does not alter existing tables,
-        so columns added in later versions must be added via ALTER TABLE.
-        Each ALTER is guarded by a column-existence check so this is idempotent.
-
-        IMPORTANT: executescript(_SCHEMA) runs AFTER this method and creates
-        indexes like ``CREATE INDEX ... ON settlements(source_type, source_id)``.
-        If the table exists but lacks those columns, executescript fails with
-        ``OperationalError: no such column: source_type`` — the root cause of
-        audit finding C2 (100% capture failure on production servers whose DBs
-        were created by an older code version).
+        """Delegate to the shared helper (preserved method for back-compat
+        with existing tests that patch this name).
         """
         assert self._db is not None
-        migrations = [
-            # --- payment_intents ---
-            ("payment_intents", "idempotency_key", "TEXT"),
-            ("payment_intents", "settlement_id", "TEXT"),
-            ("payment_intents", "metadata", "TEXT NOT NULL DEFAULT '{}'"),
-            # --- escrows ---
-            ("escrows", "idempotency_key", "TEXT"),
-            ("escrows", "settlement_id", "TEXT"),
-            ("escrows", "timeout_at", "REAL"),
-            ("escrows", "metadata", "TEXT NOT NULL DEFAULT '{}'"),
-            # --- subscriptions ---
-            ("subscriptions", "idempotency_key", "TEXT"),
-            ("subscriptions", "cancelled_by", "TEXT"),
-            ("subscriptions", "metadata", "TEXT NOT NULL DEFAULT '{}'"),
-            # --- settlements ---
-            ("settlements", "idempotency_key", "TEXT"),
-            ("settlements", "source_type", "TEXT NOT NULL DEFAULT ''"),
-            ("settlements", "source_id", "TEXT NOT NULL DEFAULT ''"),
-            ("settlements", "description", "TEXT NOT NULL DEFAULT ''"),
-            ("settlements", "status", "TEXT NOT NULL DEFAULT 'settled'"),
-            # --- refunds ---
-            ("refunds", "idempotency_key", "TEXT"),
-            ("refunds", "reason", "TEXT NOT NULL DEFAULT ''"),
-            ("refunds", "status", "TEXT NOT NULL DEFAULT 'completed'"),
-        ]
-        for table, column, col_type in migrations:
-            cursor = await self._db.execute(  # nosemgrep: formatted-sql-query, sqlalchemy-execute-raw-query
-                f"PRAGMA table_info({table})"
-            )
-            columns = [row[1] for row in await cursor.fetchall()]
-            if columns and column not in columns:
-                await self._db.execute(  # nosemgrep: formatted-sql-query, sqlalchemy-execute-raw-query
-                    f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"
-                )
-        await self._db.commit()
+        try:
+            from shared_src.storage_migrations import apply_column_migrations
+        except ImportError:
+            from src.storage_migrations import apply_column_migrations
+        await apply_column_migrations(self._db, self._COLUMN_MIGRATIONS)
 
     async def close(self) -> None:
         """Close the database connection."""
