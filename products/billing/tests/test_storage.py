@@ -219,6 +219,23 @@ class TestAtomicCreditRetry:
             with pytest.raises(sqlite3.OperationalError, match="disk I/O"):
                 await storage.atomic_credit("err-agent", 10.0)
 
+    async def test_atomic_credit_exhausts_retries(self, storage: StorageBackend):
+        """All 3 retries fail → raises the last OperationalError."""
+        import sqlite3
+        from unittest.mock import patch
+
+        await storage.create_wallet("exhaust-agent", 100.0)
+        original_execute = storage.db.execute
+
+        async def _always_locked(sql, *args, **kwargs):
+            if "BEGIN IMMEDIATE" in str(sql):
+                raise sqlite3.OperationalError("database is locked")
+            return await original_execute(sql, *args, **kwargs)
+
+        with patch.object(storage.db, "execute", side_effect=_always_locked):
+            with pytest.raises(sqlite3.OperationalError, match="database is locked"):
+                await storage.atomic_credit("exhaust-agent", 10.0)
+
     async def test_atomic_credit_succeeds_without_retry(self, storage: StorageBackend):
         """Normal atomic_credit succeeds without needing retry."""
         await storage.create_wallet("normal-agent", 200.0)
