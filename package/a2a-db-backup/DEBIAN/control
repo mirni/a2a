@@ -1,5 +1,5 @@
 Package: a2a-db-backup
-Version: 1.2.8
+Version: {{VERSION}}
 Architecture: all
 Depends: sqlite3
 Maintainer: A2A Team <team@greenhelix.net>

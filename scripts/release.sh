@@ -297,19 +297,9 @@ log "Created branch '${RELEASE_BRANCH}' at ${SHA:0:8}"
 
 header "Step 2: Bump versions to ${VERSION}"
 
-# Bump DEBIAN/control files (separate release cadence from the top-level
-# VERSION file — these track deb package versions).
-bump_deb_version() {
-    local control_file="$1"
-    if [[ -f "$control_file" ]]; then
-        sed -i "s/^Version:.*/Version: ${VERSION}/" "$control_file"
-        log "Bumped $(basename "$(dirname "$(dirname "$control_file")")")/DEBIAN/control → ${VERSION}"
-    fi
-}
-
-for pkg_dir in "$REPO_ROOT"/package/*/DEBIAN/control; do
-    bump_deb_version "$pkg_dir"
-done
+# DEBIAN/control files use {{VERSION}} placeholder — resolved at build time
+# by create_package.sh from gateway/src/_version.py. No need to sed them here.
+log "DEBIAN/control files use {{VERSION}} placeholder (resolved at build time)"
 
 # Top-level VERSION file is the single source of truth for the API
 # version shared between gateway/src/_version.py, sdk/pyproject.toml,
@@ -455,8 +445,8 @@ rm -f "$RELEASE_NOTES_FILE"
 header "Step 5: Commit release"
 
 # Stage only release-related files (not untracked files)
+# Note: package/*/DEBIAN/control uses {{VERSION}} placeholder and doesn't change.
 git -C "$REPO_ROOT" add \
-    package/*/DEBIAN/control \
     CHANGELOG.md
 [[ -f "$REPO_ROOT/VERSION" ]] && git -C "$REPO_ROOT" add VERSION || true
 [[ -f "$REPO_ROOT/sdk/pyproject.toml" ]] && git -C "$REPO_ROOT" add sdk/pyproject.toml || true

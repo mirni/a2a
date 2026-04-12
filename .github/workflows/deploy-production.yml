@@ -57,15 +57,18 @@ jobs:
           fi
 
           # Set component flags
+          # Gateway deploys always include the website so docs/API-reference
+          # stay in sync with the running server.
           if [[ "$COMPONENT" == "all" || "$COMPONENT" == "a2a-gateway" ]]; then
             echo "deploy_gateway=true" >> "$GITHUB_OUTPUT"
+            echo "deploy_website=true" >> "$GITHUB_OUTPUT"
           else
             echo "deploy_gateway=false" >> "$GITHUB_OUTPUT"
           fi
 
-          if [[ "$COMPONENT" == "all" || "$COMPONENT" == "a2a-website" ]]; then
+          if [[ "$COMPONENT" == "a2a-website" ]]; then
             echo "deploy_website=true" >> "$GITHUB_OUTPUT"
-          else
+          elif [[ "$COMPONENT" != "all" && "$COMPONENT" != "a2a-gateway" ]]; then
             echo "deploy_website=false" >> "$GITHUB_OUTPUT"
           fi
 
