@@ -1,5 +1,5 @@
 Package: a2a-litestream
-Version: 1.2.8
+Version: {{VERSION}}
 Architecture: all
 Depends: litestream
 Maintainer: A2A Team <team@greenhelix.net>

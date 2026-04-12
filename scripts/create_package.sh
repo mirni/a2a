@@ -33,6 +33,14 @@ log()  { echo -e "\033[0;32m[+]\033[0m $*"; }
 warn() { echo -e "\033[1;33m[!]\033[0m $*"; }
 err()  { echo -e "\033[0;31m[x]\033[0m $*" >&2; exit 1; }
 
+# Single source of truth for package version: gateway/src/_version.py
+PACKAGE_VERSION=$(python3 -c "
+import re, pathlib
+m = re.search(r'__version__\s*=\s*[\"\\x27]([^\"\\x27]+)', (pathlib.Path('$REPO_ROOT') / 'gateway/src/_version.py').read_text())
+print(m.group(1))
+")
+[[ -n "$PACKAGE_VERSION" ]] || err "Could not read version from gateway/src/_version.py"
+
 usage() {
     echo "Usage: $0 <package-name|ALL>"
     echo ""
@@ -84,9 +92,7 @@ build_deb() {
         err "Missing DEBIAN/control in $pkg_src"
     fi
 
-    # Read version from control file
-    local version
-    version=$(grep '^Version:' "$pkg_src/DEBIAN/control" | awk '{print $2}')
+    local version="$PACKAGE_VERSION"
     local deb_name="${pkg_name}_${version}_all"
 
     log "Building ${deb_name}.deb..."
@@ -99,8 +105,9 @@ build_deb() {
     local dest="$staging/$pkg_name"
     mkdir -p "$dest"
 
-    # Copy DEBIAN metadata (always regular files)
+    # Copy DEBIAN metadata and substitute {{VERSION}} placeholder
     cp -r "$pkg_src/DEBIAN" "$dest/DEBIAN"
+    sed -i "s/{{VERSION}}/$version/g" "$dest/DEBIAN/control"
 
     # Copy opt/ with symlink dereferencing — resolves repo content symlinks
     if [[ -d "$pkg_src/opt" ]]; then
