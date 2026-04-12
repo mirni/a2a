@@ -58,10 +58,7 @@ def read_version_file(path: Path) -> str:
     if not text:
         raise ValueError(f"VERSION file is empty: {path}")
     if not _SEMVER_RE.match(text):
-        raise ValueError(
-            f"VERSION file has invalid format: {text!r} "
-            f"(expected x.y.z or x.y.z-tag)"
-        )
+        raise ValueError(f"VERSION file has invalid format: {text!r} (expected x.y.z or x.y.z-tag)")
     return text
 
 
@@ -77,9 +74,7 @@ def write_version_file(path: Path, version: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-_GATEWAY_VERSION_RE = re.compile(
-    r'(__version__\s*=\s*["\'])([^"\']+)(["\'])'
-)
+_GATEWAY_VERSION_RE = re.compile(r'(__version__\s*=\s*["\'])([^"\']+)(["\'])')
 
 
 def update_gateway_version(path: Path, version: str, *, write: bool) -> bool:
@@ -90,7 +85,7 @@ def update_gateway_version(path: Path, version: str, *, write: bool) -> bool:
     """
     original = path.read_text()
     updated, n = _GATEWAY_VERSION_RE.subn(
-        rf'\g<1>{version}\g<3>',
+        rf"\g<1>{version}\g<3>",
         original,
         count=1,
     )
@@ -121,7 +116,7 @@ def update_pyproject_version(path: Path, version: str, *, write: bool) -> bool:
     """Rewrite the first ``version = "…"`` in a pyproject.toml file."""
     original = path.read_text()
     updated, n = _PYPROJECT_VERSION_RE.subn(
-        rf'\g<1>{version}\g<3>',
+        rf"\g<1>{version}\g<3>",
         original,
         count=1,
     )

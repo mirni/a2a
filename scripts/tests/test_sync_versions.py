@@ -21,7 +21,6 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 
 import sync_versions as mod  # noqa: E402
 
-
 # ---------------------------------------------------------------------------
 # read_version_file
 # ---------------------------------------------------------------------------
@@ -79,7 +78,7 @@ def test_update_gateway_version_check_mode_no_write(tmp_path: Path) -> None:
     f.write_text('__version__ = "1.2.7"\n')
     changed = mod.update_gateway_version(f, "1.2.9", write=False)
     assert changed is True
-    assert '1.2.7' in f.read_text()  # file untouched
+    assert "1.2.7" in f.read_text()  # file untouched
 
 
 # ---------------------------------------------------------------------------
@@ -89,9 +88,7 @@ def test_update_gateway_version_check_mode_no_write(tmp_path: Path) -> None:
 
 def test_update_pyproject_version_rewrites_toml(tmp_path: Path) -> None:
     f = tmp_path / "pyproject.toml"
-    f.write_text(
-        '[project]\nname = "foo"\nversion = "1.2.7"\ndescription = "bar"\n'
-    )
+    f.write_text('[project]\nname = "foo"\nversion = "1.2.7"\ndescription = "bar"\n')
     changed = mod.update_pyproject_version(f, "1.2.9", write=True)
     assert changed is True
     body = f.read_text()
@@ -103,11 +100,7 @@ def test_update_pyproject_version_rewrites_toml(tmp_path: Path) -> None:
 def test_update_pyproject_version_only_touches_project_table(tmp_path: Path) -> None:
     """Must not rewrite a `version = ` line in [tool.poetry] or similar."""
     f = tmp_path / "pyproject.toml"
-    f.write_text(
-        '[project]\nname = "foo"\nversion = "1.2.7"\n'
-        '\n'
-        '[tool.black]\nversion = "stable"\n'
-    )
+    f.write_text('[project]\nname = "foo"\nversion = "1.2.7"\n\n[tool.black]\nversion = "stable"\n')
     mod.update_pyproject_version(f, "1.2.9", write=True)
     body = f.read_text()
     # Only first occurrence is rewritten (under [project]).
@@ -170,13 +163,9 @@ def _make_tree(root: Path, version: str) -> None:
     """Create a miniature repo layout matching /workdir."""
     (root / "VERSION").write_text(version + "\n")
     (root / "gateway" / "src").mkdir(parents=True)
-    (root / "gateway" / "src" / "_version.py").write_text(
-        '"""gateway version."""\n\n__version__ = "0.0.0"\n'
-    )
+    (root / "gateway" / "src" / "_version.py").write_text('"""gateway version."""\n\n__version__ = "0.0.0"\n')
     (root / "sdk").mkdir()
-    (root / "sdk" / "pyproject.toml").write_text(
-        '[project]\nname = "a2a"\nversion = "0.0.0"\n'
-    )
+    (root / "sdk" / "pyproject.toml").write_text('[project]\nname = "a2a"\nversion = "0.0.0"\n')
     (root / "sdk-ts").mkdir()
     (root / "sdk-ts" / "package.json").write_text(
         json.dumps({"name": "@greenhelix/a2a-sdk", "version": "0.0.0"}, indent=2) + "\n"
@@ -236,9 +225,7 @@ def test_real_repo_version_file_exists_and_is_semver() -> None:
     # semver with optional prerelease
     import re
 
-    assert re.match(r"^\d+\.\d+\.\d+(-[a-zA-Z0-9.-]+)?$", v), (
-        f"VERSION file contains invalid semver: {v!r}"
-    )
+    assert re.match(r"^\d+\.\d+\.\d+(-[a-zA-Z0-9.-]+)?$", v), f"VERSION file contains invalid semver: {v!r}"
 
 
 def test_real_repo_targets_in_sync_with_version_file() -> None:
