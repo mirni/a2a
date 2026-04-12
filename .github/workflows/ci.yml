@@ -1,9 +1,9 @@
 # =============================================================================
 # A2A Commerce Platform — CI Pipeline (Lightweight)
 # =============================================================================
-# Runs on PRs (opened, synchronized, ready_for_review) and merge queue events.
-# Does NOT run on push to main — merges are already validated by the PR CI run,
-# and releases use release.yml on release/* branches.
+# Runs on PRs (opened, synchronized, ready_for_review), merge queue events,
+# and pushes to main (for coverage baseline updates only — all other jobs
+# are skipped on push via the `if:` guard below).
 # Skips docs-only changes via paths-ignore.
 # Three jobs: quality, test, package — then staging for PRs targeting main.
 #
@@ -26,6 +26,17 @@ on:
       - '.gitignore'
       - 'LICENSE'
   merge_group:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - 'reports/**'
+      - 'tasks/**'
+      - 'plans/**'
+      - 'logs/**'
+      - '*.md'
+      - '.gitignore'
+      - 'LICENSE'
 
 concurrency:
   group: ci-${{ github.head_ref || github.ref }}
