@@ -181,7 +181,7 @@ class TestAtomicCreditRetry:
     async def test_atomic_credit_retries_on_locked(self, storage: StorageBackend):
         """Simulate 'database is locked' on first attempt, succeed on retry."""
         import sqlite3
-        from unittest.mock import AsyncMock, patch
+        from unittest.mock import patch
 
         await storage.create_wallet("retry-agent", 100.0)
 
