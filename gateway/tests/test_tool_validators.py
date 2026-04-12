@@ -29,8 +29,8 @@ def test_check_caller_owns_agent_id_same_agent_passes():
 
 
 def test_check_caller_owns_agent_id_different_agent_raises():
-    from gateway.src.tools._validators import check_caller_owns_agent_id
     from gateway.src.tool_errors import ToolForbiddenError
+    from gateway.src.tools._validators import check_caller_owns_agent_id
 
     params = {"_caller_agent_id": "agent-a", "_caller_tier": "pro", "agent_id": "agent-b"}
     with pytest.raises(ToolForbiddenError, match="Forbidden"):
@@ -59,8 +59,8 @@ def test_check_caller_owns_job_owner_passes():
 
 
 def test_check_caller_owns_job_non_owner_raises():
-    from gateway.src.tools._validators import check_caller_owns_job
     from gateway.src.tool_errors import ToolForbiddenError
+    from gateway.src.tools._validators import check_caller_owns_job
 
     params = {"_caller_agent_id": "agent-a", "_caller_tier": "pro"}
     with pytest.raises(ToolForbiddenError, match="Forbidden"):
@@ -84,33 +84,37 @@ def test_format_money_accepts_float_and_str():
 
 
 def test_check_intent_ownership_admin_passes():
-    from gateway.src.tools._validators import check_intent_ownership
     from types import SimpleNamespace
+
+    from gateway.src.tools._validators import check_intent_ownership
 
     intent = SimpleNamespace(payer="agent-a", payee="agent-b")
     check_intent_ownership("admin-1", "admin", intent)  # should not raise
 
 
 def test_check_intent_ownership_payer_passes():
-    from gateway.src.tools._validators import check_intent_ownership
     from types import SimpleNamespace
+
+    from gateway.src.tools._validators import check_intent_ownership
 
     intent = SimpleNamespace(payer="agent-a", payee="agent-b")
     check_intent_ownership("agent-a", "pro", intent)  # should not raise
 
 
 def test_check_intent_ownership_payee_passes():
-    from gateway.src.tools._validators import check_intent_ownership
     from types import SimpleNamespace
+
+    from gateway.src.tools._validators import check_intent_ownership
 
     intent = SimpleNamespace(payer="agent-a", payee="agent-b")
     check_intent_ownership("agent-b", "pro", intent)  # should not raise
 
 
 def test_check_intent_ownership_outsider_raises():
-    from gateway.src.tools._validators import check_intent_ownership
-    from gateway.src.tool_errors import ToolForbiddenError
     from types import SimpleNamespace
+
+    from gateway.src.tool_errors import ToolForbiddenError
+    from gateway.src.tools._validators import check_intent_ownership
 
     intent = SimpleNamespace(payer="agent-a", payee="agent-b")
     with pytest.raises(ToolForbiddenError, match="Forbidden"):
@@ -118,9 +122,10 @@ def test_check_intent_ownership_outsider_raises():
 
 
 def test_check_intent_ownership_payer_only_rejects_payee():
-    from gateway.src.tools._validators import check_intent_ownership
-    from gateway.src.tool_errors import ToolForbiddenError
     from types import SimpleNamespace
+
+    from gateway.src.tool_errors import ToolForbiddenError
+    from gateway.src.tools._validators import check_intent_ownership
 
     intent = SimpleNamespace(payer="agent-a", payee="agent-b")
     with pytest.raises(ToolForbiddenError, match="payer"):
