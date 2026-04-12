@@ -91,9 +91,14 @@ class TestPublicRateLimiterIsolation:
 
 
 class TestPublicRateLimiterExpiry:
-    """Window expires and count resets."""
+    """Window expires and count resets (uses fake clock, no real sleeps)."""
 
-    async def test_window_expiry_resets_count(self):
+    async def test_window_expiry_resets_count(self, monkeypatch):
+        import gateway.src.rate_limit_headers as rl_mod
+
+        fake_now = 1_000_000.0
+        monkeypatch.setattr(rl_mod.time, "time", lambda: fake_now)
+
         limiter = PublicRateLimiter(limit=2, window_seconds=1)
 
         limiter.record("10.0.0.1")
@@ -103,21 +108,29 @@ class TestPublicRateLimiterExpiry:
         allowed, _, _ = limiter.record("10.0.0.1")
         assert allowed is False
 
-        # Wait for window to expire
-        await asyncio.sleep(1.1)
+        # Advance clock past window
+        fake_now += 1.1
+        monkeypatch.setattr(rl_mod.time, "time", lambda: fake_now)
 
         # Should be allowed again
         allowed, remaining, _ = limiter.record("10.0.0.1")
         assert allowed is True
         assert remaining == 1
 
-    async def test_cleanup_removes_expired_entries(self):
+    async def test_cleanup_removes_expired_entries(self, monkeypatch):
+        import gateway.src.rate_limit_headers as rl_mod
+
+        fake_now = 1_000_000.0
+        monkeypatch.setattr(rl_mod.time, "time", lambda: fake_now)
+
         limiter = PublicRateLimiter(limit=100, window_seconds=1)
 
         limiter.record("10.0.0.1")
         limiter.record("10.0.0.2")
 
-        await asyncio.sleep(1.1)
+        # Advance clock past window
+        fake_now += 1.1
+        monkeypatch.setattr(rl_mod.time, "time", lambda: fake_now)
 
         limiter.cleanup()
 
