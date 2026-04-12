@@ -164,27 +164,45 @@ async def _get_claim_chains(ctx: AppContext, params: dict[str, Any]) -> dict[str
 
 
 async def _create_org(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
-    """Create a new organization."""
+    """Create a new organization.
+
+    v1.2.9 audit ID5.11: wrap raw SQL in try/except so DB errors surface
+    as structured error responses instead of unhandled 500s.
+    """
+    import sqlite3
     import time as _time
     import uuid as _uuid
 
-    org_name = params["org_name"]
+    from gateway.src.tool_errors import ToolValidationError
+
+    org_name = params.get("org_name")
+    if not org_name:
+        raise ToolValidationError("org_name is required")
+
     owner_agent_id = params.get("agent_id", "")
     org_id = f"org-{_uuid.uuid4().hex[:12]}"
     now = _time.time()
 
     db = ctx.identity_api.storage.db
-    await db.execute(
-        "INSERT INTO orgs (id, name, owner_agent_id, created_at, metadata) VALUES (?, ?, ?, ?, ?)",
-        (org_id, org_name, owner_agent_id, now, "{}"),
-    )
-    # Auto-add the owner as a member with role='owner'
-    if owner_agent_id:
+    try:
         await db.execute(
-            "INSERT OR IGNORE INTO org_memberships (org_id, agent_id, role, joined_at) VALUES (?, ?, 'owner', ?)",
-            (org_id, owner_agent_id, now),
+            "INSERT INTO orgs (id, name, owner_agent_id, created_at, metadata) VALUES (?, ?, ?, ?, ?)",
+            (org_id, org_name, owner_agent_id, now, "{}"),
         )
-    await db.commit()
+        # Auto-add the owner as a member with role='owner'
+        if owner_agent_id:
+            await db.execute(
+                "INSERT OR IGNORE INTO org_memberships (org_id, agent_id, role, joined_at) VALUES (?, ?, 'owner', ?)",
+                (org_id, owner_agent_id, now),
+            )
+        await db.commit()
+    except sqlite3.IntegrityError as exc:
+        raise ToolValidationError(f"Org creation conflict: {exc}") from exc
+    except sqlite3.OperationalError:
+        import logging
+
+        logging.getLogger("a2a.identity").exception("DB error in _create_org")
+        raise
 
     return {
         "org_id": org_id,

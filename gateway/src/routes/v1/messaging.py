@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends
+from messaging_src.models import MessageType
 from pydantic import BaseModel, ConfigDict
 
 from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
@@ -28,7 +29,7 @@ class SendMessageRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     sender: str
     recipient: str
-    message_type: str
+    message_type: MessageType
     subject: str = ""
     body: str = ""
     metadata: dict[str, Any] | None = None

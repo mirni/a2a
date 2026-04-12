@@ -76,10 +76,11 @@ class WithdrawRequest(BaseModel):
 class BudgetCapRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
+        populate_by_name=True,
         json_schema_extra={"example": {"daily_cap": "100.00", "monthly_cap": "2000.00", "alert_threshold": 0.8}},
     )
-    daily_cap: Decimal | None = None
-    monthly_cap: Decimal | None = None
+    daily_cap: Decimal | None = Field(default=None, validation_alias="daily")
+    monthly_cap: Decimal | None = Field(default=None, validation_alias="monthly")
     alert_threshold: float = 0.8
 
 
@@ -140,7 +141,10 @@ async def create_wallet(
         "_caller_tier": tc.agent_tier,
     }
     await check_ownership(tc, params)
-    result = await _create_wallet(tc.ctx, params)
+    try:
+        result = await _create_wallet(tc.ctx, params)
+    except Exception as exc:
+        return await handle_product_exception(tc.request, exc)
     return await finalize_response(tc, result, status_code=201)
 
 
@@ -181,7 +185,10 @@ async def deposit(
     idem = tc.request.headers.get("idempotency-key")
     if idem:
         params["idempotency_key"] = idem
-    result = await _deposit(tc.ctx, params)
+    try:
+        result = await _deposit(tc.ctx, params)
+    except Exception as exc:
+        return await handle_product_exception(tc.request, exc)
     return await finalize_response(tc, result)
 
 
@@ -203,7 +210,10 @@ async def withdraw(
     idem = tc.request.headers.get("idempotency-key")
     if idem:
         params["idempotency_key"] = idem
-    result = await _withdraw(tc.ctx, params)
+    try:
+        result = await _withdraw(tc.ctx, params)
+    except Exception as exc:
+        return await handle_product_exception(tc.request, exc)
     return await finalize_response(tc, result)
 
 
@@ -214,7 +224,10 @@ async def freeze_wallet(
 ):
     params = {"agent_id": agent_id, "_caller_agent_id": tc.agent_id, "_caller_tier": tc.agent_tier}
     await check_ownership(tc, params)
-    result = await _freeze_wallet(tc.ctx, params)
+    try:
+        result = await _freeze_wallet(tc.ctx, params)
+    except Exception as exc:
+        return await handle_product_exception(tc.request, exc)
     return await finalize_response(tc, result)
 
 
@@ -225,7 +238,10 @@ async def unfreeze_wallet(
 ):
     params = {"agent_id": agent_id, "_caller_agent_id": tc.agent_id, "_caller_tier": tc.agent_tier}
     await check_ownership(tc, params)
-    result = await _unfreeze_wallet(tc.ctx, params)
+    try:
+        result = await _unfreeze_wallet(tc.ctx, params)
+    except Exception as exc:
+        return await handle_product_exception(tc.request, exc)
     return await finalize_response(tc, result)
 
 

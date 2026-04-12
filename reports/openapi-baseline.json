@@ -50,7 +50,7 @@
             "title": "Alert Threshold",
             "type": "number"
           },
-          "daily_cap": {
+          "daily": {
             "anyOf": [
               {
                 "type": "number"
@@ -63,9 +63,9 @@
                 "type": "null"
               }
             ],
-            "title": "Daily Cap"
+            "title": "Daily"
           },
-          "monthly_cap": {
+          "monthly": {
             "anyOf": [
               {
                 "type": "number"
@@ -78,7 +78,7 @@
                 "type": "null"
               }
             ],
-            "title": "Monthly Cap"
+            "title": "Monthly"
           }
         },
         "title": "BudgetCapRequest",
@@ -826,6 +826,18 @@
         "title": "IngestMetricsRequest",
         "type": "object"
       },
+      "MessageType": {
+        "enum": [
+          "text",
+          "price_negotiation",
+          "task_specification",
+          "counter_offer",
+          "accept",
+          "reject"
+        ],
+        "title": "MessageType",
+        "type": "string"
+      },
       "NegotiatePriceRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1372,8 +1384,7 @@
             "type": "string"
           },
           "message_type": {
-            "title": "Message Type",
-            "type": "string"
+            "$ref": "#/components/schemas/MessageType"
           },
           "metadata": {
             "anyOf": [
@@ -1855,7 +1866,7 @@
   },
   "info": {
     "title": "A2A Commerce Gateway",
-    "version": "1.2.5"
+    "version": "1.2.9"
   },
   "openapi": "3.1.0",
   "paths": {
