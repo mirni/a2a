@@ -481,10 +481,11 @@ class TestPaymentAmountValidation:
         )
         assert resp.status_code == 422
 
-    async def test_create_intent_sub_penny_rejected(self, client, pro_api_key):
+    async def test_create_intent_excessive_precision_rejected(self, client, pro_api_key):
+        """Amounts with >8 decimal places must be rejected (crypto precision limit)."""
         resp = await client.post(
             "/v1/payments/intents",
-            json={"payer": "pro-agent", "payee": "b", "amount": "10.001"},
+            json={"payer": "pro-agent", "payee": "b", "amount": "10.000000001"},
             headers={"Authorization": f"Bearer {pro_api_key}"},
         )
         assert resp.status_code == 422

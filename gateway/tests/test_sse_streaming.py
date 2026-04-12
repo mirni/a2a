@@ -73,7 +73,7 @@ class TestSSEConfig:
 
     def test_default_heartbeat_interval(self):
         cfg = SSEConfig()
-        assert cfg.heartbeat_interval_seconds == 15.0
+        assert cfg.heartbeat_interval_seconds == 5.0
 
     def test_default_max_connection(self):
         cfg = SSEConfig()

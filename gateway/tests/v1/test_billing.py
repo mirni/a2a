@@ -421,10 +421,11 @@ class TestConvertCurrencyAmountValidation:
         )
         assert resp.status_code == 422
 
-    async def test_convert_sub_penny_rejected(self, client, api_key):
+    async def test_convert_excessive_precision_rejected(self, client, api_key):
+        """Amounts with >8 decimal places must be rejected (crypto precision limit)."""
         resp = await client.post(
             "/v1/billing/wallets/test-agent/convert",
-            json={"amount": "10.001", "from_currency": "CREDITS", "to_currency": "USD"},
+            json={"amount": "10.000000001", "from_currency": "CREDITS", "to_currency": "USD"},
             headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 422
@@ -578,10 +579,11 @@ class TestAmountValidation:
         assert body["status"] == 402
         assert body["type"].endswith("/insufficient-balance")
 
-    async def test_deposit_sub_penny_rejected(self, client, api_key):
+    async def test_deposit_excessive_precision_rejected(self, client, api_key):
+        """Amounts with >8 decimal places must be rejected (crypto precision limit)."""
         resp = await client.post(
             "/v1/billing/wallets/test-agent/deposit",
-            json={"amount": "0.001"},
+            json={"amount": "0.000000001"},
             headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 422

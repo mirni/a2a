@@ -69,6 +69,25 @@ async def _probe_db(name: str, conn: Any) -> str:
         return "error"
 
 
+@router.get("/livez")
+async def livez() -> JSONResponse:
+    """Kubernetes liveness probe — no auth, no DB."""
+    return JSONResponse({"status": "ok"})
+
+
+@router.get("/readyz")
+async def readyz(request: Request) -> JSONResponse:
+    """Kubernetes readiness probe — checks billing DB."""
+    ctx = request.app.state.ctx
+    try:
+        db = ctx.tracker.storage.db
+        await db.execute("SELECT 1")
+        return JSONResponse({"status": "ok"})
+    except Exception:
+        logger.warning("Readiness probe failed", exc_info=True)
+        return JSONResponse({"status": "unavailable"}, status_code=503)
+
+
 @router.get("/v1/health")
 async def health(request: Request) -> JSONResponse:
     status = "ok"

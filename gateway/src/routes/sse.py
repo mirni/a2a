@@ -27,7 +27,7 @@ class SSEConfig:
     """Tuneable parameters for the SSE streaming connection."""
 
     poll_interval_seconds: float = 1.0
-    heartbeat_interval_seconds: float = 15.0
+    heartbeat_interval_seconds: float = 5.0
     max_connection_seconds: int = 3600
 
 

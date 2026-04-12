@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
 from gateway.src.errors import handle_product_exception
@@ -21,6 +21,7 @@ from gateway.src.tools.marketplace import (
     _search_services,
     _update_service,
 )
+from gateway.src.validators import sanitize_text
 
 router = APIRouter(prefix="/v1/marketplace", tags=["marketplace"])
 
@@ -41,6 +42,11 @@ class RegisterServiceRequest(BaseModel):
     endpoint: str = ""
     pricing: dict[str, Any] | None = None
 
+    @field_validator("description", mode="before")
+    @classmethod
+    def _sanitize_description(cls, v: str) -> str:
+        return sanitize_text(v) if isinstance(v, str) else v
+
 
 class UpdateServiceRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -51,11 +57,21 @@ class UpdateServiceRequest(BaseModel):
     endpoint: str | None = None
     metadata: dict[str, Any] | None = None
 
+    @field_validator("description", mode="before")
+    @classmethod
+    def _sanitize_description(cls, v: str) -> str:
+        return sanitize_text(v) if isinstance(v, str) else v
+
 
 class RateServiceRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     rating: int
     review: str = ""
+
+    @field_validator("review", mode="before")
+    @classmethod
+    def _sanitize_review(cls, v: str) -> str:
+        return sanitize_text(v) if isinstance(v, str) else v
 
 
 # ---------------------------------------------------------------------------
