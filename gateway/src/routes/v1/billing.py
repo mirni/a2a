@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from gateway.src.config import GatewayConfig
 from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
@@ -32,6 +32,7 @@ from gateway.src.tools.billing import (
     _withdraw,
 )
 from gateway.src.tools.infrastructure import _create_api_key, _list_api_keys
+from gateway.src.validators import AGENT_ID_PATTERN, sanitize_text
 
 router = APIRouter(prefix="/v1/billing", tags=["billing"])
 
@@ -46,7 +47,7 @@ class CreateWalletRequest(BaseModel):
         extra="forbid",
         json_schema_extra={"example": {"agent_id": "agent-alice", "initial_balance": "100.00", "signup_bonus": True}},
     )
-    agent_id: str = Field(max_length=128)
+    agent_id: str = Field(max_length=128, pattern=AGENT_ID_PATTERN)
     initial_balance: Decimal = Decimal("0")
     signup_bonus: bool = True
 
@@ -56,9 +57,14 @@ class DepositRequest(BaseModel):
         extra="forbid",
         json_schema_extra={"example": {"amount": "50.00", "currency": "CREDITS", "description": "Top-up via Stripe"}},
     )
-    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=2)
+    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=8)
     currency: str = "CREDITS"
-    description: str = ""
+    description: str = Field(default="", max_length=2000)
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def _sanitize_description(cls, v: str) -> str:
+        return sanitize_text(v) if isinstance(v, str) else v
 
 
 class WithdrawRequest(BaseModel):
@@ -68,9 +74,14 @@ class WithdrawRequest(BaseModel):
             "example": {"amount": "25.00", "currency": "CREDITS", "description": "Payout to external wallet"}
         },
     )
-    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=2)
+    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=8)
     currency: str = "CREDITS"
-    description: str = ""
+    description: str = Field(default="", max_length=2000)
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def _sanitize_description(cls, v: str) -> str:
+        return sanitize_text(v) if isinstance(v, str) else v
 
 
 class BudgetCapRequest(BaseModel):
@@ -101,7 +112,7 @@ class ConvertCurrencyRequest(BaseModel):
         extra="forbid",
         json_schema_extra={"example": {"amount": "100.00", "from_currency": "CREDITS", "to_currency": "USD"}},
     )
-    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=2)
+    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=8)
     from_currency: str
     to_currency: str
 

@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from gateway.src.deps.idempotency import check_idempotency, record_idempotent_response
 from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
@@ -35,6 +35,7 @@ from gateway.src.tools.payments import (
     _refund_settlement,
     _release_escrow,
 )
+from gateway.src.validators import AGENT_ID_PATTERN, sanitize_text
 
 router = APIRouter(prefix="/v1/payments", tags=["payments"])
 
@@ -57,12 +58,17 @@ class CreateIntentRequest(BaseModel):
             }
         },
     )
-    payer: str = Field(max_length=128)
-    payee: str = Field(max_length=128)
-    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=2)
-    description: str = ""
+    payer: str = Field(max_length=128, pattern=AGENT_ID_PATTERN)
+    payee: str = Field(max_length=128, pattern=AGENT_ID_PATTERN)
+    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=8)
+    description: str = Field(default="", max_length=2000)
     currency: str = "CREDITS"
     metadata: dict[str, Any] | None = None
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def _sanitize_description(cls, v: str) -> str:
+        return sanitize_text(v) if isinstance(v, str) else v
 
 
 class CreateEscrowRequest(BaseModel):
@@ -78,13 +84,18 @@ class CreateEscrowRequest(BaseModel):
             }
         },
     )
-    payer: str = Field(max_length=128)
-    payee: str = Field(max_length=128)
-    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=2)
-    description: str = ""
+    payer: str = Field(max_length=128, pattern=AGENT_ID_PATTERN)
+    payee: str = Field(max_length=128, pattern=AGENT_ID_PATTERN)
+    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=8)
+    description: str = Field(default="", max_length=2000)
     currency: str = "CREDITS"
     timeout_hours: int | None = None
     metadata: dict[str, Any] | None = None
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def _sanitize_description(cls, v: str) -> str:
+        return sanitize_text(v) if isinstance(v, str) else v
 
 
 class CreatePerformanceEscrowRequest(BaseModel):
@@ -101,22 +112,27 @@ class CreatePerformanceEscrowRequest(BaseModel):
             }
         },
     )
-    payer: str = Field(max_length=128)
-    payee: str = Field(max_length=128)
-    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=2)
+    payer: str = Field(max_length=128, pattern=AGENT_ID_PATTERN)
+    payee: str = Field(max_length=128, pattern=AGENT_ID_PATTERN)
+    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=8)
     metric_name: str
     threshold: str
-    description: str = ""
+    description: str = Field(default="", max_length=2000)
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def _sanitize_description(cls, v: str) -> str:
+        return sanitize_text(v) if isinstance(v, str) else v
 
 
 class PartialCaptureRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"amount": "15.00"}})
-    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=2)
+    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=8)
 
 
 class SplitEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    payee: str = Field(max_length=128)
+    payee: str = Field(max_length=128, pattern=AGENT_ID_PATTERN)
     percentage: float
 
 
@@ -132,19 +148,29 @@ class CreateSplitIntentRequest(BaseModel):
             }
         },
     )
-    payer: str = Field(max_length=128)
-    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=2)
+    payer: str = Field(max_length=128, pattern=AGENT_ID_PATTERN)
+    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=8)
     splits: list[SplitEntry]
-    description: str = ""
+    description: str = Field(default="", max_length=2000)
     currency: str = "CREDITS"
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def _sanitize_description(cls, v: str) -> str:
+        return sanitize_text(v) if isinstance(v, str) else v
 
 
 class RefundSettlementRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid", json_schema_extra={"example": {"amount": "10.00", "reason": "Service not delivered"}}
     )
-    amount: Decimal | None = Field(default=None, gt=0, le=1_000_000_000, decimal_places=2)
-    reason: str = ""
+    amount: Decimal | None = Field(default=None, gt=0, le=1_000_000_000, decimal_places=8)
+    reason: str = Field(default="", max_length=2000)
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def _sanitize_reason(cls, v: str) -> str:
+        return sanitize_text(v) if isinstance(v, str) else v
 
 
 class CreateSubscriptionRequest(BaseModel):
@@ -160,13 +186,18 @@ class CreateSubscriptionRequest(BaseModel):
             }
         },
     )
-    payer: str = Field(max_length=128)
-    payee: str = Field(max_length=128)
-    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=2)
+    payer: str = Field(max_length=128, pattern=AGENT_ID_PATTERN)
+    payee: str = Field(max_length=128, pattern=AGENT_ID_PATTERN)
+    amount: Decimal = Field(gt=0, le=1_000_000_000, decimal_places=8)
     interval: str
-    description: str = ""
+    description: str = Field(default="", max_length=2000)
     currency: str = "CREDITS"
     metadata: dict[str, Any] | None = None
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def _sanitize_description(cls, v: str) -> str:
+        return sanitize_text(v) if isinstance(v, str) else v
 
 
 # ---------------------------------------------------------------------------

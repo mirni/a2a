@@ -147,11 +147,16 @@ _valid_amount = st.decimals(
     allow_infinity=False,
 )
 
-# Strategy for valid agent IDs
-_valid_agent_id = st.text(
-    alphabet=st.sampled_from("abcdefghijklmnopqrstuvwxyz0123456789-_"),
-    min_size=1,
-    max_size=64,
+# Strategy for valid agent IDs — must match AGENT_ID_PATTERN:
+# starts with alphanumeric, then alphanumeric/dot/dash/underscore, 1-128 chars.
+_valid_agent_id = st.builds(
+    lambda first, rest: first + rest,
+    st.sampled_from("abcdefghijklmnopqrstuvwxyz0123456789"),
+    st.text(
+        alphabet=st.sampled_from("abcdefghijklmnopqrstuvwxyz0123456789._-"),
+        min_size=0,
+        max_size=63,
+    ),
 )
 
 
@@ -341,9 +346,9 @@ class TestBoundary:
             DepositRequest(amount=Decimal("0"))
 
     def test_create_wallet_empty_agent_id(self):
-        """Empty string agent_id should be accepted by model (gateway validates)."""
-        req = CreateWalletRequest(agent_id="")
-        assert req.agent_id == ""
+        """Empty string agent_id is rejected by the AGENT_ID_PATTERN validator."""
+        with pytest.raises(ValidationError):
+            CreateWalletRequest(agent_id="")
 
     def test_refund_settlement_optional_amount(self):
         """RefundSettlementRequest amount is optional (full refund)."""
