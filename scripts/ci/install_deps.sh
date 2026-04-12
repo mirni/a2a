@@ -18,13 +18,13 @@ RUNTIME_DEPS=(
     "aiosqlite>=0.20"
     "pydantic>=2.0"
     "cryptography>=46.0"
+    "jsonschema>=4.0"
 )
 
 TEST_DEPS=(
     "pytest>=8.0"
     "pytest-asyncio>=0.23"
     "pytest-cov>=5.0"
-    "jsonschema>=4.0"
     "hypothesis>=6.0"
 )
 
