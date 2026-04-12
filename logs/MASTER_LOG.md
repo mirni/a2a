@@ -7199,3 +7199,33 @@ HIGH finding H1 resolved in-branch. No CRITICALs.
 - The narrow float→Decimal hotfix only touches 3 files. Remaining
   ~50 float() conversions in the paid path stay for v1.3.0 per the
   plan — human to confirm this scoping matches expectations.
+
+---
+
+## 2026-04-12 — Phase 2/3/4 CI fix (continuation session)
+
+### Context
+Phase 4 PR #93 CI failed: `test-lambda-handler` job couldn't run
+`products/gatekeeper/tests/test_invariants.py` because the gatekeeper
+`conftest.py` imports `pytest_asyncio` (not installed in the lightweight
+lambda-handler job).
+
+### Fix
+Added `--noconftest` flag to the CI step running Z3 invariant tests.
+The invariant tests are pure Z3 with zero gatekeeper dependencies, so
+they don't need the conftest fixtures.
+
+### Result
+- Commit d31621e on `feat/phase4-fv`
+- CI run 24297422802: **all green** (quality, test-lambda-handler,
+  test-gateway x6, test-products x2, coverage, integration, package,
+  smoke-package)
+
+### Final PR status
+| PR | Branch | Target | CI |
+|----|--------|--------|----|
+| #91 | `refactor/phase2-p1` | `main` | GREEN |
+| #92 | `refactor/phase3-p2` | `refactor/phase2-p1` | GREEN |
+| #93 | `feat/phase4-fv` | `refactor/phase3-p2` | GREEN |
+
+All three daisy-chained PRs ready for human review/merge/release (v1.3.0).
