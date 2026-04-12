@@ -241,6 +241,7 @@ async def _get_volume_discount(ctx: AppContext, params: dict[str, Any]) -> dict[
     unit_price = 0.0
     if tool_def:
         pricing = tool_def.get("pricing", {})
+        # lint-no-float-money: allow (pricing-config boundary, v1.2.9 ratchet)
         unit_price = float(pricing.get("per_call", 0.0))
 
     discount_pct = _get_discount_tier(historical_calls)
@@ -273,6 +274,7 @@ async def _estimate_cost(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
     unit_price = 0.0
     if tool_def:
         pricing = tool_def.get("pricing", {})
+        # lint-no-float-money: allow (pricing-config boundary, v1.2.9 ratchet)
         unit_price = float(pricing.get("per_call", 0.0))
     else:
         raise ToolNotFoundError(f"Tool not found: {tool_name}")
@@ -461,6 +463,7 @@ async def _convert_currency(ctx: AppContext, params: dict[str, Any]) -> dict[str
         sys.modules["src.models"] = sys.modules["billing_src.models"]
 
     agent_id = params["agent_id"]
+    # lint-no-float-money: allow (wallet.convert_currency legacy float API, v1.2.9 ratchet)
     amount = float(params["amount"])
     from_currency = params["from_currency"]
     to_currency = params["to_currency"]

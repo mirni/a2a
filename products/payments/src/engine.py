@@ -161,6 +161,7 @@ class PaymentEngine:
             current_status = (current or {}).get("status", "unknown")
             raise InvalidStateError(f"Cannot capture intent in state '{current_status}'; must be 'pending'")
 
+        # lint-no-float-money: allow (wallet.withdraw legacy float API, v1.2.9 ratchet)
         amount = float(intent.amount)
         currency = (intent.metadata or {}).get("currency", "CREDITS")
         withdraw_done = False
@@ -293,6 +294,7 @@ class PaymentEngine:
 
         if amount <= 0:
             raise PaymentError("Amount must be positive")
+        # lint-no-float-money: allow (PaymentError comparison boundary, v1.2.9 ratchet)
         intent_amount_f = float(intent.amount)
         if amount > intent_amount_f:
             raise PaymentError(f"Capture amount {amount} exceeds intent amount {intent_amount_f}")
@@ -409,11 +411,13 @@ class PaymentEngine:
             # Atomic fund transfer: withdraw from payee, deposit to payer
             await self.wallet.withdraw(
                 settlement.payee,
+                # lint-no-float-money: allow (wallet.withdraw legacy float API, v1.2.9 ratchet)
                 float(refund_amount),
                 description=f"refund:{settlement_id}",
             )
             await self.wallet.deposit(
                 settlement.payer,
+                # lint-no-float-money: allow (wallet.deposit legacy float API, v1.2.9 ratchet)
                 float(refund_amount),
                 description=f"refund:{settlement_id}",
             )
@@ -514,6 +518,7 @@ class PaymentEngine:
             raise InvalidStateError(f"Cannot release escrow in state '{escrow.status.value}'; must be 'held'")
 
         # Deposit to payee
+        # lint-no-float-money: allow (wallet.deposit legacy float API, v1.2.9 ratchet)
         escrow_amount = float(escrow.amount)
         currency = (escrow.metadata or {}).get("currency", "CREDITS")
         await self.wallet.deposit(
@@ -559,6 +564,7 @@ class PaymentEngine:
         currency = (escrow.metadata or {}).get("currency", "CREDITS")
         await self.wallet.deposit(
             escrow.payer,
+            # lint-no-float-money: allow (wallet.deposit legacy float API, v1.2.9 ratchet)
             float(escrow.amount),
             description=f"escrow_refund:{escrow.id}",
             currency=currency,
@@ -583,6 +589,7 @@ class PaymentEngine:
         currency = (escrow.metadata or {}).get("currency", "CREDITS")
         await self.wallet.deposit(
             escrow.payer,
+            # lint-no-float-money: allow (wallet.deposit legacy float API, v1.2.9 ratchet)
             float(escrow.amount),
             description=f"escrow_expired:{escrow.id}",
             currency=currency,
@@ -747,6 +754,7 @@ class PaymentEngine:
             raise InvalidStateError(f"Cannot charge subscription in state '{sub.status.value}'; must be 'active'")
 
         # Attempt to transfer funds
+        # lint-no-float-money: allow (wallet.withdraw/deposit legacy float API, v1.2.9 ratchet)
         sub_amount = float(sub.amount)
         currency = (sub.metadata or {}).get("currency", "CREDITS")
         try:
