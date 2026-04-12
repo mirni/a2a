@@ -297,7 +297,8 @@ log "Created branch '${RELEASE_BRANCH}' at ${SHA:0:8}"
 
 header "Step 2: Bump versions to ${VERSION}"
 
-# Bump DEBIAN/control files
+# Bump DEBIAN/control files (separate release cadence from the top-level
+# VERSION file — these track deb package versions).
 bump_deb_version() {
     local control_file="$1"
     if [[ -f "$control_file" ]]; then
@@ -306,34 +307,22 @@ bump_deb_version() {
     fi
 }
 
-# Always bump all package versions for consistency
 for pkg_dir in "$REPO_ROOT"/package/*/DEBIAN/control; do
     bump_deb_version "$pkg_dir"
 done
 
-# Bump pyproject.toml (root)
-if [[ -f "$REPO_ROOT/pyproject.toml" ]]; then
-    sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" "$REPO_ROOT/pyproject.toml"
-    log "Bumped pyproject.toml → ${VERSION}"
-fi
+# Top-level VERSION file is the single source of truth for the API
+# version shared between gateway/src/_version.py, sdk/pyproject.toml,
+# and sdk-ts/package.json. Writing it here and letting sync_versions.py
+# propagate to all three gives us one sed call instead of four, plus a
+# CI check (scripts/sync_versions.py --check) that prevents drift.
+python3 "$REPO_ROOT/scripts/sync_versions.py" --set "$VERSION" --write
+log "Synced VERSION → ${VERSION} across gateway/sdk/sdk-ts"
 
-# Bump sdk/pyproject.toml
-if [[ -f "$REPO_ROOT/sdk/pyproject.toml" ]]; then
-    sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" "$REPO_ROOT/sdk/pyproject.toml"
-    log "Bumped sdk/pyproject.toml → ${VERSION}"
-fi
-
-# Bump gateway version (used by /v1/health endpoint)
-VERSION_PY="$REPO_ROOT/gateway/src/_version.py"
-if [[ -f "$VERSION_PY" ]]; then
-    sed -i "s/^__version__ = \".*\"/__version__ = \"${VERSION}\"/" "$VERSION_PY"
-    log "Bumped gateway/_version.py → ${VERSION}"
-fi
-
-# Bump sdk-ts/package.json (TypeScript SDK)
-if [[ -f "$REPO_ROOT/sdk-ts/package.json" ]]; then
-    (cd "$REPO_ROOT/sdk-ts" && npm version "$VERSION" --no-git-tag-version --allow-same-version 2>/dev/null)
-    log "Bumped sdk-ts/package.json → ${VERSION}"
+# sdk-ts additionally needs package-lock.json updated; npm version does
+# both. Run it after the JSON rewrite so lock file tracks the new version.
+if [[ -f "$REPO_ROOT/sdk-ts/package.json" ]] && command -v npm &>/dev/null; then
+    (cd "$REPO_ROOT/sdk-ts" && npm version "$VERSION" --no-git-tag-version --allow-same-version 2>/dev/null) || true
 fi
 
 # ---------------------------------------------------------------------------
@@ -469,7 +458,7 @@ header "Step 5: Commit release"
 git -C "$REPO_ROOT" add \
     package/*/DEBIAN/control \
     CHANGELOG.md
-[[ -f "$REPO_ROOT/pyproject.toml" ]] && git -C "$REPO_ROOT" add pyproject.toml || true
+[[ -f "$REPO_ROOT/VERSION" ]] && git -C "$REPO_ROOT" add VERSION || true
 [[ -f "$REPO_ROOT/sdk/pyproject.toml" ]] && git -C "$REPO_ROOT" add sdk/pyproject.toml || true
 [[ -f "$REPO_ROOT/gateway/src/_version.py" ]] && git -C "$REPO_ROOT" add gateway/src/_version.py || true
 [[ -f "$REPO_ROOT/sdk-ts/package.json" ]] && git -C "$REPO_ROOT" add sdk-ts/package.json sdk-ts/package-lock.json || true
