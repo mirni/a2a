@@ -160,10 +160,14 @@ async def deposit(
     }
     await check_ownership(tc, params)
 
-    # P0 #1: Enforce per-tier deposit limits
+    # P0 #1: Enforce per-tier deposit limits.
+    # v1.2.9 hotfix: compare Decimal → Decimal. ``body.amount`` is always
+    # Decimal via the Pydantic model; ``tier_limit`` is Decimal via
+    # ``GatewayConfig.deposit_limits``. No ``float(...)`` round-trip at
+    # the boundary.
     config = GatewayConfig.from_env()
     tier_limit = config.deposit_limits.get(tc.agent_tier)
-    if tier_limit is not None and float(body.amount) > tier_limit:
+    if tier_limit is not None and body.amount > tier_limit:
         from gateway.src.deps.tool_context import _ResponseError
 
         resp = await error_response(

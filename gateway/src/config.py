@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from decimal import Decimal
 
 from shared_src.pricing_config import load_pricing_config
 
@@ -65,12 +66,19 @@ class GatewayConfig:
     # (``.get()`` returned ``None``, bypassing the check). Added an
     # explicit ceiling of 10,000,000 credits as a policy placeholder —
     # review expected in PR.
-    deposit_limits: dict[str, int] = field(
+    #
+    # v1.2.9 money-hotfix: values are ``Decimal`` so the deposit-limit
+    # comparison in ``routes/v1/billing.py::deposit_funds`` can compare
+    # a Decimal amount against a Decimal cap without a ``float(...)``
+    # round-trip. Today's caps (≤ 1e10) fit in float64 exactly, but the
+    # pattern ``float(body.amount) > tier_limit`` is the bug class the
+    # audit has flagged 3 cycles running — Decimal closes it structurally.
+    deposit_limits: dict[str, Decimal] = field(
         default_factory=lambda: {
-            "free": 1_000,
-            "starter": 10_000,
-            "pro": 100_000,
-            "enterprise": 10_000_000,
+            "free": Decimal("1000"),
+            "starter": Decimal("10000"),
+            "pro": Decimal("100000"),
+            "enterprise": Decimal("10000000"),
         }
     )
 

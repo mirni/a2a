@@ -26,11 +26,20 @@ class MarketplaceStorage:
     def _db_path(self) -> str:
         return self._dsn.replace("sqlite:///", "")
 
+    # Register ``(table, column, col_type)`` triples here when a column is
+    # added to an existing table. Entries are applied BEFORE _create_tables()
+    # runs its DDL, so any new CREATE INDEX referencing the column won't
+    # abort on pre-existing DBs. See audit finding C2 and
+    # ``shared_src.storage_migrations``.
+    _COLUMN_MIGRATIONS: tuple[tuple[str, str, str], ...] = ()
+
     async def connect(self) -> None:
         try:
             from shared_src.db_security import harden_connection
+            from shared_src.storage_migrations import apply_column_migrations
         except ImportError:
             from src.db_security import harden_connection
+            from src.storage_migrations import apply_column_migrations
 
         path = self._db_path()
         if path == ":memory:":
@@ -39,6 +48,7 @@ class MarketplaceStorage:
             self._db = await aiosqlite.connect(path)
         self._db.row_factory = aiosqlite.Row
         await harden_connection(self._db)
+        await apply_column_migrations(self._db, self._COLUMN_MIGRATIONS)
         await self._create_tables()
 
     async def close(self) -> None:

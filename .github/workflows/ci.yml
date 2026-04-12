@@ -72,6 +72,12 @@ jobs:
       - name: Dependency audit
         run: pip-audit -r requirements.txt
 
+      - name: Version sync check (VERSION ↔ gateway/sdk/sdk-ts)
+        run: python scripts/sync_versions.py --check
+
+      - name: Pydantic forbid-extras lint (request models)
+        run: python scripts/lint_pydantic_forbid.py --quiet
+
       # NOTE: the old "Website stats in sync with catalog" check was
       # removed. website/*.html now ship literal placeholders
       # ({{TOTAL_TOOLS}}, {{NUM_SERVICES}}, {{VERSION}}) between the

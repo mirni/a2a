@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Any
 
 from fastapi import Request
@@ -220,27 +221,32 @@ async def _check_budget_caps(
     if row is None:
         return None
 
-    daily_cap = row["daily_cap"]
-    monthly_cap = row["monthly_cap"]
-    # Atomic-unit columns (SCALE=1e8) — convert to credits when present.
-    if daily_cap is not None:
-        daily_cap = float(daily_cap) / 100_000_000
-    if monthly_cap is not None:
-        monthly_cap = float(monthly_cap) / 100_000_000
+    # v1.2.9 money-hotfix: compare caps as Decimal, not float. The cap
+    # columns are stored in atomic units (SCALE=1e8) as integers;
+    # dividing via Decimal is exact. The pending cost and rolling-window
+    # spend are also converted to Decimal so the boundary comparison
+    # ``spend + pending > cap`` is free of float drift.
+    _SCALE = Decimal(100_000_000)
+    daily_cap_raw = row["daily_cap"]
+    monthly_cap_raw = row["monthly_cap"]
+    daily_cap: Decimal | None = Decimal(int(daily_cap_raw)) / _SCALE if daily_cap_raw is not None else None
+    monthly_cap: Decimal | None = Decimal(int(monthly_cap_raw)) / _SCALE if monthly_cap_raw is not None else None
 
     if daily_cap is None and monthly_cap is None:
         return None
 
+    pending = Decimal(str(pending_cost))
+
     now = _time.time()
     if daily_cap is not None:
         daily_since = now - 86400
-        daily_spend = float(await ctx.tracker.storage.sum_cost_since(agent_id, daily_since))
-        if daily_spend + pending_cost > daily_cap:
+        daily_spend = Decimal(str(await ctx.tracker.storage.sum_cost_since(agent_id, daily_since)))
+        if daily_spend + pending > daily_cap:
             return await error_response(
                 402,
                 (
                     f"Daily budget cap exceeded: spent {daily_spend:.2f} + pending "
-                    f"{pending_cost:.2f} > cap {daily_cap:.2f} credits."
+                    f"{pending:.2f} > cap {daily_cap:.2f} credits."
                 ),
                 "budget_exceeded",
                 request=request,
@@ -248,13 +254,13 @@ async def _check_budget_caps(
 
     if monthly_cap is not None:
         monthly_since = now - (30 * 86400)
-        monthly_spend = float(await ctx.tracker.storage.sum_cost_since(agent_id, monthly_since))
-        if monthly_spend + pending_cost > monthly_cap:
+        monthly_spend = Decimal(str(await ctx.tracker.storage.sum_cost_since(agent_id, monthly_since)))
+        if monthly_spend + pending > monthly_cap:
             return await error_response(
                 402,
                 (
                     f"Monthly budget cap exceeded: spent {monthly_spend:.2f} + "
-                    f"pending {pending_cost:.2f} > cap {monthly_cap:.2f} credits."
+                    f"pending {pending:.2f} > cap {monthly_cap:.2f} credits."
                 ),
                 "budget_exceeded",
                 request=request,
