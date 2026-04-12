@@ -7124,3 +7124,78 @@ HIGH finding H1 resolved in-branch. No CRITICALs.
 - Tag v1.2.5 after both merges land.
 - Do NOT publish to ClawMart / PyPI / npm until sandbox-parity is green.
 
+
+---
+
+## Session 2026-04-12 — Repo hygiene Phase 1 (v1.2.9) + architect review
+
+**Branch:** `fix/repo-hygiene-v1.2.9` (1 PR)
+
+### User prompts (paraphrased)
+
+1. "Assume the role of sr sw architect + formal verification expert.
+   Review the codebase, find dead code, note technical debt, create a
+   backlog task with cleanup actions. Follow best practices. Do not
+   make changes yet. Note where/how to use Z3 formal verification.
+   Create internal instructions for agents on planning SW tasks using
+   Hoare logic."
+2. "I added responses to tasks/backlog/repo-hygiene-and-formal-verification.md
+   — process and execute."
+
+### Work delivered
+
+**Architect review (no code changes):**
+- `tasks/backlog/repo-hygiene-and-formal-verification.md` — 5-phase
+  plan: P0 (blocks v1.2.9), P1, P2, Phase 4 Z3 integration with 6
+  invariants, Phase 5 deferred. Human answered 6 open questions;
+  architect added responses (log-verification options, Z3 CI cost
+  estimate, tier centralisation design).
+- `docs/agent-task-planning.md` — internal guide with Hoare logic
+  decision tree, 90-second primer, 5-step template, 3 layers of test
+  rigour, 6 common mistakes.
+
+**Phase 1 P0 execution — 6 commits on `fix/repo-hygiene-v1.2.9`:**
+
+- `e7040c8` P0-3: top-level `VERSION` file + `scripts/sync_versions.py`
+  (19 tests). release.sh refactored to single-call sync. CI drift
+  guard (`sync_versions.py --check`).
+- `8f9c09b` P0-2: `scripts/lint_pydantic_forbid.py` AST-walking lint
+  (11 tests) + CI job. Flags BaseModel subclasses missing
+  `extra="forbid"`; exempts response-shaped class-name suffixes.
+- `9a54b25` P0-1: shared `products/shared/src/storage_migrations.py`
+  helper (9 tests inc. wiring guardrail). Refactored PaymentStorage
+  to use it. Wired into identity, messaging, trust, marketplace with
+  empty `_COLUMN_MIGRATIONS` hooks.
+- `e990bde` Money hotfix: Decimal at deposit cap + budget cap gates.
+  `deposit_limits` retyped `dict[str, Decimal]`. `_check_budget_caps`
+  now uses `Decimal(int(atomic)) / Decimal(1e8)`. 4 new tests:
+  type assertion, Hypothesis property, 2 AST probes.
+- `dee87b2` Bump to v1.2.9 + fix `sync_versions.py` em-dash escape
+  bug (`json.dumps` missing `ensure_ascii=False`). Regression test
+  pins unicode round-trip.
+- `0544151` Update task file with Phase 1 status header.
+
+**Out of scope this PR (deferred to v1.3.0 / future backlog tasks):**
+- Phase 2 P1: conftest consolidation, middleware.py split, wider
+  float→Decimal sweep, /v1/execute removal.
+- Phase 3 P2: shared validators, bootstrap smoke, `config/tiers.yaml`,
+  replace `sleep()` in tests.
+- Phase 4: Z3 invariants (6 Hoare specs).
+
+### Regression results
+
+- Full gateway suite: **1686 passed** (535s)
+- payments: 252 / identity: 216 / messaging: 65 / trust: 103 /
+  marketplace: 137 / billing: 223 / paywall: 158 / shared: 180 / sdk: 80
+- Hotfix targeted suites: 19 passed.
+- New test files: 9 (205 insertions, all green).
+
+### Human action queue
+
+- Review PR on `fix/repo-hygiene-v1.2.9`.
+- Verify CI green (quality job will now fail on VERSION drift or
+  missing `extra="forbid"` on any route request model — this is
+  intentional).
+- The narrow float→Decimal hotfix only touches 3 files. Remaining
+  ~50 float() conversions in the paid path stay for v1.3.0 per the
+  plan — human to confirm this scoping matches expectations.
