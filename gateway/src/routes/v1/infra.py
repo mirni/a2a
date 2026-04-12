@@ -75,9 +75,9 @@ class RotateKeyRequest(BaseModel):
 
 
 class RegisterWebhookRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
     url: str
-    event_types: list[str]
+    event_types: list[str] = Field(validation_alias="events")
     secret: str
     filter_agent_ids: list[str] | None = None
 

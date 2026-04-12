@@ -37,6 +37,7 @@ _DEFAULT_RATES: dict[tuple[str, str], Decimal] = {
     ("GBP", "CREDITS"): Decimal("125"),
     ("BTC", "CREDITS"): Decimal("6000000"),
     ("ETH", "CREDITS"): Decimal("400000"),
+    ("USDC", "CREDITS"): Decimal("100"),
 }
 
 

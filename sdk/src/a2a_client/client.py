@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from decimal import Decimal
 from typing import Any
 
 import httpx
@@ -266,16 +267,18 @@ class A2AClient:
         self,
         payer: str,
         payee: str,
-        amount: float,
+        amount: str | float | Decimal,
         description: str = "",
         idempotency_key: str | None = None,
+        currency: str = "CREDITS",
     ) -> PaymentIntentResponse:
         """Create a payment intent."""
         body: dict[str, Any] = {
             "payer": payer,
             "payee": payee,
-            "amount": amount,
+            "amount": str(amount) if isinstance(amount, Decimal) else amount,
             "description": description,
+            "currency": currency,
         }
         extra: dict[str, str] = {}
         if idempotency_key:

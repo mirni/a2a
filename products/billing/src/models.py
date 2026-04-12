@@ -22,6 +22,7 @@ class Currency(StrEnum):
     GBP = "GBP"
     BTC = "BTC"
     ETH = "ETH"
+    USDC = "USDC"
 
 
 class CurrencyAmount(BaseModel):

@@ -39,10 +39,15 @@ router = APIRouter(prefix="/v1/identity", tags=["identity"])
 
 class RegisterAgentRequest(BaseModel):
     model_config = ConfigDict(
-        extra="forbid", json_schema_extra={"example": {"agent_id": "agent-alice", "public_key": "ed25519:abc123..."}}
+        extra="forbid",
+        json_schema_extra={
+            "example": {"agent_id": "agent-alice", "public_key": "ed25519:abc123...", "name": "Alice Agent"}
+        },
     )
     agent_id: str = Field(max_length=128)
     public_key: str | None = None
+    name: str | None = None
+    capabilities: list[str] | None = None
 
 
 class VerifyAgentRequest(BaseModel):

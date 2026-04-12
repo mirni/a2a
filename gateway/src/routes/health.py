@@ -116,6 +116,7 @@ async def health(request: Request) -> JSONResponse:
             "tools": tool_count(),
             "db": billing_status,
             "databases": databases,
+            "docs_url": "/docs",
         },
         status_code=http_status,
         headers=public_rate_limit_headers(limiter=limiter, client_ip=client_ip),

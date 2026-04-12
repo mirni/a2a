@@ -25,8 +25,14 @@ class InsufficientBalanceError(A2AError):
     pass
 
 
-class InsufficientTierError(A2AError):
-    """403 — tier too low for this tool."""
+class PermissionDeniedError(A2AError):
+    """403 — forbidden / permission denied."""
+
+    pass
+
+
+class InsufficientTierError(PermissionDeniedError):
+    """403 — tier too low for this tool (subclass of PermissionDeniedError)."""
 
     pass
 
@@ -60,7 +66,7 @@ STATUS_MAP: dict[int, type[A2AError]] = {
     400: ToolNotFoundError,
     401: AuthenticationError,
     402: InsufficientBalanceError,
-    403: InsufficientTierError,
+    403: PermissionDeniedError,
     404: ToolNotFoundError,
     429: RateLimitError,
 }
@@ -88,4 +94,7 @@ def raise_for_status(status: int, body: dict) -> None:
         code = error.get("code", "error")
 
     exc_class = STATUS_MAP.get(status, ServerError)
+    # Distinguish tier-specific 403 from generic permission denied
+    if status == 403 and "tier" in code:
+        exc_class = InsufficientTierError
     raise exc_class(message=message, code=code, status=status)

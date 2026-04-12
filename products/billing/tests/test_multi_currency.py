@@ -27,8 +27,8 @@ class TestCurrencyEnum:
     """Test the Currency enum and CurrencyAmount / ExchangeRate models."""
 
     def test_supported_currencies(self):
-        """All six currencies must be present."""
-        expected = {"CREDITS", "USD", "EUR", "GBP", "BTC", "ETH"}
+        """All seven currencies must be present."""
+        expected = {"CREDITS", "USD", "EUR", "GBP", "BTC", "ETH", "USDC"}
         actual = {c.value for c in Currency}
         assert actual == expected
 
