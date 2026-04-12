@@ -270,6 +270,9 @@ jobs:
       - name: Test Lambda handler
         run: python -m pytest lambda/z3-verifier/tests/ -x -q
 
+      - name: Test Z3 invariant harnesses (FV-1..6)
+        run: python -m pytest products/gatekeeper/tests/test_invariants.py --noconftest -x -q
+
   # ---------------------------------------------------------------------------
   # Coverage ratchet: separate job so it's a distinct required check
   # ---------------------------------------------------------------------------
