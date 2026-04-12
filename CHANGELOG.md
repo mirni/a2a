@@ -1,5 +1,39 @@
 # Changelog
 
+# Release v1.3.2
+
+**Date:** 2026-04-12
+**Commit:** 8843314d
+**Previous:** v1.3.1
+
+## Changes
+
+### Bug Fixes
+
+- fix(audit): v1.3.1 remediation — 5 findings fixed (v1.3.2) (#97) (`aea7d3b`)
+
+### Tests
+
+- fix(audit): v1.3.1 remediation — 5 findings fixed (v1.3.2) (#97) (`aea7d3b`)
+
+### Other
+
+- Append to master log (`8843314`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | {{VERSION}} |
+| a2a-db-backup | {{VERSION}} |
+| a2a-gateway | {{VERSION}} |
+| a2a-gateway-sandbox | {{VERSION}} |
+| a2a-gateway-test | {{VERSION}} |
+| a2a-litestream | {{VERSION}} |
+| a2a-website | {{VERSION}} |
+---
+
+
 # Release v1.2.8
 
 **Date:** 2026-04-11
