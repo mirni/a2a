@@ -7,6 +7,19 @@
 float-for-money drift, duplicated test infra, god-classes. Land this before
 it turns into next release's CRITs.
 
+## Status (2026-04-12, branch `fix/repo-hygiene-v1.2.9`)
+
+**Phase 1 P0 complete** — shipped in PR for v1.2.9. Commits:
+
+- `e7040c8` `feat(release): top-level VERSION file + sync_versions.py + CI drift guard` — P0-3
+- `8f9c09b` `feat(lint): Pydantic extra="forbid" guardrail for request models` — P0-2
+- `9a54b25` `fix(storage): propagate C2 column-migration hook to 4 more products` — P0-1
+- `e990bde` `fix(money): Decimal-only comparisons at deposit + budget cap gates` — narrow hotfix slice of P1-3
+- `dee87b2` `release: bump to v1.2.9` — version + em-dash sync fix
+
+**Phase 2 (P1), Phase 3 (P2), Phase 4 (Z3), Phase 5 (deferred) remain pending.**
+This file stays in `tasks/backlog/` until those phases land.
+
 ---
 
 ## Context
