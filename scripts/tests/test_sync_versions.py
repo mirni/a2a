@@ -22,6 +22,27 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 import sync_versions as mod  # noqa: E402
 
 # ---------------------------------------------------------------------------
+# regression: package.json with unicode characters (em-dash) must not
+# get ascii-escaped by the JSON writer.
+# ---------------------------------------------------------------------------
+
+
+def test_update_package_json_preserves_unicode_in_description(tmp_path: Path) -> None:
+    """v1.2.9 regression: running sync against sdk-ts/package.json must
+    not rewrite the em-dash (``—``) in the description as ``\\u2014``.
+    ``json.dumps`` needs ``ensure_ascii=False``.
+    """
+    f = tmp_path / "package.json"
+    original = '{\n  "name": "@greenhelix/sdk",\n  "version": "1.2.7",\n  "description": "A — B"\n}\n'
+    f.write_text(original, encoding="utf-8")
+    mod.update_package_json_version(f, "1.2.9", write=True)
+    body = f.read_text(encoding="utf-8")
+    assert '"version": "1.2.9"' in body
+    assert "A — B" in body
+    assert "\\u2014" not in body
+
+
+# ---------------------------------------------------------------------------
 # read_version_file
 # ---------------------------------------------------------------------------
 

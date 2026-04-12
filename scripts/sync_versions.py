@@ -144,7 +144,9 @@ def update_package_json_version(path: Path, version: str, *, write: bool) -> boo
     if write:
         # 2-space indent matches npm's own formatter; trailing newline
         # matches what ``npm version`` writes.
-        new_text = json.dumps(data, indent=2) + "\n"
+        # ensure_ascii=False preserves unicode (em-dashes etc.) so we don't
+        # escape characters that were literal in the original file.
+        new_text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
         path.write_text(new_text)
     return True
 
