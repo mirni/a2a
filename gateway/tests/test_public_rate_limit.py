@@ -6,8 +6,6 @@ enforces limits, returns 429 when exceeded, and cleans up expired entries.
 
 from __future__ import annotations
 
-import asyncio
-
 import pytest
 
 from gateway.src.rate_limit_headers import PublicRateLimiter, public_rate_limit_headers

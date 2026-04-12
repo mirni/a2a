@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import Decimal
 from typing import Any
 
 from gateway.src.authorization import ADMIN_TIER
@@ -10,6 +10,8 @@ from gateway.src.lifespan import AppContext
 from gateway.src.tool_errors import ToolForbiddenError, ToolValidationError
 from gateway.src.tools._validators import (
     check_intent_ownership as _check_intent_ownership,
+)
+from gateway.src.tools._validators import (
     format_money as _format_money,
 )
 
@@ -516,7 +518,6 @@ async def _create_split_intent(ctx: AppContext, params: dict[str, Any]) -> dict[
     Splits must sum to 100%. Withdraws full amount from payer, deposits to each payee.
     """
     import json
-    from decimal import Decimal
 
     payer = params["payer"]
     # lint-no-float-money: allow (wallet legacy float API, v1.2.9 ratchet)
@@ -639,7 +640,6 @@ async def _refund_settlement(ctx: AppContext, params: dict[str, Any]) -> dict[st
 
     If amount is omitted, refunds the full remaining balance.
     """
-    from decimal import Decimal
 
     amount = None
     if "amount" in params and params["amount"] is not None:

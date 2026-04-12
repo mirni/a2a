@@ -7,6 +7,8 @@ from typing import Any
 from gateway.src.lifespan import AppContext
 from gateway.src.tools._validators import (
     check_caller_owns_agent_id as _check_caller_owns_agent_id,
+)
+from gateway.src.tools._validators import (
     check_caller_owns_job as _check_caller_owns_job,
 )
 
