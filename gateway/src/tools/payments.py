@@ -2,46 +2,18 @@
 
 from __future__ import annotations
 
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import Decimal
 from typing import Any
 
 from gateway.src.authorization import ADMIN_TIER
 from gateway.src.lifespan import AppContext
 from gateway.src.tool_errors import ToolForbiddenError, ToolValidationError
-
-
-def _format_money(amount: float | Decimal | str) -> str:
-    """Render a monetary amount as a 2-decimal string.
-
-    Audit HIGH-3 (v1.2.1): the previous code used ``str(float)`` which
-    returned ``"0.0246"`` for a 2% fee on 1.23 and ``"5.0"`` for a 2%
-    fee on 250.00 — both broke client-side reconciliation. All money
-    returned to clients must go through this helper so we always emit
-    exactly two decimal places.
-    """
-    d = Decimal(str(amount)) if not isinstance(amount, Decimal) else amount
-    return str(d.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
-
-
-def _check_intent_ownership(caller: str, tier: str, intent, *, payer_only: bool = False) -> None:
-    """Verify the caller is authorized to act on the intent.
-
-    Args:
-        payer_only: If True, only the *payer* is authorized (used for capture/
-            void — operations that debit the payer's wallet). If False, either
-            payer or payee may access (used for read operations like get_intent).
-
-    Admin-tier callers bypass this check.
-    Raises ToolForbiddenError if the caller is not authorized.
-    """
-    if tier == ADMIN_TIER:
-        return
-    if payer_only:
-        if caller != intent.payer:
-            raise ToolForbiddenError("Forbidden: only the payer can perform this action")
-    else:
-        if caller not in (intent.payer, intent.payee):
-            raise ToolForbiddenError("Forbidden: you do not have access to this resource")
+from gateway.src.tools._validators import (
+    check_intent_ownership as _check_intent_ownership,
+)
+from gateway.src.tools._validators import (
+    format_money as _format_money,
+)
 
 
 def _check_escrow_ownership(caller: str, tier: str, escrow) -> None:
@@ -546,7 +518,6 @@ async def _create_split_intent(ctx: AppContext, params: dict[str, Any]) -> dict[
     Splits must sum to 100%. Withdraws full amount from payer, deposits to each payee.
     """
     import json
-    from decimal import Decimal
 
     payer = params["payer"]
     # lint-no-float-money: allow (wallet legacy float API, v1.2.9 ratchet)
@@ -669,7 +640,6 @@ async def _refund_settlement(ctx: AppContext, params: dict[str, Any]) -> dict[st
 
     If amount is omitted, refunds the full remaining balance.
     """
-    from decimal import Decimal
 
     amount = None
     if "amount" in params and params["amount"] is not None:

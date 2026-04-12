@@ -3,6 +3,7 @@
   "gateway": 93.5,
   "identity": 96.0,
   "marketplace": 93.0,
+  "mcp_server": 99.0,
   "messaging": 96.0,
   "payments": 98.0,
   "paywall": 99.0,

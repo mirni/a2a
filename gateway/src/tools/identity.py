@@ -5,20 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from gateway.src.lifespan import AppContext
-from gateway.src.tool_errors import ToolForbiddenError
-
-ADMIN_TIER = "admin"
-
-
-def _check_caller_owns_agent_id(params: dict[str, Any]) -> None:
-    """Raise ToolForbiddenError if caller is not admin and agent_id != caller."""
-    caller = params.get("_caller_agent_id")
-    tier = params.get("_caller_tier")
-    target = params.get("agent_id")
-    if tier == ADMIN_TIER or caller is None or target is None:
-        return
-    if caller != target:
-        raise ToolForbiddenError("Forbidden: you do not have access to this resource")
+from gateway.src.tools._validators import check_caller_owns_agent_id as _check_caller_owns_agent_id
 
 
 async def _register_agent(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
