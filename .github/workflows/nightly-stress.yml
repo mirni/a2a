@@ -68,8 +68,8 @@ jobs:
         if: ${{ !inputs.base_url }}
         env:
           PYTHONPATH: ${{ github.workspace }}
+          CUSTOMERS: ${{ inputs.customers || '20' }}
         run: |
-          CUSTOMERS="${{ inputs.customers || '20' }}"
           python scripts/ci/provision_stress_agents.py \
             --data-dir "$A2A_DATA_DIR" \
             --count "$CUSTOMERS" > /tmp/stress_agents.json
