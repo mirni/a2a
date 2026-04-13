@@ -93,17 +93,23 @@ EOF
    - **npm package:** `@greenhelix/mcp-server`
    - **Description:** AI agent commerce platform — 141 tools for payments, escrow, identity, marketplace, and Z3 formal verification
 
+**Status:** DONE
+
 ---
 
 ## P0-6: a2aregistry.org + a2a.ac
 
 ### a2aregistry.org
 1. Go to: https://a2aregistry.org/submit
-2. Submit the agent card URL: `https://api.greenhelix.net/.well-known/agents.json`
+2. Submit the agent card URL: `https://api.greenhelix.net/.well-known/agent.json`
+
+Note: The registry requires the path to end with `/agent.json` or
+`/agent-card.json` (not `agents.json`). Both paths are served by the
+gateway — see `gateway/src/routes/agent_card.py`.
 
 ### a2a.ac
 1. Go to: https://a2a.ac/submit
-2. Submit the same agent card URL
+2. Submit the same agent card URL: `https://api.greenhelix.net/.well-known/agent.json`
 
 ---
 
@@ -118,12 +124,16 @@ they're all auth errors).
 
 1. **Provision an admin API key on production:**
    ```bash
-   curl -X POST https://api.greenhelix.net/v1/infra/keys \
+   curl -X POST https://api.greenhelix.net/v1/billing/keys \
      -H "Authorization: Bearer $ADMIN_KEY" \
      -H "Content-Type: application/json" \
      -d '{"agent_id": "ci-stress-agent", "tier": "pro"}'
    ```
    Save the returned `key` value.
+
+   Note: The old `POST /v1/infra/keys` endpoint returns 410. Key
+   creation moved to `POST /v1/billing/keys`.
+
 
 2. **Add to GitHub Actions secrets:**
    ```bash
