@@ -585,6 +585,44 @@ def generate_report(
 # ---------------------------------------------------------------------------
 
 
+async def gatekeeper_smoke(base_url: str, admin_key: str, client: httpx.AsyncClient) -> None:
+    """Submit a trivial SAT job and verify the gatekeeper is functional.
+
+    Called once during setup. Logs a warning on failure but does not abort
+    the stress test — the Lambda may not be deployed in all environments.
+    """
+    print("  Gatekeeper smoke check...")
+    headers = {"Authorization": f"Bearer {admin_key}"} if admin_key else {}
+    try:
+        resp = await client.post(
+            f"{base_url}/v1/gatekeeper/jobs",
+            json={
+                "agent_id": "stress-agent-0000",
+                "properties": [
+                    {
+                        "name": "smoke_sat",
+                        "language": "z3_smt2",
+                        "expression": "(declare-const x Int)\n(assert (> x 0))",
+                    }
+                ],
+                "scope": "economic",
+                "timeout_seconds": 30,
+            },
+            headers=headers,
+            timeout=30.0,
+        )
+        if resp.status_code == 201:
+            body = resp.json()
+            if body.get("result") == "satisfied":
+                print("  Gatekeeper OK — Z3 job returned 'satisfied'")
+            else:
+                print(f"  WARNING: Gatekeeper returned unexpected result: {body.get('result')}")
+        else:
+            print(f"  WARNING: Gatekeeper returned HTTP {resp.status_code}: {resp.text[:200]}")
+    except Exception as e:
+        print(f"  WARNING: Gatekeeper smoke check failed: {e}")
+
+
 async def main(args: argparse.Namespace) -> int:
     base_url = args.base_url.rstrip("/")
     customers = args.customers
@@ -631,6 +669,10 @@ async def main(args: argparse.Namespace) -> int:
             print("Phase 2: No admin key — testing with unauthenticated requests")
             print("  (Set --admin-key or STRESS_ADMIN_KEY for authenticated stress testing)")
             agents = [(f"stress-agent-{i:04d}", "") for i in range(customers)]
+
+        # 2b. Gatekeeper smoke check
+        if admin_key and agents:
+            await gatekeeper_smoke(base_url, admin_key, client)
 
         # 3. Run stress test
         print(f"Phase 3: Ramping up {customers} customers over {ramp_up}s...")

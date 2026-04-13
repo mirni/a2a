@@ -158,6 +158,37 @@ def main() -> int:
         str(body)[:80],
     )
 
+    # --- Gatekeeper (Z3 Formal Verification) ---
+    print("[Gatekeeper]")
+    status, body = _req(
+        "POST",
+        "/v1/gatekeeper/jobs",
+        body={
+            "agent_id": "e2e-admin",
+            "properties": [
+                {
+                    "name": "smoke_sat",
+                    "language": "z3_smt2",
+                    "expression": "(declare-const x Int)\n(assert (> x 0))",
+                }
+            ],
+            "scope": "economic",
+            "timeout_seconds": 30,
+        },
+    )
+    check("POST /v1/gatekeeper/jobs → 201", status == 201, f"got {status} body={str(body)[:120]}")
+    check("job has job_id", isinstance(body, dict) and body.get("job_id") is not None, str(body)[:80])
+    check(
+        "job status is completed",
+        isinstance(body, dict) and body.get("status") == "completed",
+        f"status={body.get('status') if isinstance(body, dict) else body}",
+    )
+    check(
+        "job result is satisfied",
+        isinstance(body, dict) and body.get("result") == "satisfied",
+        f"result={body.get('result') if isinstance(body, dict) else body}",
+    )
+
     # --- Summary ---
     print()
     total = PASS_COUNT + FAIL_COUNT

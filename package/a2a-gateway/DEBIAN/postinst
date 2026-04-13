@@ -39,7 +39,8 @@ case "$1" in
         "$INSTALL_DIR/venv/bin/pip" install --upgrade pip wheel setuptools -q
         "$INSTALL_DIR/venv/bin/pip" install \
             'fastapi>=0.115' 'uvicorn>=0.29' 'httpx>=0.27' \
-            'aiosqlite>=0.20' 'pydantic>=2.0' 'cryptography>=46.0' -q
+            'aiosqlite>=0.20' 'pydantic>=2.0' 'cryptography>=46.0' \
+            'boto3>=1.34' -q
         "$INSTALL_DIR/venv/bin/pip" install -e "$INSTALL_DIR/sdk" -q 2>/dev/null \
             || "$INSTALL_DIR/venv/bin/pip" install "$INSTALL_DIR/sdk" -q
 
@@ -70,6 +71,9 @@ ENVEOF
         if [[ -f "$INSTALL_DIR/.env" ]]; then
             grep -q '^FORCE_HTTPS=' "$INSTALL_DIR/.env" || echo 'FORCE_HTTPS=1' >> "$INSTALL_DIR/.env"
             grep -q '^A2A_ENV=' "$INSTALL_DIR/.env" || echo 'A2A_ENV=production' >> "$INSTALL_DIR/.env"
+            grep -q '^VERIFIER_AUTH_MODE=' "$INSTALL_DIR/.env" || echo 'VERIFIER_AUTH_MODE=iam' >> "$INSTALL_DIR/.env"
+            grep -q '^VERIFIER_LAMBDA_FUNCTION=' "$INSTALL_DIR/.env" || echo 'VERIFIER_LAMBDA_FUNCTION=z3-verifier' >> "$INSTALL_DIR/.env"
+            grep -q '^VERIFIER_LAMBDA_REGION=' "$INSTALL_DIR/.env" || echo 'VERIFIER_LAMBDA_REGION=us-east-1' >> "$INSTALL_DIR/.env"
         fi
 
         # --- Cloudflare Authenticated Origin Pulls ---

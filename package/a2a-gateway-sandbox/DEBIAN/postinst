@@ -37,7 +37,8 @@ case "$1" in
         /opt/a2a-sandbox/venv/bin/pip install --upgrade pip wheel setuptools -q
         /opt/a2a-sandbox/venv/bin/pip install \
             'fastapi>=0.115' 'uvicorn>=0.29' 'httpx>=0.27' \
-            'aiosqlite>=0.20' 'pydantic>=2.0' 'cryptography>=46.0' -q
+            'aiosqlite>=0.20' 'pydantic>=2.0' 'cryptography>=46.0' \
+            'boto3>=1.34' -q
         /opt/a2a-sandbox/venv/bin/pip install -e /opt/a2a-sandbox/sdk -q 2>/dev/null \
             || /opt/a2a-sandbox/venv/bin/pip install /opt/a2a-sandbox/sdk -q
 
@@ -60,6 +61,10 @@ MESSAGING_DSN=sqlite:////var/lib/a2a-sandbox/messaging.db
 DISPUTE_DSN=sqlite:////var/lib/a2a-sandbox/disputes.db
 LOG_LEVEL=INFO
 FORCE_HTTPS=1
+# --- Formal Gatekeeper (Z3 Lambda) ---
+VERIFIER_LAMBDA_FUNCTION=z3-verifier
+VERIFIER_LAMBDA_REGION=us-east-1
+VERIFIER_AUTH_MODE=iam
 ENVEOF
             chmod 600 /opt/a2a-sandbox/.env
         fi
@@ -69,6 +74,9 @@ ENVEOF
         if [[ -f "$_env_file" ]]; then
             grep -q '^FORCE_HTTPS=' "$_env_file" || echo 'FORCE_HTTPS=1' >> "$_env_file"
             grep -q '^A2A_ENV=' "$_env_file" || echo 'A2A_ENV=sandbox' >> "$_env_file"
+            grep -q '^VERIFIER_AUTH_MODE=' "$_env_file" || echo 'VERIFIER_AUTH_MODE=iam' >> "$_env_file"
+            grep -q '^VERIFIER_LAMBDA_FUNCTION=' "$_env_file" || echo 'VERIFIER_LAMBDA_FUNCTION=z3-verifier' >> "$_env_file"
+            grep -q '^VERIFIER_LAMBDA_REGION=' "$_env_file" || echo 'VERIFIER_LAMBDA_REGION=us-east-1' >> "$_env_file"
         fi
 
         # --- Cloudflare Authenticated Origin Pulls ---
