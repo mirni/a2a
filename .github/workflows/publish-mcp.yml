@@ -1,7 +1,7 @@
 # =============================================================================
 # A2A Commerce Platform — Publish MCP server packages
 # =============================================================================
-# Publishes a2a-mcp-server (PyPI) and @greenhelix/mcp-server (npm) on a
+# Publishes a2a-greenhelix-mcp-server (PyPI) and @greenhelix/mcp-server (npm) on a
 # release cadence independent of the main gateway/SDK release train.
 #
 # Trigger:
@@ -13,7 +13,7 @@
 # PyPI Trusted Publishers:
 #   1. https://pypi.org/manage/account/publishing/
 #   2. Add pending publisher:
-#        PyPI project name: a2a-mcp-server
+#        PyPI project name: a2a-greenhelix-mcp-server
 #        Owner:             mirni
 #        Repository name:   a2a
 #        Workflow name:     publish-mcp.yml
@@ -145,7 +145,7 @@ jobs:
         run: npm test
 
   # ---------------------------------------------------------------------------
-  # Publish a2a-mcp-server to PyPI via Trusted Publishing (OIDC)
+  # Publish a2a-greenhelix-mcp-server to PyPI via Trusted Publishing (OIDC)
   # ---------------------------------------------------------------------------
   publish-pypi:
     needs: [validate, test]
@@ -225,7 +225,7 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
           python3 -m venv /tmp/verify-venv
-          /tmp/verify-venv/bin/pip install --quiet "a2a-mcp-server==${VERSION}"
+          /tmp/verify-venv/bin/pip install --quiet "a2a-greenhelix-mcp-server==${VERSION}"
           /tmp/verify-venv/bin/python -c "from a2a_mcp_server import build_server, GatewayClient; print('PyPI: import OK')"
 
       - name: Verify npm package installs

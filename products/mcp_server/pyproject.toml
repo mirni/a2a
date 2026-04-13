@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "a2a-mcp-server"
+name = "a2a-greenhelix-mcp-server"
 version = "0.1.0"
 description = "MCP server exposing the A2A Commerce Gateway's 141 tools — payments, escrow, identity, marketplace, trust — to any MCP-aware agent (Claude Desktop, Cursor, Claude Code, Windsurf, ...)."
 readme = "README.md"
@@ -51,6 +51,7 @@ dev = [
 
 [project.scripts]
 a2a-mcp-server = "a2a_mcp_server.cli:main"
+a2a-greenhelix-mcp-server = "a2a_mcp_server.cli:main"
 
 [project.urls]
 Homepage = "https://greenhelix.net"

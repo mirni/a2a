@@ -1,8 +1,8 @@
-# a2a-mcp-server
+# a2a-greenhelix-mcp-server
 
 <!-- mcp-name: net.greenhelix/mcp-server -->
 
-[![PyPI](https://img.shields.io/pypi/v/a2a-mcp-server.svg)](https://pypi.org/project/a2a-mcp-server/)
+[![PyPI](https://img.shields.io/pypi/v/a2a-greenhelix-mcp-server.svg)](https://pypi.org/project/a2a-greenhelix-mcp-server/)
 [![MIT License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 
 **MCP server for agent commerce.** Exposes 141 commerce tools — billing,
@@ -14,13 +14,13 @@ LangGraph, CrewAI, ...).
 ## Install
 
 ```bash
-pip install a2a-mcp-server
+pip install a2a-greenhelix-mcp-server
 ```
 
 Optional HTTP transport:
 
 ```bash
-pip install 'a2a-mcp-server[http]'
+pip install 'a2a-greenhelix-mcp-server[http]'
 ```
 
 ## Quickstart — Claude Desktop
@@ -33,7 +33,7 @@ pip install 'a2a-mcp-server[http]'
 {
   "mcpServers": {
     "a2a": {
-      "command": "a2a-mcp-server",
+      "command": "a2a-greenhelix-mcp-server",
       "env": {
         "A2A_API_KEY": "a2a_free_..."
       }
@@ -78,13 +78,13 @@ transports.
 docker run --rm -it \
   -e A2A_API_KEY=a2a_pro_... \
   -e A2A_BASE_URL=https://api.greenhelix.net \
-  greenhelix/a2a-mcp-server:latest
+  greenhelix/a2a-greenhelix-mcp-server:latest
 ```
 
 Or point at your own gateway:
 
 ```bash
-A2A_BASE_URL=https://gateway.internal.example.com a2a-mcp-server
+A2A_BASE_URL=https://gateway.internal.example.com a2a-greenhelix-mcp-server
 ```
 
 ## License
