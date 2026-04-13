@@ -387,6 +387,9 @@ jobs:
       - name: Install dependencies
         run: scripts/ci/install_deps.sh --with-test
 
+      - name: Install z3-solver for gatekeeper mock verifier
+        run: pip install 'z3-solver==4.13.4.0'
+
       - name: Start gateway
         run: scripts/ci/start_gateway.sh
         env:
