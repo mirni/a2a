@@ -206,3 +206,50 @@ class TestVerifierDefensiveDefault:
             assert resp.status_code == 200
             data = resp.json()
             assert data["status"] == "completed", f"Expected completed with defensive default, got {data}"
+
+
+class TestBoto3EagerProbe:
+    """Regression for v1.4.0 silent boto3 failure.
+
+    When VERIFIER_AUTH_MODE=iam but boto3 is not installed, the
+    VerifierClient.__init__() succeeds (boto3 import is lazy), but every
+    invoke() call fails with ModuleNotFoundError at runtime.  The eager
+    probe in lifespan must catch this at startup and fall back to the
+    mock verifier so the service remains functional.
+    """
+
+    async def test_iam_without_boto3_falls_back_to_mock(self, tmp_path, monkeypatch):
+        """VERIFIER_AUTH_MODE=iam + missing boto3 → mock fallback, not broken VerifierClient."""
+        from products.connectors.verifier.src.client import MockVerifierClient, VerifierClient
+
+        data_dir = str(tmp_path)
+        _seed_env(monkeypatch, data_dir)
+        monkeypatch.setenv("VERIFIER_AUTH_MODE", "iam")
+
+        # Block `import boto3` via sys.modules sentinel.
+        # Setting sys.modules["boto3"] = None makes `import boto3` raise
+        # ImportError("import of boto3 halted; None in sys.modules").
+        monkeypatch.setitem(sys.modules, "boto3", None)
+
+        application = create_app()
+        application.state.sse_config = SSEConfig(
+            poll_interval_seconds=0.05,
+            heartbeat_interval_seconds=60.0,
+            max_connection_seconds=0.3,
+        )
+
+        ctx_manager = lifespan(application)
+        await ctx_manager.__aenter__()
+        try:
+            ctx = application.state.ctx
+            assert ctx.gatekeeper_api is not None
+            assert ctx.gatekeeper_api.verifier is not None
+            # MUST be a MockVerifierClient (fallback), not a broken VerifierClient
+            # that would fail every invoke() with ModuleNotFoundError.
+            assert not isinstance(ctx.gatekeeper_api.verifier, VerifierClient), (
+                "Expected MockVerifierClient fallback when boto3 is missing, "
+                f"got {type(ctx.gatekeeper_api.verifier).__name__}"
+            )
+            assert isinstance(ctx.gatekeeper_api.verifier, MockVerifierClient)
+        finally:
+            await ctx_manager.__aexit__(None, None, None)
