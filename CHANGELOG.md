@@ -1,5 +1,31 @@
 # Changelog
 
+# Release v1.4.3
+
+**Date:** 2026-04-13
+**Commit:** 919e8d52
+**Previous:** v1.4.2
+
+## Changes
+
+### Other
+
+- Merge release v1.4.2 into main (`919e8d5`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | {{VERSION}} |
+| a2a-db-backup | {{VERSION}} |
+| a2a-gateway | {{VERSION}} |
+| a2a-gateway-sandbox | {{VERSION}} |
+| a2a-gateway-test | {{VERSION}} |
+| a2a-litestream | {{VERSION}} |
+| a2a-website | {{VERSION}} |
+---
+
+
 # Release v1.4.2
 
 **Date:** 2026-04-13
