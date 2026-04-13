@@ -7229,3 +7229,31 @@ they don't need the conftest fixtures.
 | #93 | `feat/phase4-fv` | `refactor/phase3-p2` | GREEN |
 
 All three daisy-chained PRs ready for human review/merge/release (v1.3.0).
+
+---
+
+## 2026-04-13 — MCP Version Bump + Session Continuation
+
+### Human Prompt
+"Done with pypi.org action. Reran the publish pipeline per your instructions but it failed with 'npm error 403...You cannot publish over the previously published versions: 0.1.0.' -- why is the version 0.1.0? Please make the first versions 1.0.0 for things that need to vary independently of the server/sdk deployment (1.4.2 currently)."
+
+### Actions Taken
+
+1. **Bumped MCP server version to 1.0.0** in all 3 locations:
+   - `products/mcp_server/pyproject.toml`
+   - `products/mcp_server/src/a2a_mcp_server/_version.py`
+   - `sdk-ts/mcp-server/package.json`
+
+2. **Created PR #104** (`chore/mcp-version-1.0.0`) — CI all green (16/16 jobs passed).
+
+3. **Verified plan completion** — all items from the Z3 gatekeeper plan are done:
+   - ✅ `lifespan.py` boto3 + credential probe (PR #103, merged)
+   - ✅ `stress_test.py` skip message (already in place)
+   - ✅ `next-steps-distribution` human instructions (updated)
+   - ✅ `v1.4.0-audit-remediation.md` audit findings plan (created)
+   - ✅ `formal-gatekeeper-audit-v1.4.1.md` external audit documented
+
+### Next Steps (Human)
+- Merge PR #104
+- Trigger `Publish MCP` workflow with `version=1.0.0`
+- Verify npm `@greenhelix/mcp-server@1.0.0` and PyPI `a2a-greenhelix-mcp-server==1.0.0` publish successfully

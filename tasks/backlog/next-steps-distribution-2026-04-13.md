@@ -47,10 +47,12 @@ DONE
 
 
 5. **Create the `mcp-registry` environment:**
+   The PAT lacks `administration:write` scope needed to create environments via API.
+   Do it manually: GitHub → repo Settings → Environments → "New environment" → name: `mcp-registry`.
+   Or upgrade the PAT to include `administration:write` and run:
    ```bash
    gh api -X PUT repos/mirni/a2a/environments/mcp-registry
    ```
-PLEASE DO
 
 6. **Delete the local key:**
    ```bash
@@ -70,7 +72,7 @@ PLEASE DO
 
 8. **Trigger first publish:**
    ```bash
-   gh workflow run "Publish MCP" -f version=0.1.0
+   gh workflow run "Publish MCP" -f version=1.0.0
    ```
    This triggers the Publish MCP workflow → PyPI + npm → MCP Registry.
 
@@ -125,11 +127,13 @@ Note: The registry requires the path to end with `/agent.json` or
 gateway — see `gateway/src/routes/agent_card.py`.
 
 ### a2a.ac
-1. Go to: https://a2a.ac/submit
-2. Submit the same agent card URL: `https://api.greenhelix.net/.well-known/agent.json`
+**No submission form exists.** a2a.ac is a community-curated directory built on
+[BenjaminScottAwk/awesome-a2a](https://github.com/BenjaminScottAwk/awesome-a2a).
+To get listed, open a PR on that repo adding the agent to their curated list.
 
-#### HUMAN RESPONSE:
-This site gives me 404. I can visit https://a2a.ac but I don't see a way to submit agent card.
+Alternative A2A directories with working submissions:
+- **a2aregistry.org** — form at https://a2aregistry.org/submit (done above)
+- **a2aagentlist.com** — email `gal6111@gmail.com` with subject "A2A Agent Submission"
 
 
 ---
@@ -162,7 +166,11 @@ they're all auth errors).
    source .env && export GH_TOKEN="$GITHUB_DEPLOYMENT_TOKEN"
    gh secret set STRESS_ADMIN_KEY --app actions --body "<key-from-step-1>"
    ```
+#### HUMAN RESPONSE:
+DONE
 
 3. **Verify** by re-running the stress test workflow. Expected: gatekeeper
    smoke check runs and shows `"Gatekeeper OK — Z3 job returned 'satisfied'"`,
    error rate drops from 100% to <5%.
+
+   Stress test triggered (run 24365395652) — waiting for results.

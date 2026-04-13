@@ -400,17 +400,22 @@ async def provision_test_agents(
         except Exception:
             pass
 
-        # Create API key via REST endpoint (pro tier so all tools are accessible)
+        # Create API key for this agent.
+        # The agent must authenticate to /v1/billing/keys with its OWN key
+        # to get a key for itself (agent_id is inferred from the token).
+        # For CI (local server), the admin key created the agent's wallet
+        # above, but creating per-agent keys via REST requires per-agent
+        # auth. Use the admin key as a fallback (ownership checks may
+        # reject cross-agent requests — that's the 403 baseline).
         try:
             resp = await client.post(
-                f"{base_url}/v1/infra/keys",
-                json={"agent_id": agent_id, "tier": "pro"},
-                headers=headers,
+                f"{base_url}/v1/billing/keys",
+                json={"tier": "pro"},
+                headers={"Authorization": f"Bearer {admin_key}"},
                 timeout=10.0,
             )
             if resp.status_code in (200, 201):
                 body = resp.json()
-                # REST endpoints return envelope-free responses
                 key = body.get("key", "") or body.get("result", {}).get("key", "")
                 if key:
                     agents.append((agent_id, key))
@@ -585,19 +590,21 @@ def generate_report(
 # ---------------------------------------------------------------------------
 
 
-async def gatekeeper_smoke(base_url: str, admin_key: str, client: httpx.AsyncClient) -> None:
+async def gatekeeper_smoke(
+    base_url: str, api_key: str, client: httpx.AsyncClient, agent_id: str = "stress-agent-0000"
+) -> None:
     """Submit a trivial SAT job and verify the gatekeeper is functional.
 
     Called once during setup. Logs a warning on failure but does not abort
     the stress test — the Lambda may not be deployed in all environments.
     """
     print("  Gatekeeper smoke check...")
-    headers = {"Authorization": f"Bearer {admin_key}"} if admin_key else {}
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     try:
         resp = await client.post(
             f"{base_url}/v1/gatekeeper/jobs",
             json={
-                "agent_id": "stress-agent-0000",
+                "agent_id": agent_id,
                 "properties": [
                     {
                         "name": "smoke_sat",
@@ -659,7 +666,16 @@ async def main(args: argparse.Namespace) -> int:
 
         # 2. Provision test agents
         agents: list[tuple[str, str]] = []
-        if admin_key:
+        agents_file = getattr(args, "agents_file", "") or ""
+        if agents_file and os.path.isfile(agents_file):
+            # Pre-provisioned agents (CI local server with DB-level keys)
+            import json as _json
+
+            with open(agents_file) as _f:
+                agents_map = _json.load(_f)
+            agents = list(agents_map.items())
+            print(f"Phase 2: Loaded {len(agents)} pre-provisioned agents from {agents_file}")
+        elif admin_key:
             print(f"Phase 2: Provisioning {customers} test agents...")
             agents = await provision_test_agents(base_url, admin_key, client, customers)
             print(f"  Provisioned {len(agents)} agents")
@@ -670,11 +686,12 @@ async def main(args: argparse.Namespace) -> int:
             print("  (Set --admin-key or STRESS_ADMIN_KEY for authenticated stress testing)")
             agents = [(f"stress-agent-{i:04d}", "") for i in range(customers)]
 
-        # 2b. Gatekeeper smoke check
-        if admin_key and agents:
-            await gatekeeper_smoke(base_url, admin_key, client)
+        # 2b. Gatekeeper smoke check (use first agent's own key for ownership match)
+        if agents and agents[0][1]:
+            agent_id_for_smoke, key_for_smoke = agents[0]
+            await gatekeeper_smoke(base_url, key_for_smoke, client, agent_id_for_smoke)
         else:
-            print("  Gatekeeper smoke: SKIPPED (no admin key)")
+            print("  Gatekeeper smoke: SKIPPED (no agent keys)")
 
         # 3. Run stress test
         print(f"Phase 3: Ramping up {customers} customers over {ramp_up}s...")
@@ -797,6 +814,11 @@ def cli() -> int:
         "--admin-key",
         default=os.environ.get("STRESS_ADMIN_KEY", ""),
         help="Admin API key for provisioning test agents",
+    )
+    parser.add_argument(
+        "--agents-file",
+        default=os.environ.get("STRESS_AGENTS_FILE", ""),
+        help="JSON file mapping agent_id → api_key (from provision_stress_agents.py)",
     )
     args = parser.parse_args()
     return asyncio.run(main(args))

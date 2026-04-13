@@ -64,6 +64,18 @@ jobs:
           echo "STRESS_ADMIN_KEY=$ADMIN_KEY" >> $GITHUB_ENV
           echo "Admin key provisioned"
 
+      - name: Provision stress agents (local only)
+        if: ${{ !inputs.base_url }}
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          CUSTOMERS="${{ inputs.customers || '20' }}"
+          python scripts/ci/provision_stress_agents.py \
+            --data-dir "$A2A_DATA_DIR" \
+            --count "$CUSTOMERS" > /tmp/stress_agents.json
+          echo "STRESS_AGENTS_FILE=/tmp/stress_agents.json" >> $GITHUB_ENV
+          echo "Provisioned $CUSTOMERS stress agents with pro-tier keys"
+
       - name: Run stress test
         env:
           STRESS_BASE_URL: ${{ inputs.base_url || 'http://localhost:8000' }}
@@ -71,15 +83,21 @@ jobs:
           STRESS_DURATION: ${{ inputs.duration || '60' }}
           STRESS_RAMP_UP: "10"
           STRESS_ADMIN_KEY: ${{ env.STRESS_ADMIN_KEY || secrets.STRESS_ADMIN_KEY || '' }}
+          STRESS_AGENTS_FILE: ${{ env.STRESS_AGENTS_FILE || '' }}
           STRESS_REPORT_PATH: stress_test_report.md
           PYTHONPATH: ${{ github.workspace }}
         run: |
+          AGENTS_ARG=""
+          if [ -n "$STRESS_AGENTS_FILE" ] && [ -f "$STRESS_AGENTS_FILE" ]; then
+            AGENTS_ARG="--agents-file $STRESS_AGENTS_FILE"
+          fi
           python scripts/stress_test.py \
             --base-url "$STRESS_BASE_URL" \
             --customers "$STRESS_CUSTOMERS" \
             --duration "$STRESS_DURATION" \
             --ramp-up "$STRESS_RAMP_UP" \
-            --admin-key "$STRESS_ADMIN_KEY"
+            --admin-key "$STRESS_ADMIN_KEY" \
+            $AGENTS_ARG
 
       - name: Upload stress test report
         if: always()
