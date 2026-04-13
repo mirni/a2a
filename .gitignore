@@ -10,6 +10,7 @@ build/
 
 # Test/coverage
 .coverage
+coverage-*.xml
 htmlcov/
 .pytest_cache/
 .hypothesis/
@@ -57,6 +58,7 @@ tmp/
 # Reports (analysis output, not tracked in git)
 reports/archive/
 reports/customer/
+reports/external/
 
 # Mutation testing (mutmut)
 **/mutants/
