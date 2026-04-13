@@ -5,7 +5,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from gateway.src.config import GatewayConfig
@@ -418,17 +418,23 @@ async def estimate_cost(
 async def get_exchange_rate(
     from_currency: str,
     to_currency: str,
+    request: Request,
     tc: ToolContext = Depends(require_tool("get_exchange_rate")),
 ):
-    result = await _get_exchange_rate(
-        tc.ctx,
-        {
-            "from_currency": from_currency,
-            "to_currency": to_currency,
-            "_caller_agent_id": tc.agent_id,
-            "_caller_tier": tc.agent_tier,
-        },
-    )
+    from gateway.src.tool_errors import ToolValidationError
+
+    try:
+        result = await _get_exchange_rate(
+            tc.ctx,
+            {
+                "from_currency": from_currency,
+                "to_currency": to_currency,
+                "_caller_agent_id": tc.agent_id,
+                "_caller_tier": tc.agent_tier,
+            },
+        )
+    except ToolValidationError as exc:
+        return await error_response(400, str(exc), "validation_error", request=request)
     return await finalize_response(tc, result)
 
 

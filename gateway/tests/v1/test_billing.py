@@ -330,6 +330,26 @@ async def test_get_exchange_rate_via_rest(client, api_key):
     assert "rate" in body
 
 
+async def test_get_exchange_rate_unsupported_currency_returns_400(client, api_key):
+    """SOL is not a supported currency — should return 400, not 500."""
+    resp = await client.get(
+        "/v1/billing/exchange-rates?from_currency=SOL&to_currency=USD",
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 400
+    body = resp.json()
+    assert "SOL" in body.get("detail", "")
+
+
+async def test_get_exchange_rate_dogecoin_returns_400(client, api_key):
+    """DOGECOIN is not a valid currency code — should return 400."""
+    resp = await client.get(
+        "/v1/billing/exchange-rates?from_currency=DOGECOIN&to_currency=CREDITS",
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert resp.status_code == 400
+
+
 # ---------------------------------------------------------------------------
 # GET /v1/billing/wallets/{agent_id}/revenue
 # ---------------------------------------------------------------------------
@@ -604,3 +624,23 @@ class TestAmountValidation:
             headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 200
+
+    async def test_deposit_dogecoin_rejected(self, client, api_key):
+        """DOGECOIN is not a valid currency — must be rejected."""
+        resp = await client.post(
+            "/v1/billing/wallets/test-agent/deposit",
+            json={"amount": "10", "currency": "DOGECOIN"},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 400
+        assert "DOGECOIN" in resp.json().get("detail", "")
+
+    async def test_withdraw_invalid_currency_rejected(self, client, api_key):
+        """Invalid currencies must be rejected on withdraw too."""
+        resp = await client.post(
+            "/v1/billing/wallets/test-agent/withdraw",
+            json={"amount": "1", "currency": "MONOPOLY"},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        assert resp.status_code == 400
+        assert "MONOPOLY" in resp.json().get("detail", "")
