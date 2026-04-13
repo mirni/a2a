@@ -1,6 +1,6 @@
 [project]
 name = "a2a-greenhelix-sdk"
-version = "1.4.0"
+version = "1.4.1"
 description = "Python SDK for the A2A Commerce gateway — agent-to-agent payments, escrow, marketplace, identity, and trust scoring"
 requires-python = ">=3.11"
 license = "MIT"

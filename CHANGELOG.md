@@ -1,5 +1,44 @@
 # Changelog
 
+# Release v1.4.1
+
+**Date:** 2026-04-13
+**Commit:** 9ee96b7f
+**Previous:** v1.4.0
+
+## Changes
+
+### Bug Fixes
+
+- fix(gatekeeper): eager boto3 probe + audit remediation plan (#102) (`aa6af71`)
+
+### Documentation
+
+- docs: update distribution queue status, add next-steps analysis (`09a1f3d`)
+
+### Chores
+
+- chore: repo hygiene — gitignore gaps, stale editor files (`2faa4e7`)
+
+### Other
+
+- Merge branch 'main' of https://github.com/mirni/a2a (`9ee96b7`)
+- Merge release v1.4.0 into main (`c2755a2`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | {{VERSION}} |
+| a2a-db-backup | {{VERSION}} |
+| a2a-gateway | {{VERSION}} |
+| a2a-gateway-sandbox | {{VERSION}} |
+| a2a-gateway-test | {{VERSION}} |
+| a2a-litestream | {{VERSION}} |
+| a2a-website | {{VERSION}} |
+---
+
+
 # Release v1.4.0
 
 **Date:** 2026-04-13
