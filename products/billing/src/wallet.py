@@ -15,11 +15,14 @@ _pricing = load_pricing_config()
 class InsufficientCreditsError(Exception):
     """Raised when a withdrawal would exceed available balance."""
 
-    def __init__(self, agent_id: str, requested: float, available: float) -> None:
+    def __init__(self, agent_id: str, requested: float, available: float, currency: str = "CREDITS") -> None:
         self.agent_id = agent_id
         self.requested = requested
         self.available = available
-        super().__init__(f"Agent {agent_id}: insufficient credits. Requested {requested}, available {available}")
+        self.currency = currency
+        super().__init__(
+            f"Agent {agent_id}: insufficient balance in {currency}. Requested {requested}, available {available}"
+        )
 
 
 class WalletNotFoundError(Exception):
@@ -207,7 +210,7 @@ class Wallet:
         success, new_balance = await self.storage.atomic_currency_debit_strict(agent_id, amount, currency)
         if not success:
             available = await self.storage.get_currency_balance(agent_id, currency)
-            raise InsufficientCreditsError(agent_id, amount, available)
+            raise InsufficientCreditsError(agent_id, amount, available, currency=currency)
 
         import json as _json
 

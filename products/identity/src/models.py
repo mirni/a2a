@@ -328,14 +328,36 @@ class OrgMembership(BaseModel):
     joined_at: float
 
 
-# Supported metric names for trading bot attestation
+# Supported metric names — finance, ML, infra, and general agent metrics.
+# Custom metric names matching ^[a-z][a-z0-9_]{0,63}$ are also accepted
+# via IdentityAPI.get_supported_metrics() which merges this set with
+# dynamically registered custom metrics.
 SUPPORTED_METRICS = {
+    # Finance / trading
     "sharpe_30d",
     "max_drawdown_30d",
     "pnl_30d",
-    "p99_latency_ms",
     "signal_accuracy_30d",
     "win_rate_30d",
     "total_trades_30d",
     "aum",
+    # Latency / performance
+    "p99_latency_ms",
+    "p95_latency_ms",
+    "p50_latency_ms",
+    "latency_ms",
+    "throughput_rps",
+    "requests_per_second",
+    # ML / AI
+    "accuracy",
+    "precision",
+    "recall",
+    "f1_score",
+    "loss",
+    "error_rate",
+    # General agent metrics
+    "uptime",
+    "success_rate",
+    "task_completion_rate",
+    "response_time_ms",
 }
