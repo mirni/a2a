@@ -77,6 +77,9 @@ from gateway.src.tools.infrastructure import (
     _test_webhook,
 )
 from gateway.src.tools.marketplace import (
+    _atlas_broker,
+    _atlas_discover,
+    _atlas_preflight,
     _best_match,
     _deactivate_service,
     _get_service,
@@ -216,6 +219,10 @@ TOOL_REGISTRY: dict[str, ToolFunc] = {
     "check_sla_compliance": _check_sla_compliance,
     # Strategy marketplace
     "list_strategies": _list_strategies,
+    # Atlas Discovery & Brokering
+    "atlas_discover": _atlas_discover,
+    "atlas_preflight": _atlas_preflight,
+    "atlas_broker": _atlas_broker,
     # Analytics
     "get_service_analytics": _get_service_analytics,
     "get_revenue_report": _get_revenue_report,

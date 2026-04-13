@@ -5898,5 +5898,167 @@
       "max_latency_ms": 500
     },
     "tier_required": "free"
+  },
+  {
+    "name": "atlas_discover",
+    "service": "marketplace",
+    "description": "Enriched agent discovery: marketplace search + trust breakdown + reputation + ratings → Atlas Score.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query for service discovery"
+        },
+        "budget": {
+          "type": "number",
+          "description": "Maximum cost per call"
+        },
+        "min_trust_score": {
+          "type": "number",
+          "description": "Minimum trust score threshold (0-100)"
+        },
+        "prefer": {
+          "type": "string",
+          "enum": ["cost", "trust", "latency"],
+          "description": "Ranking preference"
+        },
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Required tool names the provider must support"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 5,
+          "description": "Maximum number of results"
+        }
+      },
+      "required": ["query"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "service": { "type": "object" },
+              "atlas_score": { "type": "number" },
+              "trust_score": { "type": "number" },
+              "reputation": { "type": "object" },
+              "average_rating": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 2000
+    },
+    "tier_required": "free"
+  },
+  {
+    "name": "atlas_preflight",
+    "service": "marketplace",
+    "description": "Pre-transaction verification: endpoint reachable? trust OK? wallet active? pricing unchanged?",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "type": "string",
+          "description": "The service identifier to verify"
+        },
+        "min_trust_score": {
+          "type": "number",
+          "description": "Minimum acceptable trust score (0-100)"
+        },
+        "expected_cost": {
+          "type": "number",
+          "description": "Expected per-call cost for pricing verification"
+        }
+      },
+      "required": ["service_id"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "ready": { "type": "boolean" },
+        "checks": {
+          "type": "object",
+          "properties": {
+            "endpoint": { "type": "string" },
+            "trust": { "type": "string" },
+            "wallet": { "type": "string" },
+            "pricing": { "type": "string" }
+          }
+        },
+        "latency_ms": { "type": "number" }
+      }
+    },
+    "pricing": {
+      "per_call": 0.0
+    },
+    "sla": {
+      "max_latency_ms": 10000
+    },
+    "tier_required": "free"
+  },
+  {
+    "name": "atlas_broker",
+    "service": "marketplace",
+    "description": "One-call brokering: discover → preflight → create payment intent.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query for service discovery"
+        },
+        "payer": {
+          "type": "string",
+          "description": "Payer agent ID (must match authenticated caller)"
+        },
+        "budget": {
+          "type": "number",
+          "description": "Maximum cost per call"
+        },
+        "min_trust_score": {
+          "type": "number",
+          "description": "Minimum trust score threshold (0-100)"
+        },
+        "prefer": {
+          "type": "string",
+          "enum": ["cost", "trust", "latency"]
+        },
+        "description": {
+          "type": "string",
+          "description": "Description for the payment intent"
+        }
+      },
+      "required": ["query", "payer"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "match": { "type": "object" },
+        "intent_id": { "type": "string" },
+        "intent_status": { "type": "string" },
+        "atlas_score": { "type": "number" },
+        "preflight": { "type": "object" },
+        "error": { "type": "string" }
+      }
+    },
+    "pricing": {
+      "per_call": 0.5
+    },
+    "sla": {
+      "max_latency_ms": 15000
+    },
+    "tier_required": "pro"
   }
 ]

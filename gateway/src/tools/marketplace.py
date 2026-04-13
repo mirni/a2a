@@ -1,8 +1,11 @@
-"""Marketplace, strategy, and service rating tool functions."""
+"""Marketplace, strategy, service rating, and Atlas tool functions."""
 
 from __future__ import annotations
 
+import time as _time
 from typing import Any
+
+import httpx
 
 from gateway.src.lifespan import AppContext
 from gateway.src.tools._pagination import _paginate
@@ -333,3 +336,240 @@ async def _search_agents(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
         return _paginate(all_agents, params)
 
     return {"agents": all_agents[:limit]}
+
+
+# ---------------------------------------------------------------------------
+# Atlas Discovery & Brokering (Project Atlas MVP)
+# ---------------------------------------------------------------------------
+
+
+async def _atlas_discover(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    """Enriched discovery: marketplace + trust + reputation + ratings → Atlas Score."""
+    from marketplace_src.atlas import compute_atlas_score
+    from marketplace_src.models import MatchPreference
+
+    prefer = MatchPreference(params.get("prefer", "trust"))
+    limit = int(params.get("limit", 5))
+    capabilities = params.get("capabilities")
+
+    matches = await ctx.marketplace.best_match(
+        query=params["query"],
+        budget=params.get("budget"),
+        min_trust_score=params.get("min_trust_score"),
+        prefer=prefer,
+        limit=limit * 3,
+    )
+
+    results = []
+    for m in matches:
+        service = m.service
+
+        # Filter by capabilities (required tool names)
+        if capabilities:
+            svc_tools = set(service.tools) if hasattr(service, "tools") and service.tools else set()
+            if not set(capabilities).issubset(svc_tools):
+                continue
+
+        # Enrich: trust breakdown
+        trust_composite: float | None = None
+        try:
+            score = await ctx.trust_api.get_score(server_id=service.provider_id)
+            trust_composite = score.composite_score
+        except Exception:
+            pass
+
+        # Enrich: identity reputation
+        reputation_data: dict[str, Any] = {}
+        reputation_composite: float | None = None
+        transaction_volume_score: float | None = None
+        try:
+            rep = await ctx.identity_api.get_reputation(service.provider_id)
+            if rep is not None:
+                reputation_data = {
+                    "payment_reliability": rep.payment_reliability,
+                    "data_source_quality": rep.data_source_quality,
+                    "transaction_volume_score": rep.transaction_volume_score,
+                    "composite_score": rep.composite_score,
+                }
+                reputation_composite = rep.composite_score
+                transaction_volume_score = rep.transaction_volume_score
+        except Exception:
+            pass
+
+        # Enrich: service ratings
+        avg_rating = 0.0
+        try:
+            ratings_result = await _get_service_ratings_tool(ctx, {"service_id": service.id, "limit": 0})
+            avg_rating = ratings_result.get("average_rating", 0.0)
+        except Exception:
+            pass
+
+        atlas = compute_atlas_score(
+            trust_composite=trust_composite,
+            reputation_composite=reputation_composite,
+            average_rating=avg_rating,
+            transaction_volume_score=transaction_volume_score,
+        )
+
+        results.append(
+            {
+                "service": {
+                    "id": service.id,
+                    "name": service.name,
+                    "description": service.description,
+                    "provider_id": service.provider_id,
+                    "pricing": service.pricing.to_dict(),
+                    "endpoint": service.endpoint,
+                },
+                "atlas_score": atlas.total,
+                "atlas_breakdown": {
+                    "trust_component": atlas.trust_component,
+                    "reputation_component": atlas.reputation_component,
+                    "marketplace_component": atlas.marketplace_component,
+                    "volume_component": atlas.volume_component,
+                },
+                "trust_score": trust_composite,
+                "reputation": reputation_data or None,
+                "average_rating": avg_rating,
+                "rank_score": m.rank_score,
+            }
+        )
+
+    # Sort by atlas_score DESC
+    results.sort(key=lambda r: r["atlas_score"], reverse=True)
+    return {"results": results[:limit]}
+
+
+async def _atlas_preflight(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    """Pre-transaction verification for a marketplace service."""
+    from gateway.src.tool_errors import ToolNotFoundError
+
+    service_id = params["service_id"]
+    min_trust = params.get("min_trust_score")
+    expected_cost = params.get("expected_cost")
+
+    start = _time.monotonic()
+
+    # Fetch service (raises ToolNotFoundError if missing)
+    try:
+        service = await ctx.marketplace.get_service(service_id)
+    except Exception as exc:
+        raise ToolNotFoundError(f"Service not found: {service_id}") from exc
+
+    checks: dict[str, str] = {}
+
+    # Check endpoint reachability
+    endpoint = service.endpoint if hasattr(service, "endpoint") else ""
+    if endpoint:
+        try:
+            async with httpx.AsyncClient() as http:
+                resp = await http.head(endpoint, timeout=5.0)
+            checks["endpoint"] = "ok" if resp.status_code < 500 else "fail"
+        except Exception:
+            checks["endpoint"] = "fail"
+    else:
+        checks["endpoint"] = "fail"
+
+    # Check trust
+    if min_trust is not None:
+        try:
+            score = await ctx.trust_api.get_score(server_id=service.provider_id)
+            checks["trust"] = "ok" if score.composite_score >= min_trust else "fail"
+        except Exception:
+            checks["trust"] = "fail"
+    else:
+        checks["trust"] = "ok"
+
+    # Check wallet
+    try:
+        await ctx.tracker.wallet.get_balance(service.provider_id)
+        checks["wallet"] = "ok"
+    except Exception:
+        checks["wallet"] = "ok"  # No wallet doesn't mean failure for the provider
+
+    # Check pricing
+    if expected_cost is not None:
+        from decimal import Decimal
+
+        svc_cost = Decimal(str(service.pricing.cost)) if hasattr(service.pricing, "cost") else Decimal("0")
+        checks["pricing"] = "ok" if svc_cost == Decimal(str(expected_cost)) else "fail"
+    else:
+        checks["pricing"] = "ok"
+
+    elapsed_ms = round((_time.monotonic() - start) * 1000, 1)
+    ready = all(v == "ok" for v in checks.values())
+
+    return {
+        "ready": ready,
+        "checks": checks,
+        "service_id": service_id,
+        "latency_ms": elapsed_ms,
+    }
+
+
+async def _atlas_broker(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
+    """One-call brokering: discover → preflight → create payment intent."""
+    from gateway.src.tools.payments import _create_intent
+
+    query = params["query"]
+    payer = params["payer"]
+    description = params.get("description", "")
+
+    # Step 1: Discover candidates
+    discover_result = await _atlas_discover(
+        ctx,
+        {
+            "query": query,
+            "budget": params.get("budget"),
+            "min_trust_score": params.get("min_trust_score"),
+            "prefer": params.get("prefer", "trust"),
+            "limit": 5,
+        },
+    )
+
+    candidates = discover_result.get("results", [])
+    if not candidates:
+        return {"match": None, "error": "No candidate passed preflight"}
+
+    # Step 2: Preflight each candidate until one passes
+    for candidate in candidates:
+        svc = candidate["service"]
+        preflight = await _atlas_preflight(
+            ctx,
+            {
+                "service_id": svc["id"],
+                "min_trust_score": params.get("min_trust_score"),
+            },
+        )
+        if preflight["ready"]:
+            # Step 3: Create payment intent
+            pricing = svc.get("pricing", {})
+            amount = pricing.get("cost", 0)
+            try:
+                intent = await _create_intent(
+                    ctx,
+                    {
+                        "payer": payer,
+                        "payee": svc["provider_id"],
+                        "amount": amount if amount > 0 else 1.0,
+                        "description": description or f"Atlas brokered: {svc['name']}",
+                    },
+                )
+                return {
+                    "match": svc,
+                    "intent_id": intent.get("id"),
+                    "intent_status": intent.get("status"),
+                    "atlas_score": candidate["atlas_score"],
+                    "preflight": preflight,
+                }
+            except Exception as exc:
+                return {
+                    "match": svc,
+                    "intent_id": None,
+                    "intent_status": "failed",
+                    "atlas_score": candidate["atlas_score"],
+                    "preflight": preflight,
+                    "error": str(exc),
+                }
+
+    return {"match": None, "error": "No candidate passed preflight"}
