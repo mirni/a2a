@@ -280,6 +280,23 @@ async def test_agent_json_no_auth_required(client):
 
 
 @pytest.mark.asyncio
+async def test_agent_card_skills_have_a2a_registry_fields(client):
+    """Each skill must have examples, inputModes, outputModes as lists.
+
+    a2aregistry.org rejects agent cards where these fields are null or
+    missing — its Pydantic model requires ``list`` type, not ``None``.
+    """
+    resp = await client.get("/.well-known/agent.json")
+    data = resp.json()
+    for skill in data["skills"]:
+        for field in ("examples", "inputModes", "outputModes"):
+            assert field in skill, f"Skill '{skill['id']}' missing '{field}'"
+            assert isinstance(skill[field], list), (
+                f"Skill '{skill['id']}' field '{field}' must be list, got {type(skill[field]).__name__}"
+            )
+
+
+@pytest.mark.asyncio
 async def test_agent_json_matches_agent_card(client):
     """/.well-known/agent.json and agent-card.json must return identical data."""
     resp_card = await client.get("/.well-known/agent-card.json")

@@ -91,6 +91,9 @@ def _build_agent_card(request: Request) -> dict:
                 "name": svc["name"],
                 "description": svc["description"],
                 "tags": svc["tags"],
+                "examples": [],
+                "inputModes": ["application/json"],
+                "outputModes": ["application/json"],
             }
             for svc in _SERVICES
         ],

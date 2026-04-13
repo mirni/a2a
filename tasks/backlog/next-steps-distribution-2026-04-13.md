@@ -122,17 +122,18 @@ they're all auth errors).
 
 ### Steps
 
-1. **Provision an admin API key on production:**
+1. **Provision an API key on production:**
    ```bash
    curl -X POST https://api.greenhelix.net/v1/billing/keys \
      -H "Authorization: Bearer $ADMIN_KEY" \
      -H "Content-Type: application/json" \
-     -d '{"agent_id": "ci-stress-agent", "tier": "pro"}'
+     -d '{"tier": "pro"}'
    ```
    Save the returned `key` value.
 
-   Note: The old `POST /v1/infra/keys` endpoint returns 410. Key
-   creation moved to `POST /v1/billing/keys`.
+   Note: `agent_id` is NOT a body parameter — it's inferred from the
+   authenticated caller's identity. The old `POST /v1/infra/keys`
+   endpoint returns 410; key creation moved to `POST /v1/billing/keys`.
 
 
 2. **Add to GitHub Actions secrets:**
