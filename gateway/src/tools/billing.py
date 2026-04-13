@@ -453,15 +453,13 @@ async def _get_exchange_rate(ctx: AppContext, params: dict[str, Any]) -> dict[st
         from_currency = Currency(params["from_currency"])
     except ValueError:
         raise ToolValidationError(
-            f"Unsupported currency '{params['from_currency']}'; "
-            f"must be one of {[c.value for c in Currency]}"
+            f"Unsupported currency '{params['from_currency']}'; must be one of {[c.value for c in Currency]}"
         ) from None
     try:
         to_currency = Currency(params["to_currency"])
     except ValueError:
         raise ToolValidationError(
-            f"Unsupported currency '{params['to_currency']}'; "
-            f"must be one of {[c.value for c in Currency]}"
+            f"Unsupported currency '{params['to_currency']}'; must be one of {[c.value for c in Currency]}"
         ) from None
 
     exchange_svc = ExchangeRateService(storage=ctx.tracker.storage)
