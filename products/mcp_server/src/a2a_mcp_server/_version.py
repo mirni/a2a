@@ -1,3 +1,3 @@
-"""Version of a2a-mcp-server. Kept in sync with gateway releases."""
+"""Version of a2a-greenhelix-mcp-server. Independent of gateway/SDK releases."""
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
