@@ -253,3 +253,177 @@ class TestBoto3EagerProbe:
             assert isinstance(ctx.gatekeeper_api.verifier, MockVerifierClient)
         finally:
             await ctx_manager.__aexit__(None, None, None)
+
+
+class TestAuditZ3Regression:
+    """Reproduce the exact auditor payloads that have failed for 10 releases.
+
+    The external audit submits three Z3 expressions (SAT, UNSAT, spec) and
+    expects ``status=completed`` with a valid result.  Every release since
+    v1.2.1 has returned ``status=failed, result=error`` because the sandbox
+    was configured with ``VERIFIER_AUTH_MODE=iam`` (Lambda) instead of
+    ``mock`` (in-process Z3), and the server had no AWS credentials.
+
+    These tests verify that mock-mode jobs complete for each expression.
+    """
+
+    # Exact payloads from reports/external/v1.4.1/api-personas/audit.py
+    _AUDIT_PAYLOADS = [
+        {
+            "label": "SAT",
+            "property": {
+                "name": "t",
+                "expression": "(declare-const x Int) (assert (> x 0))",
+                "language": "z3_smt2",
+            },
+            "expected_result": "satisfied",
+        },
+        {
+            "label": "UNSAT",
+            "property": {
+                "name": "t",
+                "expression": "(declare-const x Int) (assert (and (> x 0) (< x 0)))",
+                "language": "z3_smt2",
+            },
+            "expected_result": "violated",
+        },
+        {
+            "label": "spec",
+            "property": {
+                "name": "t",
+                "expression": (
+                    "(declare-const price Real) (declare-const fee Real) "
+                    "(assert (= fee (* price 0.02))) (assert (>= price 0))"
+                ),
+                "language": "z3_smt2",
+            },
+            "expected_result": "satisfied",
+        },
+    ]
+
+    @pytest.mark.parametrize(
+        "payload",
+        _AUDIT_PAYLOADS,
+        ids=[p["label"] for p in _AUDIT_PAYLOADS],
+    )
+    async def test_audit_z3_job_completes(self, mock_client, mock_pro_api_key, payload):
+        """Audit Z3 expression must complete (not fail) under mock verifier."""
+        r = await mock_client.post(
+            "/v1/gatekeeper/jobs",
+            json={
+                "agent_id": "pro-agent",
+                "properties": [payload["property"]],
+            },
+            headers={"Authorization": f"Bearer {mock_pro_api_key}"},
+        )
+        assert r.status_code == 201, f"Submit failed: {r.text}"
+        body = r.json()
+        assert body["status"] == "completed", (
+            f"Expected status=completed for {payload['label']}, "
+            f"got status={body.get('status')}, result={body.get('result')}"
+        )
+        assert body["result"] == payload["expected_result"], (
+            f"Expected result={payload['expected_result']} for {payload['label']}, got result={body.get('result')}"
+        )
+
+    async def test_audit_z3_sat_produces_proof(self, mock_client, mock_pro_api_key):
+        """SAT job must produce a verifiable proof artifact."""
+        r = await mock_client.post(
+            "/v1/gatekeeper/jobs",
+            json={
+                "agent_id": "pro-agent",
+                "properties": [self._AUDIT_PAYLOADS[0]["property"]],
+            },
+            headers={"Authorization": f"Bearer {mock_pro_api_key}"},
+        )
+        assert r.status_code == 201
+        body = r.json()
+        assert body["status"] == "completed"
+        job_id = body["job_id"]
+
+        # Poll via GET to get proof_artifact_id (submit response omits it)
+        resp = await mock_client.get(
+            f"/v1/gatekeeper/jobs/{job_id}",
+            headers={"Authorization": f"Bearer {mock_pro_api_key}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        proof_id = data.get("proof_artifact_id")
+        assert proof_id is not None, "Completed job must have proof_artifact_id"
+
+        # Verify the proof
+        proof_resp = await mock_client.get(
+            f"/v1/gatekeeper/proofs/{proof_id}",
+            headers={"Authorization": f"Bearer {mock_pro_api_key}"},
+        )
+        assert proof_resp.status_code == 200
+        proof = proof_resp.json()
+        assert proof["proof_hash"]
+        assert proof["result"] == "satisfied"
+
+    async def test_iam_mode_without_credentials_falls_back(self, tmp_path, monkeypatch):
+        """VERIFIER_AUTH_MODE=iam + boto3 importable but no AWS creds → must not silently fail.
+
+        This reproduces the exact sandbox failure: boto3 is installed,
+        VerifierClient is created, but Lambda invoke() fails at runtime
+        because there are no AWS credentials. The gateway should detect
+        this at startup and fall back to mock.
+
+        We inject a fake boto3 module whose Session().get_credentials()
+        returns None, simulating a host with boto3 installed but no
+        configured AWS credentials.
+        """
+        import types
+
+        from products.connectors.verifier.src.client import MockVerifierClient
+
+        # Build a minimal fake boto3 that is importable but has no credentials
+        fake_boto3 = types.ModuleType("boto3")
+        fake_boto3.__version__ = "1.34.0"
+
+        class _FakeSession:
+            def __init__(self, **kwargs):
+                pass
+
+            def get_credentials(self):
+                return None
+
+        fake_boto3.Session = _FakeSession
+
+        def _fake_client(*args, **kwargs):
+            raise Exception("NoCredentialError: Unable to locate credentials")
+
+        fake_boto3.client = _fake_client
+
+        monkeypatch.setitem(sys.modules, "boto3", fake_boto3)
+
+        data_dir = str(tmp_path)
+        _seed_env(monkeypatch, data_dir)
+        monkeypatch.setenv("VERIFIER_AUTH_MODE", "iam")
+        # Ensure no AWS credentials in env either
+        monkeypatch.delenv("AWS_ACCESS_KEY_ID", raising=False)
+        monkeypatch.delenv("AWS_SECRET_ACCESS_KEY", raising=False)
+        monkeypatch.delenv("AWS_SESSION_TOKEN", raising=False)
+        monkeypatch.delenv("AWS_PROFILE", raising=False)
+
+        application = create_app()
+        application.state.sse_config = SSEConfig(
+            poll_interval_seconds=0.05,
+            heartbeat_interval_seconds=60.0,
+            max_connection_seconds=0.3,
+        )
+
+        ctx_manager = lifespan(application)
+        await ctx_manager.__aenter__()
+        try:
+            ctx = application.state.ctx
+            assert ctx.gatekeeper_api is not None
+            assert ctx.gatekeeper_api.verifier is not None
+            # When IAM mode has no credentials, lifespan should detect
+            # this and fall back to MockVerifierClient
+            assert isinstance(ctx.gatekeeper_api.verifier, MockVerifierClient), (
+                "Expected MockVerifierClient fallback when AWS credentials are missing, "
+                f"got {type(ctx.gatekeeper_api.verifier).__name__}"
+            )
+        finally:
+            await ctx_manager.__aexit__(None, None, None)
