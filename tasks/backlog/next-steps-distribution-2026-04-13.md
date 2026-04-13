@@ -51,13 +51,24 @@ DNS TXT record + GitHub secret. Full docs: `docs/infra/MCP_REGISTRY_PUBLISHING.m
    rm -f /tmp/key.pem
    ```
 
-7. **Trigger first publish:**
-   ```bash
-   git tag mcp-v0.1.0 && git push origin mcp-v0.1.0
+7. **Set up PyPI Trusted Publisher** (one-time):
+   Go to https://pypi.org/manage/account/publishing/ and add a pending publisher:
    ```
-   This triggers the Publish MCP workflow → PyPI + npm → MCP Registry.
+   PyPI project name: a2a-greenhelix-mcp-server
+   Owner:             mirni
+   Repository name:   a2a
+   Workflow name:     publish-mcp.yml
+   Environment name:  pypi
+   ```
+   Note: The old name `a2a-mcp-server` is taken on PyPI by a different project.
 
-8. **Verify listing:**
+8. **Trigger first publish:**
+   ```bash
+   gh workflow run "Publish MCP" -f version=0.1.0
+   ```
+   Or via tag: `git tag mcp-v0.1.0 && git push origin mcp-v0.1.0`
+
+9. **Verify listing:**
    ```bash
    curl "https://registry.modelcontextprotocol.io/v0.1/servers?search=net.greenhelix/mcp-server"
    ```
@@ -76,7 +87,7 @@ gh issue create --repo chatmcp/mcp-directory \
 - **Name:** A2A Commerce Gateway MCP Server
 - **Description:** 141-tool MCP server for AI agent commerce — payments, escrow, identity, marketplace, formal verification (Z3 Gatekeeper)
 - **npm:** @greenhelix/mcp-server
-- **PyPI:** a2a-mcp-server
+- **PyPI:** a2a-greenhelix-mcp-server
 - **GitHub:** https://github.com/mirni/a2a/tree/main/products/mcp_server
 - **Category:** Commerce & Payments
 EOF
@@ -122,17 +133,18 @@ they're all auth errors).
 
 ### Steps
 
-1. **Provision an admin API key on production:**
+1. **Provision an API key on production:**
    ```bash
    curl -X POST https://api.greenhelix.net/v1/billing/keys \
      -H "Authorization: Bearer $ADMIN_KEY" \
      -H "Content-Type: application/json" \
-     -d '{"agent_id": "ci-stress-agent", "tier": "pro"}'
+     -d '{"tier": "pro"}'
    ```
    Save the returned `key` value.
 
-   Note: The old `POST /v1/infra/keys` endpoint returns 410. Key
-   creation moved to `POST /v1/billing/keys`.
+   Note: `agent_id` is NOT a body parameter — it's inferred from the
+   authenticated caller's identity. The old `POST /v1/infra/keys`
+   endpoint returns 410; key creation moved to `POST /v1/billing/keys`.
 
 
 2. **Add to GitHub Actions secrets:**

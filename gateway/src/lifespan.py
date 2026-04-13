@@ -251,8 +251,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             from products.connectors.verifier.src.client import VerifierClient
 
             verifier_client = VerifierClient()
-            # Eager probe: ensure boto3 is importable NOW so we don't
-            # silently fail every invoke() call with ModuleNotFoundError.
+            # Eager probes: ensure boto3 is importable and has credentials
+            # so we don't silently fail every invoke() with ModuleNotFoundError
+            # or NoCredentialsError at runtime.
             if verifier_auth_mode == "iam":
                 try:
                     import boto3  # noqa: F401
@@ -260,6 +261,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                     raise ImportError(
                         "VERIFIER_AUTH_MODE=iam requires boto3. Install with: pip install 'boto3>=1.34'"
                     ) from exc
+                # Probe for AWS credentials — boto3.Session().get_credentials()
+                # returns None when no credentials are configured (no env vars,
+                # no ~/.aws/credentials, no instance metadata).
+                session = boto3.Session()
+                if session.get_credentials() is None:
+                    raise RuntimeError(
+                        "VERIFIER_AUTH_MODE=iam but no AWS credentials found. "
+                        "Set AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY or "
+                        "configure an IAM instance profile."
+                    )
             logger.info("Gatekeeper verifier: %s", verifier_auth_mode)
     except Exception:
         logger.warning(
