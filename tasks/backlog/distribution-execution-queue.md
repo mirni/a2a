@@ -14,10 +14,10 @@ Convention: `[ ]` pending, `[~]` in progress, `[x]` done.
 
 ## Sprint 1 — High ROI (~4.5 engineer-days total)
 
-### [~] A1. Build & publish the MCP server
+### [x] A1. Build & publish the MCP server
 **Reach:** ~500K agents/mo · **Effort:** 1.0d · **ROI:** High
-**Status:** Implementation complete, registry publish pending human
-DNS + secret setup (see `docs/infra/MCP_REGISTRY_PUBLISHING.md`).
+**Status:** DONE — `a2a-mcp-server` on PyPI, `@greenhelix/mcp-server` on npm.
+Registry publish pending human DNS + secret setup (see `docs/infra/MCP_REGISTRY_PUBLISHING.md`).
 
 **Why:** MCP is the lingua franca for agent tool-calling. One server lights
 up Claude Desktop, Claude Code, Cursor, Windsurf, OpenAI Agents SDK, Google
@@ -67,8 +67,9 @@ ADK, CrewAI, LangChain MCP adapter, and LlamaIndex simultaneously.
 
 ---
 
-### [ ] A3. Ship `.well-known/` artefact bundle
+### [x] A3. Ship `.well-known/` artefact bundle
 **Reach:** ~150K agents/mo · **Effort:** 0.5d · **ROI:** High
+**Status:** DONE — 6 endpoints live: `agents.json`, `ai-plugin.json`, `mcp.json`, `agent-pricing.json`, `llms.txt`, `llms-full.txt`.
 
 **Deliverables:**
 - New file `gateway/src/routes/well_known.py` serving:
@@ -114,8 +115,9 @@ ADK, CrewAI, LangChain MCP adapter, and LlamaIndex simultaneously.
 
 ---
 
-### [ ] A5. Publish LangChain / LangGraph tool pack
+### [~] A5. Publish LangChain / LangGraph tool pack
 **Reach:** ~200K agents/mo · **Effort:** 1.0d · **ROI:** High
+**Status:** `a2a-langchain` v0.1.0 published on PyPI. Missing: LangGraph example, community PR.
 
 **Deliverables:**
 - `integrations/langchain/` already exists — bump to `0.2.0`
@@ -136,8 +138,9 @@ ADK, CrewAI, LangChain MCP adapter, and LlamaIndex simultaneously.
 
 ---
 
-### [ ] A6. Publish CrewAI toolset
+### [~] A6. Publish CrewAI toolset
 **Reach:** ~80K agents/mo · **Effort:** 0.5d · **ROI:** High
+**Status:** `a2a-crewai` v0.1.0 published on PyPI. Missing: marketplace example, community index PR.
 
 **Deliverables:**
 - `integrations/crewai/` already exists — bump to `0.2.0`
@@ -154,8 +157,9 @@ ADK, CrewAI, LangChain MCP adapter, and LlamaIndex simultaneously.
 
 ---
 
-### [ ] A7. Cursor / Claude Desktop / Claude Code / Windsurf docs
+### [x] A7. Cursor / Claude Desktop / Claude Code / Windsurf docs
 **Reach:** ~500K IDE users · **Effort:** 0.25d · **ROI:** High
+**Status:** DONE — `docs/integrations/` has all 5 docs (cursor, claude-desktop, claude-code, windsurf, zed).
 
 **Depends on:** A1 complete
 
