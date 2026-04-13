@@ -1,5 +1,35 @@
 # Changelog
 
+# Release v1.4.2
+
+**Date:** 2026-04-13
+**Commit:** f65f831f
+**Previous:** v1.4.1
+
+## Changes
+
+### Bug Fixes
+
+- fix(gatekeeper): credential probe + sandbox mock mode (#103) (`f65f831`)
+
+### Other
+
+- Merge release v1.4.1 into main (`663b5d0`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | {{VERSION}} |
+| a2a-db-backup | {{VERSION}} |
+| a2a-gateway | {{VERSION}} |
+| a2a-gateway-sandbox | {{VERSION}} |
+| a2a-gateway-test | {{VERSION}} |
+| a2a-litestream | {{VERSION}} |
+| a2a-website | {{VERSION}} |
+---
+
+
 # Release v1.4.1
 
 **Date:** 2026-04-13

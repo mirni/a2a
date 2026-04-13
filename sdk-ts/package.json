@@ -1,6 +1,6 @@
 {
   "name": "@greenhelix/sdk",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "TypeScript SDK for the A2A Commerce Gateway — agent-to-agent payments, escrow, marketplace, identity, and trust scoring",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
