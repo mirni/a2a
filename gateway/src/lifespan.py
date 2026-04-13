@@ -251,6 +251,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             from products.connectors.verifier.src.client import VerifierClient
 
             verifier_client = VerifierClient()
+            # Eager probe: ensure boto3 is importable NOW so we don't
+            # silently fail every invoke() call with ModuleNotFoundError.
+            if verifier_auth_mode == "iam":
+                try:
+                    import boto3  # noqa: F401
+                except ImportError as exc:
+                    raise ImportError(
+                        "VERIFIER_AUTH_MODE=iam requires boto3. "
+                        "Install with: pip install 'boto3>=1.34'"
+                    ) from exc
             logger.info("Gatekeeper verifier: %s", verifier_auth_mode)
     except Exception:
         logger.warning(

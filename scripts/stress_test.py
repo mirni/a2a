@@ -673,6 +673,8 @@ async def main(args: argparse.Namespace) -> int:
         # 2b. Gatekeeper smoke check
         if admin_key and agents:
             await gatekeeper_smoke(base_url, admin_key, client)
+        else:
+            print("  Gatekeeper smoke: SKIPPED (no admin key)")
 
         # 3. Run stress test
         print(f"Phase 3: Ramping up {customers} customers over {ramp_up}s...")
