@@ -64,6 +64,7 @@ class CreateIntentRequest(BaseModel):
     description: str = Field(default="", max_length=2000)
     currency: str = "CREDITS"
     metadata: dict[str, Any] | None = None
+    idempotency_key: str | None = Field(default=None, max_length=256)
 
     @field_validator("description", mode="before")
     @classmethod
@@ -109,6 +110,7 @@ class CreatePerformanceEscrowRequest(BaseModel):
                 "metric_name": "accuracy",
                 "threshold": ">=0.95",
                 "description": "ML model delivery",
+                "conditions": {"min_samples": 100},
             }
         },
     )
@@ -118,6 +120,7 @@ class CreatePerformanceEscrowRequest(BaseModel):
     metric_name: str
     threshold: str
     description: str = Field(default="", max_length=2000)
+    conditions: dict[str, Any] | None = None
 
     @field_validator("description", mode="before")
     @classmethod
@@ -267,6 +270,7 @@ async def create_intent(
             "description": body.description,
             "currency": body.currency,
             "metadata": body.metadata,
+            "idempotency_key": body.idempotency_key,
         },
     )
     await check_ownership(tc, params)
@@ -381,6 +385,7 @@ async def create_performance_escrow(
             "metric_name": body.metric_name,
             "threshold": body.threshold,
             "description": body.description,
+            "conditions": body.conditions,
         },
     )
     await check_ownership(tc, params)

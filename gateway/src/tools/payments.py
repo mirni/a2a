@@ -378,16 +378,19 @@ async def _cancel_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
 
 async def _create_performance_escrow(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
     """Create escrow that auto-releases when payee's verified metric meets threshold."""
+    meta: dict[str, Any] = {
+        "performance_gated": True,
+        "metric_name": params["metric_name"],
+        "threshold": params["threshold"],
+    }
+    if params.get("conditions"):
+        meta["conditions"] = params["conditions"]
     escrow = await ctx.payment_engine.create_escrow(
         payer=params["payer"],
         payee=params["payee"],
         amount=params["amount"],
         description=params.get("description", ""),
-        metadata={
-            "performance_gated": True,
-            "metric_name": params["metric_name"],
-            "threshold": params["threshold"],
-        },
+        metadata=meta,
         idempotency_key=params.get("idempotency_key"),
     )
     return {

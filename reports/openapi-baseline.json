@@ -485,6 +485,18 @@
             "title": "Description",
             "type": "string"
           },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          },
           "metadata": {
             "anyOf": [
               {
@@ -545,6 +557,9 @@
         "additionalProperties": false,
         "example": {
           "amount": "25.00",
+          "conditions": {
+            "min_samples": 100
+          },
           "description": "ML model delivery",
           "metric_name": "accuracy",
           "payee": "agent-bob",
@@ -565,6 +580,18 @@
               }
             ],
             "title": "Amount"
+          },
+          "conditions": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conditions"
           },
           "description": {
             "default": "",
