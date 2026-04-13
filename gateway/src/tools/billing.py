@@ -7,9 +7,24 @@ from typing import Any
 from gateway.src.lifespan import AppContext
 from gateway.src.tool_errors import ToolNotFoundError, ToolValidationError
 
+# Lazily populated from billing_src.models.Currency on first use.
+_VALID_CURRENCIES: set[str] | None = None
+
+
+def _validate_billing_currency(currency: str) -> str:
+    """Validate currency against the billing Currency enum."""
+    global _VALID_CURRENCIES  # noqa: PLW0603
+    if _VALID_CURRENCIES is None:
+        from billing_src.models import Currency
+
+        _VALID_CURRENCIES = {c.value for c in Currency}
+    if currency not in _VALID_CURRENCIES:
+        raise ToolValidationError(f"Invalid currency '{currency}'; must be one of {sorted(_VALID_CURRENCIES)}")
+    return currency
+
 
 async def _get_balance(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
-    currency = params.get("currency", "CREDITS")
+    currency = _validate_billing_currency(params.get("currency", "CREDITS"))
     balance = await ctx.tracker.wallet.get_balance(params["agent_id"], currency=currency)
     result: dict[str, Any] = {"balance": balance}
     if currency != "CREDITS":
@@ -23,7 +38,7 @@ async def _get_usage_summary(ctx: AppContext, params: dict[str, Any]) -> dict[st
 
 
 async def _deposit(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
-    currency = params.get("currency", "CREDITS")
+    currency = _validate_billing_currency(params.get("currency", "CREDITS"))
     new_balance, transaction_id = await ctx.tracker.wallet.deposit_with_txn(
         params["agent_id"],
         params["amount"],
@@ -61,7 +76,7 @@ async def _create_wallet(ctx: AppContext, params: dict[str, Any]) -> dict[str, A
 
 
 async def _withdraw(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]:
-    currency = params.get("currency", "CREDITS")
+    currency = _validate_billing_currency(params.get("currency", "CREDITS"))
     new_balance = await ctx.tracker.wallet.withdraw(
         params["agent_id"],
         params["amount"],
@@ -434,8 +449,18 @@ async def _get_exchange_rate(ctx: AppContext, params: dict[str, Any]) -> dict[st
     from billing_src.exchange import ExchangeRateService
     from billing_src.models import Currency
 
-    from_currency = Currency(params["from_currency"])
-    to_currency = Currency(params["to_currency"])
+    try:
+        from_currency = Currency(params["from_currency"])
+    except ValueError:
+        raise ToolValidationError(
+            f"Unsupported currency '{params['from_currency']}'; must be one of {[c.value for c in Currency]}"
+        ) from None
+    try:
+        to_currency = Currency(params["to_currency"])
+    except ValueError:
+        raise ToolValidationError(
+            f"Unsupported currency '{params['to_currency']}'; must be one of {[c.value for c in Currency]}"
+        ) from None
 
     exchange_svc = ExchangeRateService(storage=ctx.tracker.storage)
     await exchange_svc.initialize_default_rates()

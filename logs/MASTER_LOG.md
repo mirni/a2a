@@ -7229,3 +7229,71 @@ they don't need the conftest fixtures.
 | #93 | `feat/phase4-fv` | `refactor/phase3-p2` | GREEN |
 
 All three daisy-chained PRs ready for human review/merge/release (v1.3.0).
+
+---
+
+## 2026-04-13 — MCP Version Bump + Session Continuation
+
+### Human Prompt
+"Done with pypi.org action. Reran the publish pipeline per your instructions but it failed with 'npm error 403...You cannot publish over the previously published versions: 0.1.0.' -- why is the version 0.1.0? Please make the first versions 1.0.0 for things that need to vary independently of the server/sdk deployment (1.4.2 currently)."
+
+### Actions Taken
+
+1. **Bumped MCP server version to 1.0.0** in all 3 locations:
+   - `products/mcp_server/pyproject.toml`
+   - `products/mcp_server/src/a2a_mcp_server/_version.py`
+   - `sdk-ts/mcp-server/package.json`
+
+2. **Created PR #104** (`chore/mcp-version-1.0.0`) — CI all green (16/16 jobs passed).
+
+3. **Verified plan completion** — all items from the Z3 gatekeeper plan are done:
+   - ✅ `lifespan.py` boto3 + credential probe (PR #103, merged)
+   - ✅ `stress_test.py` skip message (already in place)
+   - ✅ `next-steps-distribution` human instructions (updated)
+   - ✅ `v1.4.0-audit-remediation.md` audit findings plan (created)
+   - ✅ `formal-gatekeeper-audit-v1.4.1.md` external audit documented
+
+### Next Steps (Human)
+- Merge PR #104
+- Trigger `Publish MCP` workflow with `version=1.0.0`
+- Verify npm `@greenhelix/mcp-server@1.0.0` and PyPI `a2a-greenhelix-mcp-server==1.0.0` publish successfully
+
+---
+
+## 2026-04-13 — Stress Test Fix + v1.4.2 Audit Remediation
+
+### Human Prompts
+1. "I put some responses in next-steps-distribution-2026-04-13.md -- can you check"
+2. "Once done, process new audit reports (1.4.2)"
+
+### Actions Taken
+
+1. **Processed user responses in next-steps:**
+   - P0-1 Steps 1-4: DONE (DNS, key, secret)
+   - P0-1 Step 5: `mcp-registry` env needs manual creation (PAT lacks admin scope)
+   - a2a.ac: No submit form exists — site is a curated list from awesome-a2a GitHub repo
+   - STRESS_ADMIN_KEY: DONE
+   - Updated publish version to 1.0.0
+
+2. **Triggered & analyzed nightly stress test** (run 24365395652):
+   - Gatekeeper startup fixed: "Gatekeeper verifier: mock (in-process Z3)"
+   - 55% 403 error rate — root cause: `POST /v1/infra/keys` returns 410, all agents
+     fall back to admin key, ownership checks reject cross-agent requests
+
+3. **Fixed stress test (PR #105)**:
+   - Created `provision_stress_agents.py` for DB-level per-agent provisioning
+   - Updated `nightly-stress.yml` to use per-agent keys
+   - `stress_test.py`: accept `--agents-file`, gatekeeper smoke uses agent's own key
+
+4. **Processed v1.4.2 multi-persona audit** (80% pass rate, 8.0/10 score):
+   - F1 FIXED: SOL exchange rate 500 → 400 (Currency enum ValueError caught)
+   - F2 FIXED: DOGECOIN/arbitrary currencies rejected on deposit/withdraw
+   - F3 DOCUMENTED: `/metrics` 403 is IP-gated by design, not tier-gated
+   - Created `tasks/external/external-audit-results_v1.4.2.md`
+   - 4 new tests, 1824 total gateway tests pass
+
+### PRs
+| PR | Branch | Status | CI |
+|----|--------|--------|----|
+| #104 | `chore/mcp-version-1.0.0` | MERGED | GREEN |
+| #105 | `fix/stress-test-403` | Open | GREEN |

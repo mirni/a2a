@@ -21,6 +21,7 @@ DNS TXT record + GitHub secret. Full docs: `docs/infra/MCP_REGISTRY_PUBLISHING.m
    /workdir/scripts/mcp_registry/generate_dns_key.sh greenhelix.net
    ```
    Save the printed public key (base64) and private key (hex).
+DONE
 
 2. **Add DNS TXT record** in Cloudflare (greenhelix.net zone):
    ```
@@ -29,19 +30,26 @@ DNS TXT record + GitHub secret. Full docs: `docs/infra/MCP_REGISTRY_PUBLISHING.m
    Value: v=MCPv1; k=ed25519; p=<PUBLIC_KEY_BASE64>
    TTL:   300
    ```
+DONE
 
 3. **Verify propagation** (wait ~5 min):
    ```bash
    dig +short TXT greenhelix.net | grep MCPv1
    ```
+DONE
 
 4. **Store private key in GitHub:**
    ```bash
    source .env && export GH_TOKEN="$GITHUB_DEPLOYMENT_TOKEN"
    gh secret set MCP_REGISTRY_PRIVATE_KEY --app actions --body "<hex-string>"
    ```
+DONE
+
 
 5. **Create the `mcp-registry` environment:**
+   The PAT lacks `administration:write` scope needed to create environments via API.
+   Do it manually: GitHub → repo Settings → Environments → "New environment" → name: `mcp-registry`.
+   Or upgrade the PAT to include `administration:write` and run:
    ```bash
    gh api -X PUT repos/mirni/a2a/environments/mcp-registry
    ```
@@ -64,9 +72,9 @@ DNS TXT record + GitHub secret. Full docs: `docs/infra/MCP_REGISTRY_PUBLISHING.m
 
 8. **Trigger first publish:**
    ```bash
-   gh workflow run "Publish MCP" -f version=0.1.0
+   gh workflow run "Publish MCP" -f version=1.0.0
    ```
-   Or via tag: `git tag mcp-v0.1.0 && git push origin mcp-v0.1.0`
+   This triggers the Publish MCP workflow → PyPI + npm → MCP Registry.
 
 9. **Verify listing:**
    ```bash
@@ -119,8 +127,14 @@ Note: The registry requires the path to end with `/agent.json` or
 gateway — see `gateway/src/routes/agent_card.py`.
 
 ### a2a.ac
-1. Go to: https://a2a.ac/submit
-2. Submit the same agent card URL: `https://api.greenhelix.net/.well-known/agent.json`
+**No submission form exists.** a2a.ac is a community-curated directory built on
+[BenjaminScottAwk/awesome-a2a](https://github.com/BenjaminScottAwk/awesome-a2a).
+To get listed, open a PR on that repo adding the agent to their curated list.
+
+Alternative A2A directories with working submissions:
+- **a2aregistry.org** — form at https://a2aregistry.org/submit (done above)
+- **a2aagentlist.com** — email `gal6111@gmail.com` with subject "A2A Agent Submission"
+
 
 ---
 
@@ -152,7 +166,11 @@ they're all auth errors).
    source .env && export GH_TOKEN="$GITHUB_DEPLOYMENT_TOKEN"
    gh secret set STRESS_ADMIN_KEY --app actions --body "<key-from-step-1>"
    ```
+#### HUMAN RESPONSE:
+DONE
 
 3. **Verify** by re-running the stress test workflow. Expected: gatekeeper
    smoke check runs and shows `"Gatekeeper OK — Z3 job returned 'satisfied'"`,
    error rate drops from 100% to <5%.
+
+   Stress test triggered (run 24365395652) — waiting for results.
