@@ -1,5 +1,40 @@
 # Changelog
 
+# Release v1.4.0
+
+**Date:** 2026-04-13
+**Commit:** 25c9bb6b
+**Previous:** v1.3.2
+
+## Changes
+
+### Features
+
+- feat(atlas): add Atlas Discovery & Brokering MVP (v1.4.0) (#98) (`e95aadb`)
+
+### Bug Fixes
+
+- fix(gatekeeper): deploy config + CI smoke test for Z3 verifier (#100) (`25c9bb6`)
+- fix(audit): v1.3.2 remediation — 4 findings fixed (#99) (`9b72323`)
+
+### Other
+
+- Merge release v1.3.2 into main (`fccdb2c`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | {{VERSION}} |
+| a2a-db-backup | {{VERSION}} |
+| a2a-gateway | {{VERSION}} |
+| a2a-gateway-sandbox | {{VERSION}} |
+| a2a-gateway-test | {{VERSION}} |
+| a2a-litestream | {{VERSION}} |
+| a2a-website | {{VERSION}} |
+---
+
+
 # Release v1.3.2
 
 **Date:** 2026-04-12
