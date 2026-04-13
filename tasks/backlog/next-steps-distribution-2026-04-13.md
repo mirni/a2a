@@ -21,6 +21,7 @@ DNS TXT record + GitHub secret. Full docs: `docs/infra/MCP_REGISTRY_PUBLISHING.m
    /workdir/scripts/mcp_registry/generate_dns_key.sh greenhelix.net
    ```
    Save the printed public key (base64) and private key (hex).
+DONE
 
 2. **Add DNS TXT record** in Cloudflare (greenhelix.net zone):
    ```
@@ -29,22 +30,27 @@ DNS TXT record + GitHub secret. Full docs: `docs/infra/MCP_REGISTRY_PUBLISHING.m
    Value: v=MCPv1; k=ed25519; p=<PUBLIC_KEY_BASE64>
    TTL:   300
    ```
+DONE
 
 3. **Verify propagation** (wait ~5 min):
    ```bash
    dig +short TXT greenhelix.net | grep MCPv1
    ```
+DONE
 
 4. **Store private key in GitHub:**
    ```bash
    source .env && export GH_TOKEN="$GITHUB_DEPLOYMENT_TOKEN"
    gh secret set MCP_REGISTRY_PRIVATE_KEY --app actions --body "<hex-string>"
    ```
+DONE
+
 
 5. **Create the `mcp-registry` environment:**
    ```bash
    gh api -X PUT repos/mirni/a2a/environments/mcp-registry
    ```
+PLEASE DO
 
 6. **Delete the local key:**
    ```bash
@@ -66,7 +72,7 @@ DNS TXT record + GitHub secret. Full docs: `docs/infra/MCP_REGISTRY_PUBLISHING.m
    ```bash
    gh workflow run "Publish MCP" -f version=0.1.0
    ```
-   Or via tag: `git tag mcp-v0.1.0 && git push origin mcp-v0.1.0`
+   This triggers the Publish MCP workflow → PyPI + npm → MCP Registry.
 
 9. **Verify listing:**
    ```bash
@@ -121,6 +127,10 @@ gateway — see `gateway/src/routes/agent_card.py`.
 ### a2a.ac
 1. Go to: https://a2a.ac/submit
 2. Submit the same agent card URL: `https://api.greenhelix.net/.well-known/agent.json`
+
+#### HUMAN RESPONSE:
+This site gives me 404. I can visit https://a2a.ac but I don't see a way to submit agent card.
+
 
 ---
 
