@@ -363,6 +363,33 @@ jobs:
           path: .coverage-baseline.json
           key: coverage-baseline
 
+      - name: Generate coverage badge
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: python scripts/ci/coverage_badge.py coverage-*.xml -o /tmp/coverage-badge.json
+
+      - name: Push badge to badges branch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Create orphan badges branch if it doesn't exist
+          if git ls-remote --exit-code origin badges >/dev/null 2>&1; then
+            git fetch origin badges
+            git checkout badges
+          else
+            git checkout --orphan badges
+            git rm -rf . 2>/dev/null || true
+          fi
+          cp /tmp/coverage-badge.json coverage-badge.json
+          git add coverage-badge.json
+          if git diff --cached --quiet; then
+            echo "Badge unchanged — nothing to push."
+          else
+            git commit -m "Update coverage badge [skip ci]"
+            git push origin badges
+          fi
+          git checkout -
+
   # ---------------------------------------------------------------------------
   # Integration tests: run e2e_tests.py against a locally-started gateway
   # Runs on PRs and pushes to main — blocks merge to main on failure.

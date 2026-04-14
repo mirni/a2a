@@ -1,6 +1,7 @@
 # A2A Commerce Platform
 
 [![CI](https://github.com/mirni/a2a/actions/workflows/ci.yml/badge.svg)](https://github.com/mirni/a2a/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/mirni/a2a/badges/coverage-badge.json)](https://github.com/mirni/a2a/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://python.org)
 [![API Docs](https://img.shields.io/badge/API%20Docs-Swagger%20UI-85ea2d)](https://api.greenhelix.net/docs)
