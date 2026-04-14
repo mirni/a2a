@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any
+from typing import Any, Self
 
 from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from gateway.src.config import GatewayConfig
 from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
@@ -66,6 +66,21 @@ class DepositRequest(BaseModel):
     def _sanitize_description(cls, v: str) -> str:
         return sanitize_text(v) if isinstance(v, str) else v
 
+    @model_validator(mode="after")
+    def _check_decimal_places(self) -> Self:
+        from products.billing.src.models import Currency
+
+        try:
+            cur = Currency(self.currency)
+        except ValueError:
+            return self  # unknown currency — let _validate_billing_currency handle it
+        max_dp = cur.max_decimal_places
+        _, _, exponent = self.amount.as_tuple()
+        dp = max(0, -exponent)
+        if dp > max_dp:
+            raise ValueError(f"{self.currency} amounts allow at most {max_dp} decimal places, got {dp}")
+        return self
+
 
 class WithdrawRequest(BaseModel):
     model_config = ConfigDict(
@@ -82,6 +97,21 @@ class WithdrawRequest(BaseModel):
     @classmethod
     def _sanitize_description(cls, v: str) -> str:
         return sanitize_text(v) if isinstance(v, str) else v
+
+    @model_validator(mode="after")
+    def _check_decimal_places(self) -> Self:
+        from products.billing.src.models import Currency
+
+        try:
+            cur = Currency(self.currency)
+        except ValueError:
+            return self
+        max_dp = cur.max_decimal_places
+        _, _, exponent = self.amount.as_tuple()
+        dp = max(0, -exponent)
+        if dp > max_dp:
+            raise ValueError(f"{self.currency} amounts allow at most {max_dp} decimal places, got {dp}")
+        return self
 
 
 class BudgetCapRequest(BaseModel):
