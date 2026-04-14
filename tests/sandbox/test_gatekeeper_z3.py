@@ -19,11 +19,13 @@ class TestSandboxGatekeeperZ3:
             "/v1/gatekeeper/jobs",
             json={
                 "agent_id": "audit-pro",
-                "properties": [{
-                    "name": "smoke_sat",
-                    "language": "z3_smt2",
-                    "expression": "(declare-const x Int)\n(assert (> x 0))",
-                }],
+                "properties": [
+                    {
+                        "name": "smoke_sat",
+                        "language": "z3_smt2",
+                        "expression": "(declare-const x Int)\n(assert (> x 0))",
+                    }
+                ],
             },
             headers={"Authorization": f"Bearer {pro_key}"},
         )
@@ -40,11 +42,13 @@ class TestSandboxGatekeeperZ3:
             "/v1/gatekeeper/jobs",
             json={
                 "agent_id": "audit-pro",
-                "properties": [{
-                    "name": "smoke_unsat",
-                    "language": "z3_smt2",
-                    "expression": "(declare-const x Int)\n(assert (and (> x 0) (< x 0)))",
-                }],
+                "properties": [
+                    {
+                        "name": "smoke_unsat",
+                        "language": "z3_smt2",
+                        "expression": "(declare-const x Int)\n(assert (and (> x 0) (< x 0)))",
+                    }
+                ],
             },
             headers={"Authorization": f"Bearer {pro_key}"},
         )
