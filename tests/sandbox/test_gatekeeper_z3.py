@@ -13,12 +13,12 @@ pytestmark = pytest.mark.asyncio
 
 
 class TestSandboxGatekeeperZ3:
-    async def test_z3_sat_job_completes(self, sandbox_client, pro_key):
+    async def test_z3_sat_job_completes(self, sandbox_client, admin_key):
         """Submit a SAT Z3 expression — must return status=completed, result=satisfied."""
         resp = await sandbox_client.post(
             "/v1/gatekeeper/jobs",
             json={
-                "agent_id": "audit-pro",
+                "agent_id": "audit-admin",
                 "properties": [
                     {
                         "name": "smoke_sat",
@@ -27,7 +27,7 @@ class TestSandboxGatekeeperZ3:
                     }
                 ],
             },
-            headers={"Authorization": f"Bearer {pro_key}"},
+            headers={"Authorization": f"Bearer {admin_key}"},
         )
         assert resp.status_code == 201, f"Submit failed: {resp.text}"
         body = resp.json()
@@ -36,12 +36,12 @@ class TestSandboxGatekeeperZ3:
         )
         assert body["result"] == "satisfied"
 
-    async def test_z3_unsat_job_completes(self, sandbox_client, pro_key):
+    async def test_z3_unsat_job_completes(self, sandbox_client, admin_key):
         """Submit an UNSAT Z3 expression — must return status=completed, result=violated."""
         resp = await sandbox_client.post(
             "/v1/gatekeeper/jobs",
             json={
-                "agent_id": "audit-pro",
+                "agent_id": "audit-admin",
                 "properties": [
                     {
                         "name": "smoke_unsat",
@@ -50,7 +50,7 @@ class TestSandboxGatekeeperZ3:
                     }
                 ],
             },
-            headers={"Authorization": f"Bearer {pro_key}"},
+            headers={"Authorization": f"Bearer {admin_key}"},
         )
         assert resp.status_code == 201, f"Submit failed: {resp.text}"
         body = resp.json()
