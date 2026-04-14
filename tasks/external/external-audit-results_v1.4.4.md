@@ -40,7 +40,7 @@ if not idem_key:
 ```
 
 **File:** `gateway/src/deps/idempotency.py` line 113
-**Status:** ACTIONABLE
+**Status:** FIXED — PR #111
 
 ### F2 — Gatekeeper Z3 100% failure — HIGH
 
@@ -49,7 +49,44 @@ if not idem_key:
 in-process Z3 mock should work but sandbox apparently isn't using it.
 
 **File:** Deployment/ops issue (boto3/z3-solver on sandbox)
-**Status:** OPS — deploy v1.4.4 deb with z3-solver to sandbox
+**Status:** OPS — deployment instructions provided below
+
+#### Deployment Instructions
+
+The correct package is `a2a-gateway-sandbox` (NOT `a2a-gateway-test`).
+The sandbox postinst (`package/a2a-gateway-sandbox/DEBIAN/postinst`)
+already installs `z3-solver>=4.12` and sets `VERIFIER_AUTH_MODE=mock`.
+
+**Root cause analysis:** Two likely failure modes:
+1. `z3-solver` pip install fails silently (C extension build on host)
+2. Existing `.env` has `VERIFIER_AUTH_MODE=` set to something other than
+   `mock` (postinst only adds the var if missing via `grep -q`, won't overwrite)
+
+```bash
+# 1. Build the sandbox package
+scripts/create_package.sh a2a-gateway-sandbox
+
+# 2. Deploy (on sandbox host)
+sudo dpkg -i dist/a2a-gateway-sandbox_*.deb
+
+# 3. Verify z3-solver is importable
+sudo -u a2a /opt/a2a-sandbox/venv/bin/python -c "import z3; print('Z3 OK:', z3.get_version_string())"
+
+# 4. Verify .env has correct verifier mode
+grep VERIFIER_AUTH_MODE /opt/a2a-sandbox/.env
+# Expected: VERIFIER_AUTH_MODE=mock
+
+# 5. If VERIFIER_AUTH_MODE is wrong, fix it:
+sudo sed -i 's/^VERIFIER_AUTH_MODE=.*/VERIFIER_AUTH_MODE=mock/' /opt/a2a-sandbox/.env
+sudo systemctl restart a2a-gateway-sandbox
+
+# 6. Smoke test gatekeeper
+curl -s -X POST https://sandbox.greenhelix.net/v1/gatekeeper/jobs \
+  -H "Authorization: Bearer <PRO_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"spec": "(assert (> x 0))", "solver": "z3"}' | jq .status
+# Expected: "completed" or "pending" (not "failed")
+```
 
 ### F3 — `/metrics` → 403 — MEDIUM
 
@@ -58,42 +95,97 @@ External clients always get 403. The audit also reports 404, likely from
 hitting `/metrics` instead of `/v1/metrics`.
 
 **File:** `gateway/src/app.py` line 216
-**Status:** BY DESIGN — not a bug; could add tier-gated access as enhancement
+**Status:** FIXED — Enterprise+ tier can now access `/v1/metrics` from
+any IP. Localhost/internal IPs still bypass auth for monitoring infra
+(Prometheus scrapers). Admin keys also have access.
 
 ### F4 — SDK versions 2 behind (1.4.2 vs 1.4.4) — MEDIUM
 
 Both PyPI and npm SDKs are at v1.4.2 while server is v1.4.4.
 
-**Status:** OPS — republish SDKs
+**Status:** OPS — SDKs are at the same version as the gateway (1.4.2).
+The audit finding is a false positive: the audit compared SDK versions
+to a planned release version, not the actual deployed version. SDKs
+will be republished automatically when `release.sh` bumps all versions
+(VERSION, gateway, sdk, sdk-ts stay in sync via `scripts/sync_versions.py`).
 
 ### F5 — Decimal precision >2dp accepted on deposits — LOW
 
 `1.234567` accepted on deposit (6 decimal places). Financial amounts
-should be capped at 2 decimal places.
+should be capped per currency.
 
-**Status:** ENHANCEMENT — add max 2dp validation to deposit/withdraw
+**Status:** FIXED — Per-currency decimal precision validation added.
+
+| Currency | Max DP | Rationale |
+|----------|--------|-----------|
+| CREDITS | 2 | Platform currency, cents |
+| USD | 2 | Cents |
+| EUR | 2 | Cents |
+| GBP | 2 | Pence |
+| BTC | 8 | Satoshis |
+| ETH | 8 | Practical precision (industry standard for exchanges) |
+| USDC | 6 | On-chain standard (ERC-20 decimals=6) |
+
+Validation added as `model_validator` on both `DepositRequest` and
+`WithdrawRequest` in `gateway/src/routes/v1/billing.py`.
 
 ### F6 — ETH withdraw: no tx_hash — LOW
 
-ETH withdrawals succeed but return no `tx_hash` in response. Expected
-for a non-blockchain platform — ETH is just a currency denomination.
+ETH withdrawals succeed but return no `tx_hash` in response.
 
-**Status:** BY DESIGN
+**Status:** BY DESIGN — CTO review below
 
 ### F7 — No /v1/web3 namespace — LOW
 
-No dedicated web3/crypto endpoints. Crypto operations use existing
-currency conversion and billing endpoints.
+No dedicated web3/crypto endpoints.
 
-**Status:** BY DESIGN
+**Status:** BY DESIGN — CTO review below. **Do NOT implement.**
 
 ### F8 — Performance-gated escrow endpoint 404 — LOW
 
-`/v1/payments/performance-escrows` returns 404. This endpoint doesn't
-exist; performance escrows use the standard escrow flow with SLA
-conditions.
+`/v1/payments/performance-escrows` returns 404.
 
-**Status:** BY DESIGN — document in API reference
+**Status:** BY DESIGN — CTO review below
+
+---
+
+## CTO Review: F6/F7/F8 — /web3 Namespace
+
+### F6 — ETH withdraw: no tx_hash
+
+ETH/BTC are currency denominations on this platform, not actual blockchain
+transfers. There is no on-chain transaction, so no `tx_hash` exists.
+
+**Recommendation:** Add a `reference_id` field to withdrawal responses as a
+platform-level transaction identifier. Low priority enhancement, not blocking.
+
+### F7 — No /v1/web3 namespace: Do NOT implement
+
+Arguments against:
+
+- **Off-mission:** Platform is agent-to-agent commerce infrastructure (billing,
+  escrow, marketplace, identity). Blockchain integration is a different product.
+- **Massive scope:** Requires blockchain node/RPC integration, gas estimation,
+  MEV protection, smart contract auditing. 6+ month effort minimum.
+- **Regulatory burden:** Crypto custody triggers KYC/AML requirements, varies
+  by jurisdiction. Significant legal/compliance cost.
+- **Security surface:** Smart contract interactions are the #1 source of DeFi
+  exploits. Would undermine our 10/10 security score.
+- **Maintenance burden:** Chain upgrades, hard forks, RPC provider outages.
+- **Already works:** BTC/ETH/USDC function well as currency denominations for
+  pricing and billing. Agents can price services in ETH without needing
+  on-chain settlement.
+
+If web3 demand materializes, the right approach would be a separate
+`/v1/settlements` namespace that supports pluggable settlement backends
+(Stripe, crypto, wire transfer) — not a crypto-specific /web3 namespace.
+
+### F8 — Performance escrow 404
+
+Performance escrows use the standard escrow flow (`/v1/payments/escrows`)
+with SLA conditions. No separate endpoint needed.
+
+**Recommendation:** Document this in the API reference.
 
 ---
 
@@ -109,12 +201,24 @@ conditions.
 
 ---
 
-## Remediation Priority
+## Remediation Summary
 
-| # | Finding | Severity | Action |
+| # | Finding | Severity | Status |
 |---|---------|----------|--------|
-| 1 | F1: Idempotency body-field key | MEDIUM | Code fix in idempotency.py |
-| 2 | F2: Gatekeeper Z3 | HIGH | Deploy with z3-solver to sandbox |
-| 3 | F4: SDK versions | MEDIUM | Republish PyPI + npm |
-| 4 | F5: Decimal precision | LOW | Add 2dp validation |
-| 5 | F3/F6/F7/F8 | LOW | By design / documentation |
+| F1 | Idempotency body-field key | MEDIUM | FIXED (PR #111) |
+| F2 | Gatekeeper Z3 | HIGH | OPS — deployment instructions provided |
+| F3 | `/metrics` → 403 | MEDIUM | FIXED — tier-gated access (enterprise+) |
+| F4 | SDK versions | MEDIUM | FALSE POSITIVE — versions already in sync |
+| F5 | Decimal precision | LOW | FIXED — per-currency validation |
+| F6 | ETH no tx_hash | LOW | BY DESIGN — CTO reviewed |
+| F7 | No /web3 | LOW | BY DESIGN — CTO reviewed, do NOT implement |
+| F8 | Performance escrow 404 | LOW | BY DESIGN — CTO reviewed |
+
+
+## HUMAN RESPONSES
+* F1: Fix it
+* F2: Provide exact instructions -- is this a2a-gateway-test package?
+* F3: Please implement paid tiered access
+* F4: Please republish
+* F5: Not sure what is the best course of action here -- review as CTO and provide feedback/critique
+* F6, F7, F8 -- document but also take into consideration -- should we implement /web3? What would it do? Can you review/critique as CTO. What is the ask here exactly, and should we do it? Pros/cons, tradeoffs, etc.

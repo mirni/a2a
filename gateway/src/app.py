@@ -215,14 +215,32 @@ def create_app() -> FastAPI:
     # Standalone endpoints
     @app.get("/v1/metrics", include_in_schema=False)
     async def metrics(request: Request) -> Response:
-        # #28: IP allowlist for metrics endpoint
+        from gateway.src.authorization import ADMIN_TIER
+        from gateway.src.deps.auth import AuthError, authenticate
+
+        # 1. Tier-gated: enterprise+ (or admin) can access from any IP
+        try:
+            _, tier, _ = await authenticate(request)
+            if tier == ADMIN_TIER:
+                return await metrics_handler(request)
+            from paywall_src.tiers import tier_has_access
+
+            if tier_has_access(tier, "enterprise"):
+                return await metrics_handler(request)
+        except (AuthError, Exception):
+            pass
+
+        # 2. Fallback: IP allowlist for internal monitoring
         allowed_raw = os.environ.get("METRICS_ALLOWED_IPS", "127.0.0.1,::1")
         allowed_ips = {ip.strip() for ip in allowed_raw.split(",") if ip.strip()}
         client_ip = request.client.host if request.client else None
         if allowed_ips and client_ip not in allowed_ips:
-            from fastapi.responses import JSONResponse
-
-            return JSONResponse({"error": "Forbidden"}, status_code=403)
+            return await error_response(
+                403,
+                "Metrics requires enterprise tier or allowed IP",
+                "forbidden",
+                request=request,
+            )
         return await metrics_handler(request)
 
     @app.get("/v1/signing-key")

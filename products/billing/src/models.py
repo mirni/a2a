@@ -12,6 +12,16 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
+_CURRENCY_DECIMAL_PLACES: dict[str, int] = {
+    "CREDITS": 2,
+    "USD": 2,
+    "EUR": 2,
+    "GBP": 2,
+    "BTC": 8,
+    "ETH": 8,
+    "USDC": 6,
+}
+
 
 class Currency(StrEnum):
     """Supported currencies on the platform."""
@@ -23,6 +33,11 @@ class Currency(StrEnum):
     BTC = "BTC"
     ETH = "ETH"
     USDC = "USDC"
+
+    @property
+    def max_decimal_places(self) -> int:
+        """Maximum decimal places allowed for this currency."""
+        return _CURRENCY_DECIMAL_PLACES.get(self.value, 2)
 
 
 class CurrencyAmount(BaseModel):
