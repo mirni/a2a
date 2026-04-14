@@ -1,5 +1,49 @@
 # Changelog
 
+# Release v1.4.5
+
+**Date:** 2026-04-14
+**Commit:** 9c5b3ca3
+**Previous:** v1.4.2
+
+## Changes
+
+### Features
+
+- feat: add coverage badge to README via CI (#107) (`9baf0be`)
+
+### Bug Fixes
+
+- fix: v1.4.4 audit remediation (F2-F8) (#112) (`9c5b3ca`)
+- fix: idempotency collision check reads key from body field too (#111) (`8775f98`)
+- fix: stash before checkout in coverage badge push (#110) (`821879b`)
+- fix: use /v1/register for stress test agent provisioning (#109) (`421119f`)
+- fix: tolerate 403 in stress test when no admin key provided (#108) (`ff2646d`)
+- fix(ci): resolve Semgrep shell injection finding in nightly-stress (#106) (`88194b2`)
+- fix(stress): per-agent provisioning to eliminate 403 errors (#105) (`b323e0b`)
+
+### Chores
+
+- chore(mcp): bump version to 1.0.0 (#104) (`cc267bf`)
+
+### Other
+
+- Merge release v1.4.2 into main (`919e8d5`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | {{VERSION}} |
+| a2a-db-backup | {{VERSION}} |
+| a2a-gateway-sandbox | {{VERSION}} |
+| a2a-gateway-test | {{VERSION}} |
+| a2a-gateway | {{VERSION}} |
+| a2a-litestream | {{VERSION}} |
+| a2a-website | {{VERSION}} |
+---
+
+
 # Release v1.4.2
 
 **Date:** 2026-04-13
