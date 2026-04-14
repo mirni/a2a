@@ -773,7 +773,7 @@ async def main(args: argparse.Namespace) -> int:
     # Allow up to 2% non-auth errors (e.g. transient 503s during deploy).
     if not args.admin_key:
         errors = metrics.errors_by_status()
-        auth_errors = errors.get(401, 0) + errors.get(402, 0)
+        auth_errors = errors.get(401, 0) + errors.get(402, 0) + errors.get(403, 0)
         non_auth_errors = metrics.failed - auth_errors
         non_auth_pct = (non_auth_errors / max(1, metrics.total_requests)) * 100
         if auth_errors > 0 and non_auth_pct <= 2:
