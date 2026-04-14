@@ -36,6 +36,17 @@ class TestCurrencyEnum:
         """CREDITS should be usable as a default."""
         assert Currency("CREDITS") == Currency.CREDITS
 
+    def test_max_decimal_places_fiat(self):
+        """Fiat currencies (USD, EUR, GBP, CREDITS) allow 2 dp."""
+        for cur in (Currency.USD, Currency.EUR, Currency.GBP, Currency.CREDITS):
+            assert cur.max_decimal_places == 2, f"{cur} should allow 2 dp"
+
+    def test_max_decimal_places_crypto(self):
+        """BTC and ETH allow 8 dp, USDC allows 6 dp."""
+        assert Currency.BTC.max_decimal_places == 8
+        assert Currency.ETH.max_decimal_places == 8
+        assert Currency.USDC.max_decimal_places == 6
+
     def test_currency_amount_creation(self):
         """CurrencyAmount holds a Decimal amount and a Currency."""
         ca = CurrencyAmount(amount=Decimal("49.99"), currency=Currency.USD)
