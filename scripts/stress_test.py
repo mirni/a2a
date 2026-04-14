@@ -389,9 +389,11 @@ async def provision_test_agents(
     per-agent endpoints for other agents.
     """
     agents = []
+    # Use a per-run suffix so agents don't collide across runs (409 on prod)
+    run_suffix = f"{int(time.time()) % 100000:05d}"
 
     for i in range(count):
-        agent_id = f"stress-agent-{i:04d}"
+        agent_id = f"stress-{run_suffix}-{i:04d}"
 
         # Register creates wallet + per-agent API key in one call
         try:
