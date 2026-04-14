@@ -133,6 +133,39 @@ class TestIdempotencyBodyHashCollision:
         # distinct intent id.
         assert r1.json().get("id") != r2.json().get("id")
 
+    async def test_body_field_idempotency_key_different_body_returns_409(self, client, app):
+        """When the idempotency key is sent in the JSON body field (not the
+        HTTP header), different-body collisions must still return 409."""
+        payer_key = await _create_funded_pair(app, "idem-payer-6", "idem-payee-6")
+        idem_key = "idem-body-field-test-1"
+        headers = {"Authorization": f"Bearer {payer_key}"}
+
+        r1 = await client.post(
+            "/v1/payments/intents",
+            headers=headers,
+            json={
+                "payer": "idem-payer-6",
+                "payee": "idem-payee-6",
+                "amount": "5.00",
+                "currency": "CREDITS",
+                "idempotency_key": idem_key,
+            },
+        )
+        assert r1.status_code in (200, 201), r1.text
+
+        r2 = await client.post(
+            "/v1/payments/intents",
+            headers=headers,
+            json={
+                "payer": "idem-payer-6",
+                "payee": "idem-payee-6",
+                "amount": "9.00",  # different amount
+                "currency": "CREDITS",
+                "idempotency_key": idem_key,
+            },
+        )
+        assert r2.status_code == 409, f"expected 409, got {r2.status_code}: {r2.text}"
+
     async def test_parallel_replay_exactly_one_succeeds(self, client, app):
         """Fire 20 parallel requests with same key + different bodies.
 
