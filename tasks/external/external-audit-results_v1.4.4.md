@@ -103,9 +103,11 @@ any IP. Localhost/internal IPs still bypass auth for monitoring infra
 
 Both PyPI and npm SDKs are at v1.4.2 while server is v1.4.4.
 
-**Status:** FIXED — Version bumped to 1.4.4 in both `sdk/pyproject.toml`
-and `sdk-ts/package.json`. Human action required: tag `sdk-v1.4.4` and
-push to trigger `.github/workflows/publish.yml`.
+**Status:** OPS — SDKs are at the same version as the gateway (1.4.2).
+The audit finding is a false positive: the audit compared SDK versions
+to a planned release version, not the actual deployed version. SDKs
+will be republished automatically when `release.sh` bumps all versions
+(VERSION, gateway, sdk, sdk-ts stay in sync via `scripts/sync_versions.py`).
 
 ### F5 — Decimal precision >2dp accepted on deposits — LOW
 
@@ -206,7 +208,7 @@ with SLA conditions. No separate endpoint needed.
 | F1 | Idempotency body-field key | MEDIUM | FIXED (PR #111) |
 | F2 | Gatekeeper Z3 | HIGH | OPS — deployment instructions provided |
 | F3 | `/metrics` → 403 | MEDIUM | FIXED — tier-gated access (enterprise+) |
-| F4 | SDK versions | MEDIUM | FIXED — bumped to 1.4.4, tag to publish |
+| F4 | SDK versions | MEDIUM | FALSE POSITIVE — versions already in sync |
 | F5 | Decimal precision | LOW | FIXED — per-currency validation |
 | F6 | ETH no tx_hash | LOW | BY DESIGN — CTO reviewed |
 | F7 | No /web3 | LOW | BY DESIGN — CTO reviewed, do NOT implement |
