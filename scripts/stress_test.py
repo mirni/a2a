@@ -584,11 +584,10 @@ def generate_report(
 
 async def gatekeeper_smoke(
     base_url: str, api_key: str, client: httpx.AsyncClient, agent_id: str = "stress-agent-0000"
-) -> None:
+) -> bool:
     """Submit a trivial SAT job and verify the gatekeeper is functional.
 
-    Called once during setup. Logs a warning on failure but does not abort
-    the stress test — the Lambda may not be deployed in all environments.
+    Returns True if the Z3 job completed with result='satisfied', False otherwise.
     """
     print("  Gatekeeper smoke check...")
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
@@ -614,12 +613,16 @@ async def gatekeeper_smoke(
             body = resp.json()
             if body.get("result") == "satisfied":
                 print("  Gatekeeper OK — Z3 job returned 'satisfied'")
+                return True
             else:
-                print(f"  WARNING: Gatekeeper returned unexpected result: {body.get('result')}")
+                print(f"  FAIL: Gatekeeper returned unexpected result: {body.get('result')}")
+                return False
         else:
-            print(f"  WARNING: Gatekeeper returned HTTP {resp.status_code}: {resp.text[:200]}")
+            print(f"  FAIL: Gatekeeper returned HTTP {resp.status_code}: {resp.text[:200]}")
+            return False
     except Exception as e:
-        print(f"  WARNING: Gatekeeper smoke check failed: {e}")
+        print(f"  FAIL: Gatekeeper smoke check failed: {e}")
+        return False
 
 
 async def main(args: argparse.Namespace) -> int:
@@ -681,7 +684,10 @@ async def main(args: argparse.Namespace) -> int:
         # 2b. Gatekeeper smoke check (use first agent's own key for ownership match)
         if agents and agents[0][1]:
             agent_id_for_smoke, key_for_smoke = agents[0]
-            await gatekeeper_smoke(base_url, key_for_smoke, client, agent_id_for_smoke)
+            gk_ok = await gatekeeper_smoke(base_url, key_for_smoke, client, agent_id_for_smoke)
+            if not gk_ok:
+                print("ERROR: Gatekeeper Z3 smoke test failed — aborting stress test")
+                return 1
         else:
             print("  Gatekeeper smoke: SKIPPED (no agent keys)")
 
