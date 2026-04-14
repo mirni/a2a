@@ -112,6 +112,9 @@ async def check_idempotency(
     """
     idem_key = request.headers.get("idempotency-key")
     if not idem_key:
+        # Fall back to body field for callers that pass it in the JSON payload
+        idem_key = body.get("idempotency_key") if isinstance(body, dict) else None
+    if not idem_key:
         return None
 
     ctx = request.app.state.ctx
