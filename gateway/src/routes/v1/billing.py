@@ -75,7 +75,9 @@ class DepositRequest(BaseModel):
         except ValueError:
             return self  # unknown currency — let _validate_billing_currency handle it
         max_dp = cur.max_decimal_places
-        _, _, exponent = self.amount.as_tuple()
+        exponent = self.amount.as_tuple().exponent
+        if not isinstance(exponent, int):
+            return self  # NaN/Inf — let Field(gt=0) handle it
         dp = max(0, -exponent)
         if dp > max_dp:
             raise ValueError(f"{self.currency} amounts allow at most {max_dp} decimal places, got {dp}")
@@ -107,7 +109,9 @@ class WithdrawRequest(BaseModel):
         except ValueError:
             return self
         max_dp = cur.max_decimal_places
-        _, _, exponent = self.amount.as_tuple()
+        exponent = self.amount.as_tuple().exponent
+        if not isinstance(exponent, int):
+            return self  # NaN/Inf — let Field(gt=0) handle it
         dp = max(0, -exponent)
         if dp > max_dp:
             raise ValueError(f"{self.currency} amounts allow at most {max_dp} decimal places, got {dp}")
