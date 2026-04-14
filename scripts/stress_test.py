@@ -382,44 +382,34 @@ async def provision_test_agents(
     client: httpx.AsyncClient,
     count: int,
 ) -> list[tuple[str, str]]:
-    """Create test agent wallets and API keys. Returns [(agent_id, api_key)]."""
+    """Create test agent wallets and API keys. Returns [(agent_id, api_key)].
+
+    Uses POST /v1/register to create each agent with its own free-tier key.
+    This avoids the ownership mismatch where an admin key can't access
+    per-agent endpoints for other agents.
+    """
     agents = []
-    headers = {"Authorization": f"Bearer {admin_key}"} if admin_key else {}
 
     for i in range(count):
         agent_id = f"stress-agent-{i:04d}"
 
-        # Create wallet via REST endpoint
-        try:
-            await client.post(
-                f"{base_url}/v1/billing/wallets",
-                json={"agent_id": agent_id, "initial_balance": 100000.0},
-                headers=headers,
-                timeout=10.0,
-            )
-        except Exception:
-            pass
-
-        # Create API key for this agent.
-        # The agent must authenticate to /v1/billing/keys with its OWN key
-        # to get a key for itself (agent_id is inferred from the token).
-        # For CI (local server), the admin key created the agent's wallet
-        # above, but creating per-agent keys via REST requires per-agent
-        # auth. Use the admin key as a fallback (ownership checks may
-        # reject cross-agent requests — that's the 403 baseline).
+        # Register creates wallet + per-agent API key in one call
         try:
             resp = await client.post(
-                f"{base_url}/v1/billing/keys",
-                json={"tier": "pro"},
-                headers={"Authorization": f"Bearer {admin_key}"},
+                f"{base_url}/v1/register",
+                json={"agent_id": agent_id},
                 timeout=10.0,
             )
-            if resp.status_code in (200, 201):
+            if resp.status_code == 201:
                 body = resp.json()
-                key = body.get("key", "") or body.get("result", {}).get("key", "")
+                key = body.get("api_key", "")
                 if key:
                     agents.append((agent_id, key))
                     continue
+            elif resp.status_code == 409:
+                # Agent already exists — can't get its key via register.
+                # Fall back to admin key (ownership checks may fail).
+                pass
         except Exception:
             pass
 
