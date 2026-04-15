@@ -1,5 +1,38 @@
 # Changelog
 
+# Release v1.4.7
+
+**Date:** 2026-04-15
+**Commit:** 9bff09be
+**Previous:** v1.4.5
+
+## Changes
+
+### Bug Fixes
+
+- fix: v1.4.6 audit remediation — decimal precision + budget cap (#114) (`0bfb16a`)
+- fix: gatekeeper Z3 reliability — 5 permanent fixes (#113) (`58564b5`)
+
+### Other
+
+- Merge branch 'main' of https://github.com/mirni/a2a (`9bff09b`)
+- Update claude runner to use local cache (`24472f4`)
+- Merge release v1.4.5 into main (`5703338`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | {{VERSION}} |
+| a2a-db-backup | {{VERSION}} |
+| a2a-gateway | {{VERSION}} |
+| a2a-gateway-sandbox | {{VERSION}} |
+| a2a-gateway-test | {{VERSION}} |
+| a2a-litestream | {{VERSION}} |
+| a2a-website | {{VERSION}} |
+---
+
+
 # Release v1.4.5
 
 **Date:** 2026-04-14
