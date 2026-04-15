@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any
+from typing import Any, Self
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from gateway.src.deps.idempotency import check_idempotency, record_idempotent_response
 from gateway.src.deps.tool_context import ToolContext, check_ownership, finalize_response, require_tool
@@ -45,6 +45,24 @@ router = APIRouter(prefix="/v1/payments", tags=["payments"])
 # ---------------------------------------------------------------------------
 
 
+def _check_currency_decimal_places(self: Any) -> Any:
+    """Shared validator: reject amounts with more decimal places than the currency allows."""
+    from products.billing.src.models import Currency
+
+    try:
+        cur = Currency(self.currency)
+    except ValueError:
+        return self
+    max_dp = cur.max_decimal_places
+    exponent = self.amount.as_tuple().exponent
+    if not isinstance(exponent, int):
+        return self
+    dp = max(0, -exponent)
+    if dp > max_dp:
+        raise ValueError(f"{self.currency} amounts allow at most {max_dp} decimal places, got {dp}")
+    return self
+
+
 class CreateIntentRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -70,6 +88,10 @@ class CreateIntentRequest(BaseModel):
     @classmethod
     def _sanitize_description(cls, v: str) -> str:
         return sanitize_text(v) if isinstance(v, str) else v
+
+    @model_validator(mode="after")
+    def _check_decimal_places(self) -> Self:
+        return _check_currency_decimal_places(self)
 
 
 class CreateEscrowRequest(BaseModel):
@@ -97,6 +119,10 @@ class CreateEscrowRequest(BaseModel):
     @classmethod
     def _sanitize_description(cls, v: str) -> str:
         return sanitize_text(v) if isinstance(v, str) else v
+
+    @model_validator(mode="after")
+    def _check_decimal_places(self) -> Self:
+        return _check_currency_decimal_places(self)
 
 
 class CreatePerformanceEscrowRequest(BaseModel):
@@ -162,6 +188,10 @@ class CreateSplitIntentRequest(BaseModel):
     def _sanitize_description(cls, v: str) -> str:
         return sanitize_text(v) if isinstance(v, str) else v
 
+    @model_validator(mode="after")
+    def _check_decimal_places(self) -> Self:
+        return _check_currency_decimal_places(self)
+
 
 class RefundSettlementRequest(BaseModel):
     model_config = ConfigDict(
@@ -201,6 +231,10 @@ class CreateSubscriptionRequest(BaseModel):
     @classmethod
     def _sanitize_description(cls, v: str) -> str:
         return sanitize_text(v) if isinstance(v, str) else v
+
+    @model_validator(mode="after")
+    def _check_decimal_places(self) -> Self:
+        return _check_currency_decimal_places(self)
 
 
 # ---------------------------------------------------------------------------
