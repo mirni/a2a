@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any
 
 from gateway.src.lifespan import AppContext
@@ -323,6 +324,11 @@ async def _set_budget_cap(ctx: AppContext, params: dict[str, Any]) -> dict[str, 
     monthly_cap = params.get("monthly_cap")
     alert_threshold = params.get("alert_threshold", 0.8)
 
+    # Store caps as atomic integer units (SCALE=1e8) to match _check_budget_caps reader.
+    _SCALE = 100_000_000
+    daily_atomic = int(Decimal(str(daily_cap)) * _SCALE) if daily_cap is not None else None
+    monthly_atomic = int(Decimal(str(monthly_cap)) * _SCALE) if monthly_cap is not None else None
+
     db = ctx.tracker.storage.db
     await db.execute(
         """INSERT INTO budget_caps (agent_id, daily_cap, monthly_cap, alert_threshold)
@@ -331,7 +337,7 @@ async def _set_budget_cap(ctx: AppContext, params: dict[str, Any]) -> dict[str, 
              daily_cap = excluded.daily_cap,
              monthly_cap = excluded.monthly_cap,
              alert_threshold = excluded.alert_threshold""",
-        (agent_id, daily_cap, monthly_cap, alert_threshold),
+        (agent_id, daily_atomic, monthly_atomic, alert_threshold),
     )
     await db.commit()
 
@@ -353,19 +359,22 @@ async def _get_budget_status(ctx: AppContext, params: dict[str, Any]) -> dict[st
     cursor = await db.execute("SELECT * FROM budget_caps WHERE agent_id = ?", (agent_id,))
     row = await cursor.fetchone()
 
-    daily_cap = row["daily_cap"] if row and row["daily_cap"] is not None else None
-    monthly_cap = row["monthly_cap"] if row and row["monthly_cap"] is not None else None
-    alert_threshold = row["alert_threshold"] if row else 0.8
+    _SCALE = Decimal(100_000_000)
+    daily_cap_raw = row["daily_cap"] if row and row["daily_cap"] is not None else None
+    monthly_cap_raw = row["monthly_cap"] if row and row["monthly_cap"] is not None else None
+    daily_cap: Decimal | None = Decimal(int(daily_cap_raw)) / _SCALE if daily_cap_raw is not None else None
+    monthly_cap: Decimal | None = Decimal(int(monthly_cap_raw)) / _SCALE if monthly_cap_raw is not None else None
+    alert_threshold = Decimal(str(row["alert_threshold"])) if row else Decimal("0.8")
 
     now = _time.time()
     daily_since = now - 86400
-    daily_spend = await ctx.tracker.storage.sum_cost_since(agent_id, daily_since)
+    daily_spend = Decimal(str(await ctx.tracker.storage.sum_cost_since(agent_id, daily_since)))
 
     monthly_since = now - (30 * 86400)
-    monthly_spend = await ctx.tracker.storage.sum_cost_since(agent_id, monthly_since)
+    monthly_spend = Decimal(str(await ctx.tracker.storage.sum_cost_since(agent_id, monthly_since)))
 
-    daily_pct = (daily_spend / daily_cap * 100) if daily_cap else 0
-    monthly_pct = (monthly_spend / monthly_cap * 100) if monthly_cap else 0
+    daily_pct = (daily_spend / daily_cap * 100) if daily_cap else Decimal(0)
+    monthly_pct = (monthly_spend / monthly_cap * 100) if monthly_cap else Decimal(0)
 
     alert_triggered = False
     cap_exceeded = False
@@ -382,14 +391,23 @@ async def _get_budget_status(ctx: AppContext, params: dict[str, Any]) -> dict[st
         if monthly_spend >= monthly_cap:
             cap_exceeded = True
 
+    # JSON response serialization — Decimal is not JSON-native; float() at
+    # the response boundary is safe (values are already rounded to 2dp).
+    _ds = float(round(daily_spend, 2))
+    _ms = float(round(monthly_spend, 2))
+    _dc = float(daily_cap) if daily_cap is not None else None  # lint-no-float-money: allow
+    _mc = float(monthly_cap) if monthly_cap is not None else None  # lint-no-float-money: allow
+    _dp = float(round(daily_pct, 2))
+    _mp = float(round(monthly_pct, 2))
+
     return {
         "agent_id": agent_id,
-        "daily_spend": round(daily_spend, 2),
-        "daily_cap": daily_cap,
-        "daily_pct": round(daily_pct, 2),
-        "monthly_spend": round(monthly_spend, 2),
-        "monthly_cap": monthly_cap,
-        "monthly_pct": round(monthly_pct, 2),
+        "daily_spend": _ds,
+        "daily_cap": _dc,
+        "daily_pct": _dp,
+        "monthly_spend": _ms,
+        "monthly_cap": _mc,
+        "monthly_pct": _mp,
         "alert_triggered": alert_triggered,
         "cap_exceeded": cap_exceeded,
     }

@@ -146,6 +146,37 @@ class TestBudgetCapEnforcement:
         )
         assert resp.status_code in (200, 201), resp.text
 
+    async def test_api_set_cap_then_spend_under_limit(self, client, app):
+        """Set cap via API, then spend under it. v1.4.6 regression: cap stored
+        as float but read as atomic → 100.0 becomes 0.000001 → blocks all."""
+        ctx = app.state.ctx
+        await ctx.tracker.wallet.create("budget-api", initial_balance=500.0, signup_bonus=False)
+        key_info = await ctx.key_manager.create_key("budget-api", tier="pro")
+        key = key_info["key"]
+        await ctx.tracker.wallet.create("budget-api-payee", initial_balance=0.0, signup_bonus=False)
+
+        # Set cap via API route (stores as float — the buggy path)
+        cap_resp = await client.put(
+            "/v1/billing/wallets/budget-api/budget",
+            headers={"Authorization": f"Bearer {key}"},
+            json={"daily_cap": "100.00"},
+        )
+        assert cap_resp.status_code == 200, f"set_budget_cap failed: {cap_resp.text}"
+
+        # Now make a paid call — should succeed (5 < 100)
+        resp = await client.post(
+            "/v1/payments/intents",
+            headers={"Authorization": f"Bearer {key}"},
+            json={
+                "payer": "budget-api",
+                "payee": "budget-api-payee",
+                "amount": "5.00",
+                "currency": "CREDITS",
+                "description": "under cap",
+            },
+        )
+        assert resp.status_code in (200, 201), f"Expected 2xx for spend under cap, got {resp.status_code}: {resp.text}"
+
     async def test_admin_bypasses_cap(self, client, admin_api_key, app):
         """Admin-scoped keys bypass the budget cap entirely."""
         import time as _time
