@@ -42,6 +42,9 @@ case "$1" in
         /opt/a2a-sandbox/venv/bin/pip install -e /opt/a2a-sandbox/sdk -q 2>/dev/null \
             || /opt/a2a-sandbox/venv/bin/pip install /opt/a2a-sandbox/sdk -q
 
+        # Verify z3-solver is functional (C extension must compile)
+        /opt/a2a-sandbox/venv/bin/python -c "import z3; print('z3-solver OK:', z3.get_version_string())"
+
         # Create .env if missing
         if [[ ! -f /opt/a2a-sandbox/.env ]]; then
             cat > /opt/a2a-sandbox/.env << 'ENVEOF'
@@ -72,7 +75,11 @@ ENVEOF
         if [[ -f "$_env_file" ]]; then
             grep -q '^FORCE_HTTPS=' "$_env_file" || echo 'FORCE_HTTPS=1' >> "$_env_file"
             grep -q '^A2A_ENV=' "$_env_file" || echo 'A2A_ENV=sandbox' >> "$_env_file"
-            grep -q '^VERIFIER_AUTH_MODE=' "$_env_file" || echo 'VERIFIER_AUTH_MODE=mock' >> "$_env_file"
+            if grep -q '^VERIFIER_AUTH_MODE=' "$_env_file"; then
+                sed -i 's/^VERIFIER_AUTH_MODE=.*/VERIFIER_AUTH_MODE=mock/' "$_env_file"
+            else
+                echo 'VERIFIER_AUTH_MODE=mock' >> "$_env_file"
+            fi
         fi
 
         # --- Cloudflare Authenticated Origin Pulls ---
