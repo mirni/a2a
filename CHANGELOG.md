@@ -1,5 +1,35 @@
 # Changelog
 
+# Release v1.4.6
+
+**Date:** 2026-04-15
+**Commit:** 58564b59
+**Previous:** v1.4.5
+
+## Changes
+
+### Bug Fixes
+
+- fix: gatekeeper Z3 reliability — 5 permanent fixes (#113) (`58564b5`)
+
+### Other
+
+- Merge release v1.4.5 into main (`5703338`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | {{VERSION}} |
+| a2a-db-backup | {{VERSION}} |
+| a2a-gateway | {{VERSION}} |
+| a2a-gateway-sandbox | {{VERSION}} |
+| a2a-gateway-test | {{VERSION}} |
+| a2a-litestream | {{VERSION}} |
+| a2a-website | {{VERSION}} |
+---
+
+
 # Release v1.4.5
 
 **Date:** 2026-04-14
