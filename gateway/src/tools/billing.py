@@ -391,14 +391,23 @@ async def _get_budget_status(ctx: AppContext, params: dict[str, Any]) -> dict[st
         if monthly_spend >= monthly_cap:
             cap_exceeded = True
 
+    # JSON response serialization — Decimal is not JSON-native; float() at
+    # the response boundary is safe (values are already rounded to 2dp).
+    _ds = float(round(daily_spend, 2))
+    _ms = float(round(monthly_spend, 2))
+    _dc = float(daily_cap) if daily_cap is not None else None  # lint-no-float-money: allow
+    _mc = float(monthly_cap) if monthly_cap is not None else None  # lint-no-float-money: allow
+    _dp = float(round(daily_pct, 2))
+    _mp = float(round(monthly_pct, 2))
+
     return {
         "agent_id": agent_id,
-        "daily_spend": str(round(daily_spend, 2)),
-        "daily_cap": str(daily_cap) if daily_cap is not None else None,
-        "daily_pct": str(round(daily_pct, 2)),
-        "monthly_spend": str(round(monthly_spend, 2)),
-        "monthly_cap": str(monthly_cap) if monthly_cap is not None else None,
-        "monthly_pct": str(round(monthly_pct, 2)),
+        "daily_spend": _ds,
+        "daily_cap": _dc,
+        "daily_pct": _dp,
+        "monthly_spend": _ms,
+        "monthly_cap": _mc,
+        "monthly_pct": _mp,
         "alert_triggered": alert_triggered,
         "cap_exceeded": cap_exceeded,
     }
