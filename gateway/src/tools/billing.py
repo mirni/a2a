@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any
 
 from gateway.src.lifespan import AppContext
@@ -323,6 +324,11 @@ async def _set_budget_cap(ctx: AppContext, params: dict[str, Any]) -> dict[str, 
     monthly_cap = params.get("monthly_cap")
     alert_threshold = params.get("alert_threshold", 0.8)
 
+    # Store caps as atomic integer units (SCALE=1e8) to match _check_budget_caps reader.
+    _SCALE = 100_000_000
+    daily_atomic = int(Decimal(str(daily_cap)) * _SCALE) if daily_cap is not None else None
+    monthly_atomic = int(Decimal(str(monthly_cap)) * _SCALE) if monthly_cap is not None else None
+
     db = ctx.tracker.storage.db
     await db.execute(
         """INSERT INTO budget_caps (agent_id, daily_cap, monthly_cap, alert_threshold)
@@ -331,7 +337,7 @@ async def _set_budget_cap(ctx: AppContext, params: dict[str, Any]) -> dict[str, 
              daily_cap = excluded.daily_cap,
              monthly_cap = excluded.monthly_cap,
              alert_threshold = excluded.alert_threshold""",
-        (agent_id, daily_cap, monthly_cap, alert_threshold),
+        (agent_id, daily_atomic, monthly_atomic, alert_threshold),
     )
     await db.commit()
 
@@ -353,8 +359,11 @@ async def _get_budget_status(ctx: AppContext, params: dict[str, Any]) -> dict[st
     cursor = await db.execute("SELECT * FROM budget_caps WHERE agent_id = ?", (agent_id,))
     row = await cursor.fetchone()
 
-    daily_cap = row["daily_cap"] if row and row["daily_cap"] is not None else None
-    monthly_cap = row["monthly_cap"] if row and row["monthly_cap"] is not None else None
+    _SCALE = 100_000_000
+    daily_cap_raw = row["daily_cap"] if row and row["daily_cap"] is not None else None
+    monthly_cap_raw = row["monthly_cap"] if row and row["monthly_cap"] is not None else None
+    daily_cap = float(Decimal(int(daily_cap_raw)) / Decimal(_SCALE)) if daily_cap_raw is not None else None
+    monthly_cap = float(Decimal(int(monthly_cap_raw)) / Decimal(_SCALE)) if monthly_cap_raw is not None else None
     alert_threshold = row["alert_threshold"] if row else 0.8
 
     now = _time.time()

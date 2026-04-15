@@ -98,3 +98,79 @@ async def test_deposit_credits_2dp_ok(client, api_key):
         json={"amount": "99.99", "currency": "CREDITS"},
     )
     assert resp.status_code != 422
+
+
+# ---------------------------------------------------------------------------
+# Payment intent decimal precision (v1.4.6 audit regression)
+# ---------------------------------------------------------------------------
+
+
+async def test_intent_credits_6dp_rejected(client, pro_api_key):
+    """CREDITS intent with 6dp must be rejected (max 2). v1.4.6 regression."""
+    resp = await client.post(
+        "/v1/payments/intents",
+        headers={"Authorization": f"Bearer {pro_api_key}"},
+        json={"payer": "pro-agent", "payee": "test-agent", "amount": "1.234567", "currency": "CREDITS"},
+    )
+    assert resp.status_code == 422
+    assert "decimal" in str(resp.json()).lower()
+
+
+async def test_intent_usd_6dp_rejected(client, pro_api_key):
+    """USD intent with 6dp must be rejected (max 2)."""
+    resp = await client.post(
+        "/v1/payments/intents",
+        headers={"Authorization": f"Bearer {pro_api_key}"},
+        json={"payer": "pro-agent", "payee": "test-agent", "amount": "1.234567", "currency": "USD"},
+    )
+    assert resp.status_code == 422
+    assert "decimal" in str(resp.json()).lower()
+
+
+async def test_intent_btc_8dp_ok(client, pro_api_key):
+    """BTC intent with 8dp should be accepted."""
+    resp = await client.post(
+        "/v1/payments/intents",
+        headers={"Authorization": f"Bearer {pro_api_key}"},
+        json={"payer": "pro-agent", "payee": "test-agent", "amount": "0.00000001", "currency": "BTC"},
+    )
+    assert resp.status_code != 422
+
+
+async def test_intent_btc_9dp_rejected(client, pro_api_key):
+    """BTC intent with 9dp must be rejected (max 8)."""
+    resp = await client.post(
+        "/v1/payments/intents",
+        headers={"Authorization": f"Bearer {pro_api_key}"},
+        json={"payer": "pro-agent", "payee": "test-agent", "amount": "0.000000001", "currency": "BTC"},
+    )
+    assert resp.status_code == 422
+    assert "decimal" in str(resp.json()).lower()
+
+
+async def test_escrow_credits_6dp_rejected(client, pro_api_key):
+    """CREDITS escrow with 6dp must be rejected (max 2)."""
+    resp = await client.post(
+        "/v1/payments/escrows",
+        headers={"Authorization": f"Bearer {pro_api_key}"},
+        json={"payer": "pro-agent", "payee": "test-agent", "amount": "1.234567", "currency": "CREDITS"},
+    )
+    assert resp.status_code == 422
+    assert "decimal" in str(resp.json()).lower()
+
+
+async def test_subscription_credits_6dp_rejected(client, pro_api_key):
+    """CREDITS subscription with 6dp must be rejected (max 2)."""
+    resp = await client.post(
+        "/v1/payments/subscriptions",
+        headers={"Authorization": f"Bearer {pro_api_key}"},
+        json={
+            "payer": "pro-agent",
+            "payee": "test-agent",
+            "amount": "1.234567",
+            "interval": "monthly",
+            "currency": "CREDITS",
+        },
+    )
+    assert resp.status_code == 422
+    assert "decimal" in str(resp.json()).lower()
