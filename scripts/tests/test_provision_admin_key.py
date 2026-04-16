@@ -31,11 +31,10 @@ def test_create_key_includes_admin_scope():
             found_create_key = True
             # Check keyword arguments for scopes=
             for kw in node.keywords:
-                if kw.arg == "scopes":
-                    if isinstance(kw.value, ast.List):
-                        scope_values = [elt.value for elt in kw.value.elts if isinstance(elt, ast.Constant)]
-                        if "admin" in scope_values:
-                            has_admin_scope = True
+                if kw.arg == "scopes" and isinstance(kw.value, ast.List):
+                    scope_values = [elt.value for elt in kw.value.elts if isinstance(elt, ast.Constant)]
+                    if "admin" in scope_values:
+                        has_admin_scope = True
 
     assert found_create_key, "create_key() call not found in provision_admin_key.py"
     assert has_admin_scope, (
