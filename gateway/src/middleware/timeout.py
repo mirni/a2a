@@ -19,11 +19,16 @@ _logger = logging.getLogger("a2a.middleware")
 DEFAULT_REQUEST_TIMEOUT_SECONDS = 30.0
 
 
+_TIMEOUT_EXEMPT_PATHS = frozenset({"/v1/events/stream"})
+
+
 class RequestTimeoutMiddleware:
     """ASGI middleware that enforces a per-request timeout.
 
     If the downstream handler takes longer than ``timeout_seconds``,
     the request is cancelled and a 504 Gateway Timeout response is returned.
+
+    Long-lived streaming endpoints (SSE) are exempt from the timeout.
     """
 
     def __init__(self, app: Any, timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SECONDS) -> None:
@@ -32,6 +37,10 @@ class RequestTimeoutMiddleware:
 
     async def __call__(self, scope: dict, receive: Callable, send: Callable) -> None:
         if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        if scope.get("path", "") in _TIMEOUT_EXEMPT_PATHS:
             await self.app(scope, receive, send)
             return
 
