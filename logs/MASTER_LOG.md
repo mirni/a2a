@@ -7393,3 +7393,18 @@ All three daisy-chained PRs ready for human review/merge/release (v1.3.0).
 **Branch:** `fix/gatekeeper-z3-deploy`
 **CI:** 18/18 jobs green (including staging)
 **Test suite:** 33/33 verifier tests pass
+
+---
+
+## 2026-04-16 — Fix: Smoke test gatekeeper tier mismatch
+
+**Prompt:** Smoke failure in v1.4.8 release — `submit_verification` requires 'pro' tier but stress test agents are provisioned as 'free'.
+
+**Root cause:** `gatekeeper_smoke()` in `scripts/stress_test.py` used the first stress agent's key (free tier) to call `POST /v1/gatekeeper/jobs`. The `submit_verification` tool requires `pro` tier, causing HTTP 403.
+
+**Fix:** Changed `gatekeeper_smoke()` to use the admin key instead of the agent's key. The smoke check verifies the Z3 pipeline works, not tier access control.
+
+**PR:** https://github.com/mirni/a2a/pull/118
+**Branch:** `fix/smoke-test-gatekeeper-tier`
+**CI:** 18/18 jobs green (including staging)
+**Also applied to:** `release/1.4.8` branch (direct commit)
