@@ -7297,3 +7297,99 @@ All three daisy-chained PRs ready for human review/merge/release (v1.3.0).
 |----|--------|--------|----|
 | #104 | `chore/mcp-version-1.0.0` | MERGED | GREEN |
 | #105 | `fix/stress-test-403` | Open | GREEN |
+
+---
+
+## 2026-04-16 — Fix SKILL.md for ClawhHub Compliance
+
+**Prompt:** Implement the plan to fix SKILL.md for ClawhHub compliance — address all 5 OpenClaw findings.
+
+**Changes:**
+
+1. **`scripts/sync_versions.py`** — Added `update_skill_version()` function and SKILL.md as 4th version sync target. The `version:` field in YAML frontmatter is now kept in lockstep with the `VERSION` file.
+
+2. **`scripts/tests/test_sync_versions.py`** — Added 4 unit tests for `update_skill_version` (rewrite, idempotent, check-mode, missing field). Updated `_make_tree` helper and integration tests to include SKILL.md (24 tests total, all green).
+
+3. **`SKILL.md`** — Full rewrite with ClawhHub-compliant YAML frontmatter:
+   - `version: 1.4.7` (synced from VERSION)
+   - `executable: true`, `install.kind: pip`, `install.spec: a2a-greenhelix-sdk`
+   - `auth` section (bearer token, API key)
+   - `security` section (requires_api_key, supports_https, FORCE_HTTPS)
+   - `openclaw.requires.env` declaring all env vars from `.env.example`
+   - Escrow clarified as "simulated — in-memory SQLite ledger"
+   - Updated tool counts (108 tools across 8 services)
+   - No BRIDGE_* references
+
+4. **`tasks/done/audit-skill.md`** — Task moved from backlog to done with completion notes.
+
+**ClawhHub findings resolved:**
+
+| # | Finding | Resolution |
+|---|---------|-----------|
+| 1 | Stale version | Synced from VERSION file via sync_versions.py |
+| 2 | BRIDGE_* env vars | Removed; openclaw.requires.env declares actual vars |
+| 3 | Misleading escrow | Clarified as simulated (SQLite ledger) |
+| 4 | No auth/TLS | auth + security sections in frontmatter |
+| 5 | uv install kind | install.kind: pip |
+
+**PR:** https://github.com/mirni/a2a/pull/115
+**Branch:** `fix/clawhub-skill-audit`
+**CI:** 18/18 jobs green (including staging)
+
+---
+
+## 2026-04-16 — v1.4.7 Audit Remediation
+
+**Prompt:** Process audit results from `reports/external/v1.4.7/multi-persona-audit-v1.4.7-2026-04-16.md`.
+
+**Audit summary:** 60 tests, 49 pass (82%). Score 7.8/10. Security perfect (4th consecutive). 6 findings.
+
+**Findings triage:**
+
+| # | Issue | Severity | Action |
+|---|-------|----------|--------|
+| 1 | Gatekeeper Z3 100% failure | HIGH | Out of scope (15th release, deep systemic) |
+| 2 | SSE IncompleteRead | MEDIUM | **FIXED** |
+| 3 | gateway_fee missing from GET | LOW | **FIXED** |
+| 4 | SDK republish v1.4.7 | LOW | Infrastructure — out of scope |
+| 5 | x-ratelimit-* headers | LOW | Already implemented since v1.4.4 — false positive |
+| 6 | SDK payee="system" | LOW | SDK-side fix — out of scope |
+
+**Changes:**
+
+1. **`gateway/src/middleware/timeout.py`** — Added `_TIMEOUT_EXEMPT_PATHS` frozenset containing `/v1/events/stream`. SSE endpoint is now exempt from the 30s `RequestTimeoutMiddleware`, preventing `IncompleteRead`.
+
+2. **`gateway/src/tools/payments.py`** — Added `gateway_fee` field to `_get_intent()` response, recomputing the deterministic fee from the intent amount (same as `_create_intent()`).
+
+3. **Tests added:**
+   - `gateway/tests/test_request_timeout_middleware.py` — SSE exempt from timeout + normal paths still timeout
+   - `gateway/tests/test_get_intent_gateway_fee.py` — GET response includes gateway_fee matching POST
+
+**PR:** https://github.com/mirni/a2a/pull/116
+**Branch:** `fix/v1.4.7-audit-remediation`
+**CI:** 18/18 jobs green (including staging)
+**Full gateway suite:** 1849 tests pass
+
+---
+
+## 2026-04-16 — Fix: Gatekeeper Z3 100% Failure in Deployed Environments
+
+**Prompt:** Implement plan to fix Gatekeeper Z3 formal verification service, broken for 15+ releases. Every verification job fails immediately in deployed environments due to two independent failures: (1) `lambda/` directory missing from packages, (2) `a2a-gateway-test` postinst missing z3-solver setup.
+
+**Changes:**
+1. **Added `lambda/` symlinks** to `package/a2a-gateway-test/opt/a2a-test/` and `package/a2a-gateway-sandbox/opt/a2a-sandbox/` — ensures `cp -rL` in `create_package.sh` resolves them into deployed packages
+2. **Fixed `a2a-gateway-test` postinst** — added `z3-solver>=4.12` to pip install, z3 import verification, `VERIFIER_AUTH_MODE=mock` in .env template and env-var-ensure block (parity with sandbox)
+3. **Improved `MockVerifierClient` error reporting** — handler import failures now raise `VerifierError` with diagnostic message instead of opaque `ImportError`
+4. **Added 7 new tests** (TDD): `TestMockVerifierClient` (3 tests for import failure diagnostics and successful invocation) + `TestPackageSymlinks` (4 tests for symlink existence and resolution)
+
+**Files modified:**
+- `products/connectors/verifier/src/client.py` — try/except around handler import
+- `products/connectors/verifier/tests/test_client.py` — 7 new tests
+- `package/a2a-gateway-test/DEBIAN/postinst` — z3-solver install, verification, VERIFIER_AUTH_MODE
+- `package/a2a-gateway-test/opt/a2a-test/lambda` — NEW symlink → `../../../../lambda/`
+- `package/a2a-gateway-sandbox/opt/a2a-sandbox/lambda` — NEW symlink → `../../../../lambda/`
+
+**PR:** https://github.com/mirni/a2a/pull/117
+**Branch:** `fix/gatekeeper-z3-deploy`
+**CI:** 18/18 jobs green (including staging)
+**Test suite:** 33/33 verifier tests pass
