@@ -187,7 +187,13 @@ class MockVerifierClient:
         if handler_path not in sys.path:
             sys.path.insert(0, handler_path)
 
-        handler_mod = importlib.import_module("handler")
+        try:
+            handler_mod = importlib.import_module("handler")
+        except ImportError as exc:
+            raise VerifierError(
+                f"MockVerifierClient: cannot import handler from {handler_path}. "
+                f"Ensure lambda/z3-verifier/ is deployed and z3-solver is installed: {exc}"
+            ) from exc
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, handler_mod.lambda_handler, job_spec, None)
 

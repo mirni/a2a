@@ -34,9 +34,13 @@ case "$1" in
         /opt/a2a-test/venv/bin/pip install --upgrade pip wheel setuptools -q
         /opt/a2a-test/venv/bin/pip install \
             'fastapi>=0.115' 'uvicorn>=0.29' 'httpx>=0.27' \
-            'aiosqlite>=0.20' 'pydantic>=2.0' 'cryptography>=46.0' -q
+            'aiosqlite>=0.20' 'pydantic>=2.0' 'cryptography>=46.0' \
+            'z3-solver>=4.12' -q
         /opt/a2a-test/venv/bin/pip install -e /opt/a2a-test/sdk -q 2>/dev/null \
             || /opt/a2a-test/venv/bin/pip install /opt/a2a-test/sdk -q
+
+        # Verify z3-solver is functional (C extension must compile)
+        /opt/a2a-test/venv/bin/python -c "import z3; print('z3-solver OK:', z3.get_version_string())"
 
         # Create .env if missing
         if [[ ! -f /opt/a2a-test/.env ]]; then
@@ -57,6 +61,8 @@ MESSAGING_DSN=sqlite:////var/lib/a2a-test/messaging.db
 DISPUTE_DSN=sqlite:////var/lib/a2a-test/disputes.db
 LOG_LEVEL=INFO
 FORCE_HTTPS=1
+# --- Formal Gatekeeper (in-process Z3) ---
+VERIFIER_AUTH_MODE=mock
 ENVEOF
             chmod 600 /opt/a2a-test/.env
         fi
@@ -66,6 +72,11 @@ ENVEOF
         if [[ -f "$_env_file" ]]; then
             grep -q '^FORCE_HTTPS=' "$_env_file" || echo 'FORCE_HTTPS=1' >> "$_env_file"
             grep -q '^A2A_ENV=' "$_env_file" || echo 'A2A_ENV=staging' >> "$_env_file"
+            if grep -q '^VERIFIER_AUTH_MODE=' "$_env_file"; then
+                sed -i 's/^VERIFIER_AUTH_MODE=.*/VERIFIER_AUTH_MODE=mock/' "$_env_file"
+            else
+                echo 'VERIFIER_AUTH_MODE=mock' >> "$_env_file"
+            fi
         fi
 
         # --- Cloudflare Authenticated Origin Pulls ---
