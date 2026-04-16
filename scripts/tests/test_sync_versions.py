@@ -1,9 +1,10 @@
 """Tests for scripts/sync_versions.py.
 
 Verifies that the top-level VERSION file is the single source of truth
-for gateway/src/_version.py, sdk/pyproject.toml, and sdk-ts/package.json.
+for gateway/src/_version.py, sdk/pyproject.toml, sdk-ts/package.json,
+and SKILL.md.
 
-This is the drift guard that publish.sh relies on — these three files
+This is the drift guard that publish.sh relies on — these four files
 MUST all agree on the same version string at the release commit, or
 publish.sh refuses to tag.
 """
@@ -176,6 +177,44 @@ def test_update_package_json_version_trailing_newline_preserved(tmp_path: Path) 
 
 
 # ---------------------------------------------------------------------------
+# update_skill_version
+# ---------------------------------------------------------------------------
+
+
+def test_update_skill_version_rewrites_yaml_frontmatter(tmp_path: Path) -> None:
+    f = tmp_path / "SKILL.md"
+    f.write_text("---\ntitle: A2A Commerce\nversion: 1.0.0\ntags: [payments]\n---\n\n# Body\n")
+    changed = mod.update_skill_version(f, "1.4.7", write=True)
+    assert changed is True
+    body = f.read_text()
+    assert "version: 1.4.7" in body
+    assert "title: A2A Commerce" in body  # other fields preserved
+    assert "# Body" in body  # markdown body preserved
+
+
+def test_update_skill_version_idempotent(tmp_path: Path) -> None:
+    f = tmp_path / "SKILL.md"
+    f.write_text("---\nversion: 1.4.7\n---\n")
+    changed = mod.update_skill_version(f, "1.4.7", write=True)
+    assert changed is False
+
+
+def test_update_skill_version_check_mode_no_write(tmp_path: Path) -> None:
+    f = tmp_path / "SKILL.md"
+    f.write_text("---\nversion: 1.0.0\n---\n")
+    changed = mod.update_skill_version(f, "1.4.7", write=False)
+    assert changed is True
+    assert "1.0.0" in f.read_text()  # file untouched
+
+
+def test_update_skill_version_raises_on_missing_field(tmp_path: Path) -> None:
+    f = tmp_path / "SKILL.md"
+    f.write_text("---\ntitle: No version field\n---\n")
+    with pytest.raises(ValueError, match="No version: field"):
+        mod.update_skill_version(f, "1.4.7", write=True)
+
+
+# ---------------------------------------------------------------------------
 # sync_all
 # ---------------------------------------------------------------------------
 
@@ -191,6 +230,7 @@ def _make_tree(root: Path, version: str) -> None:
     (root / "sdk-ts" / "package.json").write_text(
         json.dumps({"name": "@greenhelix/a2a-sdk", "version": "0.0.0"}, indent=2) + "\n"
     )
+    (root / "SKILL.md").write_text("---\ntitle: A2A Commerce\nversion: 0.0.0\n---\n\n# Body\n")
 
 
 def test_sync_all_writes_every_target(tmp_path: Path) -> None:
@@ -201,19 +241,22 @@ def test_sync_all_writes_every_target(tmp_path: Path) -> None:
         tmp_path / "gateway" / "src" / "_version.py",
         tmp_path / "sdk" / "pyproject.toml",
         tmp_path / "sdk-ts" / "package.json",
+        tmp_path / "SKILL.md",
     ]
     # verify every target now reports 1.2.9
     assert '__version__ = "1.2.9"' in (tmp_path / "gateway" / "src" / "_version.py").read_text()
     assert 'version = "1.2.9"' in (tmp_path / "sdk" / "pyproject.toml").read_text()
     assert json.loads((tmp_path / "sdk-ts" / "package.json").read_text())["version"] == "1.2.9"
+    assert "version: 1.2.9" in (tmp_path / "SKILL.md").read_text()
 
 
 def test_sync_all_check_mode_reports_drift_without_writing(tmp_path: Path) -> None:
     _make_tree(tmp_path, "1.2.9")
     result = mod.sync_all(tmp_path, write=False)
-    assert len(result.changed_files) == 3
+    assert len(result.changed_files) == 4
     # Nothing written
     assert '"0.0.0"' in (tmp_path / "gateway" / "src" / "_version.py").read_text()
+    assert "version: 0.0.0" in (tmp_path / "SKILL.md").read_text()
 
 
 def test_sync_all_no_drift_returns_empty(tmp_path: Path) -> None:

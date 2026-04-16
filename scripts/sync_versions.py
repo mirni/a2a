@@ -3,11 +3,12 @@
 
 The repo root contains a ``VERSION`` file holding one line with the
 current release version, e.g. ``1.2.9``. This script propagates that
-value into the three places ``publish.sh`` verifies before tagging:
+value into the four places ``publish.sh`` verifies before tagging:
 
     gateway/src/_version.py      __version__ = "x.y.z"
     sdk/pyproject.toml           version = "x.y.z"  (under [project])
     sdk-ts/package.json          "version": "x.y.z"
+    SKILL.md                     version: x.y.z     (YAML frontmatter)
 
 Usage:
     # CI guard — exit 1 if any target drifts from VERSION
@@ -152,7 +153,28 @@ def update_package_json_version(path: Path, version: str, *, write: bool) -> boo
 
 
 # ---------------------------------------------------------------------------
-# sync_all — bundle of all three
+# Target 4: SKILL.md (YAML frontmatter)
+# ---------------------------------------------------------------------------
+
+
+_SKILL_VERSION_RE = re.compile(r"^(version:\s*)(\S+)", re.MULTILINE)
+
+
+def update_skill_version(path: Path, version: str, *, write: bool) -> bool:
+    """Rewrite the ``version:`` field in a YAML frontmatter block."""
+    original = path.read_text()
+    updated, n = _SKILL_VERSION_RE.subn(rf"\g<1>{version}", original, count=1)
+    if n == 0:
+        raise ValueError(f"No version: field found in {path}")
+    if updated == original:
+        return False
+    if write:
+        path.write_text(updated)
+    return True
+
+
+# ---------------------------------------------------------------------------
+# sync_all — bundle of all four
 # ---------------------------------------------------------------------------
 
 
@@ -161,6 +183,7 @@ def _targets(root: Path) -> list[tuple[Path, callable]]:  # type: ignore[type-ar
         (root / "gateway" / "src" / "_version.py", update_gateway_version),
         (root / "sdk" / "pyproject.toml", update_pyproject_version),
         (root / "sdk-ts" / "package.json", update_package_json_version),
+        (root / "SKILL.md", update_skill_version),
     ]
 
 
