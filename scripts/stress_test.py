@@ -681,10 +681,10 @@ async def main(args: argparse.Namespace) -> int:
             print("  (Set --admin-key or STRESS_ADMIN_KEY for authenticated stress testing)")
             agents = [(f"stress-agent-{i:04d}", "") for i in range(customers)]
 
-        # 2b. Gatekeeper smoke check (use first agent's own key for ownership match)
-        if agents and agents[0][1]:
-            agent_id_for_smoke, key_for_smoke = agents[0]
-            gk_ok = await gatekeeper_smoke(base_url, key_for_smoke, client, agent_id_for_smoke)
+        # 2b. Gatekeeper smoke check (use admin key — submit_verification requires 'pro' tier)
+        if admin_key:
+            agent_id_for_smoke = agents[0][0] if agents else "stress-agent-0000"
+            gk_ok = await gatekeeper_smoke(base_url, admin_key, client, agent_id_for_smoke)
             if not gk_ok:
                 print("ERROR: Gatekeeper Z3 smoke test failed — aborting stress test")
                 return 1
