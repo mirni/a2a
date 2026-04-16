@@ -14,7 +14,7 @@ _project_root = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from products.connectors.verifier.src.client import VerifierClient, VerifierError
+from products.connectors.verifier.src.client import MockVerifierClient, VerifierClient, VerifierError
 
 # ---------------------------------------------------------------------------
 # HTTP mode tests
@@ -460,3 +460,121 @@ class TestMultiRegionFailover:
             await client.invoke({"job_id": "vj-test"})
         # No retry — HTTP path does exactly one POST.
         assert mock_http.post.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# MockVerifierClient tests
+# ---------------------------------------------------------------------------
+
+
+class TestMockVerifierClient:
+    @pytest.mark.asyncio
+    async def test_import_failure_raises_verifier_error(self):
+        """When handler import fails, MockVerifierClient raises VerifierError with diagnostic message."""
+        from unittest.mock import patch
+
+        client = MockVerifierClient()
+
+        with patch("importlib.import_module", side_effect=ImportError("No module named 'z3'")):
+            with pytest.raises(VerifierError, match="cannot import handler"):
+                await client.invoke({"job_id": "vj-test", "properties": []})
+
+    @pytest.mark.asyncio
+    async def test_import_failure_mentions_z3_solver(self):
+        """Error message should mention z3-solver installation."""
+        from unittest.mock import patch
+
+        client = MockVerifierClient()
+
+        with patch("importlib.import_module", side_effect=ImportError("No module named 'z3'")):
+            with pytest.raises(VerifierError, match="z3-solver"):
+                await client.invoke({"job_id": "vj-test", "properties": []})
+
+    @pytest.mark.asyncio
+    async def test_successful_invocation(self):
+        """MockVerifierClient invokes handler and returns result with status completed."""
+        from unittest.mock import patch
+
+        client = MockVerifierClient()
+
+        mock_handler = MagicMock()
+        mock_handler.lambda_handler.return_value = {
+            "job_id": "vj-test",
+            "status": "completed",
+            "result": "satisfied",
+            "property_results": [],
+            "proof_data": "{}",
+            "proof_hash": "abc",
+            "duration_ms": 5,
+        }
+
+        mock_module = MagicMock()
+        mock_module.lambda_handler = mock_handler.lambda_handler
+
+        with patch("importlib.import_module", return_value=mock_module):
+            result = await client.invoke({"job_id": "vj-test", "properties": []})
+
+        assert result["status"] == "completed"
+        assert result["result"] == "satisfied"
+        mock_handler.lambda_handler.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Package lambda/ symlink tests
+# ---------------------------------------------------------------------------
+
+
+class TestPackageSymlinks:
+    """Verify lambda/ symlinks exist in package trees for deployed Z3 verifier."""
+
+    def test_gateway_test_lambda_symlink_exists(self):
+        """package/a2a-gateway-test must include lambda/ symlink."""
+        link = os.path.join(
+            _project_root,
+            "package",
+            "a2a-gateway-test",
+            "opt",
+            "a2a-test",
+            "lambda",
+        )
+        assert os.path.islink(link), f"Expected symlink at {link}"
+
+    def test_gateway_sandbox_lambda_symlink_exists(self):
+        """package/a2a-gateway-sandbox must include lambda/ symlink."""
+        link = os.path.join(
+            _project_root,
+            "package",
+            "a2a-gateway-sandbox",
+            "opt",
+            "a2a-sandbox",
+            "lambda",
+        )
+        assert os.path.islink(link), f"Expected symlink at {link}"
+
+    def test_gateway_test_lambda_symlink_resolves(self):
+        """Symlink must resolve to the actual lambda/ directory."""
+        link = os.path.join(
+            _project_root,
+            "package",
+            "a2a-gateway-test",
+            "opt",
+            "a2a-test",
+            "lambda",
+        )
+        resolved = os.path.realpath(link)
+        expected = os.path.realpath(os.path.join(_project_root, "lambda"))
+        assert resolved == expected, f"Symlink resolves to {resolved}, expected {expected}"
+
+    def test_gateway_sandbox_lambda_symlink_resolves(self):
+        """Symlink must resolve to the actual lambda/ directory."""
+        link = os.path.join(
+            _project_root,
+            "package",
+            "a2a-gateway-sandbox",
+            "opt",
+            "a2a-sandbox",
+            "lambda",
+        )
+        resolved = os.path.realpath(link)
+        expected = os.path.realpath(os.path.join(_project_root, "lambda"))
+        assert resolved == expected, f"Symlink resolves to {resolved}, expected {expected}"
