@@ -1,5 +1,47 @@
 # Changelog
 
+# Release v1.4.9
+
+**Date:** 2026-04-16
+**Commit:** c88e5a22
+**Previous:** v1.4.5
+
+## Changes
+
+### Bug Fixes
+
+- fix: use admin key for gatekeeper smoke check in stress test (#118) (`1bd887d`)
+- fix: use admin key for gatekeeper smoke check in stress test (`d9ec13b`)
+- fix: Gatekeeper Z3 — 100% failure in deployed environments (#117) (`7c0b4ca`)
+- fix: v1.4.7 audit remediation — SSE timeout + gateway_fee in GET (#116) (#116) (`997e021`)
+- fix: SKILL.md ClawhHub compliance — full rewrite + version sync (#115) (#115) (`7a22481`)
+- fix: v1.4.6 audit remediation — decimal precision + budget cap (#114) (`0bfb16a`)
+- fix: gatekeeper Z3 reliability — 5 permanent fixes (#113) (`58564b5`)
+
+### Other
+
+- Merge branch 'release/1.4.8' (`c88e5a2`)
+- Update version; Update master log (`ca0ce35`)
+- release: v1.4.8 (`94dd517`)
+- release: v1.4.7 (`ffc0bfa`)
+- Merge branch 'main' of https://github.com/mirni/a2a (`9bff09b`)
+- Update claude runner to use local cache (`24472f4`)
+- Merge release v1.4.5 into main (`5703338`)
+
+## Components
+
+| Package | Version |
+|---------|---------|
+| a2a-common | {{VERSION}} |
+| a2a-db-backup | {{VERSION}} |
+| a2a-gateway | {{VERSION}} |
+| a2a-gateway-sandbox | {{VERSION}} |
+| a2a-gateway-test | {{VERSION}} |
+| a2a-litestream | {{VERSION}} |
+| a2a-website | {{VERSION}} |
+---
+
+
 # Release v1.4.8
 
 **Date:** 2026-04-16
