@@ -5,7 +5,7 @@ description: >-
   Agent-to-agent payments, marketplace, identity, and trust scoring.
   Escrow is simulated via an in-memory SQLite ledger — no real funds
   are held. Stripe integration handles actual payment processing.
-version: 1.4.7
+version: 1.4.8
 executable: true
 install:
   kind: pip
