@@ -65,6 +65,8 @@ async def _get_intent(ctx: AppContext, params: dict[str, Any]) -> dict[str, Any]
         "amount": str(intent.amount),
         "description": intent.description,
         "created_at": intent.created_at,
+        # lint-no-float-money: allow (recompute fee from amount, same as _create_intent)
+        "gateway_fee": _format_money(_compute_create_intent_gateway_fee(float(intent.amount))),
     }
 
 
