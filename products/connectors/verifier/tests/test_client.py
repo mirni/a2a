@@ -531,7 +531,11 @@ class TestPackageSymlinks:
         """package/a2a-gateway-test must include lambda/ symlink."""
         link = os.path.join(
             _project_root,
-            "package", "a2a-gateway-test", "opt", "a2a-test", "lambda",
+            "package",
+            "a2a-gateway-test",
+            "opt",
+            "a2a-test",
+            "lambda",
         )
         assert os.path.islink(link), f"Expected symlink at {link}"
 
@@ -539,7 +543,11 @@ class TestPackageSymlinks:
         """package/a2a-gateway-sandbox must include lambda/ symlink."""
         link = os.path.join(
             _project_root,
-            "package", "a2a-gateway-sandbox", "opt", "a2a-sandbox", "lambda",
+            "package",
+            "a2a-gateway-sandbox",
+            "opt",
+            "a2a-sandbox",
+            "lambda",
         )
         assert os.path.islink(link), f"Expected symlink at {link}"
 
@@ -547,7 +555,11 @@ class TestPackageSymlinks:
         """Symlink must resolve to the actual lambda/ directory."""
         link = os.path.join(
             _project_root,
-            "package", "a2a-gateway-test", "opt", "a2a-test", "lambda",
+            "package",
+            "a2a-gateway-test",
+            "opt",
+            "a2a-test",
+            "lambda",
         )
         resolved = os.path.realpath(link)
         expected = os.path.realpath(os.path.join(_project_root, "lambda"))
@@ -557,7 +569,11 @@ class TestPackageSymlinks:
         """Symlink must resolve to the actual lambda/ directory."""
         link = os.path.join(
             _project_root,
-            "package", "a2a-gateway-sandbox", "opt", "a2a-sandbox", "lambda",
+            "package",
+            "a2a-gateway-sandbox",
+            "opt",
+            "a2a-sandbox",
+            "lambda",
         )
         resolved = os.path.realpath(link)
         expected = os.path.realpath(os.path.join(_project_root, "lambda"))
