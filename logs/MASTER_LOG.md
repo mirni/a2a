@@ -7408,3 +7408,19 @@ All three daisy-chained PRs ready for human review/merge/release (v1.3.0).
 **Branch:** `fix/smoke-test-gatekeeper-tier`
 **CI:** 18/18 jobs green (including staging)
 **Also applied to:** `release/1.4.8` branch (direct commit)
+
+---
+
+## 2026-04-16 — Fix: provision_admin_key.py missing admin scope
+
+**Prompt:** Smoke test HTTP 402 — `STRESS_ADMIN_KEY` not actually admin. Fix the provisioning script.
+
+**Root cause:** `scripts/ci/provision_admin_key.py` line 39 called `km.create_key(agent_id, tier="enterprise")` without passing `scopes=["read", "write", "admin"]`. Default scopes are `["read", "write"]`, so the key was never promoted to admin effective tier at auth time — budget caps remained enforced.
+
+**Fix:** Added `scopes=["read", "write", "admin"]` to the `create_key()` call. Added AST-based regression test.
+
+**Important next step:** After merging, re-provision the key on the server and update the `STRESS_ADMIN_KEY` GitHub Actions secret.
+
+**PR:** https://github.com/mirni/a2a/pull/119
+**Branch:** `fix/provision-admin-scope`
+**CI:** 18/18 jobs green (including staging)
