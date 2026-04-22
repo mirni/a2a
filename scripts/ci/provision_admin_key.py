@@ -36,7 +36,7 @@ async def main(data_dir: str, agent_id: str, balance: float) -> str:
     await tracker.connect()
 
     await tracker.wallet.create(agent_id, initial_balance=balance)
-    info = await km.create_key(agent_id, tier="enterprise")
+    info = await km.create_key(agent_id, tier="enterprise", scopes=["read", "write", "admin"])
 
     await ps.close()
     await tracker.close()
